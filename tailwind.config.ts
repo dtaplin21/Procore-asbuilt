@@ -81,6 +81,13 @@ export default {
           busy: "rgb(239 68 68)",
           offline: "rgb(156 163 175)",
         },
+        qc: {
+          approved: "rgb(34 197 94)",
+          pending: "rgb(245 158 11)",
+          rejected: "rgb(239 68 68)",
+          "in-review": "rgb(59 130 246)",
+          "not-started": "rgb(156 163 175)",
+        },
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
