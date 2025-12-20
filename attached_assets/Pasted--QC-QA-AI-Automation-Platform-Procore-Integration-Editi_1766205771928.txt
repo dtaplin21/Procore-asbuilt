@@ -1,0 +1,1440 @@
+# QC/QA AI Automation Platform - Procore Integration Edition
+## Construction Quality Control & As-Built Generation System with Full Procore Compatibility
+
+---
+
+## Competitive Analysis: Our Platform vs. Inertia ICDs
+
+### What Inertia Does Well (Our Inspiration):
+
+**Intelligent Construction Drawings (ICDs)**:
+- ✅ Recognizes construction objects on drawings (doors, walls, ducts, pipes)
+- ✅ Links objects to Procore records (RFIs, submittals, inspections)
+- ✅ Visual status mapping (color-coded object tracking)
+- ✅ One-click assignment of workflows to multiple objects
+- ✅ Real-time status visibility
+- ✅ Location-based tracking
+
+**Their Approach**:
+- Manual or semi-automated object recognition
+- Requires project setup and configuration
+- Focuses on visual coordination and status tracking
+- Integrates with Procore as overlay/extension
+
+### Our AI-Enhanced Approach (Key Differentiators):
+
+**1. Fully Automated Object Recognition**
+- **Inertia**: Requires manual setup, object tagging, project configuration
+- **Us**: AI automatically recognizes ALL objects on drawings with zero setup
+  - Upload drawings → AI identifies 247 manholes, 1,450 pipes, 89 valves automatically
+  - No manual tagging required
+  - Continuous learning improves accuracy
+
+**2. Intelligent Shop Drawing Analysis**
+- **Inertia**: Links shop drawings to objects, but doesn't analyze content
+- **Us**: AI reads shop drawings and automatically:
+  - Extracts which objects the shop drawing covers
+  - Identifies deviations from design
+  - Checks compliance against specifications
+  - Suggests which objects to link (not manual assignment)
+
+**3. Predictive As-Built Generation**
+- **Inertia**: Status tracking and coordination tool
+- **Us**: Full as-built automation:
+  - Real-time as-built preview (not just closeout)
+  - AI generates CAD files automatically
+  - Tracks complete object lineage (design → shop → field → as-built)
+  - Predictive: "Based on current changes, here's your projected as-built"
+
+**4. Vision-Based Field Verification**
+- **Inertia**: Manual photo upload and linking
+- **Us**: AI-powered photo analysis:
+  - Automatically identifies what object is in the photo
+  - Compares installed work against approved shop drawings
+  - Detects deviations automatically
+  - Creates redline markups without manual input
+
+**5. Natural Language Understanding**
+- **Inertia**: Structured data entry
+- **Us**: AI reads unstructured data:
+  - Interprets RFI text and maps to affected objects
+  - Reads change order descriptions and identifies impacts
+  - Understands field notes and creates appropriate markups
+
+**6. Cross-Project Learning**
+- **Inertia**: Project-by-project setup
+- **Us**: AI learns across all projects:
+  - "Type A manholes typically have these shop drawing issues"
+  - "This contractor's submittals usually need revision in these areas"
+  - Predictive quality scoring based on historical patterns
+
+### What We Keep from Inertia's Approach:
+
+✅ **Visual, location-based interface** - Proven UX that contractors love
+✅ **Object-centric workflow** - Track individual components, not just documents
+✅ **Procore integration** - Native integration, not replacement
+✅ **Status visualization** - Color-coded drawings for instant status
+✅ **Mobile-first** - Field teams need mobile access
+
+### Our Competitive Positioning:
+
+**Inertia**: "Visual coordination and status tracking tool with some Procore integration"
+
+**Us**: "AI-powered construction intelligence platform that automatically tracks every object from shop drawings through as-builts, with native Procore integration"
+
+**Market Opportunity**:
+- Inertia has proven the market wants object-level tracking
+- But manual setup is a barrier (can take weeks per project)
+- Our AI automation removes this friction
+- Faster time-to-value: hours instead of weeks
+
+**Pricing Comparison**:
+- Inertia: ~$1,500-$3,000/month per project (estimate)
+- Us: $299-$999/month (more affordable due to automation)
+- ROI: We save setup time + provide AI analysis Inertia doesn't offer
+
+---
+
+## Executive Summary
+
+A comprehensive, AI-powered Quality Control/Quality Assurance management platform that **seamlessly integrates with Procore** to automate submittal review, document control, field inspections, and as-built generation through multi-agent orchestration. This platform enhances Procore's existing capabilities with advanced AI automation while maintaining Procore as the single source of truth.
+
+**Core Value Proposition**: Transform Procore into an intelligent, AI-powered QC/QA system that automatically analyzes submittals, detects field defects, processes RFIs, and generates as-built drawings—all while syncing bidirectionally with your existing Procore projects.
+
+**Key Differentiator**: Unlike standalone QC apps, this platform operates as a **Procore-native AI layer**, ensuring zero data duplication and seamless workflow integration with your existing Procore setup.
+
+---
+
+## Procore Integration Strategy
+
+### Integration Architecture
+
+**Positioning**: This app is a **Procore App Marketplace Partner** that extends Procore's functionality with AI capabilities, with special focus on **intelligent object recognition** similar to Inertia's ICD approach.
+
+**Key Innovation**: Our AI doesn't just analyze documents—it **recognizes every object** on construction drawings (pipes, valves, manholes, fixtures, equipment) and automatically:
+- Links each object to its required shop drawing submittal
+- Tracks approval status visually on drawings
+- Connects field inspections/photos to specific objects
+- Generates object-level as-built documentation
+
+**Data Flow Philosophy**:
+- ✅ **Procore = Source of Truth**: All project data, users, permissions originate in Procore
+- ✅ **Our App = AI Processing Layer**: Analyzes Procore data, generates insights, pushes results back
+- ✅ **Bidirectional Sync**: Real-time webhooks + API calls keep everything synchronized
+- ✅ **Zero Duplication**: Don't replicate what Procore already does well
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    PROCORE PLATFORM                      │
+│  (Projects, RFIs, Submittals, Drawings, Inspections)   │
+└─────────────┬─────────────────────────────┬─────────────┘
+              │                             │
+         Webhooks                       REST API
+        (Real-time)                   (Read/Write)
+              │                             │
+              ▼                             ▼
+┌─────────────────────────────────────────────────────────┐
+│              QC/QA AI ORCHESTRATION LAYER               │
+│   • 8 Specialized AI Agents                             │
+│   • Vision Models for Photo/Drawing Analysis           │
+│   • NLP for Document Understanding                      │
+│   • Automated Compliance Checking                       │
+│   • As-Built Generation Engine                          │
+└─────────────┬─────────────────────────────┬─────────────┘
+              │                             │
+         Mobile App                     Web App
+      (Field Capture)              (Management Dashboard)
+              │                             │
+              └──────────────┬──────────────┘
+                             │
+                    Results sync back to
+                       Procore via API
+```
+
+### Procore OAuth 2.0 Authentication
+
+**Implementation**:
+```javascript
+// User clicks "Connect to Procore" in our app
+const authUrl = `https://login.procore.com/oauth/authorize?
+  client_id=${CLIENT_ID}&
+  redirect_uri=${REDIRECT_URI}&
+  response_type=code&
+  state=${STATE}`;
+
+// After user approves, exchange code for tokens
+const tokenResponse = await fetch('https://login.procore.com/oauth/token', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  body: new URLSearchParams({
+    client_id: CLIENT_ID,
+    client_secret: CLIENT_SECRET,
+    redirect_uri: REDIRECT_URI,
+    grant_type: 'authorization_code',
+    code: AUTH_CODE
+  })
+});
+
+// Store tokens securely, auto-refresh when expired
+const { access_token, refresh_token, expires_in } = await tokenResponse.json();
+```
+
+**User Experience**:
+1. User signs up for our app
+2. Clicks "Connect Procore Account"
+3. Authenticates with Procore (single sign-on)
+4. Selects which Procore projects to enable AI features
+5. Our app immediately syncs project data and activates AI agents
+
+---
+
+## Procore API Integration Points
+
+### 1. Projects API
+**Purpose**: Sync project hierarchy and metadata
+
+**Endpoints Used**:
+- `GET /rest/v1.0/projects` - List all projects
+- `GET /rest/v1.0/projects/{id}` - Get project details
+- `GET /rest/v1.0/projects/{id}/users` - Get team members
+
+**What We Sync**:
+- Project name, address, dates
+- Team directory with roles
+- Company information
+- Custom project fields
+
+**AI Enhancement**: Automatically categorize projects by type (commercial, residential, infrastructure) for tailored AI models.
+
+---
+
+### 2. Submittals API (Shop Drawings & Product Data)
+**Purpose**: AI-powered shop drawing review and compliance checking
+
+**Critical Context - Shop Drawings**:
+Shop drawings are the MOST CRITICAL submittal type that must be approved before work proceeds. They show exact fabrication/installation details and feed directly into as-built documentation.
+
+**Endpoints Used**:
+- `GET /rest/v1.0/submittals` - List submittals
+- `GET /rest/v1.0/submittals/{id}` - Get submittal details
+- `POST /rest/v1.0/submittals/{id}/responses` - Submit review response
+- `PATCH /rest/v1.0/submittals/{id}` - Update submittal status
+- `GET /rest/v1.0/submittals/{id}/attachments` - Download shop drawings
+
+**Webhook Events**:
+- `submittals.create` - New shop drawing uploaded
+- `submittals.update` - Shop drawing status changed
+
+**AI Workflow - Shop Drawing Intelligence**:
+1. **Webhook Trigger**: New shop drawing submittal created in Procore
+2. **Document Intelligence Agent**: Downloads shop drawing PDF
+3. **Drawing Analysis Agent**: 
+   - Extracts all objects/components shown (e.g., "50x Type A Manholes, 120x 12" Storm Pipes")
+   - Identifies dimensions, materials, connection types
+   - Compares against design drawings to detect deviations
+4. **Compliance Verification Agent**: 
+   - Cross-checks against project specifications
+   - Verifies material certifications
+   - Checks for code compliance
+   - Flags conflicts with other shop drawings (clash detection)
+5. **Object Linking**: AI identifies which drawing objects this shop drawing applies to
+6. **Quality Scoring Agent**: Assigns confidence score (0-100%)
+7. **Result Push**: Posts review findings to Procore submittal
+8. **Visual Status Update**: Drawing objects linked to this shop drawing change color (pending → in review)
+9. **Notification**: Alerts reviewer in Procore of AI findings with specific issues highlighted
+
+**Shop Drawing Approval Tracking**:
+- AI maintains database of which objects have approved shop drawings
+- Prevents field work on objects without approved shop drawings
+- Alerts if installation photo taken before shop drawing approval
+- Tracks shop drawing → field installation → as-built lineage
+
+**Procore Integration Details**:
+- Read shop drawing attachments via Documents API
+- Post AI review comments to submittal response log
+- Update custom fields (e.g., "AI_Shop_Drawing_Score": 92, "Objects_Covered": "MH-1 through MH-15")
+- Link shop drawing to specific drawing objects via our object recognition system
+- Respect Procore's approval workflow (AI assists, humans approve)
+
+---
+
+### 3. RFIs API
+**Purpose**: Intelligent RFI routing and auto-response suggestions
+
+**Endpoints Used**:
+- `GET /rest/v1.0/rfis` - List RFIs
+- `GET /rest/v1.0/rfis/{id}` - Get RFI details
+- `POST /rest/v1.0/rfis` - Create RFI (from field app)
+- `POST /rest/v1.0/rfis/{id}/responses` - Submit response
+
+**Webhook Events**:
+- `rfis.create` - New RFI submitted
+- `rfis.update` - RFI status changed
+
+**AI Workflow**:
+1. **Webhook Trigger**: New RFI created in Procore
+2. **RFI Processing Agent**: Analyzes question, identifies drawing references
+3. **Drawing Analysis Agent**: Pulls referenced drawings, extracts context
+4. **Historical Search**: Finds similar past RFIs with resolutions
+5. **Auto-Response**: Generates suggested answer with source citations
+6. **Result Push**: Posts suggested response as draft in Procore RFI
+
+**Key Feature**: "Smart RFI Assistant" button in Procore RFI interface (via embedded iframe or side panel)
+
+---
+
+### 4. Drawings API & Markup Integration
+**Purpose**: Automated redline creation and as-built generation
+
+**Endpoints Used**:
+- `GET /rest/v1.0/drawings` - List drawings
+- `GET /rest/v1.0/drawings/{id}` - Get drawing metadata
+- `GET /rest/v1.0/drawings/{id}/file` - Download drawing PDF
+- `POST /rest/v1.0/drawings` - Upload updated drawing (as-built)
+- `POST /rest/v1.0/drawings/{id}/revisions` - Create new revision
+- **`POST /rest/v1.0/drawings/{id}/markups`** - Create redline markups
+- **`GET /rest/v1.0/drawings/{id}/markups`** - Read existing markups
+- **`PATCH /rest/v1.0/drawings/{id}/markups/{markup_id}`** - Update markup
+
+**Webhook Events**:
+- `drawings.create` - New drawing uploaded
+- `drawings.update` - Drawing revised
+- `drawings.markups.create` - New redline added (if available)
+
+**AI Workflow - Automated Redlining**:
+1. **Initial Sync**: Download all project drawings from Procore
+2. **Drawing Analysis Agent**: Extract symbols, dimensions, coordinate system
+3. **Ongoing Redline Generation**:
+   - Field photo taken → AI detects change → **auto-creates markup in Procore**
+   - Submittal approved → AI extracts modification → **auto-creates markup**
+   - Change order issued → AI identifies impact → **auto-creates markup**
+4. **Markup Types Generated by AI**:
+   - Cloud callouts for changes
+   - Dimension annotations
+   - Text notes explaining modifications
+   - Arrow pointers to affected areas
+   - Links to source RFI/submittal/change order
+5. **As-Built Compilation**: At closeout, aggregate all Procore redline markups + AI-detected changes
+6. **CAD Generation**: Create updated DXF/PDF with all markups compiled
+7. **Upload to Procore**: Post final as-built as new drawing revision
+
+**Critical Integration**: 
+- AI creates redline markups in Procore's native markup system (not separate layer)
+- Uses Procore's "Published Layer" so all team members see AI-generated redlines
+- Maintains Procore as single source of truth for all redlines
+- Final as-builts appear in Procore's standard Drawings tool with full version history
+
+---
+
+### 5. Inspections API
+**Purpose**: AI-enhanced field inspection and defect detection
+
+**Endpoints Used**:
+- `GET /rest/v1.0/inspections` - List inspections
+- `GET /rest/v1.0/inspections/{id}` - Get inspection details
+- `POST /rest/v1.0/inspections` - Create inspection report
+- `PATCH /rest/v1.0/inspections/{id}` - Update inspection
+
+**Webhook Events**:
+- `inspections.create` - New inspection logged
+- `inspections.update` - Inspection updated
+
+**AI Workflow**:
+1. **Mobile App**: Inspector takes photos at jobsite
+2. **Field Inspection Agent**: Analyzes photos for defects, safety issues
+3. **Vision Model**: Identifies cracks, alignment issues, missing components
+4. **Geolocation Mapping**: Maps issues to drawing coordinates
+5. **Auto-Report**: Generates inspection report with AI findings
+6. **Procore Sync**: Creates inspection record in Procore with all data
+
+**Enhanced Experience**: Inspector uses our mobile app (with AI features) but all data flows into Procore's standard Inspections tool.
+
+---
+
+### 6. Documents API
+**Purpose**: Document storage and retrieval for AI processing
+
+**Endpoints Used**:
+- `GET /rest/v1.0/documents` - List documents
+- `GET /rest/v1.0/documents/{id}/download` - Download file
+- `POST /rest/v1.0/documents` - Upload document
+- `GET /rest/v1.0/folders` - Get folder structure
+
+**Use Cases**:
+- Download specification files for compliance checking
+- Store AI-generated reports and analysis
+- Access submittal attachments for review
+- Upload processed/annotated documents back to Procore
+
+**Data Flow**: All documents remain in Procore storage; our AI agents download for processing, then upload results back.
+
+---
+
+### 7. Photos API
+**Purpose**: Construction photo documentation with AI analysis
+
+**Endpoints Used**:
+- `GET /rest/v1.0/photos` - List photos
+- `GET /rest/v1.0/photos/{id}` - Get photo details
+- `POST /rest/v1.0/photos` - Upload photo
+- `PATCH /rest/v1.0/photos/{id}` - Update photo metadata
+
+**Webhook Events**:
+- `photos.create` - New photo uploaded
+
+**AI Workflow**:
+1. **Photo Capture**: Taken via our mobile app or synced from Procore
+2. **Vision Analysis**: Auto-tag with detected objects (equipment, materials, conditions)
+3. **Progress Tracking**: Compare against schedule and drawings
+4. **Quality Check**: Identify defects or issues
+5. **Auto-Organize**: Suggest proper folder/tag structure
+6. **Procore Sync**: Update photo metadata with AI-generated tags and descriptions
+
+---
+
+### 8. Punch List API
+**Purpose**: Automated punch list generation from inspections
+
+**Endpoints Used**:
+- `GET /rest/v1.0/punch_items` - List punch items
+- `POST /rest/v1.0/punch_items` - Create punch item
+- `PATCH /rest/v1.0/punch_items/{id}` - Update punch item status
+
+**AI Workflow**:
+1. **Field Inspection Agent** detects issues in photos
+2. Automatically creates punch items in Procore
+3. Assigns to appropriate trade based on issue type
+4. Links to drawing location and reference photos
+5. Tracks resolution automatically when new photos show issue fixed
+
+---
+
+### 9. Specifications API
+**Purpose**: Spec reference for compliance verification
+
+**Endpoints Used**:
+- `GET /rest/v1.0/specifications` - List spec sections
+- `GET /rest/v1.0/specifications/{id}` - Get spec content
+
+**AI Use**: 
+- Build RAG (Retrieval-Augmented Generation) database from project specs
+- Compliance Verification Agent references specs when reviewing submittals
+- Auto-cite relevant spec sections in RFI responses
+
+---
+
+### 10. Webhooks Configuration
+
+**Real-Time Event Processing**:
+
+```javascript
+// Create webhook for submittals
+POST /rest/v1.0/webhooks/hooks
+{
+  "company_id": 123456,
+  "hook": {
+    "api_version": "v2",
+    "namespace": "qc-ai-automation",
+    "destination_url": "https://api.our-app.com/webhooks/procore"
+  }
+}
+
+// Add triggers for resources we care about
+POST /rest/v1.0/webhooks/hooks/{hook_id}/triggers
+{
+  "resource_name": "Submittals",
+  "event_types": ["create", "update"]
+}
+```
+
+**Webhook Endpoints We Subscribe To**:
+- ✅ `submittals.create` → Trigger AI submittal review
+- ✅ `submittals.update` → Track status changes
+- ✅ `rfis.create` → Trigger smart RFI assistant
+- ✅ `drawings.create` → Analyze new drawings
+- ✅ `inspections.create` → Process inspection data
+- ✅ `photos.create` → Run vision analysis
+- ✅ `punch_items.update` → Track completion
+
+**Webhook Handler Architecture**:
+```javascript
+// Fast 2xx response, then async processing
+app.post('/webhooks/procore', async (req, res) => {
+  const { resource_name, event_type, resource_id, project_id } = req.body.event;
+  
+  // Immediately acknowledge receipt (prevent timeout)
+  res.status(200).json({ received: true });
+  
+  // Queue for async processing
+  await queue.add('process-procore-event', {
+    resource_name,
+    event_type,
+    resource_id,
+    project_id,
+    timestamp: Date.now()
+  });
+});
+
+// Async worker processes events
+queue.process('process-procore-event', async (job) => {
+  const { resource_name, event_type, resource_id, project_id } = job.data;
+  
+  switch(resource_name) {
+    case 'Submittals':
+      if (event_type === 'create') {
+        await coordinationAgent.processNewSubmittal(resource_id, project_id);
+      }
+      break;
+    case 'RFIs':
+      if (event_type === 'create') {
+        await coordinationAgent.processNewRFI(resource_id, project_id);
+      }
+      break;
+    // ... other event handlers
+  }
+});
+```
+
+---
+
+## AI Agent System - Procore-Enhanced
+
+### Agent 1: Document Intelligence Agent
+**Procore Integration**: 
+- Downloads files from Procore Documents API
+- Extracts metadata to populate custom fields in Procore
+- Returns classification results to Procore
+
+**Enhanced Capabilities**:
+- Respects Procore's folder structure and naming conventions
+- Auto-tags documents with extracted metadata
+- Links related documents (submittal → spec section → drawing)
+
+---
+
+### Agent 2: Drawing Analysis Agent
+**Procore Integration**:
+- Fetches drawings via Drawings API
+- Maintains version history aligned with Procore's revision system
+- Uploads analyzed drawings with AI annotations
+
+**Enhanced Capabilities**:
+- Compares new revisions against previous versions automatically
+- Generates drawing comparison reports in Procore
+- Tags drawing locations for RFI and punch list linking
+
+---
+
+### Agent 3: Compliance Verification Agent
+**Procore Integration**:
+- Reads project specifications from Specifications API
+- Posts compliance findings to submittal response log
+- Updates custom fields: `AI_Compliance_Status`, `AI_Risk_Level`
+
+**Enhanced Capabilities**:
+- Pre-fills reviewer comments based on spec violations found
+- Auto-routes non-compliant submittals to appropriate reviewers
+- Tracks compliance trends across projects in Procore dashboard
+
+---
+
+### Agent 4: Field Inspection Agent
+**Procore Integration**:
+- Creates inspection records via Inspections API
+- Links photos to inspections automatically
+- Generates punch items from detected defects
+
+**Enhanced Capabilities**:
+- Geo-tags issues on Procore's project map
+- Suggests corrective actions based on historical data
+- Tracks defect resolution automatically
+
+---
+
+### Agent 5: RFI Processing Agent
+**Procore Integration**:
+- Monitors RFI creation via webhooks
+- Posts suggested responses as draft replies
+- Links to relevant drawings and spec sections in Procore
+
+**Enhanced Capabilities**:
+- Searches historical RFIs across all Procore projects
+- Auto-routes complex RFIs to subject matter experts
+- Learns from reviewer edits to improve suggestions
+
+---
+
+### Agent 6: As-Built Generation Agent
+**Procore Integration**:
+- Aggregates changes from: submittals, field photos, change orders
+- Uploads as-built drawings as new revisions in Procore
+- Maintains full revision history in Procore's system
+
+**Enhanced Capabilities**:
+- Real-time as-built preview (design vs. current state)
+- Change tracking dashboard within Procore interface
+- Automated as-built closeout package generation
+
+---
+
+### Agent 7: Quality Scoring Agent
+**Procore Integration**:
+- Analyzes historical project data from Procore
+- Populates custom dashboard widgets in Procore
+- Alerts project managers of risk factors via Procore notifications
+
+**Enhanced Capabilities**:
+- Contractor performance scoring based on Procore metrics
+- Schedule risk prediction using Procore schedule data
+- Cost overrun forecasting from Procore financials
+
+---
+
+### Agent 8: Coordination Agent (Master Orchestrator)
+**Procore Integration**:
+- Manages all webhook events from Procore
+- Coordinates bidirectional data sync
+- Ensures data consistency between systems
+
+**Enhanced Capabilities**:
+- Intelligent retry logic for API failures
+- Batch processing for bulk operations
+- Real-time sync status dashboard
+
+---
+
+## System Architecture - Procore-Centric Design
+
+### Application Structure
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  PROCORE PLATFORM                        │
+│         (Single Source of Truth)                         │
+└────────────────┬────────────────────────────┬───────────┘
+                 │                            │
+          Webhooks (Push)              REST API (Pull)
+                 │                            │
+                 ▼                            ▼
+┌─────────────────────────────────────────────────────────┐
+│           EVENT PROCESSING LAYER                         │
+│  • Webhook Receiver (Express/Fastify)                   │
+│  • Message Queue (RabbitMQ/SQS)                         │
+│  • Job Scheduler (Bull/Celery)                          │
+└────────────────┬────────────────────────────┬───────────┘
+                 │                            │
+                 ▼                            ▼
+┌─────────────────────────────────────────────────────────┐
+│            AI ORCHESTRATION LAYER                        │
+│  • Coordination Agent (Router)                          │
+│  • 7 Specialized AI Agents                              │
+│  • Vision Models (GPT-4V/Claude)                        │
+│  • RAG System (Pinecone + Claude)                       │
+└────────────────┬────────────────────────────┬───────────┘
+                 │                            │
+          Async Processing              Results Ready
+                 │                            │
+                 ▼                            ▼
+┌─────────────────────────────────────────────────────────┐
+│          RESULTS SYNC LAYER                              │
+│  • Procore API Writer (POST/PATCH endpoints)            │
+│  • Custom Field Updater                                  │
+│  • Document Uploader                                     │
+└────────────────┬────────────────────────────┬───────────┘
+                 │                            │
+                 └──────────────┬─────────────┘
+                                │
+                                ▼
+                    Results appear in Procore
+                    (Comments, updates, files)
+
+┌─────────────────────────────────────────────────────────┐
+│           USER INTERFACES                                │
+│                                                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│  │  Web App     │  │ Mobile App   │  │ Procore      │ │
+│  │  Dashboard   │  │ (Field Use)  │  │ Embedded UI  │ │
+│  │  (React)     │  │ (React Nat.) │  │ (iframe)     │ │
+│  └──────────────┘  └──────────────┘  └──────────────┘ │
+│       ▲                  ▲                  ▲           │
+│       └──────────────────┴──────────────────┘           │
+│              All read from/write to Procore              │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Database Strategy
+
+**Procore as Primary Data Store**:
+- ✅ Projects, users, permissions: READ from Procore
+- ✅ Submittals, RFIs, drawings: READ from Procore
+- ✅ Inspection results: WRITE to Procore
+- ✅ AI analysis results: WRITE to Procore (custom fields, comments)
+
+**Our Database (PostgreSQL) Stores**:
+- 🔹 AI processing jobs and queue state
+- 🔹 ML model predictions and confidence scores
+- 🔹 Intermediate processing artifacts
+- 🔹 User preferences specific to AI features
+- 🔹 Analytics and performance metrics
+- 🔹 Webhook event logs and audit trail
+- 🔹 OAuth tokens (encrypted)
+
+**Redis Cache**:
+- 🔸 Procore API response caching (reduce API calls)
+- 🔸 Real-time agent status
+- 🔸 User session data
+- 🔸 Rate limit tracking
+
+### Data Synchronization Strategy
+
+**Initial Project Setup**:
+```javascript
+// When user enables AI features for a Procore project
+async function initializeProject(procoreProjectId, companyId) {
+  // 1. Fetch project metadata
+  const project = await procoreAPI.getProject(procoreProjectId);
+  
+  // 2. Sync team members
+  const users = await procoreAPI.getProjectUsers(procoreProjectId);
+  
+  // 3. Bulk sync existing data
+  const [submittals, rfis, drawings, inspections] = await Promise.all([
+    procoreAPI.getSubmittals(procoreProjectId),
+    procoreAPI.getRFIs(procoreProjectId),
+    procoreAPI.getDrawings(procoreProjectId),
+    procoreAPI.getInspections(procoreProjectId)
+  ]);
+  
+  // 4. Process historical data with AI (background job)
+  await queue.add('historical-analysis', {
+    projectId: procoreProjectId,
+    submittals,
+    rfis,
+    drawings
+  });
+  
+  // 5. Activate real-time webhooks
+  await setupWebhooks(companyId, procoreProjectId);
+}
+```
+
+**Ongoing Sync (Event-Driven)**:
+```javascript
+// Real-time webhook processing
+webhookHandler.on('submittals.create', async (event) => {
+  const { resource_id, project_id } = event;
+  
+  // Fetch full submittal data
+  const submittal = await procoreAPI.getSubmittal(resource_id);
+  
+  // Run AI analysis
+  const analysis = await complianceAgent.analyze(submittal);
+  
+  // Post results back to Procore
+  await procoreAPI.postSubmittalResponse(resource_id, {
+    comment: analysis.summary,
+    custom_fields: {
+      ai_compliance_score: analysis.score,
+      ai_risk_level: analysis.risk,
+      ai_issues_found: analysis.issues.length
+    }
+  });
+});
+```
+
+---
+
+## User Experience - Procore Integration
+
+### Onboarding Flow
+
+**Step 1: Sign Up**
+- User creates account on our platform
+- Selects "I use Procore" option
+
+**Step 2: Connect Procore**
+- OAuth authentication flow
+- User grants permissions: read/write access to projects, submittals, RFIs, etc.
+- System fetches list of Procore companies and projects
+
+**Step 3: Enable AI Features**
+- User selects which projects to activate AI features
+- Chooses which AI agents to enable (can start with just one)
+- Sets AI automation preferences (e.g., auto-post findings vs. draft mode)
+
+**Step 4: Initial Sync**
+- Background job syncs historical data
+- AI agents begin analyzing existing submittals, RFIs, drawings
+- User receives notification when setup is complete
+
+**Step 5: Start Using**
+- AI features immediately active on new Procore items
+- Historical analysis results populate Procore custom fields
+- User sees AI insights directly in Procore interface
+
+### Daily Workflow - Submittal Review Example
+
+**Traditional Procore Workflow**:
+1. Contractor uploads submittal to Procore
+2. Notification email sent to reviewer
+3. Reviewer manually downloads and reviews
+4. Reviewer posts comments in Procore
+5. Contractor responds and revises
+
+**Enhanced with Our AI**:
+1. Contractor uploads submittal to Procore *(unchanged)*
+2. **Webhook triggers our AI agents**
+3. **AI analyzes submittal against specs (30 seconds)**
+4. **AI posts preliminary findings to Procore submittal**
+5. Reviewer receives email: "Submittal ready + AI analysis complete"
+6. Reviewer sees AI-highlighted compliance issues in Procore
+7. Reviewer confirms/modifies AI findings, adds notes
+8. Submittal approved/rejected **(50% faster than manual review)**
+
+**User Experience in Procore**:
+- AI findings appear as a special comment with distinctive icon
+- Custom fields show: "AI Compliance Score: 85%", "AI Issues: 3"
+- Reviewer can click "View Detailed AI Analysis" to open our web app
+- Or simply review AI comments inline without leaving Procore
+
+### Mobile App Experience
+
+**Field Inspector Workflow**:
+1. Opens our mobile app (linked to Procore project)
+2. Selects inspection area on drawing overlay
+3. Takes photos of work completed
+4. **AI analyzes photos in real-time**
+5. **AI identifies: progress %, defects, safety issues**
+6. Inspector reviews AI findings, adds notes
+7. Taps "Create Inspection Report"
+8. **Report auto-posts to Procore Inspections tool**
+9. **Punch items auto-created in Procore if defects found**
+
+**Offline Mode**:
+- Full functionality works offline
+- Data syncs to Procore when connection restored
+- No interruption to field workflow
+
+---
+
+## Technical Implementation Details
+
+### Procore SDK Setup
+
+**Backend (Node.js)**:
+```javascript
+import axios from 'axios';
+
+class ProcoreClient {
+  constructor(accessToken, companyId) {
+    this.accessToken = accessToken;
+    this.companyId = companyId;
+    this.baseURL = 'https://api.procore.com/rest/v1.0';
+  }
+
+  async makeRequest(method, endpoint, data = null) {
+    const config = {
+      method,
+      url: `${this.baseURL}${endpoint}`,
+      headers: {
+        'Authorization': `Bearer ${this.accessToken}`,
+        'Procore-Company-Id': this.companyId,
+        'Content-Type': 'application/json'
+      }
+    };
+    
+    if (data) config.data = data;
+    
+    try {
+      const response = await axios(config);
+      return response.data;
+    } catch (error) {
+      // Intelligent retry logic
+      if (error.response?.status === 429) {
+        // Rate limited, wait and retry
+        await this.handleRateLimit(error.response.headers);
+        return this.makeRequest(method, endpoint, data);
+      }
+      throw error;
+    }
+  }
+
+  // Submittal operations
+  async getSubmittal(submittalId) {
+    return this.makeRequest('GET', `/submittals/${submittalId}`);
+  }
+
+  async postSubmittalResponse(submittalId, response) {
+    return this.makeRequest('POST', 
+      `/submittals/${submittalId}/responses`, 
+      response
+    );
+  }
+
+  // RFI operations
+  async getRFI(rfiId) {
+    return this.makeRequest('GET', `/rfis/${rfiId}`);
+  }
+
+  async postRFIResponse(rfiId, response) {
+    return this.makeRequest('POST', `/rfis/${rfiId}/responses`, response);
+  }
+
+  // Drawing operations
+  async listDrawings(projectId) {
+    return this.makeRequest('GET', `/projects/${projectId}/drawings`);
+  }
+
+  async uploadDrawing(projectId, drawingData) {
+    return this.makeRequest('POST', 
+      `/projects/${projectId}/drawings`, 
+      drawingData
+    );
+  }
+}
+```
+
+### Rate Limiting Strategy
+
+**Procore API Limits**:
+- 3,600 requests per hour per company
+- Burst allowance: 10 requests per second
+
+**Our Strategy**:
+```javascript
+class RateLimiter {
+  constructor(maxPerHour = 3000) { // Leave buffer
+    this.maxPerHour = maxPerHour;
+    this.requestLog = [];
+    this.queue = [];
+  }
+
+  async throttle() {
+    const now = Date.now();
+    const oneHourAgo = now - 3600000;
+    
+    // Clean old requests
+    this.requestLog = this.requestLog.filter(t => t > oneHourAgo);
+    
+    if (this.requestLog.length >= this.maxPerHour) {
+      // Wait until oldest request expires
+      const waitTime = this.requestLog[0] - oneHourAgo;
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      return this.throttle();
+    }
+    
+    this.requestLog.push(now);
+  }
+
+  async executeRequest(requestFn) {
+    await this.throttle();
+    return requestFn();
+  }
+}
+```
+
+### Caching Strategy
+
+**Redis Caching for Procore Data**:
+```javascript
+class ProcoreCachedClient extends ProcoreClient {
+  constructor(accessToken, companyId, redisClient) {
+    super(accessToken, companyId);
+    this.redis = redisClient;
+  }
+
+  async getProjectWithCache(projectId) {
+    const cacheKey = `procore:project:${projectId}`;
+    
+    // Check cache first
+    const cached = await this.redis.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+    
+    // Fetch from Procore
+    const project = await this.makeRequest('GET', `/projects/${projectId}`);
+    
+    // Cache for 1 hour (projects don't change often)
+    await this.redis.setex(cacheKey, 3600, JSON.stringify(project));
+    
+    return project;
+  }
+
+  async invalidateCache(projectId) {
+    await this.redis.del(`procore:project:${projectId}`);
+  }
+}
+
+// Invalidate cache on webhook events
+webhookHandler.on('projects.update', async (event) => {
+  await cachedClient.invalidateCache(event.resource_id);
+});
+```
+
+---
+
+## Deployment Architecture
+
+### Infrastructure Components
+
+**Cloud Provider**: AWS (Primary), GCP (Backup)
+
+**Core Services**:
+```
+┌─────────────────────────────────────────────────────────┐
+│  LOAD BALANCER (ALB)                                     │
+│  - SSL Termination (ACM certificates)                   │
+│  - Health checks                                         │
+└────────┬─────────────────────────────────────┬──────────┘
+         │                                     │
+         ▼                                     ▼
+┌──────────────────┐              ┌──────────────────────┐
+│  WEB SERVERS     │              │  API SERVERS         │
+│  (ECS/Fargate)   │              │  (ECS/Fargate)       │
+│  - React SPA     │              │  - Express/FastAPI   │
+│  - Auto-scaling  │              │  - Webhook receivers │
+└──────────────────┘              └──────────────────────┘
+                                             │
+                                             ▼
+                              ┌──────────────────────────┐
+                              │  MESSAGE QUEUE           │
+                              │  (Amazon SQS/RabbitMQ)   │
+                              └──────────────────────────┘
+                                             │
+                                             ▼
+┌──────────────────────────────────────────────────────────┐
+│  AI WORKER FLEET (ECS/EC2)                               │
+│  - Agent orchestration                                   │
+│  - ML model inference                                    │
+│  - Vision processing (GPU instances)                     │
+│  - Auto-scaling based on queue depth                     │
+└──────────────────────────────────────────────────────────┘
+         │                    │                    │
+         ▼                    ▼                    ▼
+┌──────────────┐  ┌──────────────────┐  ┌────────────────┐
+│  PostgreSQL  │  │  Redis           │  │  S3            │
+│  (RDS)       │  │  (ElastiCache)   │  │  (Files)       │
+│  - Job state │  │  - Cache         │  │  - Temp files  │
+│  - Analytics │  │  - Sessions      │  │  - Models      │
+└──────────────┘  └──────────────────┘  └────────────────┘
+```
+
+**Security**:
+- VPC with private subnets for databases
+- Security groups: only necessary ports open
+- Secrets Manager for OAuth tokens and API keys
+- KMS encryption for data at rest
+- WAF for DDoS protection
+
+---
+
+## Procore App Marketplace Listing
+
+### App Description
+
+**Title**: QC/QA AI Automation - Intelligent Quality Control for Procore
+
+**Tagline**: Transform Procore into an AI-powered quality control system that automatically analyzes submittals, detects field defects, and generates as-built drawings.
+
+**Key Features**:
+- 🤖 **AI Submittal Review**: Automatic compliance checking against project specs
+- 📸 **Smart Field Inspections**: AI-powered defect detection from photos
+- 💬 **Intelligent RFI Assistant**: Auto-suggest responses based on historical data
+- 📐 **Automated As-Builts**: Generate construction-ready as-built drawings
+- 📊 **Quality Analytics**: Predictive insights and risk scoring
+- ⚡ **Real-Time Sync**: Seamless bidirectional integration with Procore
+
+**How It Works**:
+1. Connect your Procore account
+2. Select projects to enable AI features
+3. AI agents automatically analyze new submittals, RFIs, inspections
+4. Results appear directly in your Procore project
+5. Save 50%+ time on QC/QA tasks
+
+**Pricing**:
+- **Starter**: $299/month per project
+- **Professional**: $999/month (5 projects)
+- **Enterprise**: Custom pricing
+
+**Support**:
+- Email: support@qc-ai-automation.com
+- Chat: 24/7 in-app support
+- Training: Free onboarding webinars
+
+---
+
+## Implementation Roadmap
+
+### Phase 1: MVP - Procore Integration Foundation (Months 1-3)
+
+**Goals**:
+- OAuth authentication with Procore
+- Basic webhook handling
+- Single AI agent (Submittal Review)
+- Web dashboard showing AI results
+
+**Deliverables**:
+- ✅ Procore OAuth login
+- ✅ Project selection and sync
+- ✅ Submittal webhook → AI analysis → Procore comment
+- ✅ Web dashboard: view AI analysis details
+- ✅ 10 beta customers onboarded
+
+**Success Metrics**:
+- 100% successful Procore authentication
+- <30 seconds AI analysis time
+- 80%+ accuracy on compliance checks
+- Beta users report 30% time savings
+
+---
+
+### Phase 2: Multi-Agent Expansion (Months 4-6)
+
+**Goals**:
+- Add 3 more AI agents (RFI, Inspections, Drawings)
+- Mobile app for field use
+- Procore App Marketplace listing
+
+**Deliverables**:
+- ✅ RFI Processing Agent with smart responses
+- ✅ Field Inspection Agent with photo analysis
+- ✅ Drawing Analysis Agent for as-built tracking
+- ✅ Mobile app (iOS/Android) with offline mode
+- ✅ Public launch on Procore App Marketplace
+
+**Success Metrics**:
+- 100+ active Procore projects
+- 1,000+ AI analyses per day
+- 4.5+ star rating on App Marketplace
+- 50% reduction in RFI response time
+
+---
+
+### Phase 3: As-Built Automation & Advanced Features (Months 7-10)
+
+**Goals**:
+- Full as-built generation pipeline
+- All 8 AI agents operational
+- Advanced analytics and reporting
+
+**Deliverables**:
+- ✅ As-Built Generation Agent (CAD output)
+- ✅ Quality Scoring Agent with predictive analytics
+- ✅ Advanced dashboards in Procore (embedded iframes)
+- ✅ Batch processing for historical data
+- ✅ API for third-party integrations
+
+**Success Metrics**:
+- Generate as-builts 90% faster than manual
+- 95%+ accuracy in change detection
+- 500+ active companies
+- $100K MRR
+
+---
+
+### Phase 4: Enterprise Features & Scale (Months 11-14)
+
+**Goals**:
+- Enterprise-grade features
+- International expansion
+- Custom AI model training
+
+**Deliverables**:
+- ✅ Multi-language support
+- ✅ Custom AI model fine-tuning per company
+- ✅ White-label options
+- ✅ Procore partner certification
+- ✅ SOC 2 Type II compliance
+
+**Success Metrics**:
+- 1,000+ active projects
+- 10,000+ daily AI operations
+- 99.9% uptime SLA
+- Enterprise customers: Fortune 500 contractors
+
+---
+
+## Business Model
+
+### Revenue Streams
+
+**1. Subscription Tiers**:
+
+**Starter** - $299/month per project
+- Single project
+- All AI agents
+- 5 team members
+- Basic support
+
+**Professional** - $999/month (5 projects)
+- 5 projects
+- All AI agents
+- 25 team members
+- Priority support
+- Custom AI training
+
+**Enterprise** - Custom pricing
+- Unlimited projects
+- All features
+- Unlimited users
+- Dedicated support
+- On-premise deployment option
+- Custom integrations
+
+**2. Usage-Based Add-Ons**:
+- Extra AI processing credits: $0.10 per analysis
+- Advanced analytics package: $200/month
+- Historical data analysis (one-time): $500-$5000
+
+**3. Professional Services**:
+- Implementation consulting: $5,000-$20,000
+- Custom AI model training: $10,000+
+- On-site training: $2,000/day
+
+### Pricing Strategy
+
+**Why This Works**:
+- Procore users already pay $300-$500/month per project
+- Our AI features provide 10x ROI (time savings)
+- Price point is fraction of QC staff salary
+- Usage-based model scales with value delivered
+
+**Competitive Positioning**:
+- Standalone QC apps: $50-$200/month but require double data entry
+- Our advantage: **Zero data duplication**, native Procore integration
+- Premium pricing justified by AI capabilities unique to our platform
+
+---
+
+## Go-to-Market Strategy
+
+### Target Customers
+
+**Primary**:
+- General contractors using Procore (10-500 person companies)
+- Commercial construction projects ($10M-$500M)
+- Heavy civil infrastructure projects
+
+**Secondary**:
+- Specialty contractors (mechanical, electrical, plumbing)
+- Owners/developers managing multiple projects
+- Construction management firms
+
+### Sales Channels
+
+**1. Procore App Marketplace** (Primary)
+- Featured listing with demo video
+- Free 30-day trial
+- In-app installation flow
+
+**2. Direct Sales**
+- Target Procore power users
+- Attend Procore Groundbreak conference
+- Webinar partnerships with Procore
+
+**3. Partner Channel**
+- Procore resellers and consultants
+- Construction technology consultants
+- BIM/VDC service providers
+
+### Marketing Strategy
+
+**Content Marketing**:
+- Blog: "10 Ways AI Can Save Time on Submittal Reviews"
+- Case studies: "XYZ Contractors Save 200 Hours on QC with AI"
+- YouTube: Demo videos and tutorials
+
+**Paid Advertising**:
+- Google Ads: "Procore AI integration"
+- LinkedIn: Target construction project managers
+- Construction industry publications
+
+**Events**:
+- Procore Groundbreak (sponsor booth)
+- AGC conventions
+- Local construction association meetings
+
+---
+
+## Risk Mitigation & Contingencies
+
+### Technical Risks
+
+**Risk: Procore API changes break integration**
+- **Mitigation**: 
+  - Subscribe to Procore developer newsletter
+  - Automated integration tests run daily
+  - Fallback to graceful degradation if endpoints unavailable
+  - Version pinning with controlled upgrades
+
+**Risk: AI accuracy issues damage reputation**
+- **Mitigation**:
+  - Human-in-the-loop for critical decisions
+  - Confidence scores shown with all AI predictions
+  - Easy override mechanism
+  - Continuous model retraining based on user feedback
+
+**Risk: Procore rate limits impact performance**
+- **Mitigation**:
+  - Aggressive caching strategy
+  - Batch API requests where possible
+  - Request rate limiting with queue management
+  - Enterprise tier can request higher limits from Procore
+
+### Business Risks
+
+**Risk: Procore builds competing AI features**
+- **Mitigation**:
+  - Partner with Procore (App Marketplace)
+  - Focus on specialized AI capabilities beyond Procore's core
+  - Build deep domain expertise (construction QC/QA)
+  - Offer to white-label for Procore
+
+**Risk: Low adoption due to change resistance**
+- **Mitigation**:
+  - Emphasize "works with existing Procore workflow"
+  - Generous free trial period
+  - Dedicated customer success team
+  - ROI calculator showing time/cost savings
+
+**Risk: Data security concerns**
+- **Mitigation**:
+  - SOC 2 Type II certification
+  - Data processing agreements
+  - Option for on-premise deployment
+  - Transparent privacy policy
+
+---
+
+## Success Metrics & KPIs
+
+### Product Metrics
+
+**Adoption**:
+- Active Procore projects connected
+- Daily active users (DAU)
+- AI analyses performed per day
+- Feature usage breakdown (which agents used most)
+
+**Performance**:
+- Average AI analysis time (target: <30 seconds)
+- API success rate (target: >99.5%)
+- Uptime (target: 99.9%)
+- Webhook processing time (target: <5 seconds)
+
+**Quality**:
+- AI accuracy rate per agent (target: >85%)
+- User override rate (lower is better)
+- Net Promoter Score (target: >50)
+- Customer satisfaction (target: 4.5+/5)
+
+### Business Metrics
+
+**Revenue**:
+- Monthly Recurring Revenue (MRR)
+- Annual Recurring Revenue (ARR)
+- Average Revenue Per User (ARPU)
+- Revenue growth rate (target: 20% MoM)
+
+**Customer**:
+- Customer Acquisition Cost (CAC)
+- Lifetime Value (LTV)
+- LTV:CAC ratio (target: >3:1)
+- Churn rate (target: <5% monthly)
+- Time to value (days until first AI result)
+
+**Sales**:
+- Trial-to-paid conversion rate (target: >25%)
+- Sales cycle length (target: <30 days)
+- App Marketplace ranking (target: Top 10 in category)
+
+---
+
+## Next Steps
+
+### Immediate Actions (Week 1)
+
+1. **Procore Developer Account**
+   - Sign up for Procore Developer Portal
+   - Create sandbox environment
+   - Generate OAuth credentials
+
+2. **Architecture Design**
+   - Finalize tech stack decisions
+   - Create detailed API integration plan
+   - Design database schema
+
+3. **Team Formation**
+   - Hire backend engineer (Procore API expert)
+   - Hire ML engineer (computer vision)
+   - Hire frontend engineer (React)
+
+4. **Legal Setup**
+   - Register Procore App Marketplace developer agreement
+   - Draft data processing agreement
+   - Establish privacy policy
+
+### Month 1 Milestones
+
+- ✅ OAuth authentication working
+- ✅ Test project synced from Procore sandbox
+- ✅ First webhook event successfully processed
+- ✅ AI agent 1 (Submittal Review) operational
+- ✅ Basic web dashboard deployed
+
+### Funding Requirements
+
+**Seed Round: $500K-$1M**
+- **Team**: 5 engineers, 1 product manager (12 months)
+- **Infrastructure**: AWS credits, API costs
+- **AI/ML**: Claude API costs, model training
+- **Marketing**: Procore Groundbreak booth, content
+- **Legal**: Entity formation, contracts, IP
+
+**Series A: $3M-$5M** (after product-market fit)
+- Scale engineering team (15+ engineers)
+- Sales and customer success team
+- Expand to international markets
+- Enterprise features development
+
+---
+
+## Conclusion
+
+This platform represents a **paradigm shift in how construction teams interact with Procore**. Rather than replacing Procore or creating yet another disconnected app, we're building the **AI layer that makes Procore exponentially more powerful**.
+
+### Core Innovation
+
+The seamless, bidirectional integration with Procore ensures:
+- ✅ **Zero data duplication** - Procore remains single source of truth
+- ✅ **No workflow disruption** - Teams continue using Procore as normal
+- ✅ **Instant value** - AI features activate immediately on existing data
+- ✅ **Invisible complexity** - Users see AI insights, not technical plumbing
+
+### Market Opportunity
+
+- **10,000+** companies use Procore globally
+- **$10 trillion** annual construction industry spending
+- **30-50%** time wasted on manual QC/QA tasks
+- **$500-$1000** monthly savings per project from AI automation
+
+### Competitive Moats
+
+1. **Deep Procore Integration**: First-mover advantage in Procore AI ecosystem
+2. **Construction-Specific AI**: Models trained on real project data
+3. **Network Effects**: More users = better AI predictions = more users
+4. **Procore Partnership**: Official App Marketplace listing = credibility
+
+### Why This Will Win
+
+**For Users**: Save time, reduce errors, finish projects faster
+**For Contractors**: Lower costs, fewer RFIs, happier clients
+**For Procore**: Enhanced platform value, ecosystem growth
+**For Us**: Scalable SaaS business in massive market
+
+---
+
+*This living document will evolve as we learn from users and adapt to market needs. The future of construction quality control is intelligent, automated, and seamlessly integrated with the tools teams already use.*
+
+**Let's build it.** 🚀
