@@ -236,19 +236,19 @@ export default function Dashboard({ procoreConnection, onProcoreSync }: Dashboar
                     data-testid={`rfi-row-${rfi.id}`}
                   >
                     <div className={`p-2 rounded-md ${
-                      rfi.status === "overdue" ? "bg-red-500/10" :
-                      rfi.status === "open" ? "bg-blue-500/10" :
-                      rfi.status === "answered" ? "bg-emerald-500/10" :
-                      "bg-slate-500/10"
+                      rfi.status === "overdue" ? "bg-foreground/10" :
+                      rfi.status === "open" ? "bg-primary/10" :
+                      rfi.status === "answered" ? "bg-primary/10" :
+                      "bg-foreground/10"
                     }`}>
                       {rfi.status === "answered" ? (
                         <CheckCircle className={`w-4 h-4 ${
-                          rfi.status === "answered" ? "text-emerald-500" : "text-slate-500"
+                          rfi.status === "answered" ? "text-primary" : "text-foreground"
                         }`} />
                       ) : rfi.status === "overdue" ? (
-                        <AlertTriangle className="w-4 h-4 text-red-500" />
+                        <AlertTriangle className="w-4 h-4 text-foreground" />
                       ) : (
-                        <MessageSquareText className="w-4 h-4 text-blue-500" />
+                        <MessageSquareText className="w-4 h-4 text-primary" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -282,14 +282,14 @@ export default function Dashboard({ procoreConnection, onProcoreSync }: Dashboar
 
       {/* Critical Alerts Banner */}
       {stats && stats.criticalAlerts > 0 && (
-        <Card className="border-red-500/30 bg-red-500/5">
+        <Card className="border-foreground/30 bg-foreground/5">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-red-500/15">
-                <AlertTriangle className="w-5 h-5 text-red-500" />
+              <div className="p-2 rounded-full bg-foreground/15">
+                <AlertTriangle className="w-5 h-5 text-foreground" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-red-600 dark:text-red-400">
+                <p className="font-semibold text-foreground">
                   {stats.criticalAlerts} Critical Alert{stats.criticalAlerts > 1 ? "s" : ""}
                 </p>
                 <p className="text-sm text-muted-foreground">

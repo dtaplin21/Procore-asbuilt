@@ -31,8 +31,8 @@ export function ProcoreStatus({ connection, onSync, compact = false }: ProcoreSt
         className={cn(
           "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm",
           connected 
-            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" 
-            : "bg-red-500/10 text-red-600 dark:text-red-400"
+            ? "bg-primary/10 text-primary" 
+            : "bg-foreground/10 text-foreground"
         )}
         data-testid="procore-status-compact"
       >
@@ -54,11 +54,11 @@ export function ProcoreStatus({ connection, onSync, compact = false }: ProcoreSt
     <div className="flex items-center gap-4 p-4 rounded-lg bg-card border border-card-border" data-testid="procore-status">
       <div className={cn(
         "flex items-center justify-center w-12 h-12 rounded-full",
-        connected ? "bg-emerald-500/15" : "bg-red-500/15"
+        connected ? "bg-primary/15" : "bg-foreground/15"
       )}>
         <Cloud className={cn(
           "w-6 h-6",
-          connected ? "text-emerald-500" : "text-red-500"
+          connected ? "text-primary" : "text-foreground"
         )} />
       </div>
       
@@ -66,11 +66,11 @@ export function ProcoreStatus({ connection, onSync, compact = false }: ProcoreSt
         <div className="flex items-center gap-2">
           <span className="font-semibold">Procore</span>
           {connected ? (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary">
               Connected
             </span>
           ) : (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/15 text-red-600 dark:text-red-400">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-foreground/15 text-foreground">
               Disconnected
             </span>
           )}

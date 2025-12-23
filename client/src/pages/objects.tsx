@@ -33,12 +33,12 @@ import { StatusBadge } from "@/components/status-badge";
 import type { DrawingObject, ObjectStatus } from "@shared/schema";
 
 const statusConfig: Record<ObjectStatus, { label: string; color: string }> = {
-  not_started: { label: "Not Started", color: "bg-slate-500" },
-  pending_shop_drawing: { label: "Pending Shop Drawing", color: "bg-amber-500" },
-  shop_drawing_approved: { label: "Shop Drawing Approved", color: "bg-blue-500" },
-  installed: { label: "Installed", color: "bg-purple-500" },
-  inspected: { label: "Inspected", color: "bg-cyan-500" },
-  as_built: { label: "As-Built Complete", color: "bg-emerald-500" },
+  not_started: { label: "Not Started", color: "bg-foreground/30" },
+  pending_shop_drawing: { label: "Pending Shop Drawing", color: "bg-primary/50" },
+  shop_drawing_approved: { label: "Shop Drawing Approved", color: "bg-primary" },
+  installed: { label: "Installed", color: "bg-primary/70" },
+  inspected: { label: "Inspected", color: "bg-primary/80" },
+  as_built: { label: "As-Built Complete", color: "bg-primary" },
 };
 
 export default function Objects() {
@@ -114,7 +114,7 @@ export default function Objects() {
                     <Tooltip key={status}>
                       <TooltipTrigger asChild>
                         <div 
-                          className={`h-1.5 rounded-full ${statusConfig[status as ObjectStatus]?.color || 'bg-slate-500'}`}
+                          className={`h-1.5 rounded-full ${statusConfig[status as ObjectStatus]?.color || 'bg-foreground/30'}`}
                           style={{ width: `${(count / stats.total) * 100}%`, minWidth: '4px' }}
                         />
                       </TooltipTrigger>
@@ -177,7 +177,7 @@ export default function Objects() {
                     <TooltipTrigger asChild>
                       <div
                         className={`absolute w-8 h-8 rounded-full border-2 cursor-pointer transition-transform hover:scale-110 ${
-                          statusConfig[obj.status]?.color || 'bg-slate-500'
+                          statusConfig[obj.status]?.color || 'bg-foreground/30'
                         } bg-opacity-50 flex items-center justify-center`}
                         style={{
                           left: `${15 + (i * 18)}%`,

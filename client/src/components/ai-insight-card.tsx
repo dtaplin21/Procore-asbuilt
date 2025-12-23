@@ -14,30 +14,30 @@ const typeConfig = {
   compliance: { 
     icon: CheckCircle, 
     label: "Compliance",
-    className: "text-emerald-500 bg-emerald-500/10"
+    className: "text-primary bg-primary/10"
   },
   deviation: { 
     icon: AlertTriangle, 
     label: "Deviation",
-    className: "text-amber-500 bg-amber-500/10"
+    className: "text-primary bg-primary/10"
   },
   recommendation: { 
     icon: Info, 
     label: "Recommendation",
-    className: "text-blue-500 bg-blue-500/10"
+    className: "text-primary bg-primary/10"
   },
   warning: { 
     icon: AlertCircle, 
     label: "Warning",
-    className: "text-red-500 bg-red-500/10"
+    className: "text-foreground bg-foreground/10"
   },
 };
 
 const severityConfig = {
-  low: { className: "border-l-slate-400" },
-  medium: { className: "border-l-amber-400" },
-  high: { className: "border-l-orange-500" },
-  critical: { className: "border-l-red-500" },
+  low: { className: "border-l-foreground/40" },
+  medium: { className: "border-l-primary/60" },
+  high: { className: "border-l-primary" },
+  critical: { className: "border-l-foreground" },
 };
 
 export function AIInsightCard({ insight, onResolve, onViewDetails }: AIInsightCardProps) {
@@ -77,7 +77,7 @@ export function AIInsightCard({ insight, onResolve, onViewDetails }: AIInsightCa
                 {formatDate(createdAt)}
               </span>
               {resolved && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary">
                   Resolved
                 </span>
               )}

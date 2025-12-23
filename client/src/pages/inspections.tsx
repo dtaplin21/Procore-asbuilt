@@ -144,7 +144,7 @@ export default function Inspections() {
               <Card 
                 key={inspection.id}
                 className={`cursor-pointer hover-elevate active-elevate-2 transition-all ${
-                  inspection.status === "failed" ? "border-red-500/30" : ""
+                  inspection.status === "failed" ? "border-foreground/30" : ""
                 }`}
                 onClick={() => setSelectedInspection(inspection)}
                 data-testid={`card-inspection-${inspection.id}`}
@@ -152,20 +152,20 @@ export default function Inspections() {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className={`p-2 rounded-lg ${
-                      inspection.status === "passed" ? "bg-emerald-500/10" :
-                      inspection.status === "failed" ? "bg-red-500/10" :
-                      inspection.status === "in_progress" ? "bg-amber-500/10" :
-                      inspection.status === "scheduled" ? "bg-blue-500/10" :
-                      "bg-slate-500/10"
+                      inspection.status === "passed" ? "bg-primary/10" :
+                      inspection.status === "failed" ? "bg-foreground/10" :
+                      inspection.status === "in_progress" ? "bg-primary/10" :
+                      inspection.status === "scheduled" ? "bg-primary/10" :
+                      "bg-foreground/10"
                     }`}>
                       {inspection.status === "passed" ? (
-                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                        <CheckCircle className="w-5 h-5 text-primary" />
                       ) : inspection.status === "failed" ? (
-                        <XCircle className="w-5 h-5 text-red-500" />
+                        <XCircle className="w-5 h-5 text-foreground" />
                       ) : inspection.status === "in_progress" ? (
-                        <ClipboardCheck className="w-5 h-5 text-amber-500" />
+                        <ClipboardCheck className="w-5 h-5 text-primary" />
                       ) : (
-                        <CalendarDays className="w-5 h-5 text-blue-500" />
+                        <CalendarDays className="w-5 h-5 text-primary" />
                       )}
                     </div>
                     <StatusBadge status={inspection.status} />
@@ -210,7 +210,7 @@ export default function Inspections() {
                       </span>
                     )}
                     {inspection.aiFindings.length > 0 && (
-                      <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <span className="text-xs text-primary flex items-center gap-1">
                         <AlertTriangle className="w-3.5 h-3.5" />
                         {inspection.aiFindings.length} AI findings
                       </span>
@@ -291,15 +291,15 @@ export default function Inspections() {
                         <div 
                           key={item.id}
                           className={`flex items-start gap-3 p-2 rounded-lg ${
-                            item.passed === true ? "bg-emerald-500/5" :
-                            item.passed === false ? "bg-red-500/5" :
+                            item.passed === true ? "bg-primary/5" :
+                            item.passed === false ? "bg-foreground/5" :
                             "bg-muted/30"
                           }`}
                         >
                           {item.passed === true ? (
-                            <CheckCircle className="w-4 h-4 text-emerald-500 mt-0.5" />
+                            <CheckCircle className="w-4 h-4 text-primary mt-0.5" />
                           ) : item.passed === false ? (
-                            <XCircle className="w-4 h-4 text-red-500 mt-0.5" />
+                            <XCircle className="w-4 h-4 text-foreground mt-0.5" />
                           ) : (
                             <div className="w-4 h-4 rounded-full border-2 border-muted-foreground/30 mt-0.5" />
                           )}
@@ -316,15 +316,15 @@ export default function Inspections() {
                 )}
                 
                 {selectedInspection.aiFindings.length > 0 && (
-                  <div className="p-4 rounded-lg bg-amber-500/5 border border-amber-500/20">
-                    <h4 className="text-sm font-medium flex items-center gap-2 mb-2 text-amber-600 dark:text-amber-400">
+                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                    <h4 className="text-sm font-medium flex items-center gap-2 mb-2 text-primary">
                       <AlertTriangle className="w-4 h-4" />
                       AI Findings
                     </h4>
                     <ul className="space-y-1">
                       {selectedInspection.aiFindings.map((finding, i) => (
                         <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                          <span className="text-amber-500">•</span>
+                          <span className="text-primary">•</span>
                           {finding}
                         </li>
                       ))}

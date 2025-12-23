@@ -16,10 +16,10 @@ interface StatCardProps {
 
 const variantConfig = {
   default: { iconBg: "bg-primary/10", iconColor: "text-primary" },
-  success: { iconBg: "bg-emerald-500/10", iconColor: "text-emerald-500" },
-  warning: { iconBg: "bg-amber-500/10", iconColor: "text-amber-500" },
-  danger: { iconBg: "bg-red-500/10", iconColor: "text-red-500" },
-  info: { iconBg: "bg-blue-500/10", iconColor: "text-blue-500" },
+  success: { iconBg: "bg-primary/10", iconColor: "text-primary" },
+  warning: { iconBg: "bg-primary/10", iconColor: "text-primary" },
+  danger: { iconBg: "bg-primary/10", iconColor: "text-primary" },
+  info: { iconBg: "bg-primary/10", iconColor: "text-primary" },
 };
 
 export function StatCard({ 
@@ -45,7 +45,7 @@ export function StatCard({
             {trend && (
               <div className={cn(
                 "flex items-center gap-1 text-sm mt-2",
-                trend.value >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                trend.value >= 0 ? "text-primary" : "text-foreground"
               )}>
                 {trend.value >= 0 ? (
                   <TrendingUp className="w-4 h-4" />

@@ -5,7 +5,6 @@ import {
   Cloud, 
   Bell, 
   Shield, 
-  Palette,
   Database,
   Webhook,
   Key,
@@ -25,7 +24,6 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { useTheme } from "@/components/theme-provider";
 import type { ProcoreConnection } from "@shared/schema";
 
 interface SettingsProps {
@@ -35,7 +33,6 @@ interface SettingsProps {
 }
 
 export default function SettingsPage({ procoreConnection, onConnectProcore, onDisconnectProcore }: SettingsProps) {
-  const { theme, setTheme } = useTheme();
   const [notifications, setNotifications] = useState({
     emailSubmittals: true,
     emailRFIs: true,
@@ -95,43 +92,6 @@ export default function SettingsPage({ procoreConnection, onConnectProcore, onDi
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="w-5 h-5" />
-                Appearance
-              </CardTitle>
-              <CardDescription>Customize the look and feel of the platform</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Theme</Label>
-                <div className="flex gap-2">
-                  <Button 
-                    variant={theme === "light" ? "default" : "outline"}
-                    onClick={() => setTheme("light")}
-                    data-testid="button-theme-light"
-                  >
-                    Light
-                  </Button>
-                  <Button 
-                    variant={theme === "dark" ? "default" : "outline"}
-                    onClick={() => setTheme("dark")}
-                    data-testid="button-theme-dark"
-                  >
-                    Dark
-                  </Button>
-                  <Button 
-                    variant={theme === "system" ? "default" : "outline"}
-                    onClick={() => setTheme("system")}
-                    data-testid="button-theme-system"
-                  >
-                    System
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* Integrations */}
@@ -148,10 +108,10 @@ export default function SettingsPage({ procoreConnection, onConnectProcore, onDi
               <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-full ${
-                    procoreConnection.connected ? "bg-emerald-500/15" : "bg-slate-500/15"
+                    procoreConnection.connected ? "bg-primary/15" : "bg-foreground/15"
                   }`}>
                     <Cloud className={`w-5 h-5 ${
-                      procoreConnection.connected ? "text-emerald-500" : "text-slate-500"
+                      procoreConnection.connected ? "text-primary" : "text-foreground"
                     }`} />
                   </div>
                   <div>
@@ -165,7 +125,7 @@ export default function SettingsPage({ procoreConnection, onConnectProcore, onDi
                 </div>
                 {procoreConnection.connected ? (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <span className="text-sm text-primary flex items-center gap-1">
                       <Check className="w-4 h-4" />
                       Connected
                     </span>
@@ -374,9 +334,9 @@ export default function SettingsPage({ procoreConnection, onConnectProcore, onDi
             </CardContent>
           </Card>
 
-          <Card className="border-red-500/30">
+          <Card className="border-foreground/30">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <CardTitle className="flex items-center gap-2 text-foreground">
                 <AlertCircle className="w-5 h-5" />
                 Danger Zone
               </CardTitle>

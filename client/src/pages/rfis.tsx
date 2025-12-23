@@ -144,7 +144,7 @@ export default function RFIs() {
               <Card 
                 key={rfi.id}
                 className={`cursor-pointer hover-elevate active-elevate-2 transition-all ${
-                  isOverdue ? "border-red-500/30" : ""
+                  isOverdue ? "border-foreground/30" : ""
                 }`}
                 onClick={() => setSelectedRFI(rfi)}
                 data-testid={`card-rfi-${rfi.id}`}
@@ -152,17 +152,17 @@ export default function RFIs() {
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
                     <div className={`p-2.5 rounded-lg ${
-                      rfi.status === "overdue" || isOverdue ? "bg-red-500/10" :
-                      rfi.status === "open" ? "bg-blue-500/10" :
-                      rfi.status === "answered" ? "bg-emerald-500/10" :
-                      "bg-slate-500/10"
+                      rfi.status === "overdue" || isOverdue ? "bg-foreground/10" :
+                      rfi.status === "open" ? "bg-primary/10" :
+                      rfi.status === "answered" ? "bg-primary/10" :
+                      "bg-foreground/10"
                     }`}>
                       {rfi.status === "answered" ? (
-                        <CheckCircle className={`w-5 h-5 text-emerald-500`} />
+                        <CheckCircle className={`w-5 h-5 text-primary`} />
                       ) : isOverdue || rfi.status === "overdue" ? (
-                        <AlertTriangle className="w-5 h-5 text-red-500" />
+                        <AlertTriangle className="w-5 h-5 text-foreground" />
                       ) : (
-                        <MessageSquareText className="w-5 h-5 text-blue-500" />
+                        <MessageSquareText className="w-5 h-5 text-primary" />
                       )}
                     </div>
                     
@@ -185,12 +185,12 @@ export default function RFIs() {
                           <Clock className="w-3.5 h-3.5" />
                           Due {formatDate(rfi.dueDate)}
                           {daysUntilDue > 0 && daysUntilDue <= 3 && (
-                            <span className="text-amber-500 font-medium ml-1">
+                            <span className="text-primary font-medium ml-1">
                               ({daysUntilDue}d left)
                             </span>
                           )}
                           {isOverdue && (
-                            <span className="text-red-500 font-medium ml-1">
+                            <span className="text-foreground font-medium ml-1">
                               ({Math.abs(daysUntilDue)}d overdue)
                             </span>
                           )}
@@ -297,7 +297,7 @@ export default function RFIs() {
                 {selectedRFI.answer && (
                   <div>
                     <h4 className="text-sm font-medium text-muted-foreground mb-2">Answer</h4>
-                    <p className="text-sm bg-emerald-500/5 border border-emerald-500/20 p-3 rounded-lg">
+                    <p className="text-sm bg-primary/5 border border-primary/20 p-3 rounded-lg">
                       {selectedRFI.answer}
                     </p>
                     {selectedRFI.answeredDate && (
