@@ -9,3 +9,17 @@ vite.config.ts.*
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/venv/
+backend/env/
+backend/ENV/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+backend/.env
