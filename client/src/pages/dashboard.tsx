@@ -1,13 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { 
-  FileCheck, 
-  MessageSquareText, 
   ClipboardCheck, 
   AlertTriangle,
   TrendingUp,
   Sparkles,
-  Clock,
-  CheckCircle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,9 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/stat-card";
 import { AIInsightCard } from "@/components/ai-insight-card";
 import { ProcoreStatus } from "@/components/procore-status";
-import { StatusBadge } from "@/components/status-badge";
-import { AIScoreRing } from "@/components/ai-score-ring";
-import type { DashboardStats, AIInsight, Submittal, RFI, ProcoreConnection } from "@shared/schema";
+import type { DashboardStats, AIInsight, ProcoreConnection } from "@shared/schema";
 
 interface DashboardProps {
   procoreConnection: ProcoreConnection;
@@ -27,14 +21,6 @@ interface DashboardProps {
 export default function Dashboard({ procoreConnection, onProcoreSync }: DashboardProps) {
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
-  });
-
-  const { data: recentSubmittals, isLoading: submittalsLoading } = useQuery<Submittal[]>({
-    queryKey: ["/api/submittals?limit=5"],
-  });
-
-  const { data: recentRFIs, isLoading: rfisLoading } = useQuery<RFI[]>({
-    queryKey: ["/api/rfis?limit=5"],
   });
 
   const { data: insights, isLoading: insightsLoading } = useQuery<AIInsight[]>({
@@ -55,10 +41,10 @@ export default function Dashboard({ procoreConnection, onProcoreSync }: Dashboar
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {statsLoading ? (
           <>
-            {[1, 2, 3, 4].map((i) => (
+            {[1, 2, 3].map((i) => (
               <Card key={i}>
                 <CardContent className="p-6">
                   <Skeleton className="h-4 w-24 mb-2" />
@@ -81,16 +67,9 @@ export default function Dashboard({ procoreConnection, onProcoreSync }: Dashboar
               title="Pending Review"
               value={stats.pendingReview}
               subtitle={`${stats.approvedToday} approved today`}
-              icon={FileCheck}
+              icon={ClipboardCheck}
               variant="warning"
               trend={{ value: 12, label: "vs last week" }}
-            />
-            <StatCard
-              title="Open RFIs"
-              value={stats.openRFIs}
-              subtitle={`${stats.overdueRFIs} overdue`}
-              icon={MessageSquareText}
-              variant={stats.overdueRFIs > 0 ? "danger" : "info"}
             />
             <StatCard
               title="Pass Rate"
@@ -141,144 +120,6 @@ export default function Dashboard({ procoreConnection, onProcoreSync }: Dashboar
         </CardContent>
       </Card>
 
-      {/* Recent Activity Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Submittals */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
-            <CardTitle className="flex items-center gap-2">
-              <FileCheck className="w-5 h-5 text-muted-foreground" />
-              Recent Submittals
-            </CardTitle>
-            <Button variant="ghost" size="sm" data-testid="button-view-all-submittals">
-              View All
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {submittalsLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <Skeleton className="h-10 w-10 rounded-full" />
-                    <div className="flex-1">
-                      <Skeleton className="h-4 w-32 mb-1" />
-                      <Skeleton className="h-3 w-48" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : recentSubmittals && recentSubmittals.length > 0 ? (
-              <div className="space-y-3">
-                {recentSubmittals.map((submittal) => (
-                  <div 
-                    key={submittal.id} 
-                    className="flex items-center gap-3 p-3 rounded-lg hover-elevate active-elevate-2 cursor-pointer"
-                    data-testid={`submittal-row-${submittal.id}`}
-                  >
-                    <AIScoreRing score={submittal.aiScore || 0} size="sm" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium truncate">{submittal.title}</span>
-                        <StatusBadge status={submittal.status} size="sm" />
-                      </div>
-                      <p className="text-sm text-muted-foreground truncate">
-                        <span className="font-mono text-xs">{submittal.number}</span>
-                        {" · "}
-                        {submittal.specSection}
-                      </p>
-                    </div>
-                    <div className="text-right text-sm text-muted-foreground">
-                      <Clock className="w-3.5 h-3.5 inline mr-1" />
-                      {new Date(submittal.dueDate).toLocaleDateString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <FileCheck className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                <p>No submittals yet</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent RFIs */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquareText className="w-5 h-5 text-muted-foreground" />
-              Recent RFIs
-            </CardTitle>
-            <Button variant="ghost" size="sm" data-testid="button-view-all-rfis">
-              View All
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {rfisLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <Skeleton className="h-10 w-10 rounded" />
-                    <div className="flex-1">
-                      <Skeleton className="h-4 w-32 mb-1" />
-                      <Skeleton className="h-3 w-48" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : recentRFIs && recentRFIs.length > 0 ? (
-              <div className="space-y-3">
-                {recentRFIs.map((rfi) => (
-                  <div 
-                    key={rfi.id} 
-                    className="flex items-start gap-3 p-3 rounded-lg hover-elevate active-elevate-2 cursor-pointer"
-                    data-testid={`rfi-row-${rfi.id}`}
-                  >
-                    <div className={`p-2 rounded-md ${
-                      rfi.status === "overdue" ? "bg-foreground/10" :
-                      rfi.status === "open" ? "bg-primary/10" :
-                      rfi.status === "answered" ? "bg-primary/10" :
-                      "bg-foreground/10"
-                    }`}>
-                      {rfi.status === "answered" ? (
-                        <CheckCircle className={`w-4 h-4 ${
-                          rfi.status === "answered" ? "text-primary" : "text-foreground"
-                        }`} />
-                      ) : rfi.status === "overdue" ? (
-                        <AlertTriangle className="w-4 h-4 text-foreground" />
-                      ) : (
-                        <MessageSquareText className="w-4 h-4 text-primary" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium truncate">{rfi.subject}</span>
-                        <StatusBadge status={rfi.status} size="sm" />
-                        <StatusBadge status={rfi.priority} size="sm" />
-                      </div>
-                      <p className="text-sm text-muted-foreground truncate">
-                        <span className="font-mono text-xs">{rfi.number}</span>
-                        {" · "}
-                        Assigned to {rfi.assignedTo}
-                      </p>
-                    </div>
-                    <div className="text-right text-sm text-muted-foreground whitespace-nowrap">
-                      <Clock className="w-3.5 h-3.5 inline mr-1" />
-                      Due {new Date(rfi.dueDate).toLocaleDateString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <MessageSquareText className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                <p>No RFIs yet</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Critical Alerts Banner */}
       {stats && stats.criticalAlerts > 0 && (

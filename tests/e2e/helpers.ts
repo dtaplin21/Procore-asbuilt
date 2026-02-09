@@ -16,3 +16,5 @@ export async function navigateToPage(page: Page, pageName: string) {
   await page.waitForURL(`/${pageName.toLowerCase()}`);
 }
 
+
+

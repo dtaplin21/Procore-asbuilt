@@ -18,15 +18,7 @@ test.describe('Dashboard Page', () => {
     const procoreStatus = page.getByTestId('procore-status');
     await expect(procoreStatus).toBeVisible();
   });
-
-  test('should navigate to submittals page', async ({ page }) => {
-    await page.getByTestId('nav-submittals').click();
-    await expect(page).toHaveURL('/submittals');
-  });
-
-  test('should navigate to RFIs page', async ({ page }) => {
-    await page.getByTestId('nav-rfis').click();
-    await expect(page).toHaveURL('/rfis');
-  });
 });
+
+
 

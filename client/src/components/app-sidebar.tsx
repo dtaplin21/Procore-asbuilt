@@ -1,8 +1,6 @@
 import { useLocation, Link } from "wouter";
 import { 
   LayoutDashboard, 
-  FileCheck, 
-  MessageSquareText, 
   ClipboardCheck,
   Layers,
   Settings,
@@ -29,16 +27,6 @@ const mainNavItems = [
     title: "Dashboard",
     url: "/",
     icon: LayoutDashboard,
-  },
-  {
-    title: "Submittals",
-    url: "/submittals",
-    icon: FileCheck,
-  },
-  {
-    title: "RFIs",
-    url: "/rfis",
-    icon: MessageSquareText,
   },
   {
     title: "Inspections",

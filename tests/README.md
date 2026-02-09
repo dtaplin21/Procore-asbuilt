@@ -44,8 +44,6 @@ npx playwright test tests/e2e/dashboard.spec.ts
 ## Test Structure
 
 - `tests/e2e/dashboard.spec.ts` - Dashboard page tests
-- `tests/e2e/rfis.spec.ts` - RFIs page tests
-- `tests/e2e/submittals.spec.ts` - Submittals page tests
 - `tests/e2e/navigation.spec.ts` - Navigation flow tests
 - `tests/e2e/procore-status.spec.ts` - Procore integration status tests
 - `tests/e2e/helpers.ts` - Test helper functions
@@ -83,4 +81,6 @@ test.describe('My Feature', () => {
   });
 });
 ```
+
+
 

@@ -8,8 +8,6 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import Dashboard from "@/pages/dashboard";
-import Submittals from "@/pages/submittals";
-import RFIs from "@/pages/rfis";
 import Inspections from "@/pages/inspections";
 import Objects from "@/pages/objects";
 import SettingsPage from "@/pages/settings";
@@ -28,8 +26,6 @@ function Router({
       <Route path="/">
         <Dashboard procoreConnection={procoreConnection} onProcoreSync={onProcoreSync} />
       </Route>
-      <Route path="/submittals" component={Submittals} />
-      <Route path="/rfis" component={RFIs} />
       <Route path="/inspections" component={Inspections} />
       <Route path="/objects" component={Objects} />
       <Route path="/settings">

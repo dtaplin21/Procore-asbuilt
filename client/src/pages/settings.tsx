@@ -4,13 +4,9 @@ import {
   User, 
   Cloud, 
   Bell, 
-  Shield, 
-  Database,
   Webhook,
-  Key,
   ExternalLink,
-  Check,
-  AlertCircle
+  Check
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,8 +30,6 @@ interface SettingsProps {
 
 export default function SettingsPage({ procoreConnection, onConnectProcore, onDisconnectProcore }: SettingsProps) {
   const [notifications, setNotifications] = useState({
-    emailSubmittals: true,
-    emailRFIs: true,
     emailInspections: true,
     pushAlerts: true,
     aiInsights: true,
@@ -52,11 +46,10 @@ export default function SettingsPage({ procoreConnection, onConnectProcore, onDi
       </div>
 
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="general" data-testid="tab-general">General</TabsTrigger>
           <TabsTrigger value="integrations" data-testid="tab-integrations">Integrations</TabsTrigger>
           <TabsTrigger value="notifications" data-testid="tab-notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
         </TabsList>
 
         {/* General Settings */}
@@ -153,20 +146,6 @@ export default function SettingsPage({ procoreConnection, onConnectProcore, onDi
                     <h4 className="text-sm font-medium">Sync Settings</h4>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium">Auto-sync new submittals</p>
-                        <p className="text-xs text-muted-foreground">Automatically import new submittals from Procore</p>
-                      </div>
-                      <Switch defaultChecked data-testid="switch-auto-sync-submittals" />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">Auto-sync RFIs</p>
-                        <p className="text-xs text-muted-foreground">Automatically import new RFIs from Procore</p>
-                      </div>
-                      <Switch defaultChecked data-testid="switch-auto-sync-rfis" />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
                         <p className="text-sm font-medium">Push AI insights to Procore</p>
                         <p className="text-xs text-muted-foreground">Add AI analysis as comments on Procore items</p>
                       </div>
@@ -214,28 +193,6 @@ export default function SettingsPage({ procoreConnection, onConnectProcore, onDi
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium">Submittal updates</p>
-                      <p className="text-xs text-muted-foreground">New submittals and status changes</p>
-                    </div>
-                    <Switch 
-                      checked={notifications.emailSubmittals}
-                      onCheckedChange={(checked) => setNotifications(n => ({...n, emailSubmittals: checked}))}
-                      data-testid="switch-email-submittals"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">RFI updates</p>
-                      <p className="text-xs text-muted-foreground">New RFIs and responses</p>
-                    </div>
-                    <Switch 
-                      checked={notifications.emailRFIs}
-                      onCheckedChange={(checked) => setNotifications(n => ({...n, emailRFIs: checked}))}
-                      data-testid="switch-email-rfis"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
                       <p className="text-sm font-medium">Inspection reminders</p>
                       <p className="text-xs text-muted-foreground">Upcoming inspection alerts</p>
                     </div>
@@ -276,81 +233,6 @@ export default function SettingsPage({ procoreConnection, onConnectProcore, onDi
                     />
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Security */}
-        <TabsContent value="security" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5" />
-                Security Settings
-              </CardTitle>
-              <CardDescription>Manage your account security</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="currentPassword">Current Password</Label>
-                <Input id="currentPassword" type="password" data-testid="input-current-password" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">New Password</Label>
-                <Input id="newPassword" type="password" data-testid="input-new-password" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <Input id="confirmPassword" type="password" data-testid="input-confirm-password" />
-              </div>
-              <Button data-testid="button-update-password">Update Password</Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Key className="w-5 h-5" />
-                API Keys
-              </CardTitle>
-              <CardDescription>Manage API access for external tools</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
-                <div>
-                  <p className="font-medium">Personal API Key</p>
-                  <p className="text-sm text-muted-foreground font-mono">qc_***********************</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" data-testid="button-regenerate-key">
-                    Regenerate
-                  </Button>
-                  <Button variant="ghost" size="sm" data-testid="button-copy-key">
-                    Copy
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-foreground/30">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-foreground">
-                <AlertCircle className="w-5 h-5" />
-                Danger Zone
-              </CardTitle>
-              <CardDescription>Irreversible actions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Delete Account</p>
-                  <p className="text-sm text-muted-foreground">Permanently delete your account and all data</p>
-                </div>
-                <Button variant="destructive" data-testid="button-delete-account">
-                  Delete Account
-                </Button>
               </div>
             </CardContent>
           </Card>
