@@ -1,4 +1,4 @@
-from .database import Base, Project, Submittal, RFI, Inspection, DrawingObject, AIInsight
+from .database import Base, Project, Submittal, RFI, Inspection, DrawingObject, AIInsight, ProcoreToken, ProcoreUser
 from .schemas import (
     Project as ProjectSchema,
     ProjectCreate,

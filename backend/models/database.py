@@ -111,3 +111,30 @@ class AIInsight(Base):
     related_rfi_id = Column(String, nullable=True)
     related_inspection_id = Column(String, nullable=True)
 
+class ProcoreToken(Base):
+    __tablename__ = "procore_tokens"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, nullable=False, unique=True)  # Procore user ID
+    company_id = Column(String, nullable=True)  # Primary company ID
+    access_token = Column(Text, nullable=False)  # Encrypted
+    refresh_token = Column(Text, nullable=False)  # Encrypted
+    expires_at = Column(DateTime, nullable=False)
+    token_type = Column(String, default="Bearer")
+    scope = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class ProcoreUser(Base):
+    __tablename__ = "procore_users"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    procore_user_id = Column(String, nullable=False, unique=True)
+    email = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    company_ids = Column(JSON, default=list)  # List of company IDs user belongs to
+    project_ids = Column(JSON, default=list)  # List of project IDs user has access to
+    last_synced_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+

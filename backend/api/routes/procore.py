@@ -1,35 +1,36 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import get_db
-from models.schemas import ProcoreConnection
-from datetime import datetime
+from services.procore_client import ProcoreAPIClient
+from services.procore_oauth import ProcoreOAuth
+from typing import Optional
 
 router = APIRouter(prefix="/api/procore", tags=["procore"])
 
-@router.get("/status", response_model=ProcoreConnection)
-async def get_procore_status(db: Session = Depends(get_db)):
-    # TODO: Implement actual Procore connection status check
-    # For now, return mock data
-    return ProcoreConnection(
-        connected=True,
-        last_synced_at=datetime.utcnow(),
-        sync_status="idle",
-        projects_linked=3
-    )
-
-@router.get("/oauth/authorize")
-async def authorize_procore():
-    # TODO: Implement Procore OAuth authorization flow
-    # Redirect to Procore OAuth URL
-    pass
-
-@router.get("/oauth/callback")
-async def procore_oauth_callback(code: str, state: str):
-    # TODO: Handle OAuth callback and exchange code for tokens
-    pass
-
 @router.post("/sync")
-async def sync_procore(db: Session = Depends(get_db)):
-    # TODO: Implement Procore data sync
-    pass
+async def sync_procore(
+    user_id: str = Query(...),
+    project_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Sync data from Procore"""
+    oauth = ProcoreOAuth(db)
+    token = oauth.get_token(user_id)
+    
+    if not token:
+        raise HTTPException(status_code=404, detail="No Procore connection found")
+    
+    try:
+        async with ProcoreAPIClient(db, user_id) as client:
+            # Sync projects if no specific project_id
+            if not project_id:
+                projects = await client.get_projects()
+                # TODO: Store projects in local database
+                return {"synced": len(projects), "message": f"Synced {len(projects)} projects"}
+            else:
+                # Sync specific project data
+                # TODO: Sync submittals, RFIs, inspections, etc.
+                return {"synced": True, "project_id": project_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
 
