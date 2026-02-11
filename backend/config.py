@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
@@ -10,9 +10,13 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = None
     redis_url: Optional[str] = None
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    # In some environments (CI, sandboxes), extra env vars may be present.
+    # Ignore unknown keys instead of erroring at import time.
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
 settings = Settings()
 

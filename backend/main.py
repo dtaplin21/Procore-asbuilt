@@ -1,3 +1,5 @@
+import logging
+from observability.request_logging_middleware import RequestResponseLoggingMiddleware
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +27,10 @@ app = FastAPI(
     description="AI-powered Quality Control platform with Procore integration",
     version="1.0.0"
 )
+
+logging.basicConfig(level=logging.INFO)  # Enable logging
+
+app.add_middleware(RequestResponseLoggingMiddleware)  # Add middleware
 
 # ------------------------------------------------------------
 # Error handling boundary (centralized exception handlers)

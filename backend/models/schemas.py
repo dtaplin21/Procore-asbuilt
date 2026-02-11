@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -128,16 +128,16 @@ class DrawingObjectBase(BaseModel):
 class DrawingObjectCreate(DrawingObjectBase):
     linked_submittal_id: Optional[str] = None
     linked_inspection_id: Optional[str] = None
-    metadata: dict = {}
+    # Stored on the ORM as `object_metadata`, but serialized as `metadata`
+    object_metadata: dict = Field(default_factory=dict, serialization_alias="metadata", validation_alias="metadata")
+    model_config = ConfigDict(populate_by_name=True)
 
 class DrawingObject(DrawingObjectBase):
     id: str
     linked_submittal_id: Optional[str] = None
     linked_inspection_id: Optional[str] = None
-    metadata: dict = {}
-    
-    class Config:
-        from_attributes = True
+    object_metadata: dict = Field(default_factory=dict, serialization_alias="metadata")
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 # AI Insight schemas
 class AIInsightBase(BaseModel):

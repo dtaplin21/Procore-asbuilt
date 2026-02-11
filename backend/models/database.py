@@ -93,7 +93,9 @@ class DrawingObject(Base):
     height = Column(Integer, nullable=False)
     linked_submittal_id = Column(String, nullable=True)
     linked_inspection_id = Column(String, nullable=True)
-    metadata = Column(JSON, default=dict)
+    # "metadata" is a reserved attribute name in SQLAlchemy Declarative models.
+    # Keep the DB column name as "metadata", but use a safe Python attribute name.
+    object_metadata = Column("metadata", JSON, default=dict)
 
 class AIInsight(Base):
     __tablename__ = "ai_insights"
