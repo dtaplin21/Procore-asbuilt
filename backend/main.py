@@ -1,6 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from api.routes import (
     dashboard,
     projects,
@@ -14,12 +16,94 @@ from api.routes import (
 )
 from database import init_db
 import os
+import logging
+import httpx
+from sqlalchemy.exc import SQLAlchemyError
 
 app = FastAPI(
     title="QC/QA AI Platform - Procore Integration",
     description="AI-powered Quality Control platform with Procore integration",
     version="1.0.0"
 )
+
+# ------------------------------------------------------------
+# Error handling boundary (centralized exception handlers)
+# ------------------------------------------------------------
+
+logger = logging.getLogger("qcqa")
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_error_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Request validation failed",
+                "details": exc.errors(),
+            }
+        },
+    )
+
+
+@app.exception_handler(httpx.RequestError)
+async def httpx_request_error_handler(request: Request, exc: httpx.RequestError):
+    logger.exception("Upstream request failed", extra={"url": str(getattr(exc.request, "url", ""))})
+    return JSONResponse(
+        status_code=502,
+        content={
+            "error": {
+                "code": "UPSTREAM_UNREACHABLE",
+                "message": "Failed to reach upstream service",
+            }
+        },
+    )
+
+
+@app.exception_handler(httpx.HTTPStatusError)
+async def httpx_status_error_handler(request: Request, exc: httpx.HTTPStatusError):
+    # Procore (or other upstream) returned a non-2xx response.
+    status = exc.response.status_code if exc.response is not None else 502
+    logger.exception("Upstream returned error status", extra={"status": status, "url": str(exc.request.url)})
+    return JSONResponse(
+        status_code=502,
+        content={
+            "error": {
+                "code": "UPSTREAM_ERROR",
+                "message": "Upstream service returned an error",
+                "upstream_status": status,
+            }
+        },
+    )
+
+
+@app.exception_handler(SQLAlchemyError)
+async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError):
+    logger.exception("Database error")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "DB_ERROR",
+                "message": "Database operation failed",
+            }
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "INTERNAL_ERROR",
+                "message": "Internal server error",
+            }
+        },
+    )
 
 # CORS middleware - allow frontend to connect
 app.add_middleware(
