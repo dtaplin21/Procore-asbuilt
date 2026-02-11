@@ -8,7 +8,9 @@ import sys
 from datetime import datetime
 from typing import Any, Dict
 
-from backend.request_id import get_request_id  # adjust path if needed
+# When running the backend (e.g. `cd backend && python -m uvicorn main:app`),
+# the import root is the backend directory, so `observability.*` is the correct prefix.
+from observability.request_id import get_request_id
 
 
 class RequestIdFilter(logging.Filter):

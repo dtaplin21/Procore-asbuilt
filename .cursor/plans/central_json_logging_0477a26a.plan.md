@@ -75,7 +75,3 @@ Every line includes:
 
 - Run backend and hit `/health`.
 - Confirm logs include a JSON line from `qcqa.request` with the same `request_id` that is returned in the `X-Request-Id` header.
-
-## Todos
-
-- **log-config-module**: Add `backend/observability/logging_config.py` with `dictConfig` + JSON formatter + request_id filter.
