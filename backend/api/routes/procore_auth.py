@@ -12,6 +12,7 @@ from models.schemas import ProcoreConnection
 from datetime import datetime
 from typing import Optional
 import secrets
+from errors import ProcoreNotConnected
 
 router = APIRouter(prefix="/api/procore", tags=["procore-auth"])
 
@@ -59,29 +60,25 @@ async def procore_oauth_callback(
         raise HTTPException(status_code=400, detail=f"OAuth error: {error}")
     
     # Exchange code for tokens
-    try:
-        # Generate temporary user_id (in production, get from session)
-        temp_user_id = secrets.token_urlsafe(16)
-        
-        token = await oauth.exchange_code_for_tokens(code, temp_user_id)
-        
-        # Get user info and sync
-        user = await oauth.sync_user_info(temp_user_id, token.access_token)
-        
-        # Update token with actual user_id
-        token.user_id = user.procore_user_id
-        db.commit()
-        
-        # Clean up state
-        del _oauth_states[state]
-        
-        # Redirect to frontend with success
-        return RedirectResponse(
-            url=f"http://localhost:5173/settings?procore_connected=true&user_id={user.procore_user_id}"
-        )
+    # Generate temporary user_id (in production, get from session)
+    temp_user_id = secrets.token_urlsafe(16)
     
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to complete OAuth flow: {str(e)}")
+    token = await oauth.exchange_code_for_tokens(code, temp_user_id)
+    
+    # Get user info and sync
+    user = await oauth.sync_user_info(temp_user_id, token.access_token)
+    
+    # Update token with actual user_id
+    token.user_id = user.procore_user_id
+    db.commit()
+    
+    # Clean up state
+    del _oauth_states[state]
+    
+    # Redirect to frontend with success
+    return RedirectResponse(
+        url=f"http://localhost:5173/settings?procore_connected=true&user_id={user.procore_user_id}"
+    )
 
 @router.post("/oauth/refresh")
 async def refresh_procore_token(
@@ -93,16 +90,13 @@ async def refresh_procore_token(
     
     token = oauth.get_token(user_id)
     if not token:
-        raise HTTPException(status_code=404, detail="No token found for user")
+        raise ProcoreNotConnected(details={"user_id": user_id})
     
-    try:
-        new_token = await oauth.refresh_token(token.refresh_token, user_id)
-        return {
-            "success": True,
-            "expires_at": new_token.expires_at.isoformat()
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to refresh token: {str(e)}")
+    new_token = await oauth.refresh_token(token.refresh_token, user_id)
+    return {
+        "success": True,
+        "expires_at": new_token.expires_at.isoformat()
+    }
 
 @router.get("/status")
 async def get_procore_status(
@@ -162,14 +156,11 @@ async def get_current_user(
     token = oauth.get_token(user_id)
     
     if not token:
-        raise HTTPException(status_code=404, detail="No Procore connection found")
+        raise ProcoreNotConnected(details={"user_id": user_id})
     
-    try:
-        async with ProcoreAPIClient(db, user_id) as client:
-            user_info = await client.get_current_user()
-            return user_info
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get user info: {str(e)}")
+    async with ProcoreAPIClient(db, user_id) as client:
+        user_info = await client.get_current_user()
+        return user_info
 
 @router.get("/companies")
 async def get_companies(
@@ -181,14 +172,11 @@ async def get_companies(
     token = oauth.get_token(user_id)
     
     if not token:
-        raise HTTPException(status_code=404, detail="No Procore connection found")
+        raise ProcoreNotConnected(details={"user_id": user_id})
     
-    try:
-        async with ProcoreAPIClient(db, user_id) as client:
-            companies = await client.get_companies()
-            return companies
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get companies: {str(e)}")
+    async with ProcoreAPIClient(db, user_id) as client:
+        companies = await client.get_companies()
+        return companies
 
 @router.get("/projects")
 async def get_projects(
@@ -201,14 +189,11 @@ async def get_projects(
     token = oauth.get_token(user_id)
     
     if not token:
-        raise HTTPException(status_code=404, detail="No Procore connection found")
+        raise ProcoreNotConnected(details={"user_id": user_id})
     
-    try:
-        async with ProcoreAPIClient(db, user_id) as client:
-            projects = await client.get_projects(company_id)
-            return projects
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get projects: {str(e)}")
+    async with ProcoreAPIClient(db, user_id) as client:
+        projects = await client.get_projects(company_id)
+        return projects
 
 @router.get("/projects/{project_id}")
 async def get_project(
@@ -222,14 +207,11 @@ async def get_project(
     token = oauth.get_token(user_id)
     
     if not token:
-        raise HTTPException(status_code=404, detail="No Procore connection found")
+        raise ProcoreNotConnected(details={"user_id": user_id})
     
-    try:
-        async with ProcoreAPIClient(db, user_id) as client:
-            project = await client.get_project(project_id, company_id)
-            return project
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get project: {str(e)}")
+    async with ProcoreAPIClient(db, user_id) as client:
+        project = await client.get_project(project_id, company_id)
+        return project
 
 @router.get("/projects/{project_id}/team")
 async def get_project_team(
@@ -243,14 +225,11 @@ async def get_project_team(
     token = oauth.get_token(user_id)
     
     if not token:
-        raise HTTPException(status_code=404, detail="No Procore connection found")
+        raise ProcoreNotConnected(details={"user_id": user_id})
     
-    try:
-        async with ProcoreAPIClient(db, user_id) as client:
-            team = await client.get_project_users(project_id, company_id)
-            return team
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get project team: {str(e)}")
+    async with ProcoreAPIClient(db, user_id) as client:
+        team = await client.get_project_users(project_id, company_id)
+        return team
 
 @router.post("/disconnect")
 async def disconnect_procore(

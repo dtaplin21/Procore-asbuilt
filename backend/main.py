@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from errors import AppError
 from api.routes import (
     dashboard,
     projects,
@@ -37,6 +38,11 @@ app.add_middleware(RequestResponseLoggingMiddleware)  # Add middleware
 # ------------------------------------------------------------
 
 logger = logging.getLogger("qcqa")
+
+@app.exception_handler(AppError)
+async def app_error_handler(request: Request, exc: AppError):
+    logger.exception("AppError", extra={"error_code": exc.code})
+    return JSONResponse(status_code=exc.status_code, content={"error": exc.to_response()})
 
 
 @app.exception_handler(RequestValidationError)

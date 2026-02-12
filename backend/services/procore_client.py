@@ -8,6 +8,12 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from models.database import ProcoreToken
 import json
+from errors import (
+    ExternalServiceError,
+    ProcoreAuthExpired,
+    ProcoreNotConnected,
+    ProcoreRateLimited,
+)
 
 class ProcoreAPIClient:
     """Main client for interacting with Procore REST API"""
@@ -37,7 +43,7 @@ class ProcoreAPIClient:
         ).first()
         
         if not token:
-            raise ValueError(f"No Procore token found for user {self.user_id}")
+            raise ProcoreNotConnected(details={"user_id": self.user_id})
         
         # Check if token is expired or expires soon (within 5 minutes)
         if datetime.utcnow() >= token.expires_at - timedelta(minutes=5):
@@ -70,32 +76,68 @@ class ProcoreAPIClient:
         if headers:
             request_headers.update(headers)
         
-        if not self._client:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.request(
+        try:
+            if not self._client:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.request(
+                        method=method,
+                        url=url,
+                        params=params,
+                        json=json_data,
+                        headers=request_headers,
+                    )
+            else:
+                response = await self._client.request(
                     method=method,
                     url=url,
                     params=params,
                     json=json_data,
-                    headers=request_headers
+                    headers=request_headers,
                 )
-        else:
-            response = await self._client.request(
-                method=method,
-                url=url,
-                params=params,
-                json=json_data,
-                headers=request_headers
-            )
-        
-        response.raise_for_status()
-        return response.json()
+
+            response.raise_for_status()
+            return response.json()
+
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code
+            # Best-effort parse retry-after
+            retry_after = None
+            try:
+                ra = e.response.headers.get("retry-after")
+                retry_after = int(ra) if ra is not None else None
+            except Exception:
+                retry_after = None
+
+            details = {
+                "upstream": "procore",
+                "endpoint": endpoint,
+                "method": method,
+                "upstream_status": status,
+            }
+
+            if status in (401, 403):
+                raise ProcoreAuthExpired(details=details) from e
+            if status == 429:
+                raise ProcoreRateLimited(retry_after_seconds=retry_after, details=details) from e
+            if status >= 500:
+                raise ExternalServiceError(message="Procore service error", details=details) from e
+
+            # Other 4xx: treat as upstream error with context
+            raise ExternalServiceError(message="Procore request failed", details=details) from e
+
+        except httpx.RequestError as e:
+            raise ExternalServiceError(
+                message="Failed to reach Procore",
+                details={"upstream": "procore", "endpoint": endpoint, "method": method},
+            ) from e
     
     def _get_company_id(self) -> str:
         """Get company ID from token - will be set per request"""
         token = self.db.query(ProcoreToken).filter(
             ProcoreToken.user_id == self.user_id
         ).first()
+        if not token:
+            raise ProcoreNotConnected(details={"user_id": self.user_id})
         return token.company_id or ""
     
     # User & Company Methods

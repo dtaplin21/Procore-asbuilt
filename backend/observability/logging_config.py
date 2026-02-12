@@ -36,7 +36,7 @@ class JsonFormatter(logging.Formatter):
         }
 
         # Include common extras if present
-        for key in ("method", "path", "status_code", "duration_ms", "endpoint", "upstream_status"):
+        for key in ("method", "path", "status_code", "duration_ms", "endpoint", "upstream_status", "app_env", "log_level", "error_class", "retry_after"):
             if hasattr(record, key):
                 payload[key] = getattr(record, key)
 

@@ -10,6 +10,7 @@ from config import settings
 from typing import Optional, Dict, Any
 import secrets
 import hashlib
+from errors import ExternalServiceError, ProcoreAuthExpired, ProcoreNotConnected, ProcoreOAuthError
 
 class ProcoreOAuth:
     """Handles Procore OAuth 2.0 authentication flow"""
@@ -46,21 +47,31 @@ class ProcoreOAuth:
         user_id: Optional[str] = None
     ) -> ProcoreToken:
         """Exchange authorization code for access and refresh tokens"""
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.TOKEN_URL,
-                data={
-                    "client_id": self.client_id,
-                    "client_secret": self.client_secret,
-                    "redirect_uri": self.redirect_uri,
-                    "grant_type": "authorization_code",
-                    "code": code,
-                },
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
-            
-            response.raise_for_status()
-            token_data = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    self.TOKEN_URL,
+                    data={
+                        "client_id": self.client_id,
+                        "client_secret": self.client_secret,
+                        "redirect_uri": self.redirect_uri,
+                        "grant_type": "authorization_code",
+                        "code": code,
+                    },
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                )
+
+                response.raise_for_status()
+                token_data = response.json()
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code
+            details = {"upstream": "procore_oauth", "upstream_status": status}
+            # Invalid code/redirect mismatch etc typically surface as 400
+            if status in (400, 401, 403):
+                raise ProcoreOAuthError(details=details) from e
+            raise ExternalServiceError(message="Procore OAuth token exchange failed", details=details) from e
+        except httpx.RequestError as e:
+            raise ExternalServiceError(message="Failed to reach Procore OAuth", details={"upstream": "procore_oauth"}) from e
         
         # Extract user info from token response or make separate API call
         # For now, we'll need to get user_id from a separate call after getting token
@@ -108,20 +119,31 @@ class ProcoreOAuth:
         user_id: str
     ) -> ProcoreToken:
         """Refresh access token using refresh token"""
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.TOKEN_URL,
-                data={
-                    "client_id": self.client_id,
-                    "client_secret": self.client_secret,
-                    "grant_type": "refresh_token",
-                    "refresh_token": refresh_token,
-                },
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
-            
-            response.raise_for_status()
-            token_data = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    self.TOKEN_URL,
+                    data={
+                        "client_id": self.client_id,
+                        "client_secret": self.client_secret,
+                        "grant_type": "refresh_token",
+                        "refresh_token": refresh_token,
+                    },
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                )
+
+                response.raise_for_status()
+                token_data = response.json()
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code
+            details = {"upstream": "procore_oauth", "upstream_status": status}
+            if status in (401, 403):
+                raise ProcoreAuthExpired(details=details) from e
+            if status == 400:
+                raise ProcoreOAuthError(message="Procore refresh token invalid", details=details) from e
+            raise ExternalServiceError(message="Procore token refresh failed", details=details) from e
+        except httpx.RequestError as e:
+            raise ExternalServiceError(message="Failed to reach Procore OAuth", details={"upstream": "procore_oauth"}) from e
         
         # Update token in database
         token = self.db.query(ProcoreToken).filter(
@@ -129,7 +151,7 @@ class ProcoreOAuth:
         ).first()
         
         if not token:
-            raise ValueError(f"No token found for user {user_id}")
+            raise ProcoreNotConnected(details={"user_id": user_id})
         
         expires_in = token_data.get("expires_in", 3600)
         expires_at = datetime.utcnow() + timedelta(seconds=expires_in)

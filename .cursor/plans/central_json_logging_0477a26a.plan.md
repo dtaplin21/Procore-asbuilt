@@ -74,4 +74,3 @@ Every line includes:
 ## Testing/verification
 
 - Run backend and hit `/health`.
-- Confirm logs include a JSON line from `qcqa.request` with the same `request_id` that is returned in the `X-Request-Id` header.
