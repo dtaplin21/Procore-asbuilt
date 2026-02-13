@@ -1,11 +1,10 @@
 """
 Model package exports.
 
-We are intentionally keeping only the SQLAlchemy `Base` here until the new
-data model is defined.
+`models.py` is the source of truth for ORM definitions.
 """
 
-from .database import Base
+from .models import Base
 
 __all__ = ["Base"]
 

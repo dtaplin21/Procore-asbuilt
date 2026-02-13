@@ -1,14 +1,10 @@
 """
-SQLAlchemy ORM model registry.
+Compatibility shim.
 
-This project is keeping the SQLAlchemy *structure* (engine/session/Base) but has intentionally
-cleared out the current table models and Pydantic schemas so you can redefine the data model
-from scratch.
-
-Add new ORM models here (classes inheriting from `Base`) when you’re ready.
+`backend/models/models.py` is the source of truth for ORM definitions.
+This module re-exports from `models.py` so any older imports of `models.database`
+keep working without duplicating model definitions.
 """
 
-from sqlalchemy.ext.declarative import declarative_base
-
-Base = declarative_base()
+from .models import *  # noqa: F403
 
