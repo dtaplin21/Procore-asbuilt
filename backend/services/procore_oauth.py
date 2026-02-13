@@ -5,12 +5,12 @@ Manages OAuth flow, token storage, and refresh
 import httpx
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from models.database import ProcoreToken, ProcoreUser
 from config import settings
 from typing import Optional, Dict, Any
 import secrets
 import hashlib
 from errors import ExternalServiceError, ProcoreAuthExpired, ProcoreNotConnected, ProcoreOAuthError
+from services.procore_token_store import ProcoreTokenRecord, delete_token, get_token, move_token, upsert_token
 
 class ProcoreOAuth:
     """Handles Procore OAuth 2.0 authentication flow"""
@@ -45,7 +45,7 @@ class ProcoreOAuth:
         self,
         code: str,
         user_id: Optional[str] = None
-    ) -> ProcoreToken:
+    ) -> ProcoreTokenRecord:
         """Exchange authorization code for access and refresh tokens"""
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -79,45 +79,26 @@ class ProcoreOAuth:
         # Calculate expiration time
         expires_in = token_data.get("expires_in", 3600)  # Default 1 hour
         expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
-        
-        # Store or update token
-        if user_id:
-            existing_token = self.db.query(ProcoreToken).filter(
-                ProcoreToken.user_id == user_id
-            ).first()
-            
-            if existing_token:
-                existing_token.access_token = token_data["access_token"]
-                existing_token.refresh_token = token_data["refresh_token"]
-                existing_token.expires_at = expires_at
-                existing_token.token_type = token_data.get("token_type", "Bearer")
-                existing_token.scope = token_data.get("scope")
-                existing_token.updated_at = datetime.utcnow()
-                self.db.commit()
-                self.db.refresh(existing_token)
-                return existing_token
-        
-        # Create new token (user_id will be set after we get user info)
-        token = ProcoreToken(
-            user_id=user_id or "",  # Will be updated after user info fetch
+
+        if not user_id:
+            # We need a key to store the token. Routes pass a temp id and later re-key it
+            # to the real Procore user id once /me is fetched.
+            raise ProcoreOAuthError(message="Missing user_id for token storage")
+
+        record = ProcoreTokenRecord(
             access_token=token_data["access_token"],
             refresh_token=token_data["refresh_token"],
             expires_at=expires_at,
             token_type=token_data.get("token_type", "Bearer"),
             scope=token_data.get("scope"),
         )
-        
-        self.db.add(token)
-        self.db.commit()
-        self.db.refresh(token)
-        
-        return token
+        return upsert_token(user_id, record)
     
     async def refresh_token(
         self,
         refresh_token: str,
         user_id: str
-    ) -> ProcoreToken:
+    ) -> ProcoreTokenRecord:
         """Refresh access token using refresh token"""
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -145,45 +126,28 @@ class ProcoreOAuth:
         except httpx.RequestError as e:
             raise ExternalServiceError(message="Failed to reach Procore OAuth", details={"upstream": "procore_oauth"}) from e
         
-        # Update token in database
-        token = self.db.query(ProcoreToken).filter(
-            ProcoreToken.user_id == user_id
-        ).first()
-        
-        if not token:
-            raise ProcoreNotConnected(details={"user_id": user_id})
-        
         expires_in = token_data.get("expires_in", 3600)
         expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
-        
+
+        token = get_token(user_id)
+        if not token:
+            raise ProcoreNotConnected(details={"user_id": user_id})
+
         token.access_token = token_data["access_token"]
         token.refresh_token = token_data.get("refresh_token", refresh_token)  # May get new refresh token
         token.expires_at = expires_at
-        token.updated_at = datetime.utcnow()
-        
-        self.db.commit()
-        self.db.refresh(token)
-        
-        return token
+        token.token_type = token_data.get("token_type", token.token_type)
+        token.scope = token_data.get("scope", token.scope)
+
+        return upsert_token(user_id, token)
     
-    def get_token(self, user_id: str) -> Optional[ProcoreToken]:
+    def get_token(self, user_id: str) -> Optional[ProcoreTokenRecord]:
         """Get stored token for user"""
-        return self.db.query(ProcoreToken).filter(
-            ProcoreToken.user_id == user_id
-        ).first()
+        return get_token(user_id)
     
     def delete_token(self, user_id: str) -> bool:
         """Delete token for user (disconnect)"""
-        token = self.db.query(ProcoreToken).filter(
-            ProcoreToken.user_id == user_id
-        ).first()
-        
-        if token:
-            self.db.delete(token)
-            self.db.commit()
-            return True
-        
-        return False
+        return delete_token(user_id)
     
     async def get_user_info(self, access_token: str) -> Dict[str, Any]:
         """Get current user info from Procore"""
@@ -203,12 +167,17 @@ class ProcoreOAuth:
         self,
         user_id: str,
         access_token: str
-    ) -> ProcoreUser:
-        """Sync user info from Procore and store locally"""
+    ) -> Dict[str, Any]:
+        """
+        Fetch user info from Procore.
+
+        Note: ORM persistence has been removed; we return a plain dict and allow the
+        caller (OAuth callback) to re-key the token from a temp id to the real Procore user id.
+        """
         user_info = await self.get_user_info(access_token)
         
         # Get companies user belongs to
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             companies_response = await client.get(
                 "https://api.procore.com/rest/v1.0/companies",
                 headers={
@@ -218,74 +187,36 @@ class ProcoreOAuth:
             )
             companies_response.raise_for_status()
             companies = companies_response.json()
-        
-        # Get projects user has access to
-        project_ids = []
-        if companies:
-            # Get projects for first company (can be expanded)
-            company_id = companies[0]["id"]
-            projects_response = await client.get(
-                "https://api.procore.com/rest/v1.0/projects",
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Procore-Company-Id": str(company_id),
-                    "Content-Type": "application/json",
-                },
-            )
-            if projects_response.status_code == 200:
-                projects = projects_response.json()
-                project_ids = [str(p["id"]) for p in projects]
-        
-        # Store or update user info
-        existing_user = self.db.query(ProcoreUser).filter(
-            ProcoreUser.procore_user_id == str(user_info["id"])
-        ).first()
-        
-        company_ids = [str(c["id"]) for c in companies]
-        
-        if existing_user:
-            existing_user.email = user_info.get("email", "")
-            existing_user.name = user_info.get("name", "")
-            existing_user.company_ids = company_ids
-            existing_user.project_ids = project_ids
-            existing_user.last_synced_at = datetime.utcnow()
-            existing_user.updated_at = datetime.utcnow()
-            self.db.commit()
-            self.db.refresh(existing_user)
-            
-            # Update token with user_id
-            token = self.db.query(ProcoreToken).filter(
-                ProcoreToken.user_id == user_id
-            ).first()
-            if token and not token.user_id:
-                token.user_id = str(user_info["id"])
-                token.company_id = str(company_ids[0]) if company_ids else None
-                self.db.commit()
-            
-            return existing_user
-        
-        # Create new user
-        user = ProcoreUser(
-            procore_user_id=str(user_info["id"]),
-            email=user_info.get("email", ""),
-            name=user_info.get("name", ""),
-            company_ids=company_ids,
-            project_ids=project_ids,
-            last_synced_at=datetime.utcnow(),
-        )
-        
-        self.db.add(user)
-        self.db.commit()
-        self.db.refresh(user)
-        
-        # Update token with user_id
-        token = self.db.query(ProcoreToken).filter(
-            ProcoreToken.user_id == user_id
-        ).first()
-        if token:
-            token.user_id = str(user_info["id"])
-            token.company_id = str(company_ids[0]) if company_ids else None
-            self.db.commit()
-        
-        return user
+
+            company_ids = [str(c["id"]) for c in companies]
+
+            project_ids = []
+            if companies:
+                company_id = str(companies[0]["id"])
+                projects_response = await client.get(
+                    "https://api.procore.com/rest/v1.0/projects",
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "Procore-Company-Id": company_id,
+                        "Content-Type": "application/json",
+                    },
+                )
+                if projects_response.status_code == 200:
+                    projects = projects_response.json()
+                    project_ids = [str(p["id"]) for p in projects]
+
+        # Best-effort: attach company_id onto the stored token (still keyed by caller's user_id for now)
+        token = get_token(user_id)
+        if token and company_ids and not token.company_id:
+            token.company_id = company_ids[0]
+            upsert_token(user_id, token)
+
+        return {
+            "procore_user_id": str(user_info["id"]),
+            "email": user_info.get("email", ""),
+            "name": user_info.get("name", ""),
+            "company_ids": company_ids,
+            "project_ids": project_ids,
+            "last_synced_at": datetime.utcnow().isoformat(),
+        }
 

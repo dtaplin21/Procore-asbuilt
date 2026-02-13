@@ -1,42 +1,11 @@
-from .database import Base, Project, Submittal, RFI, Inspection, DrawingObject, AIInsight, ProcoreToken, ProcoreUser
-from .schemas import (
-    Project as ProjectSchema,
-    ProjectCreate,
-    Submittal as SubmittalSchema,
-    SubmittalCreate,
-    RFI as RFISchema,
-    RFICreate,
-    Inspection as InspectionSchema,
-    InspectionCreate,
-    DrawingObject as DrawingObjectSchema,
-    DrawingObjectCreate,
-    AIInsight as AIInsightSchema,
-    AIInsightCreate,
-    DashboardStats,
-    ProcoreConnection,
-)
+"""
+Model package exports.
 
-__all__ = [
-    "Base",
-    "Project",
-    "Submittal",
-    "RFI",
-    "Inspection",
-    "DrawingObject",
-    "AIInsight",
-    "ProjectSchema",
-    "ProjectCreate",
-    "SubmittalSchema",
-    "SubmittalCreate",
-    "RFISchema",
-    "RFICreate",
-    "InspectionSchema",
-    "InspectionCreate",
-    "DrawingObjectSchema",
-    "DrawingObjectCreate",
-    "AIInsightSchema",
-    "AIInsightCreate",
-    "DashboardStats",
-    "ProcoreConnection",
-]
+We are intentionally keeping only the SQLAlchemy `Base` here until the new
+data model is defined.
+"""
+
+from .database import Base
+
+__all__ = ["Base"]
 

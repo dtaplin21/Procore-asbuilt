@@ -6,7 +6,6 @@ import httpx
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from models.database import ProcoreToken
 import json
 from errors import (
     ExternalServiceError,
@@ -14,6 +13,7 @@ from errors import (
     ProcoreNotConnected,
     ProcoreRateLimited,
 )
+from services.procore_token_store import get_token
 
 class ProcoreAPIClient:
     """Main client for interacting with Procore REST API"""
@@ -38,9 +38,7 @@ class ProcoreAPIClient:
         """Get valid access token, refreshing if necessary"""
         from services.procore_oauth import ProcoreOAuth
         
-        token = self.db.query(ProcoreToken).filter(
-            ProcoreToken.user_id == self.user_id
-        ).first()
+        token = get_token(self.user_id)
         
         if not token:
             raise ProcoreNotConnected(details={"user_id": self.user_id})
@@ -133,9 +131,7 @@ class ProcoreAPIClient:
     
     def _get_company_id(self) -> str:
         """Get company ID from token - will be set per request"""
-        token = self.db.query(ProcoreToken).filter(
-            ProcoreToken.user_id == self.user_id
-        ).first()
+        token = get_token(self.user_id)
         if not token:
             raise ProcoreNotConnected(details={"user_id": self.user_id})
         return token.company_id or ""

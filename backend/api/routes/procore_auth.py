@@ -8,11 +8,11 @@ from sqlalchemy.orm import Session
 from database import get_db
 from services.procore_oauth import ProcoreOAuth
 from services.procore_client import ProcoreAPIClient
-from models.schemas import ProcoreConnection
 from datetime import datetime
 from typing import Optional
 import secrets
 from errors import ProcoreNotConnected
+from services.procore_token_store import move_token
 
 router = APIRouter(prefix="/api/procore", tags=["procore-auth"])
 
@@ -68,16 +68,17 @@ async def procore_oauth_callback(
     # Get user info and sync
     user = await oauth.sync_user_info(temp_user_id, token.access_token)
     
-    # Update token with actual user_id
-    token.user_id = user.procore_user_id
-    db.commit()
+    # Re-key token from temp id -> real Procore user id
+    procore_user_id = str(user.get("procore_user_id", ""))
+    if procore_user_id:
+        move_token(temp_user_id, procore_user_id)
     
     # Clean up state
     del _oauth_states[state]
     
     # Redirect to frontend with success
     return RedirectResponse(
-        url=f"http://localhost:5173/settings?procore_connected=true&user_id={user.procore_user_id}"
+        url=f"http://localhost:5173/settings?procore_connected=true&user_id={procore_user_id}"
     )
 
 @router.post("/oauth/refresh")
@@ -109,12 +110,13 @@ async def get_procore_status(
     token = oauth.get_token(user_id)
     
     if not token:
-        return ProcoreConnection(
-            connected=False,
-            sync_status="idle",
-            projects_linked=0,
-            error_message="Not connected to Procore"
-        )
+        return {
+            "connected": False,
+            "last_synced_at": None,
+            "sync_status": "idle",
+            "projects_linked": 0,
+            "error_message": "Not connected to Procore",
+        }
     
     # Check if token is expired
     is_expired = datetime.utcnow() >= token.expires_at
@@ -124,27 +126,21 @@ async def get_procore_status(
             # Attempt to refresh
             token = await oauth.refresh_token(token.refresh_token, user_id)
         except Exception as e:
-            return ProcoreConnection(
-                connected=False,
-                sync_status="error",
-                projects_linked=0,
-                error_message=f"Token expired and refresh failed: {str(e)}"
-            )
-    
-    # Get user info to count projects
-    from models.database import ProcoreUser
-    user = db.query(ProcoreUser).filter(
-        ProcoreUser.procore_user_id == user_id
-    ).first()
-    
-    projects_linked = len(user.project_ids) if user else 0
-    
-    return ProcoreConnection(
-        connected=True,
-        last_synced_at=user.last_synced_at.isoformat() if user and user.last_synced_at else None,
-        sync_status="idle",
-        projects_linked=projects_linked
-    )
+            return {
+                "connected": False,
+                "last_synced_at": None,
+                "sync_status": "error",
+                "projects_linked": 0,
+                "error_message": f"Token expired and refresh failed: {str(e)}",
+            }
+
+    return {
+        "connected": True,
+        "last_synced_at": token.updated_at.isoformat() if getattr(token, "updated_at", None) else None,
+        "sync_status": "idle",
+        "projects_linked": 0,
+        "error_message": None,
+    }
 
 @router.get("/me")
 async def get_current_user(
