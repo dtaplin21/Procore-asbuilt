@@ -15,7 +15,10 @@ class User(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
-    companies = relationship("UserCompany", back_populates="user")
+    # Association objects (membership records with role, timestamps, etc.)
+    user_companies = relationship("UserCompany", back_populates="user")
+    # Convenience many-to-many: list of Company objects the user belongs to
+    companies = relationship("Company", secondary="user_companies", back_populates="users")
     settings = relationship("UserSettings", back_populates="user", uselist=False)
     usage_logs = relationship("UsageLog", back_populates="user")
 
@@ -28,7 +31,10 @@ class Company(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
-    users = relationship("UserCompany", back_populates="company")
+    # Association objects (membership records with role, timestamps, etc.)
+    user_companies = relationship("UserCompany", back_populates="company")
+    # Convenience many-to-many: list of User objects in the company
+    users = relationship("User", secondary="user_companies", back_populates="companies")
     procore_connections = relationship("ProcoreConnection", back_populates="company")
 
 class UserCompany(Base):
@@ -41,8 +47,8 @@ class UserCompany(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
-    user = relationship("User", back_populates="companies")
-    company = relationship("Company", back_populates="users")
+    user = relationship("User", back_populates="user_companies")
+    company = relationship("Company", back_populates="user_companies")
 
 class ProcoreConnection(Base):
     __tablename__ = "procore_connections"
@@ -111,7 +117,9 @@ class UsageLog(Base):
     processing_time = Column(Float)  # seconds
     cost = Column(Float)  # if tracking costs
     
-    metadata = Column(JSON)  # Additional data
+    # "metadata" is reserved on SQLAlchemy declarative models.
+    # Keep the database column name as "metadata", but use a safe Python attribute.
+    log_metadata = Column("metadata", JSON)  # Additional data
     
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     

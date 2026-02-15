@@ -1,3 +1,5 @@
+from models.database import User, Company, ProcoreConnection, JobQueue
+from models.schemas import UserCreate, UserResponse, JobCreate, JobResponse
 from observability.request_logging_middleware import RequestResponseLoggingMiddleware
 from fastapi import FastAPI, Request
 from observability.logging_config import configure_logging

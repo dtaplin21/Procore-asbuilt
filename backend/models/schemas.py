@@ -6,8 +6,8 @@ scaffolding, but removing the current table-specific schemas so new schemas can 
 against the redesigned data model.
 """
 # models/schemas.py
-from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional, List, Literal
 from datetime import datetime
 
 # User Schemas
@@ -36,6 +36,38 @@ class CompanyResponse(CompanyBase):
     id: int
     created_at: datetime
     
+    class Config:
+        from_attributes = True
+
+# ============================================
+# PROJECT SCHEMAS
+# ============================================
+
+ProjectStatus = Literal["active", "completed", "on_hold"]
+
+
+class ProjectBase(BaseModel):
+    company_id: int
+    name: str = Field(..., min_length=1)
+    status: ProjectStatus = "active"
+    procore_project_id: Optional[str] = None
+
+
+class ProjectCreate(ProjectBase):
+    pass
+
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1)
+    status: Optional[ProjectStatus] = None
+    procore_project_id: Optional[str] = None
+
+
+class ProjectResponse(ProjectBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
     class Config:
         from_attributes = True
 
