@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
   ClipboardCheck, 
@@ -13,9 +14,27 @@ import { AIInsightCard } from "@/components/ai-insight-card";
 import { ProcoreStatus } from "@/components/procore-status";
 import type { DashboardStats, AIInsight, ProcoreConnection } from "@shared/schema";
 
+type Project = {
+  id: string | number;
+  name: string;
+};
+
+function getProjectIdFromUrl(): string | null {
+  const sp = new URLSearchParams(window.location.search);
+  const raw = sp.get("projectId");
+  return raw && raw.trim().length > 0 ? raw : null;
+}
+
+function setProjectIdInUrl(projectId: string | null) {
+  const url = new URL(window.location.href);
+  if (projectId) url.searchParams.set("projectId", projectId);
+  else url.searchParams.delete("projectId");
+  window.history.replaceState({}, "", url.toString());
+}
+
 interface DashboardProps {
   procoreConnection: ProcoreConnection;
-  onProcoreSync?: () => void;
+  onProcoreSync?: () => void; 
 }
 
 export default function Dashboard({ procoreConnection, onProcoreSync }: DashboardProps) {
@@ -27,17 +46,82 @@ export default function Dashboard({ procoreConnection, onProcoreSync }: Dashboar
     queryKey: ["/api/insights?limit=4"],
   });
 
+  // Projects list for selector (Phase 1 / Step 3)
+  const { data: projects, isLoading: projectsLoading } = useQuery<Project[]>({
+    queryKey: ["/api/projects"],
+  });
+
+  // Selected project context (scopes the dashboard structurally)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() =>
+    getProjectIdFromUrl()
+  );
+
+  // If URL has no projectId, pick a default once projects load
+  useEffect(() => {
+    if (projectsLoading) return;
+    if (!projects || projects.length === 0) return;
+    if (selectedProjectId) return;
+
+    const firstId = String(projects[0].id);
+    setSelectedProjectId(firstId);
+    setProjectIdInUrl(firstId);
+  }, [projectsLoading, projects, selectedProjectId]);
+
+  // Whenever selection changes, persist it in the URL
+  useEffect(() => {
+    setProjectIdInUrl(selectedProjectId);
+  }, [selectedProjectId]);
+
+  const selectedProjectName = useMemo(() => {
+    if (!projects || !selectedProjectId) return null;
+    const p = projects.find((x) => String(x.id) === String(selectedProjectId));
+    return p?.name ?? null;
+  }, [projects, selectedProjectId]);
+
+  // NOTE (future): when backend supports project-scoped stats/insights, use query params:
+  // queryKey: [`/api/dashboard/stats?project_id=${selectedProjectId}`]
+  // queryKey: [`/api/insights?limit=4&project_id=${selectedProjectId}`]
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Dashboard</h1>
           <p className="text-muted-foreground">Quality control overview and AI insights</p>
+          {selectedProjectName && (
+            <p className="text-sm text-muted-foreground mt-1" data-testid="text-selected-project">
+              Project: <span className="font-medium text-foreground">{selectedProjectName}</span>
+            </p>
+          )}
         </div>
-        <ProcoreStatus 
-          connection={procoreConnection} 
-          onSync={onProcoreSync}
-        />
+        <div className="flex items-center gap-3">
+          {/* Project Selector */}
+          <div className="flex flex-col">
+            <label className="text-xs text-muted-foreground">Project</label>
+            <select
+              className="h-9 rounded-md border bg-background px-3 text-sm"
+              value={selectedProjectId ?? ""}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              disabled={projectsLoading || !projects || projects.length === 0}
+              data-testid="project-selector"
+            >
+              {projectsLoading ? (
+                <option value="">Loading projects…</option>
+              ) : !projects || projects.length === 0 ? (
+                <option value="">No projects found</option>
+              ) : (
+                projects.map((p) => (
+                  <option key={String(p.id)} value={String(p.id)}>
+                    {p.name}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
+          {/* Existing Procore status */}
+          <ProcoreStatus connection={procoreConnection} onSync={onProcoreSync} />
+        </div>
       </div>
 
       {/* Stats Grid */}
