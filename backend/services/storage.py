@@ -11,6 +11,8 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 from typing import Any, Dict, List, Optional
 
+from models.models import Project
+
 
 class StorageService:
     def __init__(self, db: Session):
@@ -20,11 +22,14 @@ class StorageService:
     # Placeholder methods (return empty data until new models are defined)
     # ------------------------------------------------------------------
 
-    def get_projects(self) -> List[Dict[str, Any]]:
-        return []
+    def get_projects(self, company_id: Optional[int] = None) -> List[Project]:
+        q = self.db.query(Project)
+        if company_id is not None:
+            q = q.filter(Project.company_id == company_id)
+        return q.order_by(Project.name.asc()).all()
 
-    def get_project(self, project_id: str) -> Optional[Dict[str, Any]]:
-        return None
+    def get_project(self, project_id: int) -> Optional[Project]:
+        return self.db.query(Project).filter(Project.id == project_id).first()
 
     def get_submittals(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
         return []

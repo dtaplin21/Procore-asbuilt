@@ -1,5 +1,5 @@
 # models/database.py
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Float, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Float, JSON, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -35,7 +35,38 @@ class Company(Base):
     user_companies = relationship("UserCompany", back_populates="company")
     # Convenience many-to-many: list of User objects in the company
     users = relationship("User", secondary="user_companies", back_populates="companies")
+    projects = relationship("Project", back_populates="company")
     procore_connections = relationship("ProcoreConnection", back_populates="company")
+
+class Project(Base):
+    __tablename__ = "projects"
+    __table_args__ = (
+        UniqueConstraint("company_id", "procore_project_id", name="uq_projects_company_procore_id"),
+    )
+    
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
+    
+    # External identifier from Procore (scoped unique per company)
+    procore_project_id = Column(String, nullable=False, index=True)
+    
+    name = Column(String, nullable=False)
+    status = Column(String, default="active")  # active, completed, on_hold
+    
+    # Sync tracking (optional but useful for UI)
+    last_sync_at = Column(DateTime, nullable=True)
+    sync_status = Column(String, nullable=True)  # idle, syncing, error
+    
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+    
+    # Relationships
+    company = relationship("Company", back_populates="projects")
+    jobs = relationship("JobQueue", back_populates="project")
 
 class UserCompany(Base):
     __tablename__ = "user_companies"
@@ -82,6 +113,7 @@ class JobQueue(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     
     job_type = Column(String, nullable=False)  # "drawing_markup", "clash_detection", etc.
     status = Column(String, default="pending")  # pending, processing, completed, failed
@@ -101,6 +133,9 @@ class JobQueue(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+    
+    # Relationships
+    project = relationship("Project", back_populates="jobs")
 
 # Usage Tracking
 class UsageLog(Base):
