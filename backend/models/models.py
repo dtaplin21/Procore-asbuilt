@@ -67,6 +67,7 @@ class Project(Base):
     # Relationships
     company = relationship("Company", back_populates="projects")
     jobs = relationship("JobQueue", back_populates="project")
+    findings = relationship("Finding", back_populates="project", cascade="all, delete-orphan")
 
 class UserCompany(Base):
     __tablename__ = "user_companies"
@@ -136,6 +137,42 @@ class JobQueue(Base):
     
     # Relationships
     project = relationship("Project", back_populates="jobs")
+
+# Findings (DB term) / Insights (API & UI term)
+class Finding(Base):
+    __tablename__ = "findings"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Scope: every finding belongs to a project
+    project_id = Column(
+        Integer,
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # Mirrors the frontend AIInsight contract
+    type = Column(String, nullable=False)       # compliance | deviation | recommendation | warning
+    severity = Column(String, nullable=False)   # low | medium | high | critical
+
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+
+    # Store list of affected items (MVP)
+    affected_items = Column(JSON, default=list)
+
+    resolved = Column(Boolean, default=False, nullable=False)
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+
+    # Optional links (future-proof, can be null for now)
+    related_submittal_id = Column(String, nullable=True)
+    related_rfi_id = Column(String, nullable=True)
+    related_inspection_id = Column(String, nullable=True)
+
+    # Relationships
+    project = relationship("Project", back_populates="findings")
 
 # Usage Tracking
 class UsageLog(Base):
