@@ -42,14 +42,14 @@ Optional fields now (future-proofing):
 ## Implementation steps
 
 ### Step 1 — Add Alembic to backend dependencies
-- Add `alembic` to `backend/requirements.txt`
+- Add `alembic` to `backend/requirements.txt` (Done)
 
 ### Step 2 — Initialize Alembic in `backend/`
 Create:
 - `backend/alembic.ini`
 - `backend/alembic/env.py`
 - `backend/alembic/script.py.mako`
-- `backend/alembic/versions/` directory
+- `backend/alembic/versions/` directory (Done)
 
 Configure `env.py` so:
 - DB URL comes from `config.settings.database_url`
@@ -58,11 +58,11 @@ Configure `env.py` so:
 ### Step 3 — Create the `findings` ORM model
 In `backend/models/models.py`:
 - Add `Finding` (or `FindingRecord`) with `__tablename__ = "findings"`
-- Add `project_id` FK relationship to `Project`
+- Add `project_id` FK relationship to `Project` (Done)
 
 ### Step 4 — Create the initial Alembic migration
 - Generate a migration that creates the `findings` table and any missing columns/FKs.
-- Apply it with `alembic upgrade head`.
+- Apply it with `alembic upgrade head`. (done)
 
 ### Step 5 — Replace storage stubs for insights
 In `backend/services/storage.py`:
