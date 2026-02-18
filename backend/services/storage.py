@@ -9,9 +9,10 @@ so routes can continue to import it while the new data model is designed.
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 from typing import Any, Dict, List, Optional
 
-from models.models import Project
+from models.models import Project, Finding
 
 
 class StorageService:
@@ -73,11 +74,28 @@ class StorageService:
     def get_object(self, object_id: str) -> Optional[Dict[str, Any]]:
         return None
 
-    def get_insights(self, project_id: Optional[str] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
-        return []
+    def get_insights(self, project_id: Optional[int] = None, limit: Optional[int] = None) -> List[Finding]:
+        q = self.db.query(Finding)
+        if project_id is not None:
+            q = q.filter(Finding.project_id == project_id)
+        q = q.order_by(Finding.created_at.desc(), Finding.id.desc())
+        if limit is not None:
+            q = q.limit(limit)
+        return q.all()
 
-    def resolve_insight(self, insight_id: str) -> Optional[Dict[str, Any]]:
-        return None
+    def resolve_insight(self, insight_id: int) -> Optional[Finding]:
+        finding = self.db.query(Finding).filter(Finding.id == insight_id).first()
+        if finding is None:
+            return None
+
+        finding.resolved = True
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(finding)
+        return finding
 
     def get_dashboard_stats(self) -> Dict[str, Any]:
         return {

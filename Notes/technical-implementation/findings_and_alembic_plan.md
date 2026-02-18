@@ -67,7 +67,7 @@ In `backend/models/models.py`:
 ### Step 5 — Replace storage stubs for insights
 In `backend/services/storage.py`:
 - `get_insights(project_id, limit)` queries `findings`
-- `resolve_insight(insight_id)` updates `resolved=True`
+- `resolve_insight(insight_id)` updates `resolved=True` (done)
 
 In `backend/api/routes/insights.py`:
 - ensure `project_id` is accepted as an **int** (query param)

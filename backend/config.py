@@ -2,7 +2,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql://user:password@localhost/procore_integrator"
+    # Use psycopg v3 driver by default (matches requirements.txt: psycopg[binary])
+    database_url: str = "postgresql+psycopg://user:password@localhost/procore_integrator"
     procore_client_id: Optional[str] = None
     procore_client_secret: Optional[str] = None
     procore_redirect_uri: str = "http://localhost:2000/api/procore/oauth/callback"

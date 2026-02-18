@@ -6,7 +6,7 @@ scaffolding, but removing the current table-specific schemas so new schemas can 
 against the redesigned data model.
 """
 # models/schemas.py
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 from typing import Optional, List, Literal
 from datetime import datetime
 
@@ -70,6 +70,37 @@ class ProjectResponse(ProjectBase):
 
     class Config:
         from_attributes = True
+
+# ============================================
+# INSIGHTS (FINDINGS) SCHEMAS
+# Frontend contract: shared/schema.ts -> AIInsight (camelCase)
+# ============================================
+
+AIInsightType = Literal["compliance", "deviation", "recommendation", "warning"]
+AIInsightSeverity = Literal["low", "medium", "high", "critical"]
+
+
+class AIInsightResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True, coerce_numbers_to_str=True)
+
+    # Store as snake_case in Python (matches ORM) but serialize as camelCase (matches frontend)
+    id: str
+    project_id: str = Field(serialization_alias="projectId")
+    type: AIInsightType
+    severity: AIInsightSeverity
+    title: str
+    description: str
+    affected_items: List[str] = Field(default_factory=list, serialization_alias="affectedItems")
+    created_at: datetime = Field(serialization_alias="createdAt")
+    resolved: bool
+    related_submittal_id: Optional[str] = Field(default=None, serialization_alias="relatedSubmittalId")
+    related_rfi_id: Optional[str] = Field(default=None, serialization_alias="relatedRFIId")
+    related_inspection_id: Optional[str] = Field(default=None, serialization_alias="relatedInspectionId")
+
+    @field_validator("affected_items", mode="before")
+    @classmethod
+    def _coerce_affected_items(cls, v):
+        return [] if v is None else v
 
 # Procore Connection Schemas
 class ProcoreTokenCreate(BaseModel):
