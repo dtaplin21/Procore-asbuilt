@@ -38,23 +38,28 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ procoreConnection, onProcoreSync }: DashboardProps) {
+  // Selected project context (scopes the dashboard structurally)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() =>
+    getProjectIdFromUrl()
+  );
+
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
   });
 
   const { data: insights, isLoading: insightsLoading } = useQuery<AIInsight[]>({
-    queryKey: ["/api/insights?limit=4"],
+    queryKey: [
+      selectedProjectId
+        ? `/api/insights?project_id=${encodeURIComponent(selectedProjectId)}&limit=4`
+        : "/api/insights?limit=4",
+    ],
+    enabled: !!selectedProjectId,
   });
 
   // Projects list for selector (Phase 1 / Step 3)
   const { data: projects, isLoading: projectsLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
   });
-
-  // Selected project context (scopes the dashboard structurally)
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() =>
-    getProjectIdFromUrl()
-  );
 
   // If URL has no projectId, pick a default once projects load
   useEffect(() => {
