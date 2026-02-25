@@ -1,5 +1,5 @@
 # models/database.py
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Float, JSON, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Float, JSON, UniqueConstraint, Index, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -84,26 +84,54 @@ class UserCompany(Base):
 
 class ProcoreConnection(Base):
     __tablename__ = "procore_connections"
-    
+    __table_args__ = (
+        # 1 row per (company_id, procore_user_id)
+        UniqueConstraint(
+            "company_id",
+            "procore_user_id",
+            name="uq_procore_connections_company_user",
+        ),
+
+        # Ensure lookups are fast
+        Index("ix_procore_connections_procore_user_id", "procore_user_id"),
+
+        # Optional (recommended): enforce only one active company context per Procore user
+        # Postgres partial unique index: procore_user_id unique when is_active = true
+        Index(
+            "uq_procore_connections_active_user",
+            "procore_user_id",
+            unique=True,
+            postgresql_where=text("is_active"),
+        ),
+    )
+
     id = Column(Integer, primary_key=True, index=True)
-    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
-    
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
+
     # OAuth tokens
     access_token = Column(Text, nullable=False)
     refresh_token = Column(Text, nullable=False)
     token_expires_at = Column(DateTime, nullable=False)
-    
+
+    # NEW: token metadata
+    token_type = Column(String, nullable=False, server_default="Bearer")
+    scope = Column(Text, nullable=True)
+
     # Procore details
-    procore_user_id = Column(String)
-    
-    is_active = Column(Boolean, default=True)
+    procore_user_id = Column(String, nullable=True)  # consider nullable=False once flow always stores after /me
+
+    # NEW: audit (optional but recommended)
+    revoked_at = Column(DateTime, nullable=True)  # or disconnected_at if you prefer naming
+
+    is_active = Column(Boolean, default=True, nullable=False)
+
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
-    
+
     # Relationships
     company = relationship("Company", back_populates="procore_connections")
 
