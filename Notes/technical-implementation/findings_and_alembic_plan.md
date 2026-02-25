@@ -71,12 +71,12 @@ In `backend/services/storage.py`:
 
 In `backend/api/routes/insights.py`:
 - ensure `project_id` is accepted as an **int** (query param)
-- keep the route path `/api/insights`
+- keep the route path `/api/insights` (done)
 
 ### Step 6 — Seed 1–2 findings (dev)
 Pick one:
 - one-time seed script `backend/scripts/seed_findings.py`, or
-- manual SQL insert in `psql`
+- manual SQL insert in `psql` (pending)
 
 ### Step 7 — Wire dashboard query to project scope
 In `client/src/pages/dashboard.tsx`:
