@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import get_db
 from services.procore_client import ProcoreAPIClient
-from services.procore_oauth import ProcoreOAuth
 from typing import Optional
 from errors import ProcoreNotConnected
+from services.procore_connection_store import get_active_connection
 
 router = APIRouter(prefix="/api/procore", tags=["procore"])
 
@@ -15,10 +15,8 @@ async def sync_procore(
     db: Session = Depends(get_db)
 ):
     """Sync data from Procore"""
-    oauth = ProcoreOAuth(db)
-    token = oauth.get_token(user_id)
-    
-    if not token:
+    conn = get_active_connection(db, user_id)
+    if not conn:
         raise ProcoreNotConnected(details={"user_id": user_id})
     
     async with ProcoreAPIClient(db, user_id) as client:

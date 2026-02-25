@@ -13,7 +13,8 @@ from errors import (
     ProcoreNotConnected,
     ProcoreRateLimited,
 )
-from services.procore_token_store import get_token
+from models.models import Company
+from services.procore_connection_store import get_active_connection
 
 class ProcoreAPIClient:
     """Main client for interacting with Procore REST API"""
@@ -38,19 +39,19 @@ class ProcoreAPIClient:
         """Get valid access token, refreshing if necessary"""
         from services.procore_oauth import ProcoreOAuth
         
-        token = get_token(self.user_id)
+        conn = get_active_connection(self.db, self.user_id)
         
-        if not token:
+        if not conn:
             raise ProcoreNotConnected(details={"user_id": self.user_id})
         
         # Check if token is expired or expires soon (within 5 minutes)
-        if datetime.utcnow() >= token.expires_at - timedelta(minutes=5):
+        if datetime.utcnow() >= conn.token_expires_at - timedelta(minutes=5):
             # Refresh token
             oauth = ProcoreOAuth(self.db)
-            new_token = await oauth.refresh_token(token.refresh_token, self.user_id)
-            return new_token.access_token
+            new_payload = await oauth.refresh_token(self.user_id)
+            return str(new_payload["access_token"])
         
-        return token.access_token
+        return conn.access_token
     
     async def _request(
         self,
@@ -64,12 +65,15 @@ class ProcoreAPIClient:
         access_token = await self._get_access_token()
         
         url = f"{self.BASE_URL}/rest/{self.API_VERSION}/{endpoint.lstrip('/')}"
-        
+
         request_headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
-            "Procore-Company-Id": self._get_company_id(),  # Will be set per request
         }
+
+        company_header = self._get_company_id()
+        if company_header:
+            request_headers["Procore-Company-Id"] = company_header
         
         if headers:
             request_headers.update(headers)
@@ -130,11 +134,22 @@ class ProcoreAPIClient:
             ) from e
     
     def _get_company_id(self) -> str:
-        """Get company ID from token - will be set per request"""
-        token = get_token(self.user_id)
-        if not token:
+        """
+        Get Procore company id header value for the ACTIVE connection.
+
+        NOTE: ProcoreConnection.company_id is an internal FK. We must map it to
+        Company.procore_company_id for the Procore-Company-Id header.
+        """
+        conn = get_active_connection(self.db, self.user_id)
+        if not conn:
             raise ProcoreNotConnected(details={"user_id": self.user_id})
-        return token.company_id or ""
+
+        company = (
+            self.db.query(Company)
+            .filter(Company.id == conn.company_id)
+            .first()
+        )
+        return str(company.procore_company_id) if company and company.procore_company_id else ""
     
     # User & Company Methods
     async def get_current_user(self) -> Dict[str, Any]:

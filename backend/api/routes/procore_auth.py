@@ -12,7 +12,14 @@ from datetime import datetime
 from typing import Optional
 import secrets
 from errors import ProcoreNotConnected
-from services.procore_token_store import move_token
+from models.models import Company
+from services.procore_connection_store import (
+    get_active_connection,
+    get_connection,
+    set_active_company,
+    upsert_connection,
+    delete_connection,
+)
 
 router = APIRouter(prefix="/api/procore", tags=["procore-auth"])
 
@@ -47,69 +54,67 @@ async def procore_oauth_callback(
     code: str = Query(...),
     state: str = Query(...),
     error: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Handle OAuth callback from Procore"""
+    """Handle OAuth callback from Procore (DB persistence, no temp IDs)"""
     oauth = ProcoreOAuth(db)
-    
+
     # Verify state
     if state not in _oauth_states:
         raise HTTPException(status_code=400, detail="Invalid state parameter")
-    
+
     if error:
         raise HTTPException(status_code=400, detail=f"OAuth error: {error}")
-    
-    # Exchange code for tokens
-    # Generate temporary user_id (in production, get from session)
-    temp_user_id = secrets.token_urlsafe(16)
-    
-    token = await oauth.exchange_code_for_tokens(code, temp_user_id)
-    
-    # Get user info and sync
-    user = await oauth.sync_user_info(temp_user_id, token.access_token)
-    
-    # Re-key token from temp id -> real Procore user id
+
+    # Exchange code -> token payload (does NOT store)
+    token_payload = await oauth.exchange_code_for_tokens(code)
+
+    # /me + /companies + persist default company connection
+    user = await oauth.sync_user_info(token_payload)
+
     procore_user_id = str(user.get("procore_user_id", ""))
-    if procore_user_id:
-        move_token(temp_user_id, procore_user_id)
-    
+
     # Clean up state
     del _oauth_states[state]
-    
-    # Redirect to frontend with success
-    return RedirectResponse(
-        url=f"http://localhost:5173/settings?procore_connected=true&user_id={procore_user_id}"
-    )
+
+    # Determine the internal company_id we activated (first company persisted in sync_user_info)
+    active_conn = get_active_connection(db, procore_user_id)
+    active_company_id = active_conn.company_id if active_conn else None
+
+    # Redirect to frontend
+    base = "http://localhost:5173/settings"
+    qs = f"?procore_connected=true&user_id={procore_user_id}"
+    if active_company_id:
+        qs += f"&company_id={active_company_id}"
+
+    return RedirectResponse(url=f"{base}{qs}")
 
 @router.post("/oauth/refresh")
 async def refresh_procore_token(
     user_id: str = Query(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Refresh Procore access token"""
+    """Refresh Procore access token for the user's ACTIVE company connection (DB-backed)."""
     oauth = ProcoreOAuth(db)
-    
-    token = oauth.get_token(user_id)
-    if not token:
-        raise ProcoreNotConnected(details={"user_id": user_id})
-    
-    new_token = await oauth.refresh_token(token.refresh_token, user_id)
+
+    # This refresh loads active connection from DB and persists updated tokens
+    new_payload = await oauth.refresh_token(user_id)
+
     return {
         "success": True,
-        "expires_at": new_token.expires_at.isoformat()
+        "expires_at": new_payload["expires_at"].isoformat(),
     }
 
 @router.get("/status")
 async def get_procore_status(
     user_id: str = Query(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Get Procore connection status for user"""
+    """Get Procore connection status for user (DB-backed)."""
     oauth = ProcoreOAuth(db)
-    
-    token = oauth.get_token(user_id)
-    
-    if not token:
+
+    conn = get_active_connection(db, user_id)
+    if not conn:
         return {
             "connected": False,
             "last_synced_at": None,
@@ -117,14 +122,14 @@ async def get_procore_status(
             "projects_linked": 0,
             "error_message": "Not connected to Procore",
         }
-    
-    # Check if token is expired
-    is_expired = datetime.utcnow() >= token.expires_at
-    
+
+    # Check expiry using token_expires_at
+    is_expired = datetime.utcnow() >= conn.token_expires_at
+
     if is_expired:
         try:
-            # Attempt to refresh
-            token = await oauth.refresh_token(token.refresh_token, user_id)
+            await oauth.refresh_token(user_id)  # refreshes + persists active row
+            conn = get_active_connection(db, user_id)
         except Exception as e:
             return {
                 "connected": False,
@@ -136,10 +141,11 @@ async def get_procore_status(
 
     return {
         "connected": True,
-        "last_synced_at": token.updated_at.isoformat() if getattr(token, "updated_at", None) else None,
+        "last_synced_at": conn.updated_at.isoformat() if conn and conn.updated_at else None,
         "sync_status": "idle",
         "projects_linked": 0,
         "error_message": None,
+        "active_company_id": conn.company_id if conn else None,
     }
 
 @router.get("/me")
@@ -148,10 +154,8 @@ async def get_current_user(
     db: Session = Depends(get_db)
 ):
     """Get current authenticated user info"""
-    oauth = ProcoreOAuth(db)
-    token = oauth.get_token(user_id)
-    
-    if not token:
+    conn = get_active_connection(db, user_id)
+    if not conn:
         raise ProcoreNotConnected(details={"user_id": user_id})
     
     async with ProcoreAPIClient(db, user_id) as client:
@@ -164,15 +168,33 @@ async def get_companies(
     db: Session = Depends(get_db)
 ):
     """List all companies user has access to"""
-    oauth = ProcoreOAuth(db)
-    token = oauth.get_token(user_id)
-    
-    if not token:
+    conn = get_active_connection(db, user_id)
+    if not conn:
         raise ProcoreNotConnected(details={"user_id": user_id})
     
     async with ProcoreAPIClient(db, user_id) as client:
         companies = await client.get_companies()
         return companies
+
+@router.post("/company/select")
+async def select_active_company(
+    user_id: str = Query(...),
+    company_id: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    """
+    Switch active Procore company context for this procore_user_id.
+    Marks other connections inactive and activates this one.
+    """
+    # Require that a connection row exists for this (company_id, user_id)
+    conn = get_connection(db, company_id, user_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail="No Procore connection found for that company/user")
+
+    set_active_company(db, user_id, company_id)
+    db.commit()
+
+    return {"success": True, "active_company_id": int(company_id)}
 
 @router.get("/projects")
 async def get_projects(
@@ -181,10 +203,8 @@ async def get_projects(
     db: Session = Depends(get_db)
 ):
     """List all projects user has access to"""
-    oauth = ProcoreOAuth(db)
-    token = oauth.get_token(user_id)
-    
-    if not token:
+    conn = get_active_connection(db, user_id)
+    if not conn:
         raise ProcoreNotConnected(details={"user_id": user_id})
     
     async with ProcoreAPIClient(db, user_id) as client:
@@ -199,10 +219,8 @@ async def get_project(
     db: Session = Depends(get_db)
 ):
     """Get project details"""
-    oauth = ProcoreOAuth(db)
-    token = oauth.get_token(user_id)
-    
-    if not token:
+    conn = get_active_connection(db, user_id)
+    if not conn:
         raise ProcoreNotConnected(details={"user_id": user_id})
     
     async with ProcoreAPIClient(db, user_id) as client:
@@ -217,10 +235,8 @@ async def get_project_team(
     db: Session = Depends(get_db)
 ):
     """Get project team members"""
-    oauth = ProcoreOAuth(db)
-    token = oauth.get_token(user_id)
-    
-    if not token:
+    conn = get_active_connection(db, user_id)
+    if not conn:
         raise ProcoreNotConnected(details={"user_id": user_id})
     
     async with ProcoreAPIClient(db, user_id) as client:
@@ -230,15 +246,22 @@ async def get_project_team(
 @router.post("/disconnect")
 async def disconnect_procore(
     user_id: str = Query(...),
+    company_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """Disconnect Procore account"""
-    oauth = ProcoreOAuth(db)
-    
-    success = oauth.delete_token(user_id)
-    
-    if not success:
-        raise HTTPException(status_code=404, detail="No Procore connection found")
-    
+    """
+    Disconnect Procore.
+
+    If company_id is provided: delete that specific (company_id, user_id) connection.
+    If not provided: delete the ACTIVE connection.
+    """
+    if company_id is None:
+        active = get_active_connection(db, user_id)
+        if not active:
+            raise HTTPException(status_code=404, detail="No Procore connection found")
+        company_id = active.company_id
+
+    delete_connection(db, user_id, company_id)
+
     return {"success": True, "message": "Disconnected from Procore"}
 
