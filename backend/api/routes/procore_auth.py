@@ -176,6 +176,34 @@ async def get_companies(
         companies = await client.get_companies()
         return companies
 
+
+@router.get("/companies/local")
+async def get_local_companies(
+    user_id: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns local Company rows (internal id) for the companies the user has access to.
+    Uses ProcoreAPIClient to fetch /companies, then maps to DB Company records.
+    """
+    conn = get_active_connection(db, user_id)
+    if not conn:
+        raise ProcoreNotConnected(details={"user_id": user_id})
+
+    async with ProcoreAPIClient(db, user_id) as client:
+        procore_companies = await client.get_companies()
+
+    procore_ids = [str(c.get("id")) for c in (procore_companies or []) if c.get("id") is not None]
+    if not procore_ids:
+        return []
+
+    rows = db.query(Company).filter(Company.procore_company_id.in_(procore_ids)).all()
+
+    return [
+        {"id": r.id, "name": r.name, "procore_company_id": r.procore_company_id}
+        for r in rows
+    ]
+
 @router.post("/company/select")
 async def select_active_company(
     user_id: str = Query(...),

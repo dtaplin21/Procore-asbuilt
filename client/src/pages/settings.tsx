@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { 
   Settings, 
   User, 
@@ -15,6 +15,13 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Tabs,
   TabsContent,
   TabsList,
@@ -22,18 +29,98 @@ import {
 } from "@/components/ui/tabs";
 import type { ProcoreConnection } from "@shared/schema";
 
+type LocalCompany = { id: number; name: string; procore_company_id: string | null };
+
 interface SettingsProps {
   procoreConnection: ProcoreConnection;
   onConnectProcore?: () => void;
   onDisconnectProcore?: () => void;
+  userId?: string | null;
+  activeCompanyId?: number | null;
+  onRefreshProcoreStatus?: () => Promise<void>;
+  onInvalidateCompanyScopedData?: () => void;
 }
 
-export default function SettingsPage({ procoreConnection, onConnectProcore, onDisconnectProcore }: SettingsProps) {
+export default function SettingsPage({
+  procoreConnection,
+  onConnectProcore,
+  onDisconnectProcore,
+  userId,
+  activeCompanyId,
+  onRefreshProcoreStatus,
+  onInvalidateCompanyScopedData,
+}: SettingsProps) {
   const [notifications, setNotifications] = useState({
     emailInspections: true,
     pushAlerts: true,
     aiInsights: true,
   });
+
+  const [companies, setCompanies] = useState<LocalCompany[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+  const [companyLoading, setCompanyLoading] = useState(false);
+  const [companyError, setCompanyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeCompanyId == null) return;
+    const next = String(activeCompanyId);
+    setSelectedCompanyId((prev) => (prev === next ? prev : next));
+  }, [activeCompanyId]);
+
+  useEffect(() => {
+    if (!procoreConnection.connected) return;
+    if (!userId) return;
+
+    let cancelled = false;
+    setCompanyLoading(true);
+    setCompanyError(null);
+
+    fetch(`/api/procore/companies/local?user_id=${encodeURIComponent(userId)}`, {
+      credentials: "include",
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+        return (await res.json()) as LocalCompany[];
+      })
+      .then((rows) => {
+        if (cancelled) return;
+        setCompanies(rows || []);
+        if (activeCompanyId == null && rows && rows.length > 0) {
+          setSelectedCompanyId((prev) => (prev ? prev : String(rows[0].id)));
+        }
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setCompanyError(e instanceof Error ? e.message : "Failed to load companies");
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setCompanyLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [procoreConnection.connected, userId, activeCompanyId]);
+
+  async function handleSelectCompany(nextCompanyId: string) {
+    if (!userId) return;
+    if (nextCompanyId === selectedCompanyId) return;
+    setSelectedCompanyId(nextCompanyId);
+    setCompanyError(null);
+    try {
+      const qs = new URLSearchParams({ user_id: userId, company_id: nextCompanyId });
+      const res = await fetch(`/api/procore/company/select?${qs.toString()}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+      await onRefreshProcoreStatus?.();
+      onInvalidateCompanyScopedData?.();
+    } catch (e) {
+      setCompanyError(e instanceof Error ? e.message : "Failed to switch company");
+    }
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
@@ -142,6 +229,38 @@ export default function SettingsPage({ procoreConnection, onConnectProcore, onDi
               {procoreConnection.connected && (
                 <>
                   <Separator />
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Active Company</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Choose which Procore company context to use for API calls and syncing.
+                    </p>
+
+                    <div className="max-w-sm">
+                      <Select
+                        value={selectedCompanyId}
+                        onValueChange={handleSelectCompany}
+                        disabled={companyLoading || !userId || companies.length === 0}
+                      >
+                        <SelectTrigger data-testid="select-procore-company">
+                          <SelectValue placeholder={companyLoading ? "Loading companies…" : "Select a company"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {companies.map((c) => (
+                            <SelectItem key={String(c.id)} value={String(c.id)}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {companyError && (
+                      <p className="text-xs text-foreground" data-testid="text-company-error">
+                        {companyError}
+                      </p>
+                    )}
+                  </div>
+
                   <div className="space-y-3">
                     <h4 className="text-sm font-medium">Sync Settings</h4>
                     <div className="flex items-center justify-between">

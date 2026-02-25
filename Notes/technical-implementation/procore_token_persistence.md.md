@@ -55,7 +55,7 @@ Create a new implementation outline doc at `Notes/technical-implementation/proco
 
 ## Data model + migration (Alembic)
 
-Update `backend/models/models.py` (`ProcoreConnection`):
+Update `backend/models/models.py` (`ProcoreConnection`): (done)
 
 - Add columns:
   - `token_type` (string, default "Bearer")
@@ -85,7 +85,7 @@ Create a small DB-backed store module (new file), e.g. `backend/services/procore
 
 Then update callers:
 
-- `backend/services/procore_oauth.py`
+- `backend/services/procore_oauth.py` (done)
   - `exchange_code_for_tokens()` should **return token payload** (don’t store in-memory).
   - After calling `/me` and `/companies`, persist to `procore_connections` via the DB store.
   - `refresh_token()` should refresh and **persist updated tokens** into the correct `procore_connections` row.
@@ -113,10 +113,7 @@ Update `backend/api/routes/procore_auth.py`:
 
 ## Frontend wiring (minimal)
 
-- After connect, fetch companies (already possible via `GET /api/procore/companies?user_id=...`).
-- Add a simple company selector (likely in Settings), calling the new “select company” endpoint.
-- Sync Projects button uses the active company context to pull projects and upsert into `projects`.
-
+- If you want, the next logical step is updating any remaining “Procore connected” UI paths to rely on /status’s new active_company_id, and then wiring the /company/select flow to switch active context.
 ## Verification checklist
 
 - Restart backend → connection status remains connected (tokens in DB).

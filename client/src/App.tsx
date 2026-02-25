@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -14,12 +14,35 @@ import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import type { ProcoreConnection } from "@shared/schema";
 
+type ProcoreStatusResponse = {
+  connected: boolean;
+  last_synced_at: string | null;
+  sync_status: "idle" | "syncing" | "error";
+  projects_linked: number;
+  error_message: string | null;
+  active_company_id: number | null;
+};
+
+const PROCORE_USER_ID_STORAGE_KEY = "procore_user_id";
+
 function Router({ 
   procoreConnection, 
-  onProcoreSync 
+  onProcoreSync,
+  onConnectProcore,
+  onDisconnectProcore,
+  procoreUserId,
+  activeCompanyId,
+  onRefreshProcoreStatus,
+  onInvalidateCompanyScopedData,
 }: { 
   procoreConnection: ProcoreConnection; 
   onProcoreSync: () => void;
+  onConnectProcore: () => void;
+  onDisconnectProcore: () => void;
+  procoreUserId: string | null;
+  activeCompanyId: number | null;
+  onRefreshProcoreStatus: () => Promise<void>;
+  onInvalidateCompanyScopedData: () => void;
 }) {
   return (
     <Switch>
@@ -31,8 +54,12 @@ function Router({
       <Route path="/settings">
         <SettingsPage 
           procoreConnection={procoreConnection}
-          onConnectProcore={onProcoreSync}
-          onDisconnectProcore={() => {}}
+          onConnectProcore={onConnectProcore}
+          onDisconnectProcore={onDisconnectProcore}
+          userId={procoreUserId}
+          activeCompanyId={activeCompanyId}
+          onRefreshProcoreStatus={onRefreshProcoreStatus}
+          onInvalidateCompanyScopedData={onInvalidateCompanyScopedData}
         />
       </Route>
       <Route component={NotFound} />
@@ -42,21 +69,112 @@ function Router({
 
 function App() {
   const [procoreConnection, setProcoreConnection] = useState<ProcoreConnection>({
-    connected: true,
-    lastSyncedAt: new Date().toISOString(),
     syncStatus: "idle",
-    projectsLinked: 3,
+    connected: false,
+    projectsLinked: 0,
+    errorMessage: "Not connected to Procore",
   });
 
-  const handleProcoreSync = () => {
-    setProcoreConnection(prev => ({ ...prev, syncStatus: "syncing" }));
-    setTimeout(() => {
-      setProcoreConnection(prev => ({
+  const [procoreUserId, setProcoreUserId] = useState<string | null>(null);
+  const [activeCompanyId, setActiveCompanyId] = useState<number | null>(null);
+
+  async function loadProcoreStatus(userId: string) {
+    const res = await fetch(`/api/procore/status?user_id=${encodeURIComponent(userId)}`, {
+      credentials: "include",
+    });
+    const status = (await res.json()) as ProcoreStatusResponse;
+
+    setActiveCompanyId(status.active_company_id ?? null);
+    setProcoreConnection({
+      connected: !!status.connected,
+      lastSyncedAt: status.last_synced_at ?? undefined,
+      syncStatus: status.sync_status ?? "idle",
+      projectsLinked: status.projects_linked ?? 0,
+      errorMessage: status.error_message ?? undefined,
+    });
+  }
+
+  useEffect(() => {
+    // Prefer URL param (OAuth callback) then fall back to localStorage.
+    const sp = new URLSearchParams(window.location.search);
+    const fromUrl = sp.get("user_id");
+    const fromStorage = window.localStorage.getItem(PROCORE_USER_ID_STORAGE_KEY);
+    const userId = (fromUrl || fromStorage || "").trim() || null;
+
+    if (userId) {
+      window.localStorage.setItem(PROCORE_USER_ID_STORAGE_KEY, userId);
+      setProcoreUserId(userId);
+      void loadProcoreStatus(userId);
+      return;
+    }
+
+    setProcoreUserId(null);
+    setActiveCompanyId(null);
+    setProcoreConnection({
+      connected: false,
+      syncStatus: "idle",
+      projectsLinked: 0,
+      errorMessage: "Not connected to Procore",
+    });
+  }, []);
+
+  const handleConnectProcore = () => {
+    window.location.href = "/api/procore/oauth/authorize";
+  };
+
+  const handleDisconnectProcore = async () => {
+    if (!procoreUserId) return;
+
+    const qs = new URLSearchParams({ user_id: procoreUserId });
+    if (activeCompanyId) qs.set("company_id", String(activeCompanyId));
+    await fetch(`/api/procore/disconnect?${qs.toString()}`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    window.localStorage.removeItem(PROCORE_USER_ID_STORAGE_KEY);
+    setProcoreUserId(null);
+    setActiveCompanyId(null);
+    setProcoreConnection({
+      connected: false,
+      syncStatus: "idle",
+      projectsLinked: 0,
+      errorMessage: "Not connected to Procore",
+    });
+  };
+
+  const handleProcoreSync = async () => {
+    if (!procoreUserId) {
+      handleConnectProcore();
+      return;
+    }
+
+    setProcoreConnection((prev) => ({ ...prev, syncStatus: "syncing" }));
+    try {
+      await fetch(`/api/procore/sync?user_id=${encodeURIComponent(procoreUserId)}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      await loadProcoreStatus(procoreUserId);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Sync failed";
+      setProcoreConnection((prev) => ({
         ...prev,
-        syncStatus: "idle",
-        lastSyncedAt: new Date().toISOString(),
+        syncStatus: "error",
+        errorMessage: msg,
       }));
-    }, 2000);
+    }
+  };
+
+  const refreshProcoreStatus = async () => {
+    if (!procoreUserId) return;
+    await loadProcoreStatus(procoreUserId);
+  };
+
+  const invalidateCompanyScopedData = () => {
+    // Company context influences which local projects should appear.
+    // Invalidate active queries so UI refetches immediately.
+    queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
   };
 
   const sidebarStyle = {
@@ -82,6 +200,12 @@ function App() {
                   <Router 
                     procoreConnection={procoreConnection}
                     onProcoreSync={handleProcoreSync}
+                    onConnectProcore={handleConnectProcore}
+                    onDisconnectProcore={handleDisconnectProcore}
+                    procoreUserId={procoreUserId}
+                    activeCompanyId={activeCompanyId}
+                    onRefreshProcoreStatus={refreshProcoreStatus}
+                    onInvalidateCompanyScopedData={invalidateCompanyScopedData}
                   />
                 </main>
               </div>
