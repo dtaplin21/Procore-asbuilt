@@ -72,6 +72,47 @@ class ProjectResponse(ProjectBase):
         from_attributes = True
 
 # ============================================
+# DASHBOARD SUMMARY (PROJECT-SCOPED)
+# ============================================
+
+
+class ProjectSummary(BaseModel):
+    id: int
+    name: str
+    company_id: int
+    procore_project_id: Optional[str] = None
+
+
+class CompanyContext(BaseModel):
+    active_company_id: Optional[int] = None
+    project_company_id: int
+    matches_active_company: bool
+
+
+DashboardSyncStatus = Literal["idle", "syncing", "error"]
+
+
+class SyncHealth(BaseModel):
+    connected: bool
+    sync_status: DashboardSyncStatus = "idle"
+    project_last_sync_at: Optional[datetime] = None
+    token_expires_at: Optional[datetime] = None
+    error_message: Optional[str] = None
+
+
+class CurrentDrawingSummary(BaseModel):
+    id: int
+    name: str
+    updated_at: datetime
+
+
+class DashboardSummaryResponse(BaseModel):
+    project: ProjectSummary
+    company_context: CompanyContext
+    sync_health: SyncHealth
+    current_drawing: Optional[CurrentDrawingSummary] = None
+
+# ============================================
 # INSIGHTS (FINDINGS) SCHEMAS
 # Frontend contract: shared/schema.ts -> AIInsight (camelCase)
 # ============================================

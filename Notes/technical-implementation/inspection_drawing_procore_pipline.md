@@ -64,12 +64,12 @@ This doc is an implementation pipeline view. The roadmap in `Notes/IMPLEMENTATIO
 
 ## Phased implementation (step-by-step)
 
-### Phase 0 — Dashboard anchor (Project Summary)
+### Phase 0 — Dashboard anchor (Project Summary) #####################################################################################
 
 - Add `GET /api/projects/{project_id}/dashboard/summary` and wire the dashboard top section.
 - This becomes the anchor for “current drawing + sync health + current active company context”.
 
-### Phase 1 — Core drawing + evidence persistence (Phase 4-compatible)
+### Phase 1 — Core drawing + evidence persistence (Phase 4-compatible) ###############################################################
 
 Add Postgres tables (Alembic) and ORM models:
 
@@ -98,7 +98,7 @@ Backend endpoints (project-scoped):
 - `POST /api/projects/{project_id}/evidence` (multipart upload; type=spec|inspection_doc)
 - `GET /api/projects/{project_id}/evidence?type=...`
 
-### Phase 2 — Sub-drawing registration + alignment (NEW)
+### Phase 2 — Sub-drawing registration + alignment (NEW) #############################################################################
 
 To support “subsection drawing ↔ master drawing mapping” you need explicit linkage and a computed transform.
 
@@ -139,7 +139,7 @@ UI needs (MVP):
 - On the drawing viewer, allow user to draw a region box/polygon and attach a sub-drawing to it.
 - Kick off alignment job; show status.
 
-### Phase 3 — Diff/mismatch detection (NEW)
+### Phase 3 — Diff/mismatch detection (NEW) ##########################################################################################
 
 To answer: “Does the subsection drawing match the master drawing?”
 
@@ -176,7 +176,7 @@ UI:
 - Render diff overlays on the master drawing
 - Show a “Mismatch found” banner and link to the related finding
 
-### Phase 4 — Inspection extraction → overlay generation
+### Phase 4 — Inspection extraction → overlay generation #############################################################################
 
 Add tables:
 
@@ -211,7 +211,7 @@ Endpoints:
 - `GET /api/projects/{project_id}/inspections/runs?...`
 - `GET /api/projects/{project_id}/drawings/{drawing_id}/overlays`
 
-### Phase 5 — Procore writeback
+### Phase 5 — Procore writeback ######################################################################################################
 
 Add endpoint:
 

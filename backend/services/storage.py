@@ -13,6 +13,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from typing import Any, Dict, List, Optional
 
 from models.models import Project, Finding
+from services.procore_connection_store import get_active_connection
 
 
 class StorageService:
@@ -31,6 +32,49 @@ class StorageService:
 
     def get_project(self, project_id: int) -> Optional[Project]:
         return self.db.query(Project).filter(Project.id == project_id).first()
+
+    def get_project_dashboard_summary(
+        self,
+        project_id: int,
+        procore_user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        project = self.get_project(project_id)
+        if project is None:
+            return {}
+
+        conn = None
+        if procore_user_id:
+            conn = get_active_connection(self.db, procore_user_id)
+
+        connected = conn is not None
+        active_company_id = conn.company_id if conn is not None else None
+        project_company_id = int(project.company_id)
+        matches_active_company = bool(active_company_id == project_company_id) if active_company_id is not None else False
+
+        # NOTE: Return datetimes as datetime objects. If the route uses a Pydantic response_model
+        # (recommended), FastAPI will serialize these. If returning raw dict without a model,
+        # you may want to .isoformat() them instead.
+        return {
+            "project": {
+                "id": int(project.id),
+                "name": project.name,
+                "company_id": project_company_id,
+                "procore_project_id": getattr(project, "procore_project_id", None),
+            },
+            "company_context": {
+                "active_company_id": active_company_id,
+                "project_company_id": project_company_id,
+                "matches_active_company": matches_active_company,
+            },
+            "sync_health": {
+                "connected": connected,
+                "sync_status": getattr(project, "sync_status", None) or "idle",
+                "project_last_sync_at": getattr(project, "last_sync_at", None),
+                "token_expires_at": getattr(conn, "token_expires_at", None) if conn is not None else None,
+                "error_message": None if connected else ("Not connected to Procore" if procore_user_id else None),
+            },
+            "current_drawing": None,
+        }
 
     def get_submittals(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
         return []
