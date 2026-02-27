@@ -158,3 +158,50 @@ export interface DashboardStats {
   aiInsightsCount: number;
   criticalAlerts: number;
 }
+
+// ----------------------------
+// Dashboard summary (project-level overview)
+// ----------------------------
+
+// A minimal project summary returned by the dashboard endpoint. This mirrors
+// ``ProjectSummary`` on the backend and is intentionally small so the UI can
+// show basic information even before the full project record is fetched.
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  companyId: string;
+  procoreProjectId?: string;
+}
+
+// Active company context information used for display/validation.
+export interface CompanyContext {
+  activeCompanyId?: string; // null when there is no active connection
+  projectCompanyId: string;
+  matchesActiveCompany: boolean;
+}
+
+// Synchronization health status shown on the dashboard header.
+export interface SyncHealth {
+  connected: boolean;
+  syncStatus: "idle" | "syncing" | "error";
+  projectLastSyncAt?: string;
+  tokenExpiresAt?: string;
+  errorMessage?: string;
+}
+
+// Summary for the currently selected drawing, if any.
+export interface CurrentDrawing {
+  id: string;
+  name: string;
+  updatedAt: string;
+}
+
+// Top-level dashboard summary response type. This matches the shape of the
+// ``DashboardSummaryResponse`` pydantic model on the backend and is returned by
+// GET /api/projects/{project_id}/dashboard/summary.
+export interface DashboardSummary {
+  project: ProjectSummary;
+  companyContext: CompanyContext;
+  syncHealth: SyncHealth;
+  currentDrawing: CurrentDrawing | null;
+}
