@@ -4,7 +4,7 @@ This is the source-of-truth roadmap for building the QC/QA AI Automation Platfor
 
 ---
 
-## Phase 1 — Project scoping foundation (start here)
+## Phase 1 — Project scoping foundation (Done)
 
 ### Step 1 — Decide your project identifier (use Procore project id)
 
@@ -68,7 +68,7 @@ Don’t build the full dashboard yet—just get:
 
 ---
 
-## Phase 2 — Dashboard sections wired to project-scoped endpoints
+## Phase 2 — Dashboard sections wired to project-scoped endpoints*******************************************************************************************************************************
 
 Now that `projectId` exists, implement each section one-by-one.
 
