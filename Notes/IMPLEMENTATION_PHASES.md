@@ -68,7 +68,7 @@ Don’t build the full dashboard yet—just get:
 
 ---
 
-## Phase 2 — Dashboard sections wired to project-scoped endpoints*******************************************************************************************************************************
+## Phase 2 — Dashboard sections wired to project-scoped endpoints ###########################################################
 
 Now that `projectId` exists, implement each section one-by-one.
 

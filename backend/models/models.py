@@ -68,6 +68,8 @@ class Project(Base):
     company = relationship("Company", back_populates="projects")
     jobs = relationship("JobQueue", back_populates="project")
     findings = relationship("Finding", back_populates="project", cascade="all, delete-orphan")
+    drawings = relationship("Drawing", back_populates="project", cascade="all, delete-orphan")
+    evidence_records = relationship("EvidenceRecord", back_populates="project", cascade="all, delete-orphan")
 
 class UserCompany(Base):
     __tablename__ = "user_companies"
@@ -254,3 +256,58 @@ class UserSettings(Base):
     # Relationships
     user = relationship("User", back_populates="settings")
 
+
+# Drawings (uploaded or from Procore)
+class Drawing(Base):
+    __tablename__ = "drawings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    
+    source = Column(String, nullable=False)  # 'upload' or 'procore'
+    name = Column(String, nullable=False)
+    storage_key = Column(String, nullable=True)  # path in backend/uploads/ or Procore URL
+    file_url = Column(String, nullable=True)  # API endpoint for download
+    content_type = Column(String, nullable=True)  # 'application/pdf', 'image/png', etc.
+    page_count = Column(Integer, nullable=True)  # for PDFs
+    
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+    
+    # Relationships
+    project = relationship("Project", back_populates="drawings")
+
+
+# Evidence Records (specs, inspection docs, etc.)
+class EvidenceRecord(Base):
+    __tablename__ = "evidence_records"
+    __table_args__ = (
+        Index("ix_evidence_records_project_type", "project_id", "type"),
+    )
+    
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    
+    type = Column(String, nullable=False)  # 'spec' or 'inspection_doc'
+    trade = Column(String, nullable=True)  # e.g., 'HVAC', 'Electrical'
+    spec_section = Column(String, nullable=True)  # e.g., '15830 - HVAC Controls'
+    title = Column(String, nullable=False)
+    storage_key = Column(String, nullable=True)  # path in backend/uploads/
+    text_content = Column(Text, nullable=True)  # Phase 4: extracted text from PDFs
+    
+    # Flexible metadata for future extensions
+    meta = Column(JSON, nullable=True)
+    
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+    
+    # Relationships
+    project = relationship("Project", back_populates="evidence_records")

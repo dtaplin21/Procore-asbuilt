@@ -69,7 +69,7 @@ This doc is an implementation pipeline view. The roadmap in `Notes/IMPLEMENTATIO
 - Add `GET /api/projects/{project_id}/dashboard/summary` and wire the dashboard top section.
 - This becomes the anchor for “current drawing + sync health + current active company context”.
 
-### Phase 1 — Core drawing + evidence persistence (Phase 4-compatible) ###############################################################
+### Phase 1 — Core drawing + evidence persistence (Phase 4-compatible) ################################################################
 
 Add Postgres tables (Alembic) and ORM models:
 
@@ -98,7 +98,7 @@ Backend endpoints (project-scoped):
 - `POST /api/projects/{project_id}/evidence` (multipart upload; type=spec|inspection_doc)
 - `GET /api/projects/{project_id}/evidence?type=...`
 
-### Phase 2 — Sub-drawing registration + alignment (NEW) #############################################################################
+### Phase 2 — Sub-drawing registration + alignment (NEW) ###################################################################
 
 To support “subsection drawing ↔ master drawing mapping” you need explicit linkage and a computed transform.
 
