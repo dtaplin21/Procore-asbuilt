@@ -47,7 +47,11 @@ function Router({
   return (
     <Switch>
       <Route path="/">
-        <Dashboard procoreConnection={procoreConnection} onProcoreSync={onProcoreSync} />
+        <Dashboard
+          procoreConnection={procoreConnection}
+          onProcoreSync={onProcoreSync}
+          procoreUserId={procoreUserId ?? undefined}
+        />
       </Route>
       <Route path="/inspections" component={Inspections} />
       <Route path="/objects" component={Objects} />
@@ -82,8 +86,9 @@ function App() {
     const res = await fetch(`/api/procore/status?user_id=${encodeURIComponent(userId)}`, {
       credentials: "include",
     });
-    const status = (await res.json()) as ProcoreStatusResponse;
+    const status = await res.json();
 
+    setProcoreUserId(status.procore_user_id ?? null);
     setActiveCompanyId(status.active_company_id ?? null);
     setProcoreConnection({
       connected: !!status.connected,

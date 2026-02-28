@@ -1,0 +1,1 @@
+1. Add supabase to handle imported files. (currently we use the local database)

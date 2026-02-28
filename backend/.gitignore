@@ -29,3 +29,5 @@ htmlcov/
 .dmypy.json
 dmypy.json
 
+# Uploaded files (local storage)
+uploads/

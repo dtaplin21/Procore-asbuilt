@@ -121,6 +121,9 @@ async def get_procore_status(
             "sync_status": "idle",
             "projects_linked": 0,
             "error_message": "Not connected to Procore",
+            "procore_user_id": None,
+            "active_company_id": None,
+            "company_name": None,
         }
 
     # Check expiry using token_expires_at
@@ -137,7 +140,14 @@ async def get_procore_status(
                 "sync_status": "error",
                 "projects_linked": 0,
                 "error_message": f"Token expired and refresh failed: {str(e)}",
+                "procore_user_id": conn.procore_user_id if conn else None,
+                "active_company_id": conn.company_id if conn else None,
+                "company_name": None,
             }
+
+    company = None
+    if conn and conn.company_id:
+        company = db.query(Company).filter(Company.id == conn.company_id).first()
 
     return {
         "connected": True,
@@ -145,7 +155,9 @@ async def get_procore_status(
         "sync_status": "idle",
         "projects_linked": 0,
         "error_message": None,
-        "active_company_id": conn.company_id if conn else None,
+        "procore_user_id": conn.procore_user_id,
+        "active_company_id": conn.company_id,
+        "company_name": company.name if company else None,
     }
 
 @router.get("/me")

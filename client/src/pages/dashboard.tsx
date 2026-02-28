@@ -12,7 +12,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/stat-card";
 import { AIInsightCard } from "@/components/ai-insight-card";
 import { ProcoreStatus } from "@/components/procore-status";
-import type { DashboardStats, AIInsight, ProcoreConnection } from "@shared/schema";
+import type {
+  DashboardStats,
+  AIInsight,
+  ProcoreConnection,
+  DashboardSummary
+} from "@shared/schema";
 
 type Project = {
   id: string | number;
@@ -32,12 +37,19 @@ function setProjectIdInUrl(projectId: string | null) {
   window.history.replaceState({}, "", url.toString());
 }
 
+
 interface DashboardProps {
   procoreConnection: ProcoreConnection;
-  onProcoreSync?: () => void; 
+  /**
+   * Procore user id (optional). Passed through to the backend when fetching
+   * the project dashboard summary to allow the service to include the active
+   * company context for the user.
+   */
+  procoreUserId?: string;
+  onProcoreSync?: () => void;
 }
 
-export default function Dashboard({ procoreConnection, onProcoreSync }: DashboardProps) {
+export default function Dashboard({ procoreConnection, procoreUserId, onProcoreSync }: DashboardProps) {
   // Selected project context (scopes the dashboard structurally)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() =>
     getProjectIdFromUrl()
@@ -59,6 +71,16 @@ export default function Dashboard({ procoreConnection, onProcoreSync }: Dashboar
   // Projects list for selector (Phase 1 / Step 3)
   const { data: projects, isLoading: projectsLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
+  });
+
+  // Project-specific summary (Phase 0 change)
+  const { data: projectSummary, isLoading: projectSummaryLoading } = useQuery<DashboardSummary>({
+    queryKey: [
+      selectedProjectId
+        ? `/api/projects/${selectedProjectId}/dashboard/summary?user_id=${procoreUserId || ""}`
+        : "/api/projects/" // unused but keeps key consistent
+    ],
+    enabled: !!selectedProjectId,
   });
 
   // If URL has no projectId, pick a default once projects load
