@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from database import get_db
@@ -90,4 +91,36 @@ async def upload_project_drawing(
     db.refresh(drawing)
 
     return drawing
+
+
+@router.get(
+    "/{project_id}/drawings/{drawing_id}/download",
+    response_class=FileResponse,
+)
+def download_project_drawing(
+    project_id: int,
+    drawing_id: int,
+    db: Session = Depends(get_db),
+):
+    # ensure the requested drawing belongs to the project
+    drawing = (
+        db.query(Drawing)
+        .filter(Drawing.id == drawing_id, Drawing.project_id == project_id)
+        .first()
+    )
+    if not drawing:
+        raise HTTPException(status_code=404, detail="Drawing not found")
+
+    if not drawing.storage_key:
+        raise HTTPException(status_code=404, detail="No file available")
+
+    path = get_file_path(drawing.storage_key)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="File missing on disk")
+
+    return FileResponse(
+        path,
+        media_type=drawing.content_type or "application/octet-stream",
+        filename=drawing.name,
+    )
 
