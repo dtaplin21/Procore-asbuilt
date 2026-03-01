@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from typing import Any, Dict, List, Optional
 
-from models.models import Project, Finding
+from models.models import Project, Finding, Drawing, EvidenceRecord
 from services.procore_connection_store import get_active_connection
 
 
@@ -75,6 +75,103 @@ class StorageService:
             },
             "current_drawing": None,
         }
+    
+        # ------------------------------------------------------------------
+    # Drawings (Phase 1)
+    # ------------------------------------------------------------------
+
+    def create_drawing(
+        self,
+        project_id: int,
+        *,
+        source: str,
+        name: str,
+        storage_key: str,
+        content_type: str,
+        page_count: Optional[int] = None,
+    ) -> Drawing:
+        drawing = Drawing(
+            project_id=project_id,
+            source=source,
+            name=name,
+            storage_key=storage_key,
+            content_type=content_type,
+            page_count=page_count,
+        )
+        self.db.add(drawing)
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(drawing)
+        return drawing
+
+    def list_drawings(self, project_id: int) -> List[Drawing]:
+        return (
+            self.db.query(Drawing)
+            .filter(Drawing.project_id == project_id)
+            .order_by(Drawing.created_at.desc(), Drawing.id.desc())
+            .all()
+        )
+
+    def get_drawing(self, project_id: int, drawing_id: int) -> Optional[Drawing]:
+        return (
+            self.db.query(Drawing)
+            .filter(Drawing.project_id == project_id, Drawing.id == drawing_id)
+            .first()
+        )
+    
+    def create_evidence_record(
+        self,
+        project_id: int,
+        *,
+        type: str,  # "spec" | "inspection_doc"
+        title: str,
+        storage_key: str,
+        content_type: str,
+        trade: Optional[str] = None,
+        spec_section: Optional[str] = None,
+        text_content: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> EvidenceRecord:
+        record = EvidenceRecord(
+            project_id=project_id,
+            type=type,
+            trade=trade,
+            spec_section=spec_section,
+            title=title,
+            storage_key=storage_key,
+            content_type=content_type,
+            text_content=text_content,
+            meta=meta or {},
+        )
+        self.db.add(record)
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(record)
+        return record
+
+    def list_evidence_records(
+        self,
+        project_id: int,
+        *,
+        type: Optional[str] = None,
+    ) -> List[EvidenceRecord]:
+        q = self.db.query(EvidenceRecord).filter(EvidenceRecord.project_id == project_id)
+        if type is not None:
+            q = q.filter(EvidenceRecord.type == type)
+        return q.order_by(EvidenceRecord.created_at.desc(), EvidenceRecord.id.desc()).all()
+
+    def get_evidence_record(self, project_id: int, evidence_id: int) -> Optional[EvidenceRecord]:
+        return (
+            self.db.query(EvidenceRecord)
+            .filter(EvidenceRecord.project_id == project_id, EvidenceRecord.id == evidence_id)
+            .first()
+        )
 
     def get_submittals(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
         return []
