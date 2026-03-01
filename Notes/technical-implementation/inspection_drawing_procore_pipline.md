@@ -64,7 +64,7 @@ This doc is an implementation pipeline view. The roadmap in `Notes/IMPLEMENTATIO
 
 ## Phased implementation (step-by-step)
 
-### Phase 0 — Dashboard anchor (Project Summary) #####################################################################################
+### Phase 0 — Dashboard anchor (Project Summary) (done)#####################################################################################
 
 - Add `GET /api/projects/{project_id}/dashboard/summary` and wire the dashboard top section.
 - This becomes the anchor for “current drawing + sync health + current active company context”.
