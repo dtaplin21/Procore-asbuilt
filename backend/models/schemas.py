@@ -161,6 +161,23 @@ class ProcoreTokenResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+# ============================================
+# DRAWINGS / UPLOAD SCHEMAS
+# ============================================
+
+
+class DrawingResponse(BaseModel):
+    id: int
+    name: str
+    file_url: Optional[str] = None
+    content_type: Optional[str] = None
+    page_count: Optional[int] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 # Job Queue Schemas
 class JobCreate(BaseModel):
     user_id: int

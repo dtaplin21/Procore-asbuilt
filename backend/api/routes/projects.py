@@ -1,10 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from database import get_db
 from services.storage import StorageService
 from models.schemas import ProjectResponse
 from models.schemas import DashboardSummaryResponse
+from models.schemas import DrawingResponse
+from models.models import Drawing, Project
+import os
+from uuid import uuid4
+from datetime import datetime
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -54,4 +59,54 @@ async def get_project_dashboard_summary(
         raise HTTPException(status_code=404, detail="Project not found")
 
     return summary
+
+
+
+@router.post("/{project_id}/drawings", response_model=DrawingResponse)
+async def upload_project_drawing(
+    project_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    # Verify project exists
+    proj = db.query(Project).filter(Project.id == project_id).first()
+    if not proj:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Prepare upload directory
+    upload_dir = os.path.join(os.path.dirname(__file__), "..", "..", "uploads")
+    project_dir = os.path.join(upload_dir, str(project_id))
+    os.makedirs(project_dir, exist_ok=True)
+
+    # Save file with uuid prefix to avoid collisions
+    filename = f"{uuid4().hex}_{os.path.basename(file.filename)}"
+    file_path = os.path.join(project_dir, filename)
+
+    try:
+        with open(file_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+
+    # Build storage_key and file_url (file_url served by a future download endpoint)
+    storage_key = f"uploads/{project_id}/{filename}"
+    file_url = f"/api/projects/{project_id}/drawings/{filename}"  # simple placeholder
+
+    # Persist drawing record
+    drawing = Drawing(
+        project_id=project_id,
+        source="upload",
+        name=file.filename,
+        storage_key=storage_key,
+        file_url=file_url,
+        content_type=file.content_type,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+    db.add(drawing)
+    db.commit()
+    db.refresh(drawing)
+
+    return drawing
 
