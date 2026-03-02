@@ -178,6 +178,20 @@ class DrawingResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class EvidenceRecordResponse(BaseModel):
+    id: int
+    type: str
+    trade: Optional[str] = None
+    spec_section: Optional[str] = None
+    title: str
+    file_url: Optional[str] = None
+    content_type: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 # Job Queue Schemas
 class JobCreate(BaseModel):
     user_id: int
