@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from database import get_db
-from services.storage import StorageService
-from models.schemas import ProjectResponse, DashboardSummaryResponse, DrawingResponse
-from models.models import Drawing, Project
-from services.file_storage import save_upload
+from backend.api.dependencies import get_db
+from backend.services.storage import StorageService
+from backend.models.schemas import ProjectResponse, DashboardSummaryResponse, DrawingResponse
+from backend.models.models import Drawing, Project
+from backend.services.file_storage import save_upload, get_file_path
 from datetime import datetime
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -66,6 +66,12 @@ async def upload_project_drawing(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
+    """Upload a drawing file for a project.
+    
+    - Validates file type and size
+    - Saves file to disk
+    - Creates database record with file_url pointing to /file endpoint
+    """
     # Verify project exists
     proj = db.query(Project).filter(Project.id == project_id).first()
     if not proj:
@@ -73,22 +79,73 @@ async def upload_project_drawing(
 
     # Persist file via helper (validates size/type and writes to disk)
     storage_key, content_type, original_name = save_upload(file, project_id, category="drawings")
-    file_url = f"/api/projects/{project_id}/drawings/{os.path.basename(storage_key)}"
 
-    # Persist drawing record
-    drawing = Drawing(
+    # Create drawing record via service layer
+    service = StorageService(db)
+    drawing = service.create_drawing(
         project_id=project_id,
         source="upload",
         name=original_name,
         storage_key=storage_key,
-        file_url=file_url,
         content_type=content_type,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        page_count=None,
     )
-    db.add(drawing)
+    
+    # Set file_url to point to the /file route (will be implemented in next step)
+    drawing.file_url = f"/api/projects/{project_id}/drawings/{drawing.id}/file"
     db.commit()
     db.refresh(drawing)
+
+    return drawing
+
+
+@router.get("/{project_id}/drawings", response_model=List[DrawingResponse])
+def list_project_drawings(
+    project_id: int,
+    db: Session = Depends(get_db),
+):
+    """List all drawings for a project.
+    
+    - Metadata comes from database, no filesystem reads
+    - Returns drawings sorted by creation date (newest first)
+    """
+    # Verify project exists
+    proj = db.query(Project).filter(Project.id == project_id).first()
+    if not proj:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    service = StorageService(db)
+    drawings = service.list_drawings(project_id)
+    
+    # Set file_url on each drawing to point to /file endpoint
+    for drawing in drawings:
+        drawing.file_url = f"/api/projects/{project_id}/drawings/{drawing.id}/file"
+    
+    db.commit()  # Persist file_url changes
+    
+    return drawings
+
+
+@router.get("/{project_id}/drawings/{drawing_id}", response_model=DrawingResponse)
+def get_project_drawing(
+    project_id: int,
+    drawing_id: int,
+    db: Session = Depends(get_db),
+):
+    """Get metadata for a specific drawing.
+    
+    - Metadata comes from database, no filesystem reads
+    - Returns drawing details including file_url
+    """
+    service = StorageService(db)
+    drawing = service.get_drawing(project_id, drawing_id)
+    
+    if not drawing:
+        raise HTTPException(status_code=404, detail="Drawing not found")
+    
+    # Set file_url to point to /file endpoint
+    drawing.file_url = f"/api/projects/{project_id}/drawings/{drawing.id}/file"
+    db.commit()
 
     return drawing
 

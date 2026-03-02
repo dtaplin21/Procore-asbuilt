@@ -69,7 +69,7 @@ This doc is an implementation pipeline view. The roadmap in `Notes/IMPLEMENTATIO
 - Add `GET /api/projects/{project_id}/dashboard/summary` and wire the dashboard top section.
 - This becomes the anchor for “current drawing + sync health + current active company context”.
 
-### Phase 1 — Core drawing + evidence persistence (Phase 4-compatible) ################################################################
+### Phase 1 — Core drawing + evidence persistence (Phase 4-compatible) (DONE) ###############################################################
 
 Add Postgres tables (Alembic) and ORM models:
 

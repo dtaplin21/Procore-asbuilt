@@ -17,7 +17,9 @@ from api.routes import (
     objects,
     insights,
     procore,
-    procore_auth
+    procore_auth,
+    drawings,
+    evidence
 )
 from database import init_db
 import os
@@ -142,7 +144,9 @@ app.include_router(inspections.router)
 app.include_router(objects.router)
 app.include_router(insights.router)
 app.include_router(procore.router)
-app.include_router(procore_auth.router)  # Authentication routes
+app.include_router(procore_auth.router)
+app.include_router(drawings.router)
+app.include_router(evidence.router)  # Authentication routes
 
 # Serve static files in production (if needed)
 # static_dir = os.path.join(os.path.dirname(__file__), "..", "dist", "public")
