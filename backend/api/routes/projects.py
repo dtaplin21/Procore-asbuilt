@@ -181,3 +181,36 @@ def download_project_drawing(
         filename=drawing.name,
     )
 
+
+@router.get("/{project_id}/drawings/{drawing_id}/file", response_class=FileResponse)
+def download_project_drawing_file(
+    project_id: int,
+    drawing_id: int,
+    db: Session = Depends(get_db),
+):
+    """Secure file download for a drawing. Returns file bytes with correct content-type.
+
+    Flow:
+    - Load drawing via StorageService.get_drawing(project_id, drawing_id)
+    - If not found -> 404
+    - Resolve on-disk path via get_file_path(drawing.storage_key)
+    - Return FileResponse(path, media_type=..., filename=drawing.name)
+    """
+    service = StorageService(db)
+    drawing = service.get_drawing(project_id, drawing_id)
+    if not drawing:
+        raise HTTPException(status_code=404, detail="Drawing not found")
+
+    if not drawing.storage_key:
+        raise HTTPException(status_code=404, detail="No file available")
+
+    path = get_file_path(drawing.storage_key)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="File missing on disk")
+
+    return FileResponse(
+        path,
+        media_type=drawing.content_type or "application/octet-stream",
+        filename=drawing.name,
+    )
+

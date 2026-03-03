@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Tuple
 from uuid import uuid4
 from fastapi import HTTPException, UploadFile
+from fastapi import Request
+from fastapi.responses import FileResponse, Response
 
 # Base upload directory (relative to project root)
 BASE_UPLOAD_DIR = Path(__file__).parent.parent / "uploads"
@@ -73,6 +75,52 @@ def get_file_path(storage_key: str) -> Path:
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid storage key")
     return p
+
+
+def range_file_response(
+    path: Path,
+    request: Request,
+    media_type: str,
+    filename: str,
+) -> Response:
+    """Return a file response honoring a `Range` header if present.
+
+    If the requester includes ``Range: bytes=start-end`` we slice the file
+    and return a 206 partial response with appropriate ``Content-Range`` and
+    ``Accept-Ranges`` headers.  Otherwise we fall back to a normal
+    :class:`~fastapi.responses.FileResponse`.
+
+    This helper keeps range logic in one place so callers in the routers can
+    stay small and we can evolve the implementation later (streaming,
+    caching, etc.) without touching every endpoint.
+    """
+
+    size = path.stat().st_size
+    range_header = request.headers.get("range")
+    if range_header:
+        # simple parser; only support single range
+        m = re.match(r"bytes=(\d*)-(\d*)", range_header)
+        if m:
+            try:
+                start = int(m.group(1)) if m.group(1) else 0
+                end = int(m.group(2)) if m.group(2) else size - 1
+            except ValueError:
+                return Response(status_code=400)
+            if end >= size:
+                end = size - 1
+            if start > end:
+                return Response(status_code=416)
+            length = end - start + 1
+            with open(path, "rb") as f:
+                f.seek(start)
+                data = f.read(length)
+            headers = {
+                "Content-Range": f"bytes {start}-{end}/{size}",
+                "Accept-Ranges": "bytes",
+            }
+            return Response(data, status_code=206, media_type=media_type, headers=headers)
+    # no range requested, send full file
+    return FileResponse(path, media_type=media_type, filename=filename)
 
 
 def delete_file(storage_key: str) -> None:

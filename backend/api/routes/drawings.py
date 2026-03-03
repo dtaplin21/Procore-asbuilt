@@ -7,7 +7,8 @@ from backend.api.dependencies import get_db
 from backend.models.models import Drawing
 from backend.models.schemas import DrawingResponse
 from backend.services.storage import StorageService
-from backend.services.file_storage import save_upload
+from backend.services.file_storage import save_upload, get_file_path
+from fastapi.responses import FileResponse
 
 router = APIRouter(tags=["drawings"])
 
@@ -69,3 +70,29 @@ def get_drawing(
     if not drawing:
         raise HTTPException(status_code=404, detail="Drawing not found")
     return DrawingResponse.from_orm(drawing)
+
+
+@router.get("/api/projects/{project_id}/drawings/{drawing_id}/file", response_class=FileResponse)
+def download_drawing_file(
+    project_id: int,
+    drawing_id: int,
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    """Download the file bytes for a drawing, verifying project scope."""
+    service = StorageService(db)
+    drawing = service.get_drawing(project_id, drawing_id)
+    if not drawing:
+        raise HTTPException(status_code=404, detail="Drawing not found")
+
+    if not drawing.storage_key:
+        raise HTTPException(status_code=404, detail="File not available")
+
+    path = get_file_path(drawing.storage_key)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="File missing on disk")
+
+    return FileResponse(
+        path,
+        media_type=drawing.content_type or "application/octet-stream",
+        filename=drawing.name,
+    )

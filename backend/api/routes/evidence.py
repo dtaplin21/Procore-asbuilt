@@ -8,7 +8,8 @@ from backend.api.dependencies import get_db
 from backend.models.models import EvidenceRecord, Project
 from backend.models.schemas import EvidenceRecordResponse
 from backend.services.storage import StorageService
-from backend.services.file_storage import save_upload
+from backend.services.file_storage import save_upload, get_file_path
+from fastapi.responses import FileResponse
 
 router = APIRouter(tags=["evidence"])
 
@@ -148,3 +149,36 @@ def get_evidence(
     db.commit()
 
     return evidence
+
+
+@router.get("/api/projects/{project_id}/evidence/{evidence_id}/file", response_class=FileResponse)
+def download_evidence_file(
+    project_id: int,
+    evidence_id: int,
+    db: Session = Depends(get_db),
+):
+    """Secure file download for an evidence record.
+
+    Flow:
+    - Load evidence via StorageService.get_evidence_record(project_id, evidence_id)
+    - If not found -> 404
+    - Resolve on-disk path via get_file_path(evidence.storage_key)
+    - Return FileResponse(path, media_type=..., filename=evidence.title)
+    """
+    service = StorageService(db)
+    evidence = service.get_evidence_record(project_id, evidence_id)
+    if not evidence:
+        raise HTTPException(status_code=404, detail="Evidence not found")
+
+    if not evidence.storage_key:
+        raise HTTPException(status_code=404, detail="No file available")
+
+    path = get_file_path(evidence.storage_key)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="File missing on disk")
+
+    return FileResponse(
+        path,
+        media_type=evidence.content_type or "application/octet-stream",
+        filename=evidence.title or "download",
+    )
