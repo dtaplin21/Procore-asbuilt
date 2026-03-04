@@ -9,7 +9,7 @@ from database import get_db
 from services.procore_oauth import ProcoreOAuth
 from services.procore_client import ProcoreAPIClient
 from datetime import datetime
-from typing import Optional
+from typing import Optional, cast
 import secrets
 from errors import ProcoreNotConnected
 from models.models import Company
@@ -79,12 +79,12 @@ async def procore_oauth_callback(
 
     # Determine the internal company_id we activated (first company persisted in sync_user_info)
     active_conn = get_active_connection(db, procore_user_id)
-    active_company_id = active_conn.company_id if active_conn else None
+    active_company_id = cast(int, active_conn.company_id) if active_conn else None
 
     # Redirect to frontend
     base = "http://localhost:5173/settings"
     qs = f"?procore_connected=true&user_id={procore_user_id}"
-    if active_company_id:
+    if active_company_id is not None:
         qs += f"&company_id={active_company_id}"
 
     return RedirectResponse(url=f"{base}{qs}")
@@ -127,7 +127,8 @@ async def get_procore_status(
         }
 
     # Check expiry using token_expires_at
-    is_expired = datetime.utcnow() >= conn.token_expires_at
+    expires_at = cast(datetime, conn.token_expires_at)
+    is_expired = datetime.utcnow() >= expires_at
 
     if is_expired:
         try:
@@ -140,24 +141,26 @@ async def get_procore_status(
                 "sync_status": "error",
                 "projects_linked": 0,
                 "error_message": f"Token expired and refresh failed: {str(e)}",
-                "procore_user_id": conn.procore_user_id if conn else None,
-                "active_company_id": conn.company_id if conn else None,
+                "procore_user_id": cast(str, conn.procore_user_id) if conn else None,
+                "active_company_id": cast(int, conn.company_id) if conn else None,
                 "company_name": None,
             }
 
     company = None
-    if conn and conn.company_id:
-        company = db.query(Company).filter(Company.id == conn.company_id).first()
+    if conn:
+        company_id_val = cast(int, conn.company_id)
+        company = db.query(Company).filter(Company.id == company_id_val).first()
 
+    updated_at_val = cast(datetime, conn.updated_at) if conn else None
     return {
         "connected": True,
-        "last_synced_at": conn.updated_at.isoformat() if conn and conn.updated_at else None,
+        "last_synced_at": updated_at_val.isoformat() if updated_at_val else None,
         "sync_status": "idle",
         "projects_linked": 0,
         "error_message": None,
-        "procore_user_id": conn.procore_user_id,
-        "active_company_id": conn.company_id,
-        "company_name": company.name if company else None,
+        "procore_user_id": cast(str, conn.procore_user_id) if conn else None,
+        "active_company_id": cast(int, conn.company_id) if conn else None,
+        "company_name": cast(str, company.name) if company else None,
     }
 
 @router.get("/me")
@@ -299,7 +302,7 @@ async def disconnect_procore(
         active = get_active_connection(db, user_id)
         if not active:
             raise HTTPException(status_code=404, detail="No Procore connection found")
-        company_id = active.company_id
+        company_id = cast(int, active.company_id)
 
     delete_connection(db, user_id, company_id)
 

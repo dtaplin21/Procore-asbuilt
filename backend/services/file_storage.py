@@ -53,7 +53,7 @@ def save_upload(file: UploadFile, project_id: int, category: str) -> Tuple[str, 
             raise HTTPException(status_code=413, detail="File too large")
         contents += chunk
 
-    sanitized = _sanitize_filename(file.filename)
+    sanitized = _sanitize_filename(file.filename or "upload")
     key = f"projects/{project_id}/{category}/{uuid4().hex}_{sanitized}"
     dest_path = BASE_UPLOAD_DIR / key
     dest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -64,7 +64,7 @@ def save_upload(file: UploadFile, project_id: int, category: str) -> Tuple[str, 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save upload: {str(e)}")
 
-    return key, file.content_type, file.filename
+    return key, file.content_type, file.filename or "upload"
 
 
 def get_file_path(storage_key: str) -> Path:

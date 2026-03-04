@@ -1,13 +1,13 @@
-from typing import List
+from typing import List, Optional, cast
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from sqlalchemy.orm import Session
 
-from backend.api.dependencies import get_db
-from backend.models.models import Drawing
-from backend.models.schemas import DrawingResponse
-from backend.services.storage import StorageService
-from backend.services.file_storage import save_upload, get_file_path
+from api.dependencies import get_db
+from models.models import Drawing
+from models.schemas import DrawingResponse
+from services.storage import StorageService
+from services.file_storage import save_upload, get_file_path
 from fastapi.responses import FileResponse
 
 router = APIRouter(tags=["drawings"])
@@ -28,7 +28,7 @@ async def upload_drawing(
         raise HTTPException(status_code=400, detail="Missing filename")
 
     # Save file to disk with validation
-    storage_key, content_type, original_name = await save_upload(file, project_id, category="drawings")
+    storage_key, content_type, original_name = save_upload(file, project_id, category="drawings")
 
     # Create database record
     service = StorageService(db)
@@ -84,15 +84,18 @@ def download_drawing_file(
     if not drawing:
         raise HTTPException(status_code=404, detail="Drawing not found")
 
-    if not drawing.storage_key:
+    storage_key = cast(Optional[str], drawing.storage_key)
+    if not storage_key:
         raise HTTPException(status_code=404, detail="File not available")
 
-    path = get_file_path(drawing.storage_key)
+    path = get_file_path(storage_key)
     if not path.exists():
         raise HTTPException(status_code=404, detail="File missing on disk")
 
+    content_type = cast(Optional[str], drawing.content_type) or "application/octet-stream"
+    name = cast(str, drawing.name)
     return FileResponse(
         path,
-        media_type=drawing.content_type or "application/octet-stream",
-        filename=drawing.name,
+        media_type=content_type,
+        filename=name,
     )

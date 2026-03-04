@@ -30,7 +30,7 @@ class RequestResponseLoggingMiddleware:
             return
         
         # Ensure state exists
-        scope.setdefault("state", {})
+        scope_state = scope.setdefault("state", {})
         
         # Extract request info
         method = scope.get("method", "UNKNOWN")
@@ -40,7 +40,7 @@ class RequestResponseLoggingMiddleware:
         request_id = _get_header(scope, b"x-request-id") or str(uuid.uuid4())
         
         # Store request ID
-        scope["state"]["request_id"] = request_id
+        scope_state["request_id"] = request_id
         token = set_request_id(request_id)
         
         # Start timer

@@ -6,7 +6,7 @@ import httpx
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from config import settings
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, cast
 import secrets
 from errors import ExternalServiceError, ProcoreAuthExpired, ProcoreNotConnected, ProcoreOAuthError
 
@@ -135,7 +135,7 @@ class ProcoreOAuth:
         # Persist refresh results into the SAME (company_id, procore_user_id) row
         upsert_connection(
             db=self.db,
-            company_id=conn.company_id,
+            company_id=cast(int, conn.company_id),
             procore_user_id=str(procore_user_id),
             access_token=new_payload["access_token"],
             refresh_token=new_payload["refresh_token"],
@@ -216,7 +216,7 @@ class ProcoreOAuth:
                 self.db.flush()
 
             if internal_company_id is None:
-                internal_company_id = row.id
+                internal_company_id = cast(int, row.id)
 
         if internal_company_id is None:
             raise ProcoreOAuthError(message="No Procore companies found")

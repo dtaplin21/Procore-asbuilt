@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from models.models import Project, Finding, Drawing, EvidenceRecord
 from services.procore_connection_store import get_active_connection
@@ -48,7 +48,7 @@ class StorageService:
 
         connected = conn is not None
         active_company_id = conn.company_id if conn is not None else None
-        project_company_id = int(project.company_id)
+        project_company_id = cast(int, project.company_id)
         matches_active_company = bool(active_company_id == project_company_id) if active_company_id is not None else False
 
         # NOTE: Return datetimes as datetime objects. If the route uses a Pydantic response_model
@@ -56,7 +56,7 @@ class StorageService:
         # you may want to .isoformat() them instead.
         return {
             "project": {
-                "id": int(project.id),
+                "id": cast(int, project.id),
                 "name": project.name,
                 "company_id": project_company_id,
                 "procore_project_id": getattr(project, "procore_project_id", None),
@@ -229,7 +229,7 @@ class StorageService:
         if finding is None:
             return None
 
-        finding.resolved = True
+        setattr(finding, "resolved", True)
         try:
             self.db.commit()
         except SQLAlchemyError:

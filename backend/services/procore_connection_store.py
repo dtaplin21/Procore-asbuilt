@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, cast
 
 from sqlalchemy.orm import Session
 
@@ -103,15 +103,15 @@ def upsert_connection(
         db.add(conn)
         db.flush()
     else:
-        conn.access_token = access_token
-        conn.refresh_token = refresh_token
-        conn.token_expires_at = token_expires_at
-        conn.token_type = token_type or conn.token_type or "Bearer"
+        setattr(conn, "access_token", access_token)
+        setattr(conn, "refresh_token", refresh_token)
+        setattr(conn, "token_expires_at", token_expires_at)
+        setattr(conn, "token_type", token_type or conn.token_type or "Bearer")
         if scope is not None:
-            conn.scope = scope
-        conn.revoked_at = None
+            setattr(conn, "scope", scope)
+        setattr(conn, "revoked_at", None)
         if make_active:
-            conn.is_active = True
+            setattr(conn, "is_active", True)
         db.add(conn)
 
     if make_active:
@@ -145,7 +145,7 @@ def delete_connection(db: Session, procore_user_id: str, company_id: int) -> Non
             .first()
         )
         if replacement:
-            set_active_company(db, procore_user_id, replacement.company_id)
+            set_active_company(db, procore_user_id, cast(int, replacement.company_id))
             db.commit()
 
 
@@ -156,7 +156,7 @@ def revoke_connection(db: Session, procore_user_id: str, company_id: int) -> Non
     conn = get_connection(db, int(company_id), str(procore_user_id))
     if conn is None:
         return
-    conn.revoked_at = datetime.now(timezone.utc)
-    conn.is_active = False
+    setattr(conn, "revoked_at", datetime.now(timezone.utc))
+    setattr(conn, "is_active", False)
     db.add(conn)
     db.commit()

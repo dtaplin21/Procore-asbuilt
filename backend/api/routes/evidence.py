@@ -1,14 +1,14 @@
-from typing import List, Optional, Any
+from typing import List, Optional, Any, cast
 import json
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Depends
 from sqlalchemy.orm import Session
 
-from backend.api.dependencies import get_db
-from backend.models.models import EvidenceRecord, Project
-from backend.models.schemas import EvidenceRecordResponse
-from backend.services.storage import StorageService
-from backend.services.file_storage import save_upload, get_file_path
+from api.dependencies import get_db
+from models.models import EvidenceRecord, Project
+from models.schemas import EvidenceRecordResponse
+from services.storage import StorageService
+from services.file_storage import save_upload, get_file_path
 from fastapi.responses import FileResponse
 
 router = APIRouter(tags=["evidence"])
@@ -55,7 +55,7 @@ async def upload_evidence(
         raise HTTPException(status_code=404, detail="Project not found")
 
     # Persist file via helper (validates size/type and writes to disk)
-    storage_key, content_type, original_name = await save_upload(
+    storage_key, content_type, original_name = save_upload(
         file, project_id, category="evidence"
     )
 
@@ -170,15 +170,18 @@ def download_evidence_file(
     if not evidence:
         raise HTTPException(status_code=404, detail="Evidence not found")
 
-    if not evidence.storage_key:
+    storage_key = cast(Optional[str], evidence.storage_key)
+    if not storage_key:
         raise HTTPException(status_code=404, detail="No file available")
 
-    path = get_file_path(evidence.storage_key)
+    path = get_file_path(storage_key)
     if not path.exists():
         raise HTTPException(status_code=404, detail="File missing on disk")
 
+    content_type = cast(Optional[str], evidence.content_type) or "application/octet-stream"
+    filename = cast(Optional[str], evidence.title) or "download"
     return FileResponse(
         path,
-        media_type=evidence.content_type or "application/octet-stream",
-        filename=evidence.title or "download",
+        media_type=content_type,
+        filename=filename,
     )

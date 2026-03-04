@@ -3,7 +3,7 @@ Procore API Client Service
 Handles all HTTP requests to Procore API with authentication
 """
 import httpx
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, cast
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 import json
@@ -45,13 +45,14 @@ class ProcoreAPIClient:
             raise ProcoreNotConnected(details={"user_id": self.user_id})
         
         # Check if token is expired or expires soon (within 5 minutes)
-        if datetime.utcnow() >= conn.token_expires_at - timedelta(minutes=5):
+        expires_at = cast(datetime, conn.token_expires_at)
+        if datetime.utcnow() >= expires_at - timedelta(minutes=5):
             # Refresh token
             oauth = ProcoreOAuth(self.db)
             new_payload = await oauth.refresh_token(self.user_id)
             return str(new_payload["access_token"])
         
-        return conn.access_token
+        return cast(str, conn.access_token)
     
     async def _request(
         self,
@@ -132,7 +133,17 @@ class ProcoreAPIClient:
                 message="Failed to reach Procore",
                 details={"upstream": "procore", "endpoint": endpoint, "method": method},
             ) from e
-    
+
+    def _ensure_list(self, data: Any) -> List[Dict[str, Any]]:
+        """Normalize API response to list; handles raw array or {data|results|companies} wrapper."""
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            for key in ("data", "results", "companies", "projects", "users", "submittals", "attachments", "rfis", "drawings", "inspections"):
+                if key in data and isinstance(data[key], list):
+                    return data[key]
+        return []
+
     def _get_company_id(self) -> str:
         """
         Get Procore company id header value for the ACTIVE connection.
@@ -146,10 +157,13 @@ class ProcoreAPIClient:
 
         company = (
             self.db.query(Company)
-            .filter(Company.id == conn.company_id)
+            .filter(Company.id == cast(int, conn.company_id))
             .first()
         )
-        return str(company.procore_company_id) if company and company.procore_company_id else ""
+        if company is None:
+            return ""
+        pcid = cast(Optional[str], company.procore_company_id)
+        return str(pcid) if pcid else ""
     
     # User & Company Methods
     async def get_current_user(self) -> Dict[str, Any]:
@@ -162,7 +176,8 @@ class ProcoreAPIClient:
     
     async def get_companies(self) -> List[Dict[str, Any]]:
         """List all companies user has access to"""
-        return await self._request("GET", "/companies")
+        data = await self._request("GET", "/companies")
+        return self._ensure_list(data)
     
     async def get_company(self, company_id: str) -> Dict[str, Any]:
         """Get company details"""
@@ -180,7 +195,8 @@ class ProcoreAPIClient:
         if company_id:
             headers["Procore-Company-Id"] = company_id
         
-        return await self._request("GET", "/projects", params=params, headers=headers)
+        data = await self._request("GET", "/projects", params=params, headers=headers)
+        return self._ensure_list(data)
     
     async def get_project(self, project_id: str, company_id: Optional[str] = None) -> Dict[str, Any]:
         """Get project details"""
@@ -196,7 +212,8 @@ class ProcoreAPIClient:
         if company_id:
             headers["Procore-Company-Id"] = company_id
         
-        return await self._request("GET", f"/projects/{project_id}/users", headers=headers)
+        data = await self._request("GET", f"/projects/{project_id}/users", headers=headers)
+        return self._ensure_list(data)
     
     async def get_project_companies(self, project_id: str, company_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get companies on project"""
@@ -204,7 +221,8 @@ class ProcoreAPIClient:
         if company_id:
             headers["Procore-Company-Id"] = company_id
         
-        return await self._request("GET", f"/projects/{project_id}/companies", headers=headers)
+        data = await self._request("GET", f"/projects/{project_id}/companies", headers=headers)
+        return self._ensure_list(data)
     
     # Submittals Methods
     async def get_submittals(
@@ -222,7 +240,8 @@ class ProcoreAPIClient:
         if params:
             request_params.update(params)
         
-        return await self._request("GET", "/submittals", params=request_params, headers=headers)
+        data = await self._request("GET", "/submittals", params=request_params, headers=headers)
+        return self._ensure_list(data)
     
     async def get_submittal(
         self,
@@ -293,12 +312,13 @@ class ProcoreAPIClient:
         if company_id:
             headers["Procore-Company-Id"] = company_id
         
-        return await self._request(
+        data = await self._request(
             "GET",
             f"/submittals/{submittal_id}/attachments",
             params={"project_id": project_id},
             headers=headers
         )
+        return self._ensure_list(data)
     
     # RFIs Methods
     async def get_rfis(
@@ -316,7 +336,8 @@ class ProcoreAPIClient:
         if params:
             request_params.update(params)
         
-        return await self._request("GET", "/rfis", params=request_params, headers=headers)
+        data = await self._request("GET", "/rfis", params=request_params, headers=headers)
+        return self._ensure_list(data)
     
     async def get_rfi(
         self,
@@ -372,7 +393,8 @@ class ProcoreAPIClient:
         if params:
             request_params.update(params)
         
-        return await self._request("GET", "/drawings", params=request_params, headers=headers)
+        data = await self._request("GET", "/drawings", params=request_params, headers=headers)
+        return self._ensure_list(data)
     
     async def get_drawing(
         self,
@@ -450,7 +472,8 @@ class ProcoreAPIClient:
         if params:
             request_params.update(params)
         
-        return await self._request("GET", "/inspections", params=request_params, headers=headers)
+        data = await self._request("GET", "/inspections", params=request_params, headers=headers)
+        return self._ensure_list(data)
     
     async def get_inspection(
         self,

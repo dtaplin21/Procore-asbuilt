@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from backend.api.dependencies import get_db
-from backend.services.storage import StorageService
-from backend.models.schemas import ProjectResponse, DashboardSummaryResponse, DrawingResponse
-from backend.models.models import Drawing, Project
-from backend.services.file_storage import save_upload, get_file_path
+from typing import List, Optional, cast
+from api.dependencies import get_db
+from services.storage import StorageService
+from models.schemas import ProjectResponse, DashboardSummaryResponse, DrawingResponse
+from models.models import Drawing, Project
+from services.file_storage import save_upload, get_file_path
 from datetime import datetime
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -92,7 +92,7 @@ async def upload_project_drawing(
     )
     
     # Set file_url to point to the /file route (will be implemented in next step)
-    drawing.file_url = f"/api/projects/{project_id}/drawings/{drawing.id}/file"
+    setattr(drawing, "file_url", f"/api/projects/{project_id}/drawings/{cast(int, drawing.id)}/file")
     db.commit()
     db.refresh(drawing)
 
@@ -119,7 +119,7 @@ def list_project_drawings(
     
     # Set file_url on each drawing to point to /file endpoint
     for drawing in drawings:
-        drawing.file_url = f"/api/projects/{project_id}/drawings/{drawing.id}/file"
+        setattr(drawing, "file_url", f"/api/projects/{project_id}/drawings/{cast(int, drawing.id)}/file")
     
     db.commit()  # Persist file_url changes
     
@@ -144,7 +144,7 @@ def get_project_drawing(
         raise HTTPException(status_code=404, detail="Drawing not found")
     
     # Set file_url to point to /file endpoint
-    drawing.file_url = f"/api/projects/{project_id}/drawings/{drawing.id}/file"
+    setattr(drawing, "file_url", f"/api/projects/{project_id}/drawings/{cast(int, drawing.id)}/file")
     db.commit()
 
     return drawing
@@ -168,17 +168,20 @@ def download_project_drawing(
     if not drawing:
         raise HTTPException(status_code=404, detail="Drawing not found")
 
-    if not drawing.storage_key:
+    storage_key = cast(Optional[str], drawing.storage_key)
+    if not storage_key:
         raise HTTPException(status_code=404, detail="No file available")
 
-    path = get_file_path(drawing.storage_key)
+    path = get_file_path(storage_key)
     if not path.exists():
         raise HTTPException(status_code=404, detail="File missing on disk")
 
+    content_type = cast(Optional[str], drawing.content_type) or "application/octet-stream"
+    name = cast(str, drawing.name)
     return FileResponse(
         path,
-        media_type=drawing.content_type or "application/octet-stream",
-        filename=drawing.name,
+        media_type=content_type,
+        filename=name,
     )
 
 
@@ -201,16 +204,19 @@ def download_project_drawing_file(
     if not drawing:
         raise HTTPException(status_code=404, detail="Drawing not found")
 
-    if not drawing.storage_key:
+    storage_key = cast(Optional[str], drawing.storage_key)
+    if not storage_key:
         raise HTTPException(status_code=404, detail="No file available")
 
-    path = get_file_path(drawing.storage_key)
+    path = get_file_path(storage_key)
     if not path.exists():
         raise HTTPException(status_code=404, detail="File missing on disk")
 
+    content_type = cast(Optional[str], drawing.content_type) or "application/octet-stream"
+    name = cast(str, drawing.name)
     return FileResponse(
         path,
-        media_type=drawing.content_type or "application/octet-stream",
-        filename=drawing.name,
+        media_type=content_type,
+        filename=name,
     )
 
