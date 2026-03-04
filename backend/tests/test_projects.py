@@ -7,7 +7,7 @@ most reliable way in a pytest environment is to import via the package
 namespace rather than relying on the current working directory.
 """
 
-from backend.main import app
+from main import app
 
 client = TestClient(app)
 
