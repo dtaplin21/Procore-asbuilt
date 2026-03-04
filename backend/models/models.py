@@ -280,6 +280,92 @@ class Drawing(Base):
     
     # Relationships
     project = relationship("Project", back_populates="drawings")
+    regions = relationship("DrawingRegion", back_populates="master_drawing", cascade="all, delete-orphan")
+    alignments_as_master = relationship(
+        "DrawingAlignment",
+        foreign_keys="DrawingAlignment.master_drawing_id",
+        back_populates="master_drawing",
+        cascade="all, delete-orphan",
+    )
+    alignments_as_sub = relationship(
+        "DrawingAlignment",
+        foreign_keys="DrawingAlignment.sub_drawing_id",
+        back_populates="sub_drawing",
+        cascade="all, delete-orphan",
+    )
+
+
+class DrawingRegion(Base):
+    __tablename__ = "drawing_regions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    master_drawing_id = Column(
+        Integer,
+        ForeignKey("drawings.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    label = Column(String(length=255), nullable=False)
+    page = Column(Integer, nullable=False, default=1)
+    geometry = Column(JSON, nullable=False)  # polygon/rect in master coordinate system
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    # Relationships
+    master_drawing = relationship("Drawing", back_populates="regions")
+    alignments = relationship("DrawingAlignment", back_populates="region")
+
+
+class DrawingAlignment(Base):
+    __tablename__ = "drawing_alignments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    master_drawing_id = Column(
+        Integer,
+        ForeignKey("drawings.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    sub_drawing_id = Column(
+        Integer,
+        ForeignKey("drawings.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    region_id = Column(
+        Integer,
+        ForeignKey("drawing_regions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    method = Column(String(length=50), nullable=False)  # manual | feature_match | vision
+    transform = Column(JSON, nullable=True)  # homography/affine + confidence
+    status = Column(String(length=50), nullable=False)  # queued | processing | complete | failed
+    error_message = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    # Relationships
+    master_drawing = relationship(
+        "Drawing",
+        foreign_keys=[master_drawing_id],
+        back_populates="alignments_as_master",
+    )
+    sub_drawing = relationship(
+        "Drawing",
+        foreign_keys=[sub_drawing_id],
+        back_populates="alignments_as_sub",
+    )
+    region = relationship("DrawingRegion", back_populates="alignments")
 
 
 # Evidence Records (specs, inspection docs, etc.)

@@ -19,7 +19,8 @@ from api.routes import (
     procore,
     procore_auth,
     drawings,
-    evidence
+    evidence,
+    drawing_alignment,
 )
 from database import init_db
 import os
@@ -146,7 +147,8 @@ app.include_router(insights.router)
 app.include_router(procore.router)
 app.include_router(procore_auth.router)
 app.include_router(drawings.router)
-app.include_router(evidence.router)  # Authentication routes
+app.include_router(evidence.router)
+app.include_router(drawing_alignment.router)
 
 # Serve static files in production (if needed)
 # static_dir = os.path.join(os.path.dirname(__file__), "..", "dist", "public")

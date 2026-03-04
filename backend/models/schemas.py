@@ -192,6 +192,52 @@ class EvidenceRecordResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+# ============================================
+# DRAWING REGIONS / ALIGNMENTS (Phase 2)
+# ============================================
+
+class DrawingRegionCreate(BaseModel):
+    label: str
+    page: int = 1
+    geometry: dict  # polygon/rect in master coordinate system
+
+
+class DrawingRegionResponse(BaseModel):
+    id: int
+    master_drawing_id: int
+    label: str
+    page: int
+    geometry: dict
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DrawingAlignmentCreate(BaseModel):
+    sub_drawing_id: int
+    region_id: Optional[int] = None
+    method: str  # manual | feature_match | vision
+
+
+class DrawingAlignmentResponse(BaseModel):
+    id: int
+    master_drawing_id: int
+    sub_drawing_id: int
+    region_id: Optional[int] = None
+    method: str
+    transform: Optional[dict] = None
+    status: str
+    error_message: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # Job Queue Schemas
 class JobCreate(BaseModel):
     user_id: int

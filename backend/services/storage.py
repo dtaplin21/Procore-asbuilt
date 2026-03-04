@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from typing import Any, Dict, List, Optional, cast
 
-from models.models import Project, Finding, Drawing, EvidenceRecord
+from models.models import Project, Finding, Drawing, DrawingRegion, DrawingAlignment, EvidenceRecord
 from services.procore_connection_store import get_active_connection
 
 
@@ -121,7 +121,122 @@ class StorageService:
             .filter(Drawing.project_id == project_id, Drawing.id == drawing_id)
             .first()
         )
-    
+
+    # ------------------------------------------------------------------
+    # Drawing Regions (Phase 2)
+    # ------------------------------------------------------------------
+
+    def create_drawing_region(
+        self,
+        master_drawing_id: int,
+        *,
+        label: str,
+        page: int = 1,
+        geometry: Dict[str, Any],
+    ) -> DrawingRegion:
+        region = DrawingRegion(
+            master_drawing_id=master_drawing_id,
+            label=label,
+            page=page,
+            geometry=geometry,
+        )
+        self.db.add(region)
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(region)
+        return region
+
+    def list_drawing_regions(self, master_drawing_id: int) -> List[DrawingRegion]:
+        return (
+            self.db.query(DrawingRegion)
+            .filter(DrawingRegion.master_drawing_id == master_drawing_id)
+            .order_by(DrawingRegion.created_at.desc(), DrawingRegion.id.desc())
+            .all()
+        )
+
+    def get_drawing_region(
+        self,
+        master_drawing_id: int,
+        region_id: int,
+    ) -> Optional[DrawingRegion]:
+        return (
+            self.db.query(DrawingRegion)
+            .filter(
+                DrawingRegion.master_drawing_id == master_drawing_id,
+                DrawingRegion.id == region_id,
+            )
+            .first()
+        )
+
+    # ------------------------------------------------------------------
+    # Drawing Alignments (Phase 2)
+    # ------------------------------------------------------------------
+
+    def create_drawing_alignment(
+        self,
+        master_drawing_id: int,
+        sub_drawing_id: int,
+        method: str,
+        *,
+        region_id: Optional[int] = None,
+    ) -> DrawingAlignment:
+        alignment = DrawingAlignment(
+            master_drawing_id=master_drawing_id,
+            sub_drawing_id=sub_drawing_id,
+            region_id=region_id,
+            method=method,
+            status="queued",
+        )
+        self.db.add(alignment)
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(alignment)
+        return alignment
+
+    def list_drawing_alignments(self, master_drawing_id: int) -> List[DrawingAlignment]:
+        return (
+            self.db.query(DrawingAlignment)
+            .filter(DrawingAlignment.master_drawing_id == master_drawing_id)
+            .order_by(DrawingAlignment.created_at.desc(), DrawingAlignment.id.desc())
+            .all()
+        )
+
+    def update_alignment_status(
+        self,
+        alignment_id: int,
+        status: str,
+        *,
+        transform: Optional[Dict[str, Any]] = None,
+        error_message: Optional[str] = None,
+    ) -> Optional[DrawingAlignment]:
+        alignment = self.db.query(DrawingAlignment).filter(DrawingAlignment.id == alignment_id).first()
+        if alignment is None:
+            return None
+
+        setattr(alignment, "status", status)
+        if transform is not None:
+            setattr(alignment, "transform", transform)
+        if error_message is not None:
+            setattr(alignment, "error_message", error_message)
+
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(alignment)
+        return alignment
+
+    # ------------------------------------------------------------------
+    # Evidence Records
+    # ------------------------------------------------------------------
+
     def create_evidence_record(
         self,
         project_id: int,
