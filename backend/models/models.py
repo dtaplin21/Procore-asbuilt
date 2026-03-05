@@ -203,6 +203,7 @@ class Finding(Base):
 
     # Relationships
     project = relationship("Project", back_populates="findings")
+    drawing_diffs = relationship("DrawingDiff", back_populates="finding", passive_deletes=True)
 
 # Usage Tracking
 class UsageLog(Base):
@@ -366,6 +367,35 @@ class DrawingAlignment(Base):
         back_populates="alignments_as_sub",
     )
     region = relationship("DrawingRegion", back_populates="alignments")
+    drawing_diffs = relationship("DrawingDiff", back_populates="alignment", cascade="all, delete-orphan")
+
+
+class DrawingDiff(Base):
+    """Diff analysis between master and sub drawing; optionally linked to a finding."""
+    __tablename__ = "drawing_diffs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    alignment_id = Column(
+        Integer,
+        ForeignKey("drawing_alignments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    finding_id = Column(
+        Integer,
+        ForeignKey("findings.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    summary = Column(String, nullable=False)
+    severity = Column(String, nullable=False, index=True)  # low | medium | high | critical
+    diff_regions = Column(JSON, nullable=False)  # list of normalized region objects
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+
+    # Relationships
+    alignment = relationship("DrawingAlignment", back_populates="drawing_diffs")
+    finding = relationship("Finding", back_populates="drawing_diffs")
 
 
 # Evidence Records (specs, inspection docs, etc.)
