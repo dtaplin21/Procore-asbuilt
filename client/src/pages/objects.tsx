@@ -5,7 +5,6 @@ import {
   Search, 
   Filter, 
   ZoomIn,
-  ZoomOut,
   Move,
   MousePointer,
   Grid3X3,
@@ -30,7 +29,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { StatusBadge } from "@/components/status-badge";
+import { CreateRegionForm } from "@/components/create-region-form";
+import { AttachSubDrawingForm } from "@/components/attach-sub-drawing-form";
 import type { DrawingObject, ObjectStatus } from "@shared/schema";
+
+type Project = { id: string | number; name: string };
+type Drawing = { id: number; name?: string };
 
 const statusConfig: Record<ObjectStatus, { label: string; color: string }> = {
   not_started: { label: "Not Started", color: "bg-foreground/30" },
@@ -46,6 +50,17 @@ export default function Objects() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedTool, setSelectedTool] = useState<"select" | "pan" | "zoom">("select");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedMasterDrawingId, setSelectedMasterDrawingId] = useState<string | null>(null);
+
+  const { data: projects, isLoading: projectsLoading } = useQuery<Project[]>({
+    queryKey: ["/api/projects"],
+  });
+
+  const { data: drawings, isLoading: drawingsLoading } = useQuery<Drawing[]>({
+    queryKey: [`/api/projects/${selectedProjectId}/drawings`],
+    enabled: !!selectedProjectId,
+  });
 
   const { data: objects, isLoading } = useQuery<DrawingObject[]>({
     queryKey: ["/api/objects"],
@@ -129,6 +144,26 @@ export default function Objects() {
           ))}
         </div>
       )}
+
+      {/* Create Region + Attach Sub Drawing */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <CreateRegionForm
+          projectId={selectedProjectId}
+          masterDrawingId={selectedMasterDrawingId}
+          projects={projects ?? []}
+          drawings={drawings ?? []}
+          projectsLoading={projectsLoading}
+          drawingsLoading={drawingsLoading}
+          onProjectChange={setSelectedProjectId}
+          onDrawingChange={setSelectedMasterDrawingId}
+        />
+        <AttachSubDrawingForm
+          projectId={selectedProjectId}
+          masterDrawingId={selectedMasterDrawingId}
+          drawings={drawings ?? []}
+          drawingsLoading={drawingsLoading}
+        />
+      </div>
 
       {/* Drawing Viewer Mockup */}
       <Card>
