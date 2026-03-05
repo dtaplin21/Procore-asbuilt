@@ -13,13 +13,15 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from typing import Any, Dict, List, Optional, cast
 
-from models.models import Drawing, EvidenceRecord, InspectionRun
+from models.models import Drawing, DrawingRegion, EvidenceRecord, InspectionRun
 from services.file_storage import get_file_path
 from services.storage import StorageService
 
 logger = logging.getLogger(__name__)
 
 # Known inspection types (for lookup + LLM output constraint)
+OUTCOMES = ("pass", "fail", "mixed", "unknown")
+
 KNOWN_INSPECTION_TYPES: List[str] = [
     "hvac",
     "electrical",
@@ -128,6 +130,60 @@ Respond with only the type, e.g. hvac or electrical."""
     except Exception as e:
         logger.warning("inspection_type_llm_failed", extra={"error": str(e)})
         return "unknown"
+
+
+def _extract_outcomes_llm(
+    title: str,
+    inspection_type: str,
+    text_content: Optional[str],
+) -> tuple[str, str]:
+    """
+    Use LLM to extract outcome (pass/fail/mixed/unknown) and short notes from evidence.
+    Returns (outcome, notes).
+    """
+    try:
+        from config import settings
+        from openai import OpenAI
+    except ImportError:
+        return "unknown", ""
+
+    if not getattr(settings, "openai_api_key", None):
+        return "unknown", ""
+
+    client = OpenAI(api_key=settings.openai_api_key)
+    text_preview = (text_content or "")[:2000]
+
+    prompt = f"""Analyze this inspection document and determine the overall outcome.
+
+Document title: {title}
+Inspection type: {inspection_type}
+
+Content:
+{text_preview or '(No text content available)'}
+
+Respond in exactly this format:
+OUTCOME: <pass|fail|mixed|unknown>
+NOTES: <short summary, 1-2 sentences>"""
+
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=256,
+        )
+        raw = (resp.choices[0].message.content or "").strip().lower()
+        outcome = "unknown"
+        for o in OUTCOMES:
+            if f"outcome: {o}" in raw or raw.startswith(o):
+                outcome = o
+                break
+        notes = ""
+        if "notes:" in raw:
+            notes = raw.split("notes:")[-1].strip().split("\n")[0].strip()[:500]
+        return outcome, notes
+    except Exception as e:
+        logger.warning("extract_outcomes_llm_failed", extra={"error": str(e)})
+        return "unknown", ""
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +300,161 @@ def _classify_and_persist_inspection_type(
 
 
 # ---------------------------------------------------------------------------
-# Main Pipeline (Steps 1 + 2)
+# Step 3 — Extract Outcomes
+# ---------------------------------------------------------------------------
+
+
+def _extract_and_persist_outcomes(
+    db: Session,
+    ctx: Dict[str, Any],
+) -> Optional[Any]:
+    """
+    Use LLM to extract outcome (pass/fail/mixed/unknown) and notes.
+    Persist by creating inspection_results row.
+    Returns the created InspectionResult or None.
+    """
+    run = ctx["run"]
+    evidence = ctx.get("evidence")
+    inspection_type = ctx.get("inspection_type", "unknown")
+
+    if evidence is not None:
+        title = getattr(evidence, "title", "") or ""
+        text = getattr(evidence, "text_content", None)
+        outcome, notes = _extract_outcomes_llm(title, inspection_type, text)
+    else:
+        outcome = "unknown"
+        notes = "No evidence document linked"
+
+    outcome = outcome if outcome in OUTCOMES else "unknown"
+
+    storage = StorageService(db)
+    run_id = cast(int, run.id)
+    result = storage.create_inspection_result(run_id, outcome, notes=notes or None)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Step 4 — Map Areas to Master Drawing Coordinates
+# ---------------------------------------------------------------------------
+
+# Unknown/unmapped geometry: full-page rect (normalized 0-1)
+UNMAPPED_GEOMETRY: Dict[str, Any] = {
+    "page": 1,
+    "type": "rect",
+    "x": 0.0,
+    "y": 0.0,
+    "width": 1.0,
+    "height": 1.0,
+    "label": "unmapped",
+}
+
+
+def _resolve_region_geometries(
+    db: Session,
+    master_drawing_id: int,
+    evidence: Optional[EvidenceRecord],
+) -> List[tuple[Dict[str, Any], Dict[str, Any]]]:
+    """
+    Resolve overlay geometries from drawing_regions via evidence metadata.
+
+    Evidence meta may contain:
+      - region_id: int → single region by id
+      - region_ids: list[int] → multiple regions
+      - region_label: str → single region by label (case-insensitive)
+
+    Returns list of (geometry, meta). Meta includes "unmapped": True when no region matched.
+    """
+    meta: Dict[str, Any] = {}
+    regions = (
+        db.query(DrawingRegion)
+        .filter(DrawingRegion.master_drawing_id == master_drawing_id)
+        .all()
+    )
+    region_by_id = {cast(int, r.id): r for r in regions}
+    region_by_label = {(getattr(r, "label", "") or "").strip().lower(): r for r in regions}
+    out: List[tuple[Dict[str, Any], Dict[str, Any]]] = []
+
+    if evidence is not None:
+        ev_meta = getattr(evidence, "meta", None) or {}
+        if not isinstance(ev_meta, dict):
+            ev_meta = {}
+
+        region_ids = ev_meta.get("region_ids")
+        if isinstance(region_ids, list):
+            for rid in region_ids:
+                if rid in region_by_id:
+                    reg = region_by_id[rid]
+                    geom = reg.geometry
+                    if isinstance(geom, dict):
+                        out.append((dict(geom), dict(meta)))
+
+        if not out:
+            region_id = ev_meta.get("region_id")
+            if region_id is not None and region_id in region_by_id:
+                reg = region_by_id[region_id]
+                geom = reg.geometry
+                if isinstance(geom, dict):
+                    out.append((dict(geom), dict(meta)))
+
+        if not out:
+            region_label = ev_meta.get("region_label")
+            if region_label is not None:
+                label_norm = str(region_label).strip().lower()
+                if label_norm in region_by_label:
+                    reg = region_by_label[label_norm]
+                    geom = reg.geometry
+                    if isinstance(geom, dict):
+                        out.append((dict(geom), dict(meta)))
+
+    if not out:
+        meta["unmapped"] = True
+        out.append((dict(UNMAPPED_GEOMETRY), meta))
+
+    return out
+
+
+def _map_and_persist_overlays(
+    db: Session,
+    ctx: Dict[str, Any],
+) -> List[Any]:
+    """
+    Map areas to master drawing coords via drawing_regions (or unmapped fallback).
+    Persist one or more drawing_overlays rows.
+    Returns list of created DrawingOverlay.
+    """
+    run = ctx["run"]
+    master_drawing = ctx["master_drawing"]
+    evidence = ctx.get("evidence")
+    inspection_result = ctx.get("inspection_result")
+
+    master_drawing_id = cast(int, master_drawing.id)
+    run_id = cast(int, run.id)
+
+    status = (
+        getattr(inspection_result, "outcome", "unknown")
+        if inspection_result is not None
+        else "unknown"
+    )
+    if status not in ("pass", "fail", "unknown"):
+        status = "unknown"
+
+    geometries_and_meta = _resolve_region_geometries(db, master_drawing_id, evidence)
+    storage = StorageService(db)
+    overlays: List[Any] = []
+    for geometry, meta in geometries_and_meta:
+        overlay = storage.create_drawing_overlay(
+            master_drawing_id,
+            geometry,
+            status,
+            meta=meta or None,
+            inspection_run_id=run_id,
+        )
+        overlays.append(overlay)
+    return overlays
+
+
+# ---------------------------------------------------------------------------
+# Main Pipeline (Steps 1 + 2 + 3 + 4)
 # ---------------------------------------------------------------------------
 
 
@@ -254,11 +464,15 @@ def run_inspection_mapping(db: Session, run: InspectionRun) -> Dict[str, Any]:
 
     Step 1: Load evidence + master drawing, resolve file paths.
     Step 2: Classify inspection type (lookup or LLM), persist to inspection_runs.inspection_type.
+    Step 3: Extract outcomes (LLM), persist inspection_results row.
+    Step 4: Map areas to master coords via drawing_regions, persist drawing_overlays.
 
     Returns dict with:
       - run, evidence, master_drawing (loaded records)
       - evidence_path, master_drawing_path (resolved Paths when storage_key present)
       - inspection_type (str, after classification)
+      - inspection_result (created row)
+      - drawing_overlays (list of created overlay rows)
       - error (str | None, set on failure)
     """
     ctx = _load_evidence_and_master(db, run)
@@ -267,4 +481,11 @@ def run_inspection_mapping(db: Session, run: InspectionRun) -> Dict[str, Any]:
 
     inspection_type = _classify_and_persist_inspection_type(db, ctx)
     ctx["inspection_type"] = inspection_type
+
+    result = _extract_and_persist_outcomes(db, ctx)
+    ctx["inspection_result"] = result
+
+    overlays = _map_and_persist_overlays(db, ctx)
+    ctx["drawing_overlays"] = overlays
+
     return ctx
