@@ -8,6 +8,7 @@ so routes can continue to import it while the new data model is designed.
 
 from __future__ import annotations
 
+from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from typing import Any, Dict, List, Optional, cast
@@ -21,6 +22,9 @@ from models.models import (
     DrawingDiff,
     EvidenceRecord,
     UsageLog,
+    InspectionRun,
+    InspectionResult,
+    DrawingOverlay,
 )
 from services.procore_connection_store import get_active_connection
 
@@ -387,7 +391,8 @@ class StorageService:
         Finding fields: type="deviation", title="Mismatch on {drawing.name}", description=summary,
         affected_items=region labels, project_id=master drawing project.
         """
-        sev_rank = self.SEVERITY_ORDER.get(diff.severity, 0)
+        diff_severity = cast(str, diff.severity)
+        sev_rank = self.SEVERITY_ORDER.get(diff_severity, 0)
         thresh_rank = self.SEVERITY_ORDER.get(severity_threshold, 3)  # default "high"
         if sev_rank < thresh_rank:
             return None
@@ -415,7 +420,7 @@ class StorageService:
         finding = Finding(
             project_id=project_id,
             type=finding_type,
-            severity=diff.severity,
+            severity=diff_severity,
             title=f"Mismatch on {drawing_name}",
             description=diff.summary,
             affected_items=affected_items,
@@ -491,6 +496,164 @@ class StorageService:
             self.db.query(EvidenceRecord)
             .filter(EvidenceRecord.project_id == project_id, EvidenceRecord.id == evidence_id)
             .first()
+        )
+
+    # ------------------------------------------------------------------
+    # Inspection Runs
+    # ------------------------------------------------------------------
+
+    def create_inspection_run(
+        self,
+        project_id: int,
+        master_drawing_id: int,
+        evidence_id: Optional[int] = None,
+        inspection_type: Optional[str] = None,
+    ) -> InspectionRun:
+        run = InspectionRun(
+            project_id=project_id,
+            master_drawing_id=master_drawing_id,
+            evidence_id=evidence_id,
+            inspection_type=inspection_type,
+            status="queued",
+        )
+        self.db.add(run)
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(run)
+        return run
+
+    def get_inspection_run(self, project_id: int, run_id: int) -> Optional[InspectionRun]:
+        return (
+            self.db.query(InspectionRun)
+            .filter(InspectionRun.project_id == project_id, InspectionRun.id == run_id)
+            .first()
+        )
+
+    def list_inspection_runs(
+        self,
+        project_id: int,
+        *,
+        master_drawing_id: Optional[int] = None,
+        status: Optional[str] = None,
+        limit: Optional[int] = None,
+    ) -> List[InspectionRun]:
+        q = self.db.query(InspectionRun).filter(InspectionRun.project_id == project_id)
+        if master_drawing_id is not None:
+            q = q.filter(InspectionRun.master_drawing_id == master_drawing_id)
+        if status is not None:
+            q = q.filter(InspectionRun.status == status)
+        base = q.order_by(InspectionRun.created_at.desc(), InspectionRun.id.desc())
+        if limit is not None:
+            base = base.limit(limit)
+        return base.all()
+
+    def update_inspection_run_status(
+        self,
+        run_id: int,
+        status: str,
+        *,
+        started_at: Optional[datetime] = None,
+        completed_at: Optional[datetime] = None,
+        error_message: Optional[str] = None,
+        inspection_type: Optional[str] = None,
+    ) -> Optional[InspectionRun]:
+        run = self.db.query(InspectionRun).filter(InspectionRun.id == run_id).first()
+        if run is None:
+            return None
+
+        setattr(run, "status", status)
+        if started_at is not None:
+            setattr(run, "started_at", started_at)
+        if completed_at is not None:
+            setattr(run, "completed_at", completed_at)
+        if error_message is not None:
+            setattr(run, "error_message", error_message)
+        if inspection_type is not None:
+            setattr(run, "inspection_type", inspection_type)
+
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(run)
+        return run
+
+    # ------------------------------------------------------------------
+    # Inspection Results + Overlays
+    # ------------------------------------------------------------------
+
+    def create_inspection_result(
+        self,
+        run_id: int,
+        outcome: str,
+        notes: Optional[str] = None,
+    ) -> InspectionResult:
+        result = InspectionResult(
+            inspection_run_id=run_id,
+            outcome=outcome,
+            notes=notes,
+        )
+        self.db.add(result)
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(result)
+        return result
+
+    def create_drawing_overlay(
+        self,
+        master_drawing_id: int,
+        geometry: Dict[str, Any],
+        status: str,
+        meta: Optional[Dict[str, Any]] = None,
+        *,
+        inspection_run_id: Optional[int] = None,
+        diff_id: Optional[int] = None,
+    ) -> DrawingOverlay:
+        """Create overlay. Exactly one of inspection_run_id or diff_id must be set (DB constraint)."""
+        if (inspection_run_id is None) == (diff_id is None):
+            raise ValueError("Exactly one of inspection_run_id or diff_id must be set")
+        overlay = DrawingOverlay(
+            master_drawing_id=master_drawing_id,
+            inspection_run_id=inspection_run_id,
+            diff_id=diff_id,
+            geometry=geometry,
+            status=status,
+            meta=meta,
+        )
+        self.db.add(overlay)
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(overlay)
+        return overlay
+
+    def list_drawing_overlays(
+        self,
+        master_drawing_id: int,
+        *,
+        inspection_run_id: Optional[int] = None,
+        diff_id: Optional[int] = None,
+    ) -> List[DrawingOverlay]:
+        q = (
+            self.db.query(DrawingOverlay)
+            .filter(DrawingOverlay.master_drawing_id == master_drawing_id)
+        )
+        if inspection_run_id is not None:
+            q = q.filter(DrawingOverlay.inspection_run_id == inspection_run_id)
+        if diff_id is not None:
+            q = q.filter(DrawingOverlay.diff_id == diff_id)
+        return (
+            q.order_by(DrawingOverlay.created_at.desc(), DrawingOverlay.id.desc())
+            .all()
         )
 
     def get_submittals(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
