@@ -294,6 +294,50 @@ class DrawingAlignmentResponse(BaseModel):
         from_attributes = True
 
 
+class DrawingDiffRegion(BaseModel):
+    """A single diff region; geometry normalized 0-1."""
+    page: int
+    type: Literal["rect", "polygon"]
+    points: List[List[float]]  # polygon: [[x,y],...]; rect: [[x,y],[x+w,y],[x+w,y+h],[x,y+h]] or [x,y,w,h]
+    label: Optional[str] = None
+    confidence: float = Field(ge=0.0, le=1.0, default=1.0)
+
+
+class DrawingDiffCreate(BaseModel):
+    """Body for POST create drawing diff."""
+    alignment_id: int
+    finding_id: Optional[int] = None
+    summary: str
+    severity: Literal["low", "medium", "high", "critical"]
+    diff_regions: List[DrawingDiffRegion]
+
+
+class DrawingDiffResponse(BaseModel):
+    """
+    Returned by API. Includes:
+    - diff metadata: id, alignment_id, summary, severity, created_at
+    - diff_regions: list of DrawingDiffRegion
+    - finding_id: optional link to finding
+    """
+    id: int
+    alignment_id: int
+    finding_id: Optional[int] = None
+    summary: str
+    severity: str
+    diff_regions: List[DrawingDiffRegion]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+    @field_validator("diff_regions", mode="before")
+    @classmethod
+    def parse_diff_regions(cls, v: Any) -> Any:
+        if isinstance(v, list):
+            return [DrawingDiffRegion.model_validate(x) if isinstance(x, dict) else x for x in v]
+        return v
+
+
 # Job Queue Schemas
 class JobCreate(BaseModel):
     user_id: int

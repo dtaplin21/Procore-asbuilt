@@ -12,7 +12,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from typing import Any, Dict, List, Optional, cast
 
-from models.models import Project, Finding, Drawing, DrawingRegion, DrawingAlignment, EvidenceRecord
+from models.models import (
+    Project,
+    Finding,
+    Drawing,
+    DrawingRegion,
+    DrawingAlignment,
+    DrawingDiff,
+    EvidenceRecord,
+)
 from services.procore_connection_store import get_active_connection
 
 
@@ -248,6 +256,60 @@ class StorageService:
             raise
         self.db.refresh(alignment)
         return alignment
+
+    # ------------------------------------------------------------------
+    # Drawing Diffs
+    # ------------------------------------------------------------------
+
+    def create_drawing_diff(
+        self,
+        alignment_id: int,
+        *,
+        summary: str,
+        severity: str,
+        diff_regions: List[Dict[str, Any]],
+        finding_id: Optional[int] = None,
+    ) -> DrawingDiff:
+        diff = DrawingDiff(
+            alignment_id=alignment_id,
+            finding_id=finding_id,
+            summary=summary,
+            severity=severity,
+            diff_regions=diff_regions,
+        )
+        self.db.add(diff)
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(diff)
+        return diff
+
+    def list_drawing_diffs(
+        self,
+        alignment_id: int,
+        *,
+        severity: Optional[str] = None,
+    ) -> List[DrawingDiff]:
+        q = self.db.query(DrawingDiff).filter(DrawingDiff.alignment_id == alignment_id)
+        if severity is not None:
+            q = q.filter(DrawingDiff.severity == severity)
+        return q.order_by(DrawingDiff.created_at.desc(), DrawingDiff.id.desc()).all()
+
+    def get_drawing_diff(
+        self,
+        alignment_id: int,
+        diff_id: int,
+    ) -> Optional[DrawingDiff]:
+        return (
+            self.db.query(DrawingDiff)
+            .filter(
+                DrawingDiff.alignment_id == alignment_id,
+                DrawingDiff.id == diff_id,
+            )
+            .first()
+        )
 
     # ------------------------------------------------------------------
     # Evidence Records
