@@ -1,22 +1,24 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from database import get_db
 from services.storage import StorageService
+from models.schemas import InspectionListResponse
 
 router = APIRouter(prefix="/api/inspections", tags=["inspections"])
 
-@router.get("")
+
+@router.get("", response_model=InspectionListResponse)
 async def get_inspections(
     project_id: Optional[str] = Query(None),
-    limit: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
 ):
+    """List inspection records with pagination (limit, offset). Placeholder: returns empty list."""
     storage = StorageService(db)
-    inspections = storage.get_inspections(project_id)
-    if limit:
-        inspections = inspections[:limit]
-    return inspections
+    items, total = storage.get_inspections(project_id, limit=limit, offset=offset)
+    return InspectionListResponse(items=items, total=total, limit=limit, offset=offset)
 
 @router.get("/{inspection_id}")
 async def get_inspection(inspection_id: str, db: Session = Depends(get_db)):

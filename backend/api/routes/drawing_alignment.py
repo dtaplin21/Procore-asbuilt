@@ -5,7 +5,7 @@ Phase 2: User-defined regions on master drawings and sub-drawing alignment linka
 """
 from typing import List, cast
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
@@ -14,6 +14,7 @@ from models.schemas import (
     DrawingRegionResponse,
     DrawingAlignmentCreate,
     DrawingAlignmentResponse,
+    DrawingAlignmentListResponse,
     AlignmentUpdate,
 )
 from services.storage import StorageService
@@ -131,19 +132,24 @@ def create_drawing_alignment(
 
 @router.get(
     "/{project_id}/drawings/{master_drawing_id}/alignments",
-    response_model=List[DrawingAlignmentResponse],
+    response_model=DrawingAlignmentListResponse,
 )
 def list_drawing_alignments(
     project_id: int,
     master_drawing_id: int,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-) -> List[DrawingAlignmentResponse]:
-    """List all alignments for a master drawing."""
+) -> DrawingAlignmentListResponse:
+    """List alignments for a master drawing with pagination (limit, offset)."""
     storage = StorageService(db)
     _ensure_master_drawing_in_project(storage, project_id, master_drawing_id)
 
-    alignments = storage.list_drawing_alignments(master_drawing_id)
-    return [DrawingAlignmentResponse.model_validate(a) for a in alignments]
+    alignments, total = storage.list_drawing_alignments(
+        master_drawing_id, limit=limit, offset=offset
+    )
+    items = [DrawingAlignmentResponse.model_validate(a) for a in alignments]
+    return DrawingAlignmentListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.patch(
@@ -164,8 +170,7 @@ def update_drawing_alignment(
     storage = StorageService(db)
     _ensure_master_drawing_in_project(storage, project_id, master_drawing_id)
 
-    alignments = storage.list_drawing_alignments(master_drawing_id)
-    alignment = next((a for a in alignments if cast(int, a.id) == alignment_id), None)
+    alignment = storage.get_drawing_alignment_by_id(project_id, master_drawing_id, alignment_id)
     if alignment is None:
         raise HTTPException(
             status_code=404,

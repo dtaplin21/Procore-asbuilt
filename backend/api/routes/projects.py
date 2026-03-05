@@ -4,20 +4,24 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, cast
 from api.dependencies import get_db
 from services.storage import StorageService
-from models.schemas import ProjectResponse, DashboardSummaryResponse, DrawingResponse
+from models.schemas import ProjectResponse, ProjectListResponse, DashboardSummaryResponse, DrawingResponse
 from models.models import Drawing, Project
 from services.file_storage import save_upload, get_file_path
 from datetime import datetime
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
-@router.get("", response_model=List[ProjectResponse])
+@router.get("", response_model=ProjectListResponse)
 async def get_projects(
     company_id: Optional[int] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    """List projects with pagination (limit, offset)."""
     storage = StorageService(db)
-    return storage.get_projects(company_id=company_id)
+    items, total = storage.get_projects(company_id=company_id, limit=limit, offset=offset)
+    return ProjectListResponse(items=items, total=total, limit=limit, offset=offset)
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(project_id: int, db: Session = Depends(get_db)):

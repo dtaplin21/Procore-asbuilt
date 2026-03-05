@@ -32,11 +32,21 @@ class StorageService:
     # Placeholder methods (return empty data until new models are defined)
     # ------------------------------------------------------------------
 
-    def get_projects(self, company_id: Optional[int] = None) -> List[Project]:
+    def get_projects(
+        self,
+        company_id: Optional[int] = None,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[List[Project], int]:
+        """List projects with pagination. Returns (items, total)."""
         q = self.db.query(Project)
         if company_id is not None:
             q = q.filter(Project.company_id == company_id)
-        return q.order_by(Project.name.asc()).all()
+        base = q.order_by(Project.name.asc())
+        total = base.count()
+        items = base.limit(limit).offset(offset).all()
+        return items, total
 
     def get_project(self, project_id: int) -> Optional[Project]:
         return self.db.query(Project).filter(Project.id == project_id).first()
@@ -223,13 +233,22 @@ class StorageService:
         self.db.refresh(alignment)
         return alignment
 
-    def list_drawing_alignments(self, master_drawing_id: int) -> List[DrawingAlignment]:
-        return (
+    def list_drawing_alignments(
+        self,
+        master_drawing_id: int,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[List[DrawingAlignment], int]:
+        """List alignments for a master drawing with pagination. Returns (items, total)."""
+        base = (
             self.db.query(DrawingAlignment)
             .filter(DrawingAlignment.master_drawing_id == master_drawing_id)
             .order_by(DrawingAlignment.created_at.desc(), DrawingAlignment.id.desc())
-            .all()
         )
+        total = base.count()
+        items = base.limit(limit).offset(offset).all()
+        return items, total
 
     def get_drawing_alignment_by_id(
         self,
@@ -315,15 +334,28 @@ class StorageService:
         master_drawing_id: int,
         *,
         alignment_id: Optional[int] = None,
-    ) -> List[DrawingDiff]:
-        q = (
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[List[DrawingDiff], int]:
+        """
+        List diffs for a master drawing, optionally filtered by alignment.
+        Sorted by created_at desc. Returns (items, total).
+        """
+        base = (
             self.db.query(DrawingDiff)
             .join(DrawingAlignment, DrawingDiff.alignment_id == DrawingAlignment.id)
             .filter(DrawingAlignment.master_drawing_id == master_drawing_id)
         )
         if alignment_id is not None:
-            q = q.filter(DrawingDiff.alignment_id == alignment_id)
-        return q.order_by(DrawingDiff.created_at.desc(), DrawingDiff.id.desc()).all()
+            base = base.filter(DrawingDiff.alignment_id == alignment_id)
+        total = base.count()
+        items = (
+            base.order_by(DrawingDiff.created_at.desc(), DrawingDiff.id.desc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+        return items, total
 
     def get_drawing_diff(
         self,
@@ -437,11 +469,17 @@ class StorageService:
         project_id: int,
         *,
         type: Optional[str] = None,
-    ) -> List[EvidenceRecord]:
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[List[EvidenceRecord], int]:
+        """List evidence records with pagination. Returns (items, total)."""
         q = self.db.query(EvidenceRecord).filter(EvidenceRecord.project_id == project_id)
         if type is not None:
             q = q.filter(EvidenceRecord.type == type)
-        return q.order_by(EvidenceRecord.created_at.desc(), EvidenceRecord.id.desc()).all()
+        base = q.order_by(EvidenceRecord.created_at.desc(), EvidenceRecord.id.desc())
+        total = base.count()
+        items = base.limit(limit).offset(offset).all()
+        return items, total
 
     def get_evidence_record(self, project_id: int, evidence_id: int) -> Optional[EvidenceRecord]:
         return (
@@ -474,8 +512,15 @@ class StorageService:
     def update_rfi(self, rfi_id: str, updates: dict) -> Optional[Dict[str, Any]]:
         return None
 
-    def get_inspections(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        return []
+    def get_inspections(
+        self,
+        project_id: Optional[str] = None,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[List[Dict[str, Any]], int]:
+        """List inspections with pagination. Returns (items, total). Placeholder: always empty."""
+        return [], 0
 
     def get_inspection(self, inspection_id: str) -> Optional[Dict[str, Any]]:
         return None
@@ -492,14 +537,21 @@ class StorageService:
     def get_object(self, object_id: str) -> Optional[Dict[str, Any]]:
         return None
 
-    def get_insights(self, project_id: Optional[int] = None, limit: Optional[int] = None) -> List[Finding]:
+    def get_insights(
+        self,
+        project_id: Optional[int] = None,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[List[Finding], int]:
+        """List AI findings/insights with pagination. Returns (items, total)."""
         q = self.db.query(Finding)
         if project_id is not None:
             q = q.filter(Finding.project_id == project_id)
-        q = q.order_by(Finding.created_at.desc(), Finding.id.desc())
-        if limit is not None:
-            q = q.limit(limit)
-        return q.all()
+        base = q.order_by(Finding.created_at.desc(), Finding.id.desc())
+        total = base.count()
+        items = base.limit(limit).offset(offset).all()
+        return items, total
 
     def get_finding(
         self,

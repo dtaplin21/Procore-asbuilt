@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
 from models.models import EvidenceRecord, Project
-from models.schemas import EvidenceRecordResponse
+from models.schemas import EvidenceRecordResponse, EvidenceListResponse
 from services.storage import StorageService
 from services.file_storage import save_upload, get_file_path
 from fastapi.responses import FileResponse
@@ -92,20 +92,23 @@ async def upload_evidence(
     return evidence
 
 
-@router.get("/api/projects/{project_id}/evidence", response_model=List[EvidenceRecordResponse])
+@router.get("/api/projects/{project_id}/evidence", response_model=EvidenceListResponse)
 def list_evidence(
     project_id: int,
     type: Optional[str] = Query(default=None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """List evidence records for a project.
+    """List evidence records for a project with pagination (limit, offset).
     
     - Metadata comes from database, no filesystem reads
-    - Optionally filter by type (e.g., ?type=photo)
+    - Optionally filter by type (e.g., ?type=spec)
     - Returns evidence sorted by creation date (newest first)
     
-        Query Parameters:
-        - type: optional filter by evidence type ('spec' or 'inspection_doc')
+    Query Parameters:
+    - type: optional filter by evidence type ('spec' or 'inspection_doc')
+    - limit, offset: pagination
     """
     # Verify project exists
     proj = db.query(Project).filter(Project.id == project_id).first()
@@ -113,18 +116,19 @@ def list_evidence(
         raise HTTPException(status_code=404, detail="Project not found")
 
     service = StorageService(db)
-    
-    # Query with optional type filter
     type_param = type.strip().lower() if type else None
-    evidence_list = service.list_evidence_records(project_id, type=type_param)
-    
+    evidence_list, total = service.list_evidence_records(
+        project_id, type=type_param, limit=limit, offset=offset
+    )
+
     # Set file_url on each record
     for evidence in evidence_list:
         evidence.file_url = f"/api/projects/{project_id}/evidence/{evidence.id}/file"
-    
+
     db.commit()
-    
-    return evidence_list
+
+    items = [EvidenceRecordResponse.model_validate(e) for e in evidence_list]
+    return EvidenceListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get("/api/projects/{project_id}/evidence/{evidence_id}", response_model=EvidenceRecordResponse)

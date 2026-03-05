@@ -7,7 +7,7 @@ against the redesigned data model.
 """
 # models/schemas.py
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
-from typing import Optional, List, Literal, Any
+from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime
 
 # User Schemas
@@ -70,6 +70,15 @@ class ProjectResponse(ProjectBase):
 
     class Config:
         from_attributes = True
+
+
+class ProjectListResponse(BaseModel):
+    """Paginated list of projects."""
+    items: List[ProjectResponse]
+    total: int
+    limit: int
+    offset: int
+
 
 # ============================================
 # DASHBOARD SUMMARY (PROJECT-SCOPED)
@@ -143,6 +152,15 @@ class AIInsightResponse(BaseModel):
     def _coerce_affected_items(cls, v):
         return [] if v is None else v
 
+
+class InsightListResponse(BaseModel):
+    """Paginated list of AI findings/insights."""
+    items: List[AIInsightResponse]
+    total: int
+    limit: int
+    offset: int
+
+
 # Procore Connection Schemas
 class ProcoreTokenCreate(BaseModel):
     company_id: int
@@ -191,6 +209,22 @@ class EvidenceRecordResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class EvidenceListResponse(BaseModel):
+    """Paginated list of document evidence records."""
+    items: List[EvidenceRecordResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class InspectionListResponse(BaseModel):
+    """Paginated list of inspection records (dict items)."""
+    items: List[Dict[str, Any]]
+    total: int
+    limit: int
+    offset: int
 
 
 # ============================================
@@ -294,6 +328,14 @@ class DrawingAlignmentResponse(BaseModel):
         from_attributes = True
 
 
+class DrawingAlignmentListResponse(BaseModel):
+    """Paginated list of drawing alignments."""
+    items: List[DrawingAlignmentResponse]
+    total: int
+    limit: int
+    offset: int
+
+
 class DrawingDiffRegion(BaseModel):
     """A single diff region; geometry normalized 0-1."""
     page: int
@@ -304,12 +346,17 @@ class DrawingDiffRegion(BaseModel):
 
 
 class DrawingDiffCreate(BaseModel):
-    """Body for POST create drawing diff."""
+    """Body for POST create drawing diff (manual)."""
     alignment_id: int
     finding_id: Optional[int] = None
     summary: str
     severity: Literal["low", "medium", "high", "critical"]
     diff_regions: List[DrawingDiffRegion]
+
+
+class RunDrawingDiffRequest(BaseModel):
+    """Body for POST run drawing diff pipeline."""
+    alignment_id: int
 
 
 class DrawingDiffResponse(BaseModel):
@@ -336,6 +383,14 @@ class DrawingDiffResponse(BaseModel):
         if isinstance(v, list):
             return [DrawingDiffRegion.model_validate(x) if isinstance(x, dict) else x for x in v]
         return v
+
+
+class DrawingDiffListResponse(BaseModel):
+    """Paginated list of diffs."""
+    items: List[DrawingDiffResponse]
+    total: int
+    limit: int
+    offset: int
 
 
 # Job Queue Schemas

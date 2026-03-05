@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
-from models.schemas import DrawingDiffCreate, DrawingDiffResponse
+from models.schemas import DrawingDiffListResponse, DrawingDiffResponse, RunDrawingDiffRequest
+from ai.pipelines import run_drawing_diff
 from services.storage import StorageService
 
 router = APIRouter(prefix="/api/projects", tags=["drawing-diffs"])
@@ -31,33 +32,48 @@ def _ensure_master_drawing_in_project(
 
 @router.get(
     "/{project_id}/drawings/{master_drawing_id}/diffs",
-    response_model=List[DrawingDiffResponse],
+    response_model=DrawingDiffListResponse,
 )
 def list_drawing_diffs(
     project_id: int,
     master_drawing_id: int,
     alignment_id: Optional[int] = Query(None, description="Filter by alignment"),
+    limit: int = Query(50, ge=1, le=100, description="Page size"),
+    offset: int = Query(0, ge=0, description="Number of items to skip"),
     db: Session = Depends(get_db),
-) -> List[DrawingDiffResponse]:
-    """List diffs for a master drawing, optionally filtered by alignment."""
+) -> DrawingDiffListResponse:
+    """List diffs for a master drawing. Sorted by created_at desc. Paginated."""
     storage = StorageService(db)
     _ensure_master_drawing_in_project(storage, project_id, master_drawing_id)
 
-    diffs = storage.list_drawing_diffs(master_drawing_id, alignment_id=alignment_id)
-    return [DrawingDiffResponse.model_validate(d) for d in diffs]
+    diffs, total = storage.list_drawing_diffs(
+        master_drawing_id,
+        alignment_id=alignment_id,
+        limit=limit,
+        offset=offset,
+    )
+    return DrawingDiffListResponse(
+        items=[DrawingDiffResponse.model_validate(d) for d in diffs],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.post(
     "/{project_id}/drawings/{master_drawing_id}/diffs",
-    response_model=DrawingDiffResponse,
+    response_model=List[DrawingDiffResponse],
 )
-def create_drawing_diff(
+def run_diffs_for_alignment(
     project_id: int,
     master_drawing_id: int,
-    body: DrawingDiffCreate,
+    body: RunDrawingDiffRequest,
     db: Session = Depends(get_db),
-) -> DrawingDiffResponse:
-    """Create a drawing diff. Validates alignment belongs to project and master drawing."""
+) -> List[DrawingDiffResponse]:
+    """
+    Run the diff pipeline for an alignment.
+    Validates alignment exists, project ownership, and master drawing match.
+    """
     storage = StorageService(db)
     _ensure_master_drawing_in_project(storage, project_id, master_drawing_id)
 
@@ -70,15 +86,8 @@ def create_drawing_diff(
             detail=f"Alignment {body.alignment_id} not found on master drawing",
         )
 
-    diff_regions = [r.model_dump() for r in body.diff_regions]
-    diff = storage.create_drawing_diff(
-        body.alignment_id,
-        summary=body.summary,
-        severity=body.severity,
-        diff_regions=diff_regions,
-        finding_id=body.finding_id,
-    )
-    return DrawingDiffResponse.model_validate(diff)
+    diffs = run_drawing_diff(db, alignment)
+    return [DrawingDiffResponse.model_validate(d) for d in diffs]
 
 
 @router.get(

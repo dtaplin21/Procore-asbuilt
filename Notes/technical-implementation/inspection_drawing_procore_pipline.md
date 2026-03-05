@@ -98,7 +98,7 @@ Backend endpoints (project-scoped):
 - `POST /api/projects/{project_id}/evidence` (multipart upload; type=spec|inspection_doc)
 - `GET /api/projects/{project_id}/evidence?type=...`
 
-### Phase 2 — Sub-drawing registration + alignment (NEW) ###################################################################
+### Phase 2 — Sub-drawing registration + alignment (DONE) ###################################################################
 
 To support “subsection drawing ↔ master drawing mapping” you need explicit linkage and a computed transform.
 
