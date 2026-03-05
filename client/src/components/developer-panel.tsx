@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Wrench, MapPin, Link2, ListOrdered, RefreshCw } from "lucide-react";
+import { Wrench, MapPin, Link2, ListOrdered, RefreshCw, Play } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useRunDrawingDiff } from "@/hooks/use-drawing-diffs";
+import { useToast } from "@/hooks/use-toast";
 
 type Project = { id: string | number; name: string };
 type Drawing = { id: number; name?: string };
@@ -90,11 +92,25 @@ async function fetchAlignments(
   return res.json();
 }
 
+type DiffItem = {
+  id: number;
+  alignment_id: number;
+  finding_id: number | null;
+  summary: string;
+  severity: string;
+  diff_regions: Array<{ page: number; type: string; points: number[][]; label?: string; confidence: number }>;
+  created_at: string;
+};
+
 interface DeveloperPanelProps {
   projectId: string | null;
   masterDrawingId: string | null;
+  selectedAlignmentId: number | null;
+  onAlignmentChange: (id: number | null) => void;
   projects: Project[];
   drawings: Drawing[];
+  diffs?: DiffItem[];
+  diffsLoading?: boolean;
   projectsLoading?: boolean;
   drawingsLoading?: boolean;
   onProjectChange: (id: string | null) => void;
@@ -104,8 +120,12 @@ interface DeveloperPanelProps {
 export function DeveloperPanel({
   projectId,
   masterDrawingId,
+  selectedAlignmentId,
+  onAlignmentChange,
   projects,
   drawings,
+  diffs = [],
+  diffsLoading = false,
   projectsLoading,
   drawingsLoading,
   onProjectChange,
@@ -178,17 +198,24 @@ export function DeveloperPanel({
 
   // Section C
   const {
-    data: alignments,
+    data: alignmentsData,
     isLoading: alignmentsLoading,
     refetch: refetchAlignments,
     isFetching: alignmentsFetching,
-  } = useQuery<Alignment[]>({
+  } = useQuery<{ items: Alignment[] } | Alignment[]>({
     queryKey: [`/api/projects/${projectId}/drawings/${masterDrawingId}/alignments`],
     enabled: !!projectId && !!masterDrawingId,
   });
 
+  const alignments = Array.isArray(alignmentsData)
+    ? alignmentsData
+    : (alignmentsData?.items ?? []);
+
   const canCreateRegion = projectId && masterDrawingId && regionLabel.trim();
   const canCreateAlignment = projectId && masterDrawingId && subDrawingId;
+
+  const runDiffMutation = useRunDrawingDiff(projectId, masterDrawingId);
+  const { toast } = useToast();
 
   return (
     <Card>
@@ -208,6 +235,7 @@ export function DeveloperPanel({
               onValueChange={(v) => {
                 onProjectChange(v || null);
                 onDrawingChange(null);
+                onAlignmentChange(null);
               }}
               disabled={projectsLoading}
             >
@@ -225,7 +253,10 @@ export function DeveloperPanel({
             <Label>Master Drawing</Label>
             <Select
               value={masterDrawingId ?? ""}
-              onValueChange={(v) => onDrawingChange(v || null)}
+              onValueChange={(v) => {
+                onDrawingChange(v || null);
+                onAlignmentChange(null);
+              }}
               disabled={!projectId || drawingsLoading}
             >
               <SelectTrigger>
@@ -400,7 +431,18 @@ export function DeveloperPanel({
                     return (
                       <div
                         key={a.id}
-                        className="flex flex-col gap-1 rounded border p-2 text-sm"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() =>
+                          onAlignmentChange(selectedAlignmentId === a.id ? null : a.id)
+                        }
+                        onKeyDown={(e) =>
+                          e.key === "Enter" &&
+                          onAlignmentChange(selectedAlignmentId === a.id ? null : a.id)
+                        }
+                        className={`flex flex-col gap-1 rounded border p-2 text-sm cursor-pointer transition-colors hover:bg-muted/50 ${
+                          selectedAlignmentId === a.id ? "ring-2 ring-primary" : ""
+                        }`}
                       >
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <span className="font-medium">
@@ -414,6 +456,75 @@ export function DeveloperPanel({
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+
+            {/* Section D: Drawing Diffs */}
+            <div className="space-y-3 rounded-lg border p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <h4 className="font-medium">D. Drawing Diffs</h4>
+                {(() => {
+                  const selectedAlignment = (alignments ?? []).find(
+                    (a) => a.id === selectedAlignmentId
+                  );
+                  const canRunDiff =
+                    selectedAlignmentId != null && selectedAlignment?.status === "complete";
+                  return (
+                    <Button
+                      size="sm"
+                      disabled={!canRunDiff || runDiffMutation.isPending}
+                      onClick={() =>
+                        selectedAlignmentId != null &&
+                        runDiffMutation.mutate(
+                          { alignmentId: selectedAlignmentId },
+                          {
+                            onSuccess: (diffs) => {
+                              toast({ title: `Diff complete: ${diffs.length} region(s) found` });
+                            },
+                            onError: (err) => {
+                              toast({ variant: "destructive", title: err.message });
+                            },
+                          }
+                        )
+                      }
+                    >
+                      <Play className="w-4 h-4 mr-1" />
+                      {runDiffMutation.isPending ? "Running…" : "Run Diff"}
+                    </Button>
+                  );
+                })()}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {selectedAlignmentId
+                  ? `Filtered by alignment ${selectedAlignmentId}. Select a complete alignment above to run diff.`
+                  : "Select an alignment above (status must be complete) to run diff."}
+              </p>
+              {diffsLoading ? (
+                <p className="text-sm text-muted-foreground">Loading diffs…</p>
+              ) : diffs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No diffs yet. Run the diff pipeline via the API.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {diffs.map((d) => (
+                    <div
+                      key={d.id}
+                      className="flex flex-col gap-1 rounded border p-2 text-sm"
+                    >
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="font-medium">{d.summary}</span>
+                        <Badge variant="secondary">{d.severity}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Alignment {d.alignment_id} · {d.diff_regions.length} region(s)
+                      </p>
+                      {d.finding_id != null && (
+                        <p className="text-xs">Finding #{d.finding_id}</p>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

@@ -135,6 +135,43 @@ export interface AIInsight {
 
 export type InsertAIInsight = Omit<AIInsight, "id">;
 
+// Drawing Diff types (matches backend DrawingDiffResponse)
+export type DrawingDiffSeverity = "low" | "medium" | "high" | "critical";
+
+export interface DrawingDiffRegion {
+  page: number;
+  type: "rect" | "polygon";
+  points: number[][];
+  label?: string;
+  confidence: number;
+}
+
+export interface DrawingDiff {
+  id: number;
+  alignmentId: number;
+  findingId: number | null;
+  summary: string;
+  severity: DrawingDiffSeverity;
+  diffRegions: DrawingDiffRegion[];
+  createdAt: string;
+}
+
+/** Paginated list of diffs (API response shape; items use snake_case from backend). */
+export interface DrawingDiffsListResponse {
+  items: Array<{
+    id: number;
+    alignment_id: number;
+    finding_id: number | null;
+    summary: string;
+    severity: DrawingDiffSeverity;
+    diff_regions: DrawingDiffRegion[];
+    created_at: string;
+  }>;
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 // Procore Connection Status
 export interface ProcoreConnection {
   connected: boolean;

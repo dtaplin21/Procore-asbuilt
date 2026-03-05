@@ -61,3 +61,9 @@ class ProcoreOAuthError(AppError):
         super().__init__(message=message, status_code=400, code="PROCORE_OAUTH_ERROR", details=details or {})
 
 
+class DrawingDiffPipelineError(AppError):
+    """Raised when the drawing diff pipeline fails. API returns 500."""
+    def __init__(self, message: str = "Pipeline failure", details: Optional[Dict[str, Any]] = None):
+        super().__init__(message=message, status_code=500, code="PIPELINE_FAILURE", details=details or {})
+
+

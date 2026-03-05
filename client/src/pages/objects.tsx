@@ -31,6 +31,7 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { DeveloperPanel } from "@/components/developer-panel";
 import type { DrawingObject, ObjectStatus } from "@shared/schema";
+import { useDrawingDiffs } from "@/hooks/use-drawing-diffs";
 
 type Project = { id: string | number; name: string };
 type Drawing = { id: number; name?: string };
@@ -51,19 +52,35 @@ export default function Objects() {
   const [selectedTool, setSelectedTool] = useState<"select" | "pan" | "zoom">("select");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedMasterDrawingId, setSelectedMasterDrawingId] = useState<string | null>(null);
+  const [selectedAlignmentId, setSelectedAlignmentId] = useState<number | null>(null);
 
-  const { data: projects, isLoading: projectsLoading } = useQuery<Project[]>({
+  const { data: projectsData, isLoading: projectsLoading } = useQuery<
+    Project[] | { items: Project[] }
+  >({
     queryKey: ["/api/projects"],
   });
 
-  const { data: drawings, isLoading: drawingsLoading } = useQuery<Drawing[]>({
+  const { data: drawingsData, isLoading: drawingsLoading } = useQuery<
+    Drawing[] | { items: Drawing[] }
+  >({
     queryKey: [`/api/projects/${selectedProjectId}/drawings`],
     enabled: !!selectedProjectId,
   });
 
+  const projects = Array.isArray(projectsData) ? projectsData : (projectsData?.items ?? []);
+  const drawings = Array.isArray(drawingsData) ? drawingsData : (drawingsData?.items ?? []);
+
   const { data: objects, isLoading } = useQuery<DrawingObject[]>({
     queryKey: ["/api/objects"],
   });
+
+  const { data: diffsData, isLoading: diffsLoading } = useDrawingDiffs(
+    selectedProjectId,
+    selectedMasterDrawingId,
+    selectedAlignmentId
+  );
+
+  const diffs = diffsData?.items ?? [];
 
   const filteredObjects = objects?.filter((obj) => {
     const matchesSearch = 
@@ -148,10 +165,14 @@ export default function Objects() {
       <DeveloperPanel
         projectId={selectedProjectId}
         masterDrawingId={selectedMasterDrawingId}
-        projects={projects ?? []}
-        drawings={drawings ?? []}
+        selectedAlignmentId={selectedAlignmentId}
+        onAlignmentChange={setSelectedAlignmentId}
+        projects={projects}
+        drawings={drawings}
         projectsLoading={projectsLoading}
         drawingsLoading={drawingsLoading}
+        diffs={diffs}
+        diffsLoading={diffsLoading}
         onProjectChange={setSelectedProjectId}
         onDrawingChange={setSelectedMasterDrawingId}
       />

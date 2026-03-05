@@ -31,10 +31,19 @@ from sqlalchemy.exc import SQLAlchemyError
 
 configure_logging()
 
+tags_metadata = [
+    {"name": "drawing-diffs", "description": "Compute and fetch drawing diffs for a master drawing."},
+    {"name": "drawing-alignment", "description": "Regions and alignments linking master and sub-drawings."},
+    {"name": "projects", "description": "Projects, drawings, and project-scoped resources."},
+    {"name": "insights", "description": "AI findings and insights."},
+    {"name": "evidence", "description": "Document evidence (specs, inspection docs)."},
+]
+
 app = FastAPI(
     title="QC/QA AI Platform - Procore Integration",
     description="AI-powered Quality Control platform with Procore integration",
-    version="1.0.0"
+    version="1.0.0",
+    openapi_tags=tags_metadata,
 )
 
 app.add_middleware(RequestResponseLoggingMiddleware)  # Add middleware

@@ -371,7 +371,7 @@ class StorageService:
             .first()
         )
 
-    SEVERITY_ORDER = ("low", "medium", "high", "critical")
+    SEVERITY_ORDER = {"low": 1, "medium": 2, "high": 3, "critical": 4}
 
     def create_finding_for_diff(
         self,
@@ -383,16 +383,12 @@ class StorageService:
         """
         When diff severity exceeds threshold, create a Finding and attach finding_id to diff.
         Returns the Finding if created, else None.
+        Finding fields: type="deviation", title="Mismatch on {drawing.name}", description=summary,
+        affected_items=region labels, project_id=master drawing project.
         """
-        try:
-            sev_idx = self.SEVERITY_ORDER.index(diff.severity)
-        except ValueError:
-            return None
-        try:
-            thresh_idx = self.SEVERITY_ORDER.index(severity_threshold)
-        except ValueError:
-            thresh_idx = 2  # default "high"
-        if sev_idx < thresh_idx:
+        sev_rank = self.SEVERITY_ORDER.get(diff.severity, 0)
+        thresh_rank = self.SEVERITY_ORDER.get(severity_threshold, 3)  # default "high"
+        if sev_rank < thresh_rank:
             return None
 
         alignment = self.db.query(DrawingAlignment).filter(
@@ -406,14 +402,22 @@ class StorageService:
         if master is None:
             return None
         project_id = cast(int, master.project_id)
+        drawing_name = getattr(master, "name", "drawing") or "drawing"
+
+        # Extract region labels from diff_regions for affected_items
+        regions = diff.diff_regions if isinstance(diff.diff_regions, list) else []
+        affected_items = [
+            r.get("label") for r in regions
+            if isinstance(r, dict) and r.get("label")
+        ]
 
         finding = Finding(
             project_id=project_id,
             type=finding_type,
             severity=diff.severity,
-            title=diff.summary,
+            title=f"Mismatch on {drawing_name}",
             description=diff.summary,
-            affected_items=[],
+            affected_items=affected_items,
         )
         self.db.add(finding)
         try:

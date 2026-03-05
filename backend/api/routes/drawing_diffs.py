@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
+from errors import DrawingDiffPipelineError
 from models.schemas import DrawingDiffListResponse, DrawingDiffResponse, RunDrawingDiffRequest
 from ai.pipelines import run_drawing_diff
 from services.storage import StorageService
@@ -81,12 +82,20 @@ def run_diffs_for_alignment(
         project_id, master_drawing_id, body.alignment_id
     )
     if alignment is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Alignment {body.alignment_id} not found on master drawing",
-        )
+        raise HTTPException(status_code=404, detail="alignment not found")
 
-    diffs = run_drawing_diff(db, alignment)
+    # 409: diff already exists for this alignment (optional check)
+    existing, total = storage.list_drawing_diffs(
+        master_drawing_id, alignment_id=body.alignment_id, limit=1, offset=0
+    )
+    if total > 0:
+        raise HTTPException(status_code=409, detail="diff already exists")
+
+    try:
+        diffs = run_drawing_diff(db, alignment)
+    except DrawingDiffPipelineError:
+        raise HTTPException(status_code=500, detail="pipeline failure")
+
     return [DrawingDiffResponse.model_validate(d) for d in diffs]
 
 
@@ -109,10 +118,7 @@ def get_drawing_diff(
         project_id, master_drawing_id, alignment_id
     )
     if alignment is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Alignment {alignment_id} not found on master drawing",
-        )
+        raise HTTPException(status_code=404, detail="alignment not found")
 
     diff = storage.get_drawing_diff(alignment_id, diff_id)
     if diff is None:

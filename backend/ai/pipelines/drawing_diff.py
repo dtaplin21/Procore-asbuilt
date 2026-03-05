@@ -12,6 +12,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from typing import Any, Dict, List, Optional, Tuple, cast
 
+from errors import DrawingDiffPipelineError
 from models.models import Drawing, DrawingAlignment, DrawingDiff
 from services.file_storage import get_file_path
 from services.storage import StorageService
@@ -170,10 +171,10 @@ def run_drawing_diff(
                 "failed",
                 error_message=err,
             )
-            return []
+            raise DrawingDiffPipelineError(message="Pipeline failure", details={"reason": err})
 
         if master_path is None or sub_path is None:
-            return []
+            raise DrawingDiffPipelineError(message="Pipeline failure", details={"reason": "File paths not resolved"})
 
         # Step 2 — Warp sub drawing
         transform = getattr(alignment, "transform", None)
@@ -203,6 +204,8 @@ def run_drawing_diff(
 
         return created
 
+    except DrawingDiffPipelineError:
+        raise
     except Exception as e:
         logger.exception(
             "drawing_diff_pipeline_failed",
@@ -216,4 +219,4 @@ def run_drawing_diff(
             )
         except Exception:
             logger.exception("drawing_diff_status_update_failed")
-        return []
+        raise DrawingDiffPipelineError(message="Pipeline failure", details={"reason": str(e)})
