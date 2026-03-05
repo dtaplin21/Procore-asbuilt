@@ -29,9 +29,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { StatusBadge } from "@/components/status-badge";
-import { CreateRegionForm } from "@/components/create-region-form";
-import { AttachSubDrawingForm } from "@/components/attach-sub-drawing-form";
-import { AlignmentsList } from "@/components/alignments-list";
+import { DeveloperPanel } from "@/components/developer-panel";
 import type { DrawingObject, ObjectStatus } from "@shared/schema";
 
 type Project = { id: string | number; name: string };
@@ -146,31 +144,16 @@ export default function Objects() {
         </div>
       )}
 
-      {/* Create Region + Attach Sub Drawing */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CreateRegionForm
-          projectId={selectedProjectId}
-          masterDrawingId={selectedMasterDrawingId}
-          projects={projects ?? []}
-          drawings={drawings ?? []}
-          projectsLoading={projectsLoading}
-          drawingsLoading={drawingsLoading}
-          onProjectChange={setSelectedProjectId}
-          onDrawingChange={setSelectedMasterDrawingId}
-        />
-        <AttachSubDrawingForm
-          projectId={selectedProjectId}
-          masterDrawingId={selectedMasterDrawingId}
-          drawings={drawings ?? []}
-          drawingsLoading={drawingsLoading}
-        />
-      </div>
-
-      {/* Alignments List */}
-      <AlignmentsList
+      {/* Developer Panel (Phase 2 API) */}
+      <DeveloperPanel
         projectId={selectedProjectId}
         masterDrawingId={selectedMasterDrawingId}
+        projects={projects ?? []}
         drawings={drawings ?? []}
+        projectsLoading={projectsLoading}
+        drawingsLoading={drawingsLoading}
+        onProjectChange={setSelectedProjectId}
+        onDrawingChange={setSelectedMasterDrawingId}
       />
 
       {/* Drawing Viewer Mockup */}
