@@ -20,6 +20,7 @@ from models.models import (
     DrawingAlignment,
     DrawingDiff,
     EvidenceRecord,
+    UsageLog,
 )
 from services.procore_connection_store import get_active_connection
 
@@ -580,6 +581,34 @@ class StorageService:
             raise
         self.db.refresh(finding)
         return finding
+
+    def create_usage_log(
+        self,
+        user_id: int,
+        action: str,
+        *,
+        company_id: Optional[int] = None,
+        resource_type: Optional[str] = None,
+        processing_time: Optional[float] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> UsageLog:
+        """Create a UsageLog entry for telemetry/monitoring. Optionally called after diff runs."""
+        log = UsageLog(
+            user_id=user_id,
+            company_id=company_id,
+            action=action,
+            resource_type=resource_type,
+            processing_time=processing_time,
+            log_metadata=metadata,
+        )
+        self.db.add(log)
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(log)
+        return log
 
     def get_dashboard_stats(self) -> Dict[str, Any]:
         return {

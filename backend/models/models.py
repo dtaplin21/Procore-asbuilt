@@ -413,6 +413,7 @@ class EvidenceRecord(Base):
     spec_section = Column(String, nullable=True)  # e.g., '15830 - HVAC Controls'
     title = Column(String, nullable=False)
     storage_key = Column(String, nullable=True)  # path in backend/uploads/
+    content_type = Column(String, nullable=True)  # 'application/pdf', 'image/png', etc.
     text_content = Column(Text, nullable=True)  # Phase 4: extracted text from PDFs
     
     # Flexible metadata for future extensions

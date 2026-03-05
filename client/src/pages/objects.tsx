@@ -9,8 +9,11 @@ import {
   MousePointer,
   Grid3X3,
   List,
-  Eye
+  Eye,
+  EyeOff,
+  AlertTriangle
 } from "lucide-react";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,8 +31,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/status-badge";
 import { DeveloperPanel } from "@/components/developer-panel";
+import { DrawingDiffOverlay } from "@/components/drawing-diff-overlay";
 import type { DrawingObject, ObjectStatus } from "@shared/schema";
 import { useDrawingDiffs } from "@/hooks/use-drawing-diffs";
 
@@ -53,6 +58,8 @@ export default function Objects() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedMasterDrawingId, setSelectedMasterDrawingId] = useState<string | null>(null);
   const [selectedAlignmentId, setSelectedAlignmentId] = useState<number | null>(null);
+  const [showDiffOverlay, setShowDiffOverlay] = useState(true);
+  const [diffRunning, setDiffRunning] = useState(false);
 
   const { data: projectsData, isLoading: projectsLoading } = useQuery<
     Project[] | { items: Project[] }
@@ -82,6 +89,14 @@ export default function Objects() {
 
   const diffs = diffsData?.items ?? [];
 
+  const SEVERITY_RANK = { low: 1, medium: 2, high: 3, critical: 4 } as const;
+  const MISMATCH_THRESHOLD = "high" as const;
+  const thresholdRank = SEVERITY_RANK[MISMATCH_THRESHOLD];
+  const mismatchCount = diffs.filter(
+    (d) => (SEVERITY_RANK[d.severity as keyof typeof SEVERITY_RANK] ?? 0) >= thresholdRank
+  ).length;
+  const showMismatchBanner = mismatchCount > 0;
+
   const filteredObjects = objects?.filter((obj) => {
     const matchesSearch = 
       obj.objectId.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -104,6 +119,26 @@ export default function Objects() {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      {/* Mismatch Banner: severity >= threshold */}
+      {showMismatchBanner && (
+        <Alert variant="destructive" className="border-destructive/50">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Drawing Mismatches Detected</AlertTitle>
+          <AlertDescription>
+            <span>
+              {mismatchCount} diff{mismatchCount > 1 ? "s" : ""} with severity {MISMATCH_THRESHOLD} or higher.
+              {" "}
+              <Link
+                href="/insights"
+                className="font-medium underline underline-offset-4 hover:no-underline"
+              >
+                View insights
+              </Link>
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-page-title">
@@ -173,6 +208,7 @@ export default function Objects() {
         drawingsLoading={drawingsLoading}
         diffs={diffs}
         diffsLoading={diffsLoading}
+        onDiffRunningChange={setDiffRunning}
         onProjectChange={setSelectedProjectId}
         onDrawingChange={setSelectedMasterDrawingId}
       />
@@ -206,16 +242,40 @@ export default function Objects() {
             >
               <ZoomIn className="w-4 h-4" />
             </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={showDiffOverlay ? "secondary" : "ghost"}
+                  size="icon"
+                  onClick={() => setShowDiffOverlay(!showDiffOverlay)}
+                  data-testid="tool-toggle-diffs"
+                >
+                  {showDiffOverlay ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{showDiffOverlay ? "Hide" : "Show"} diff overlay</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="relative aspect-video bg-muted/50 rounded-lg border-2 border-dashed border-muted-foreground/20 flex items-center justify-center">
+          <div className="relative aspect-video bg-muted/50 rounded-lg border-2 border-dashed border-muted-foreground/20 flex items-center justify-center overflow-hidden">
             <div className="text-center text-muted-foreground">
               <Layers className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p className="font-medium">Drawing Canvas</p>
               <p className="text-sm">Upload a construction drawing to view AI-recognized objects</p>
             </div>
-            
+
+            {/* Drawing diff overlays (polygon regions, severity badges, tooltips) */}
+            <DrawingDiffOverlay
+              diffs={diffs}
+              visible={showDiffOverlay}
+              onVisibilityChange={setShowDiffOverlay}
+              diffRunning={diffRunning}
+              diffsLoading={diffsLoading}
+            />
+
             {/* Simulated recognized objects overlay */}
             {objects && objects.length > 0 && (
               <div className="absolute inset-0 p-4">

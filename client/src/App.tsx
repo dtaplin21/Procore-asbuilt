@@ -54,6 +54,13 @@ function Router({
         />
       </Route>
       <Route path="/inspections" component={Inspections} />
+      <Route path="/insights">
+        <Dashboard
+          procoreConnection={procoreConnection}
+          onProcoreSync={onProcoreSync}
+          procoreUserId={procoreUserId ?? undefined}
+        />
+      </Route>
       <Route path="/objects" component={Objects} />
       <Route path="/settings">
         <SettingsPage 

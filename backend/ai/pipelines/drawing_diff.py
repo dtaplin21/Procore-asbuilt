@@ -202,6 +202,14 @@ def run_drawing_diff(
                 )
                 # Continue with other diffs; do not fail entire pipeline
 
+        logger.info(
+            "drawing_diff_pipeline_completed",
+            extra={
+                "alignment_id": alignment_id,
+                "diff_count": len(created),
+                "detected_count": len(detected),
+            },
+        )
         return created
 
     except DrawingDiffPipelineError:

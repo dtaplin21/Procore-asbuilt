@@ -69,9 +69,13 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
   });
 
   // Projects list for selector (Phase 1 / Step 3)
-  const { data: projects, isLoading: projectsLoading } = useQuery<Project[]>({
+  const { data: projectsData, isLoading: projectsLoading } = useQuery<
+    Project[] | { items: Project[] }
+  >({
     queryKey: ["/api/projects"],
   });
+
+  const projects = Array.isArray(projectsData) ? projectsData : (projectsData?.items ?? []);
 
   // Project-specific summary (Phase 0 change)
   const { data: projectSummary, isLoading: projectSummaryLoading } = useQuery<DashboardSummary>({

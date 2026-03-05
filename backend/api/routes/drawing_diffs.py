@@ -3,6 +3,8 @@ Drawing diffs API.
 
 Diff analysis results between master and sub drawings.
 """
+import logging
+import time
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -13,6 +15,8 @@ from errors import DrawingDiffPipelineError
 from models.schemas import DrawingDiffListResponse, DrawingDiffResponse, RunDrawingDiffRequest
 from ai.pipelines import run_drawing_diff
 from services.storage import StorageService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/projects", tags=["drawing-diffs"])
 
@@ -69,11 +73,14 @@ def run_diffs_for_alignment(
     project_id: int,
     master_drawing_id: int,
     body: RunDrawingDiffRequest,
+    user_id: Optional[int] = Query(None, description="Optional: for UsageLog telemetry"),
+    company_id: Optional[int] = Query(None, description="Optional: for UsageLog telemetry"),
     db: Session = Depends(get_db),
 ) -> List[DrawingDiffResponse]:
     """
     Run the diff pipeline for an alignment.
     Validates alignment exists, project ownership, and master drawing match.
+    Logs diff runs for monitoring. Optionally creates UsageLog when user_id provided.
     """
     storage = StorageService(db)
     _ensure_master_drawing_in_project(storage, project_id, master_drawing_id)
@@ -91,12 +98,66 @@ def run_diffs_for_alignment(
     if total > 0:
         raise HTTPException(status_code=409, detail="diff already exists")
 
+    logger.info(
+        "drawing_diff_run_started",
+        extra={
+            "project_id": project_id,
+            "master_drawing_id": master_drawing_id,
+            "alignment_id": body.alignment_id,
+        },
+    )
+    start = time.perf_counter()
+
     try:
         diffs = run_drawing_diff(db, alignment)
-    except DrawingDiffPipelineError:
-        raise HTTPException(status_code=500, detail="pipeline failure")
+        duration_ms = (time.perf_counter() - start) * 1000
 
-    return [DrawingDiffResponse.model_validate(d) for d in diffs]
+        logger.info(
+            "drawing_diff_run_completed",
+            extra={
+                "project_id": project_id,
+                "master_drawing_id": master_drawing_id,
+                "alignment_id": body.alignment_id,
+                "diff_count": len(diffs),
+                "duration_ms": round(duration_ms, 2),
+            },
+        )
+
+        if user_id is not None:
+            try:
+                storage.create_usage_log(
+                    user_id=user_id,
+                    action="drawing_diff_run",
+                    resource_type="drawing_diff",
+                    company_id=company_id,
+                    processing_time=duration_ms / 1000,
+                    metadata={
+                        "project_id": project_id,
+                        "master_drawing_id": master_drawing_id,
+                        "alignment_id": body.alignment_id,
+                        "diff_count": len(diffs),
+                    },
+                )
+            except Exception as e:
+                logger.warning(
+                    "drawing_diff_usage_log_failed",
+                    extra={"user_id": user_id, "error": str(e)},
+                )
+
+        return [DrawingDiffResponse.model_validate(d) for d in diffs]
+    except DrawingDiffPipelineError as e:
+        duration_ms = (time.perf_counter() - start) * 1000
+        logger.warning(
+            "drawing_diff_run_failed",
+            extra={
+                "project_id": project_id,
+                "master_drawing_id": master_drawing_id,
+                "alignment_id": body.alignment_id,
+                "duration_ms": round(duration_ms, 2),
+                "error": str(e),
+            },
+        )
+        raise HTTPException(status_code=500, detail="pipeline failure")
 
 
 @router.get(

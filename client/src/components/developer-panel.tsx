@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Wrench, MapPin, Link2, ListOrdered, RefreshCw, Play } from "lucide-react";
+import { Wrench, MapPin, Link2, ListOrdered, RefreshCw, Play, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -111,6 +111,7 @@ interface DeveloperPanelProps {
   drawings: Drawing[];
   diffs?: DiffItem[];
   diffsLoading?: boolean;
+  onDiffRunningChange?: (running: boolean) => void;
   projectsLoading?: boolean;
   drawingsLoading?: boolean;
   onProjectChange: (id: string | null) => void;
@@ -126,6 +127,7 @@ export function DeveloperPanel({
   drawings,
   diffs = [],
   diffsLoading = false,
+  onDiffRunningChange,
   projectsLoading,
   drawingsLoading,
   onProjectChange,
@@ -216,6 +218,11 @@ export function DeveloperPanel({
 
   const runDiffMutation = useRunDrawingDiff(projectId, masterDrawingId);
   const { toast } = useToast();
+
+  useEffect(() => {
+    onDiffRunningChange?.(runDiffMutation.isPending);
+    return () => onDiffRunningChange?.(false);
+  }, [runDiffMutation.isPending, onDiffRunningChange]);
 
   return (
     <Card>
@@ -500,12 +507,21 @@ export function DeveloperPanel({
                   ? `Filtered by alignment ${selectedAlignmentId}. Select a complete alignment above to run diff.`
                   : "Select an alignment above (status must be complete) to run diff."}
               </p>
-              {diffsLoading ? (
-                <p className="text-sm text-muted-foreground">Loading diffs…</p>
+              {diffsLoading || runDiffMutation.isPending ? (
+                <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin shrink-0" />
+                  <span>{runDiffMutation.isPending ? "Running diff…" : "Loading diffs…"}</span>
+                </div>
               ) : diffs.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No diffs yet. Run the diff pipeline via the API.
-                </p>
+                <div className="rounded-lg border border-dashed p-6 text-center">
+                  <p className="text-sm font-medium text-muted-foreground">No diffs yet</p>
+                  <p className="mt-2 text-xs text-muted-foreground max-w-sm mx-auto">
+                    1. Select an alignment with status <strong>Complete</strong> above
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    2. Click <strong>Run Diff</strong> to compare master and sub drawings
+                  </p>
+                </div>
               ) : (
                 <div className="space-y-2">
                   {diffs.map((d) => (
