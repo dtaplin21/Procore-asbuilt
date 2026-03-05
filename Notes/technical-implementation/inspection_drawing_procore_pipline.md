@@ -139,7 +139,7 @@ UI needs (MVP):
 - On the drawing viewer, allow user to draw a region box/polygon and attach a sub-drawing to it.
 - Kick off alignment job; show status.
 
-### Phase 3 — Diff/mismatch detection (NEW) ##########################################################################################
+### Phase 3 — Diff/mismatch detection (Done) ##########################################################################################
 
 To answer: “Does the subsection drawing match the master drawing?”
 

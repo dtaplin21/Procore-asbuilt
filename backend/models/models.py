@@ -1,5 +1,6 @@
 # models/database.py
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Float, JSON, UniqueConstraint, Index, text
+from sqlalchemy import CheckConstraint, Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Float, JSON, UniqueConstraint, Index, text
+from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -70,6 +71,7 @@ class Project(Base):
     findings = relationship("Finding", back_populates="project", cascade="all, delete-orphan")
     drawings = relationship("Drawing", back_populates="project", cascade="all, delete-orphan")
     evidence_records = relationship("EvidenceRecord", back_populates="project", cascade="all, delete-orphan")
+    inspection_runs = relationship("InspectionRun", back_populates="project", cascade="all, delete-orphan")
 
 class UserCompany(Base):
     __tablename__ = "user_companies"
@@ -282,6 +284,7 @@ class Drawing(Base):
     # Relationships
     project = relationship("Project", back_populates="drawings")
     regions = relationship("DrawingRegion", back_populates="master_drawing", cascade="all, delete-orphan")
+    overlays = relationship("DrawingOverlay", back_populates="master_drawing", cascade="all, delete-orphan")
     alignments_as_master = relationship(
         "DrawingAlignment",
         foreign_keys="DrawingAlignment.master_drawing_id",
@@ -294,6 +297,7 @@ class Drawing(Base):
         back_populates="sub_drawing",
         cascade="all, delete-orphan",
     )
+    inspection_runs = relationship("InspectionRun", back_populates="master_drawing", cascade="all, delete-orphan")
 
 
 class DrawingRegion(Base):
@@ -396,6 +400,134 @@ class DrawingDiff(Base):
     # Relationships
     alignment = relationship("DrawingAlignment", back_populates="drawing_diffs")
     finding = relationship("Finding", back_populates="drawing_diffs")
+    overlays = relationship("DrawingOverlay", back_populates="diff", passive_deletes=True)
+
+
+# Inspection runs (AI extraction from evidence docs)
+class InspectionRun(Base):
+    __tablename__ = "inspection_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "status in ('queued','processing','complete','failed')",
+            name="ck_inspection_runs_status",
+        ),
+        Index("ix_inspection_runs_project_id", "project_id"),
+        Index("ix_inspection_runs_master_drawing_id", "master_drawing_id"),
+        Index("ix_inspection_runs_evidence_id", "evidence_id"),
+        Index("ix_inspection_runs_status", "status"),
+        Index("ix_inspection_runs_project_id_created_at", "project_id", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(
+        Integer,
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    master_drawing_id = Column(
+        Integer,
+        ForeignKey("drawings.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    evidence_id = Column(
+        Integer,
+        ForeignKey("evidence_records.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    inspection_type = Column(String, nullable=True)
+    status = Column(String, nullable=False, server_default="queued")  # queued | processing | complete | failed
+
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project", back_populates="inspection_runs")
+    master_drawing = relationship("Drawing", back_populates="inspection_runs")
+    evidence = relationship("EvidenceRecord", back_populates="inspection_runs")
+    results = relationship("InspectionResult", back_populates="inspection_run", cascade="all, delete-orphan")
+    overlays = relationship("DrawingOverlay", back_populates="inspection_run", passive_deletes=True)
+
+
+class InspectionResult(Base):
+    __tablename__ = "inspection_results"
+    __table_args__ = (
+        CheckConstraint(
+            "outcome in ('pass','fail','mixed','unknown')",
+            name="ck_inspection_results_outcome",
+        ),
+        Index("ix_inspection_results_inspection_run_id", "inspection_run_id"),
+        Index("ix_inspection_results_outcome", "outcome"),
+        Index("ix_inspection_results_inspection_run_id_created_at", "inspection_run_id", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    inspection_run_id = Column(
+        Integer,
+        ForeignKey("inspection_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    outcome = Column(String, nullable=False, server_default="unknown")  # pass | fail | mixed | unknown
+    notes = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+    # Relationships
+    inspection_run = relationship("InspectionRun", back_populates="results")
+
+
+class DrawingOverlay(Base):
+    """Overlay geometry on a master drawing; sourced from either an inspection run or a drawing diff."""
+    __tablename__ = "drawing_overlays"
+    __table_args__ = (
+        CheckConstraint(
+            "status in ('pass','fail','unknown')",
+            name="ck_drawing_overlays_status",
+        ),
+        CheckConstraint(
+            "(inspection_run_id is not null)::int + (diff_id is not null)::int = 1",
+            name="ck_drawing_overlays_exactly_one_source",
+        ),
+        Index("ix_drawing_overlays_master_drawing_id", "master_drawing_id"),
+        Index("ix_drawing_overlays_inspection_run_id", "inspection_run_id"),
+        Index("ix_drawing_overlays_diff_id", "diff_id"),
+        Index("ix_drawing_overlays_status", "status"),
+        Index("ix_drawing_overlays_master_drawing_id_created_at", "master_drawing_id", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    master_drawing_id = Column(
+        Integer,
+        ForeignKey("drawings.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    inspection_run_id = Column(
+        Integer,
+        ForeignKey("inspection_runs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    diff_id = Column(
+        Integer,
+        ForeignKey("drawing_diffs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    geometry = Column(JSON, nullable=False)
+    status = Column(String, nullable=False, server_default="unknown")  # pass | fail | unknown
+
+    meta = Column(JSON, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+    # Relationships
+    master_drawing = relationship("Drawing", back_populates="overlays")
+    inspection_run = relationship("InspectionRun", back_populates="overlays")
+    diff = relationship("DrawingDiff", back_populates="overlays")
 
 
 # Evidence Records (specs, inspection docs, etc.)
@@ -428,3 +560,4 @@ class EvidenceRecord(Base):
     
     # Relationships
     project = relationship("Project", back_populates="evidence_records")
+    inspection_runs = relationship("InspectionRun", back_populates="evidence")

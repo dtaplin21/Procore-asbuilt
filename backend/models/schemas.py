@@ -393,6 +393,100 @@ class DrawingDiffListResponse(BaseModel):
     offset: int
 
 
+# ============================================
+# INSPECTION RUNS / OVERLAYS / GEOMETRY
+# ============================================
+#
+# Geometry contract (MVP): normalized coords 0-1 in master space
+# { "page": 1, "type": "polygon", "points": [{"x":0.1,"y":0.2}, ...], "label": "...", "confidence": 0.88 }
+#
+
+
+class OverlayPoint(BaseModel):
+    """Normalized point in master drawing space (0-1)."""
+    x: float = Field(ge=0.0, le=1.0, description="Normalized x (0-1)")
+    y: float = Field(ge=0.0, le=1.0, description="Normalized y (0-1)")
+
+
+OverlayGeometryType = Literal["polygon", "rect"]
+
+
+class OverlayGeometry(BaseModel):
+    """Validated geometry for overlays; normalized 0-1 in master drawing space."""
+    page: int = Field(ge=1, description="Page number (1-based)")
+    type: OverlayGeometryType
+    points: List[OverlayPoint]
+    label: str = ""
+    confidence: float = Field(ge=0.0, le=1.0, default=1.0)
+
+    @field_validator("points")
+    @classmethod
+    def points_non_empty(cls, v: List[OverlayPoint]) -> List[OverlayPoint]:
+        if not v:
+            raise ValueError("points must not be empty")
+        return v
+
+
+# ----- Request bodies -----
+
+
+class InspectionRunCreate(BaseModel):
+    """Body for POST create inspection run."""
+    master_drawing_id: int
+    evidence_id: Optional[int] = None
+    inspection_type: Optional[str] = None  # allow override
+
+
+# ----- Response models -----
+
+
+class InspectionRunResponse(BaseModel):
+    id: int
+    project_id: int
+    master_drawing_id: int
+    evidence_id: Optional[int] = None
+    inspection_type: Optional[str] = None
+    status: str
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InspectionResultResponse(BaseModel):
+    id: int
+    inspection_run_id: int
+    outcome: str
+    notes: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DrawingOverlayResponse(BaseModel):
+    id: int
+    master_drawing_id: int
+    inspection_run_id: Optional[int] = None
+    diff_id: Optional[int] = None
+    geometry: dict  # OverlayGeometry structure (validated on create)
+    status: str
+    meta: Optional[dict] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InspectionRunListResponse(BaseModel):
+    """Paginated list of inspection runs."""
+    items: List[InspectionRunResponse]
+    total: int
+    limit: int
+    offset: int
+
+
 # Job Queue Schemas
 class JobCreate(BaseModel):
     user_id: int
