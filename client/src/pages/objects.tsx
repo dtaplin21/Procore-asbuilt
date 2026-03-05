@@ -31,6 +31,7 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { CreateRegionForm } from "@/components/create-region-form";
 import { AttachSubDrawingForm } from "@/components/attach-sub-drawing-form";
+import { AlignmentsList } from "@/components/alignments-list";
 import type { DrawingObject, ObjectStatus } from "@shared/schema";
 
 type Project = { id: string | number; name: string };
@@ -164,6 +165,13 @@ export default function Objects() {
           drawingsLoading={drawingsLoading}
         />
       </div>
+
+      {/* Alignments List */}
+      <AlignmentsList
+        projectId={selectedProjectId}
+        masterDrawingId={selectedMasterDrawingId}
+        drawings={drawings ?? []}
+      />
 
       {/* Drawing Viewer Mockup */}
       <Card>
