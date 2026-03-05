@@ -231,6 +231,30 @@ class StorageService:
             .all()
         )
 
+    def get_drawing_alignment_by_id(
+        self,
+        project_id: int,
+        master_drawing_id: int,
+        alignment_id: int,
+    ) -> Optional[DrawingAlignment]:
+        """
+        Fetch alignment with project validation.
+        Ensures: alignment exists, belongs to correct project, belongs to correct master drawing.
+        """
+        alignment = (
+            self.db.query(DrawingAlignment)
+            .filter(
+                DrawingAlignment.id == alignment_id,
+                DrawingAlignment.master_drawing_id == master_drawing_id,
+            )
+            .first()
+        )
+        if alignment is None:
+            return None
+        if self.get_drawing(project_id, master_drawing_id) is None:
+            return None
+        return alignment
+
     def update_alignment_status(
         self,
         alignment_id: int,
@@ -288,13 +312,17 @@ class StorageService:
 
     def list_drawing_diffs(
         self,
-        alignment_id: int,
+        master_drawing_id: int,
         *,
-        severity: Optional[str] = None,
+        alignment_id: Optional[int] = None,
     ) -> List[DrawingDiff]:
-        q = self.db.query(DrawingDiff).filter(DrawingDiff.alignment_id == alignment_id)
-        if severity is not None:
-            q = q.filter(DrawingDiff.severity == severity)
+        q = (
+            self.db.query(DrawingDiff)
+            .join(DrawingAlignment, DrawingDiff.alignment_id == DrawingAlignment.id)
+            .filter(DrawingAlignment.master_drawing_id == master_drawing_id)
+        )
+        if alignment_id is not None:
+            q = q.filter(DrawingDiff.alignment_id == alignment_id)
         return q.order_by(DrawingDiff.created_at.desc(), DrawingDiff.id.desc()).all()
 
     def get_drawing_diff(
@@ -310,6 +338,62 @@ class StorageService:
             )
             .first()
         )
+
+    SEVERITY_ORDER = ("low", "medium", "high", "critical")
+
+    def create_finding_for_diff(
+        self,
+        diff: DrawingDiff,
+        *,
+        severity_threshold: str = "high",
+        finding_type: str = "deviation",
+    ) -> Optional[Finding]:
+        """
+        When diff severity exceeds threshold, create a Finding and attach finding_id to diff.
+        Returns the Finding if created, else None.
+        """
+        try:
+            sev_idx = self.SEVERITY_ORDER.index(diff.severity)
+        except ValueError:
+            return None
+        try:
+            thresh_idx = self.SEVERITY_ORDER.index(severity_threshold)
+        except ValueError:
+            thresh_idx = 2  # default "high"
+        if sev_idx < thresh_idx:
+            return None
+
+        alignment = self.db.query(DrawingAlignment).filter(
+            DrawingAlignment.id == diff.alignment_id,
+        ).first()
+        if alignment is None:
+            return None
+        master = self.db.query(Drawing).filter(
+            Drawing.id == cast(int, alignment.master_drawing_id),
+        ).first()
+        if master is None:
+            return None
+        project_id = cast(int, master.project_id)
+
+        finding = Finding(
+            project_id=project_id,
+            type=finding_type,
+            severity=diff.severity,
+            title=diff.summary,
+            description=diff.summary,
+            affected_items=[],
+        )
+        self.db.add(finding)
+        try:
+            self.db.flush()  # get finding.id
+            setattr(diff, "finding_id", cast(int, finding.id))
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(finding)
+        self.db.refresh(diff)
+        return finding
 
     # ------------------------------------------------------------------
     # Evidence Records
@@ -416,6 +500,16 @@ class StorageService:
         if limit is not None:
             q = q.limit(limit)
         return q.all()
+
+    def get_finding(
+        self,
+        finding_id: int,
+        project_id: Optional[int] = None,
+    ) -> Optional[Finding]:
+        q = self.db.query(Finding).filter(Finding.id == finding_id)
+        if project_id is not None:
+            q = q.filter(Finding.project_id == project_id)
+        return q.first()
 
     def resolve_insight(self, insight_id: int) -> Optional[Finding]:
         finding = self.db.query(Finding).filter(Finding.id == insight_id).first()
