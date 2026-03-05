@@ -222,6 +222,24 @@ class DrawingAlignmentCreate(BaseModel):
     method: str  # manual | feature_match | vision
 
 
+class AlignmentTransform(BaseModel):
+    """
+    Minimal transform JSON contract stored in drawing_alignments.transform.
+    Homography/affine matrix mapping sub-drawing coords to master.
+    """
+    type: str  # e.g. "homography"
+    matrix: List[float]  # 9 numbers for 3x3 homography
+    confidence: float = Field(ge=0.0, le=1.0)
+    page: int = 1
+
+
+class AlignmentUpdate(BaseModel):
+    """Body for PATCH alignment status/transform."""
+    status: Optional[str] = None  # queued | processing | complete | failed
+    transform: Optional[AlignmentTransform] = None
+    error_message: Optional[str] = None
+
+
 class DrawingAlignmentResponse(BaseModel):
     id: int
     master_drawing_id: int

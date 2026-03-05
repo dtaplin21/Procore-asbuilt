@@ -175,6 +175,13 @@ class StorageService:
     # Drawing Alignments (Phase 2)
     # ------------------------------------------------------------------
 
+    IDENTITY_TRANSFORM: Dict[str, Any] = {
+        "type": "homography",
+        "matrix": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+        "confidence": 1.0,
+        "page": 1,
+    }
+
     def create_drawing_alignment(
         self,
         master_drawing_id: int,
@@ -183,12 +190,21 @@ class StorageService:
         *,
         region_id: Optional[int] = None,
     ) -> DrawingAlignment:
+        # MVP: manual alignments complete immediately with identity transform
+        if method.strip().lower() == "manual":
+            status = "complete"
+            transform = self.IDENTITY_TRANSFORM
+        else:
+            status = "queued"
+            transform = None
+
         alignment = DrawingAlignment(
             master_drawing_id=master_drawing_id,
             sub_drawing_id=sub_drawing_id,
             region_id=region_id,
             method=method,
-            status="queued",
+            status=status,
+            transform=transform,
         )
         self.db.add(alignment)
         try:

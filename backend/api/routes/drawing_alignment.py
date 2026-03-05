@@ -3,7 +3,7 @@ Drawing regions and alignments API.
 
 Phase 2: User-defined regions on master drawings and sub-drawing alignment linkage.
 """
-from typing import List
+from typing import List, cast
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -14,6 +14,7 @@ from models.schemas import (
     DrawingRegionResponse,
     DrawingAlignmentCreate,
     DrawingAlignmentResponse,
+    AlignmentUpdate,
 )
 from services.storage import StorageService
 
@@ -143,3 +144,47 @@ def list_drawing_alignments(
 
     alignments = storage.list_drawing_alignments(master_drawing_id)
     return [DrawingAlignmentResponse.model_validate(a) for a in alignments]
+
+
+@router.patch(
+    "/{project_id}/drawings/{master_drawing_id}/alignments/{alignment_id}",
+    response_model=DrawingAlignmentResponse,
+)
+def update_drawing_alignment(
+    project_id: int,
+    master_drawing_id: int,
+    alignment_id: int,
+    body: AlignmentUpdate,
+    db: Session = Depends(get_db),
+) -> DrawingAlignmentResponse:
+    """
+    Update alignment status, transform, or error_message.
+    Transform contract: { "type": "homography", "matrix": [9 numbers], "confidence": 0.0-1.0, "page": 1 }
+    """
+    storage = StorageService(db)
+    _ensure_master_drawing_in_project(storage, project_id, master_drawing_id)
+
+    alignments = storage.list_drawing_alignments(master_drawing_id)
+    alignment = next((a for a in alignments if cast(int, a.id) == alignment_id), None)
+    if alignment is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Alignment {alignment_id} not found on master drawing",
+        )
+
+    if body.status is None and body.transform is None and body.error_message is None:
+        return DrawingAlignmentResponse.model_validate(alignment)
+
+    status = body.status if body.status is not None else cast(str, alignment.status)
+    transform_dict = body.transform.model_dump() if body.transform is not None else None
+    error_msg = body.error_message
+
+    updated = storage.update_alignment_status(
+        alignment_id,
+        status,
+        transform=transform_dict,
+        error_message=error_msg,
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Alignment not found")
+    return DrawingAlignmentResponse.model_validate(updated)
