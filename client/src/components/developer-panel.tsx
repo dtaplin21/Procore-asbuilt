@@ -119,6 +119,8 @@ export function DeveloperPanel({
   const [regionRect, setRegionRect] = useState({ x: 0.25, y: 0.4, w: 0.1, h: 0.2 });
   const [regionResponse, setRegionResponse] = useState<string | null>(null);
 
+  const clamp01 = (n: number) => Math.max(0, Math.min(1, Number(n) || 0));
+
   const regionMutation = useMutation({
     mutationFn: () =>
       createRegion(projectId!, masterDrawingId!, {
@@ -126,10 +128,10 @@ export function DeveloperPanel({
         page: regionPage,
         geometry: {
           type: "rect",
-          x: regionRect.x,
-          y: regionRect.y,
-          width: regionRect.w,
-          height: regionRect.h,
+          x: clamp01(regionRect.x),
+          y: clamp01(regionRect.y),
+          width: clamp01(regionRect.w),
+          height: clamp01(regionRect.h),
         },
       }),
     onSuccess: (data) => {
@@ -271,6 +273,7 @@ export function DeveloperPanel({
                   />
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground">x, y, w, h normalized 0–1 (no pixels)</p>
               <div className="grid grid-cols-4 gap-2">
                 {(["x", "y", "w", "h"] as const).map((key) => (
                   <div key={key} className="grid gap-1">

@@ -307,7 +307,7 @@ class DrawingRegion(Base):
     )
     label = Column(String(length=255), nullable=False)
     page = Column(Integer, nullable=False, default=1)
-    geometry = Column(JSON, nullable=False)  # polygon/rect in master coordinate system
+    geometry = Column(JSON, nullable=False)  # normalized 0-1; rect or polygon
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(

@@ -7,7 +7,7 @@ against the redesigned data model.
 """
 # models/schemas.py
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Any
 from datetime import datetime
 
 # User Schemas
@@ -196,11 +196,49 @@ class EvidenceRecordResponse(BaseModel):
 # ============================================
 # DRAWING REGIONS / ALIGNMENTS (Phase 2)
 # ============================================
+#
+# Coordinate system: Store geometry NORMALIZED (0-1). Do NOT use pixel coordinates.
+# This prevents resolution mismatch across different display/export contexts.
+#
+# Rect: { "type": "rect", "x": 0.25, "y": 0.4, "width": 0.1, "height": 0.2 }
+# Polygon: { "type": "polygon", "points": [[0.1, 0.2], [0.2, 0.25], ...] }
+
+
+def _check_normalized(value: float, name: str) -> None:
+    if not (0 <= value <= 1):
+        raise ValueError(f"{name} must be 0-1 (normalized), got {value}")
+
 
 class DrawingRegionCreate(BaseModel):
     label: str
     page: int = 1
-    geometry: dict  # polygon/rect in master coordinate system
+    geometry: dict  # rect or polygon, all coords normalized 0-1
+
+    @field_validator("geometry")
+    @classmethod
+    def geometry_normalized(cls, v: Any) -> Any:
+        if not isinstance(v, dict):
+            raise ValueError("geometry must be an object")
+        gtype = v.get("type")
+        if gtype == "rect":
+            for key in ("x", "y", "width", "height"):
+                if key in v:
+                    val = v[key]
+                    if not isinstance(val, (int, float)):
+                        raise ValueError(f"{key} must be a number")
+                    _check_normalized(float(val), key)
+        elif gtype == "polygon":
+            pts = v.get("points")
+            if not isinstance(pts, list):
+                raise ValueError("polygon must have points array")
+            for i, p in enumerate(pts):
+                if not isinstance(p, (list, tuple)) or len(p) < 2:
+                    raise ValueError(f"point {i} must be [x, y]")
+                _check_normalized(float(p[0]), f"points[{i}][0]")
+                _check_normalized(float(p[1]), f"points[{i}][1]")
+        else:
+            raise ValueError("geometry.type must be 'rect' or 'polygon'")
+        return v
 
 
 class DrawingRegionResponse(BaseModel):
