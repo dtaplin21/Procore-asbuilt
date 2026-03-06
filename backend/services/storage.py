@@ -437,6 +437,34 @@ class StorageService:
         self.db.refresh(diff)
         return finding
 
+    def create_finding(
+        self,
+        project_id: int,
+        *,
+        type: str = "deviation",
+        severity: str = "high",
+        title: str,
+        description: str,
+        affected_items: Optional[List[str]] = None,
+    ) -> Finding:
+        """Create a Finding (used by inspection pipeline, etc.)."""
+        finding = Finding(
+            project_id=project_id,
+            type=type,
+            severity=severity,
+            title=title,
+            description=description,
+            affected_items=affected_items or [],
+        )
+        self.db.add(finding)
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(finding)
+        return finding
+
     # ------------------------------------------------------------------
     # Evidence Records
     # ------------------------------------------------------------------

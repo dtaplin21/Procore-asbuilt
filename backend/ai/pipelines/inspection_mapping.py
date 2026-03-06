@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from sqlalchemy.orm import Session
 from typing import Any, Dict, List, Optional, cast
 
-from models.models import Drawing, DrawingRegion, EvidenceRecord, InspectionRun
+from models.models import Drawing, DrawingRegion, EvidenceRecord, InspectionRun, Finding
 from services.file_storage import get_file_path
 from services.storage import StorageService
 
@@ -21,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 # Known inspection types (for lookup + LLM output constraint)
 OUTCOMES = ("pass", "fail", "mixed", "unknown")
+
+FINDING_CONFIDENCE_THRESHOLD = 0.70
 
 KNOWN_INSPECTION_TYPES: List[str] = [
     "hvac",
@@ -184,6 +187,97 @@ NOTES: <short summary, 1-2 sentences>"""
     except Exception as e:
         logger.warning("extract_outcomes_llm_failed", extra={"error": str(e)})
         return "unknown", ""
+
+def _should_create_finding(outcome: str, confidence: Optional[float]) -> bool:
+    """
+    Create a finding when:
+    - outcome is fail
+    - outcome is mixed
+    - confidence is low
+    """
+    if outcome in ("fail", "mixed"):
+        return True
+
+    if confidence is not None and confidence < FINDING_CONFIDENCE_THRESHOLD:
+        return True
+
+    return False
+
+
+def _create_and_persist_finding(
+    db: Session,
+    ctx: Dict[str, Any],
+) -> Optional[Finding]:
+    """
+    Create a Finding when inspection outcome requires escalation.
+    """
+    run = ctx["run"]
+    evidence = ctx.get("evidence")
+    master_drawing = ctx["master_drawing"]
+    inspection_result = ctx.get("inspection_result")
+
+    if inspection_result is None:
+        return None
+
+    outcome = getattr(inspection_result, "outcome", "unknown") or "unknown"
+
+    # MVP: confidence not yet extracted by LLM, so read from ctx if later added
+    confidence = ctx.get("confidence")
+
+    if not _should_create_finding(outcome, confidence):
+        return None
+
+    project_id = getattr(run, "project_id", None)
+    if project_id is None:
+        return None
+
+    evidence_id = getattr(run, "evidence_id", None)
+    master_drawing_id = cast(int, master_drawing.id)
+    inspection_run_id = cast(int, run.id)
+    notes = getattr(inspection_result, "notes", None)
+
+    severity = "high" if outcome == "fail" else "medium"
+    evidence_title = getattr(evidence, "title", None) if evidence else None
+    drawing_name = getattr(master_drawing, "name", "drawing") or "drawing"
+    title = f"Inspection failed: {evidence_title or drawing_name}"[:255]
+    description = notes or f"Inspection result marked as {outcome}."
+    affected_items = [f"Inspection run #{inspection_run_id}", f"Drawing #{master_drawing_id}"]
+
+    storage = StorageService(db)
+    finding = storage.create_finding(
+        project_id=project_id,
+        type="deviation",
+        severity=severity,
+        title=title,
+        description=description,
+        affected_items=affected_items,
+    )
+    return finding
+
+
+def _attach_finding_to_overlays(
+    db: Session,
+    overlays: List[Any],
+    finding: Optional[Finding],
+) -> None:
+    """
+    Store finding linkage in drawing_overlays.meta.
+    """
+    if not overlays:
+        return
+
+    for overlay in overlays:
+        current_meta = getattr(overlay, "meta", None) or {}
+        if not isinstance(current_meta, dict):
+            current_meta = {}
+
+        current_meta["finding_created"] = finding is not None
+        if finding is not None:
+            current_meta["finding_id"] = getattr(finding, "id", None)
+
+        overlay.meta = current_meta
+
+    db.flush()
 
 
 # ---------------------------------------------------------------------------
@@ -454,7 +548,7 @@ def _map_and_persist_overlays(
 
 
 # ---------------------------------------------------------------------------
-# Main Pipeline (Steps 1 + 2 + 3 + 4)
+# Main Pipeline (Steps 1 + 2 + 3 + 4 + 5)
 # ---------------------------------------------------------------------------
 
 
@@ -466,6 +560,8 @@ def run_inspection_mapping(db: Session, run: InspectionRun) -> Dict[str, Any]:
     Step 2: Classify inspection type (lookup or LLM), persist to inspection_runs.inspection_type.
     Step 3: Extract outcomes (LLM), persist inspection_results row.
     Step 4: Map areas to master coords via drawing_regions, persist drawing_overlays.
+    Step 5: Create finding when outcome is fail/mixed; attach finding_id to overlay meta.
+    Step 6: Update run status (processing → complete/failed), started_at, completed_at, error_message.
 
     Returns dict with:
       - run, evidence, master_drawing (loaded records)
@@ -473,19 +569,63 @@ def run_inspection_mapping(db: Session, run: InspectionRun) -> Dict[str, Any]:
       - inspection_type (str, after classification)
       - inspection_result (created row)
       - drawing_overlays (list of created overlay rows)
+      - finding (created when outcome fail/mixed, else None)
       - error (str | None, set on failure)
     """
-    ctx = _load_evidence_and_master(db, run)
-    if ctx.get("error"):
+    storage = StorageService(db)
+    run_id = cast(int, run.id)
+    now = datetime.now(timezone.utc)
+
+    # Step 6 — Start: status = processing, started_at
+    storage.update_inspection_run_status(
+        run_id,
+        "processing",
+        started_at=now,
+    )
+
+    try:
+        ctx = _load_evidence_and_master(db, run)
+        if ctx.get("error"):
+            storage.update_inspection_run_status(
+                run_id,
+                "failed",
+                completed_at=datetime.now(timezone.utc),
+                error_message=ctx["error"],
+            )
+            return ctx
+
+        inspection_type = _classify_and_persist_inspection_type(db, ctx)
+        ctx["inspection_type"] = inspection_type
+
+        result = _extract_and_persist_outcomes(db, ctx)
+        ctx["inspection_result"] = result
+
+        overlays = _map_and_persist_overlays(db, ctx)
+        ctx["drawing_overlays"] = overlays
+
+        finding = _create_and_persist_finding(db, ctx)
+        ctx["finding"] = finding
+
+        _attach_finding_to_overlays(db, overlays, finding)
+
+        # Step 6 — Success: status = complete, completed_at
+        storage.update_inspection_run_status(
+            run_id,
+            "complete",
+            completed_at=datetime.now(timezone.utc),
+        )
+
         return ctx
 
-    inspection_type = _classify_and_persist_inspection_type(db, ctx)
-    ctx["inspection_type"] = inspection_type
-
-    result = _extract_and_persist_outcomes(db, ctx)
-    ctx["inspection_result"] = result
-
-    overlays = _map_and_persist_overlays(db, ctx)
-    ctx["drawing_overlays"] = overlays
-
-    return ctx
+    except Exception as e:
+        logger.exception(
+            "inspection_mapping_pipeline_failed",
+            extra={"run_id": run_id},
+        )
+        storage.update_inspection_run_status(
+            run_id,
+            "failed",
+            completed_at=datetime.now(timezone.utc),
+            error_message=str(e),
+        )
+        return {"run": run, "error": str(e)}
