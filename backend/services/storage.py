@@ -566,17 +566,19 @@ class StorageService:
         *,
         master_drawing_id: Optional[int] = None,
         status: Optional[str] = None,
-        limit: Optional[int] = None,
-    ) -> List[InspectionRun]:
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[List[InspectionRun], int]:
+        """List inspection runs with pagination. Returns (items, total)."""
         q = self.db.query(InspectionRun).filter(InspectionRun.project_id == project_id)
         if master_drawing_id is not None:
             q = q.filter(InspectionRun.master_drawing_id == master_drawing_id)
         if status is not None:
             q = q.filter(InspectionRun.status == status)
         base = q.order_by(InspectionRun.created_at.desc(), InspectionRun.id.desc())
-        if limit is not None:
-            base = base.limit(limit)
-        return base.all()
+        total = base.count()
+        items = base.limit(limit).offset(offset).all()
+        return items, total
 
     def update_inspection_run_status(
         self,

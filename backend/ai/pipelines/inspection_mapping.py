@@ -576,22 +576,32 @@ def run_inspection_mapping(db: Session, run: InspectionRun) -> Dict[str, Any]:
     run_id = cast(int, run.id)
     now = datetime.now(timezone.utc)
 
-    # Step 6 — Start: status = processing, started_at
-    storage.update_inspection_run_status(
-        run_id,
-        "processing",
-        started_at=now,
-    )
-
-    try:
-        ctx = _load_evidence_and_master(db, run)
-        if ctx.get("error"):
+    def _mark_failed(err: str) -> None:
+        """Update run status to failed. Must not raise so request does not crash."""
+        try:
             storage.update_inspection_run_status(
                 run_id,
                 "failed",
                 completed_at=datetime.now(timezone.utc),
-                error_message=ctx["error"],
+                error_message=err,
             )
+        except Exception as status_err:
+            logger.exception(
+                "inspection_mapping_status_update_failed",
+                extra={"run_id": run_id, "original_error": err},
+            )
+
+    try:
+        # Step 6 — Start: status = processing, started_at
+        storage.update_inspection_run_status(
+            run_id,
+            "processing",
+            started_at=now,
+        )
+
+        ctx = _load_evidence_and_master(db, run)
+        if ctx.get("error"):
+            _mark_failed(ctx["error"])
             return ctx
 
         inspection_type = _classify_and_persist_inspection_type(db, ctx)
@@ -622,10 +632,5 @@ def run_inspection_mapping(db: Session, run: InspectionRun) -> Dict[str, Any]:
             "inspection_mapping_pipeline_failed",
             extra={"run_id": run_id},
         )
-        storage.update_inspection_run_status(
-            run_id,
-            "failed",
-            completed_at=datetime.now(timezone.utc),
-            error_message=str(e),
-        )
+        _mark_failed(str(e))
         return {"run": run, "error": str(e)}
