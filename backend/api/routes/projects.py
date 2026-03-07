@@ -14,7 +14,8 @@ from models.schemas import (
 )
 from models.models import Drawing, Project
 from services.file_storage import save_upload, get_file_path
-from services.procore_writeback import build_inspection_payload, build_writeback_payload_for_api
+from services.procore_writeback_contract import build_writeback_contract
+from services.procore_writeback import translate_contract_to_procore_payload
 from services.procore_client import ProcoreAPIClient
 from services.procore_connection_store import get_active_connection
 from errors import ProcoreNotConnected
@@ -103,34 +104,34 @@ async def procore_writeback(
             detail="mode must be 'dry_run' or 'commit'",
         )
 
-    if body.mode == "dry_run":
-        payload, err = build_inspection_payload(db, project_id, body.inspection_run_id)
-        if err:
-            raise HTTPException(status_code=400, detail=err)
-        # Strip _meta for response (internal only)
-        out = {k: v for k, v in payload.items() if k != "_meta"}
-        return ProcoreWritebackResponse(mode="dry_run", payload=out)
-
-    # commit: require Procore connection
-    if get_active_connection(db, user_id) is None:
-        raise ProcoreNotConnected(details={"user_id": user_id})
-
+    # 1. Load the internal contract
     try:
-        api_payload = build_writeback_payload_for_api(
-            db, project_id, body.inspection_run_id
-        )
+        contract = build_writeback_contract(db, project_id, body.inspection_run_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    procore_project_id = str(getattr(project, "procore_project_id", "") or "")
+    # 2. Translate to Procore format
+    procore_payload = translate_contract_to_procore_payload(contract)
+
+    # 3. Dry-run: return payload (no API call)
+    if body.mode == "dry_run":
+        return ProcoreWritebackResponse(mode="dry_run", payload=procore_payload)
+
+    # 4. Commit: require Procore connection and push to Procore
+    if get_active_connection(db, user_id) is None:
+        raise ProcoreNotConnected(details={"user_id": user_id})
+
+    procore_project_id = contract.get("project", {}).get("procore_project_id", "")
+    if not procore_project_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Project has no procore_project_id; sync project from Procore first",
+        )
 
     async with ProcoreAPIClient(db, user_id) as client:
         created = await client.create_inspection(
-            project_id=procore_project_id,
-            inspection_data=api_payload,
+            project_id=str(procore_project_id),
+            inspection_data=procore_payload,
         )
     return ProcoreWritebackResponse(
         mode="commit",

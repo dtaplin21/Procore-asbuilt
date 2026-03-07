@@ -21,31 +21,25 @@ logger = logging.getLogger(__name__)
 INSPECTION_TYPE_TO_TEMPLATE_ID: Dict[str, int] = {}
 
 
-def build_inspection_payload(
-    db: Session,
-    project_id: int,
-    inspection_run_id: int,
-) -> tuple[Dict[str, Any], Optional[str]]:
+def translate_contract_to_procore_payload(contract: dict) -> dict:
     """
-    Build Procore inspection payload from inspection_run, inspection_result, overlays.
+    Convert the internal writeback contract into the payload Procore expects.
 
-    Returns (payload, error_message). If error_message is set, payload may be partial.
-    Uses Project.procore_project_id for Procore API calls.
+    This is where our internal language gets translated into whatever the
+    Procore inspection endpoint expects (e.g. inspection_log shape).
     """
-    try:
-        contract = build_writeback_contract(db, project_id, inspection_run_id)
-    except ValueError as exc:
-        return {}, str(exc)
+    run_ctx = contract.get("inspection_run") or {}
+    inspection_result = contract.get("inspection_result")
 
-    # Use completed_at or created_at for date
-    run_ctx = contract.inspection_run
+    # Use completed_at, started_at, or created_at for date
     dt = (
-        run_ctx.completed_at
-        or run_ctx.started_at
-        or run_ctx.created_at
-        or datetime.now(timezone.utc)
+        run_ctx.get("completed_at")
+        or run_ctx.get("started_at")
+        or run_ctx.get("created_at")
     )
     if dt is None:
+        dt = datetime.now(timezone.utc)
+    elif not isinstance(dt, datetime):
         dt = datetime.now(timezone.utc)
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
@@ -55,17 +49,14 @@ def build_inspection_payload(
     hour = dt.hour
     minute = dt.minute
 
-    inspection_result = contract.inspection_result
-    inspection_type = (run_ctx.inspection_type or "").strip() or "Inspection"
+    inspection_type = (run_ctx.get("inspection_type") or "").strip() or "Inspection"
     outcome = (
-        inspection_result.outcome if inspection_result is not None else "unknown"
+        inspection_result.get("outcome") if inspection_result else "unknown"
     )
-    notes = (inspection_result.notes if inspection_result is not None else "") or ""
-
+    notes = (inspection_result.get("notes") if inspection_result else "") or ""
     comments = f"Outcome: {outcome}. {notes}".strip()
 
     # Procore Inspection Logs API shape (inspection_log wrapper).
-    # Inspections product may use different schema; adjust if API returns 400.
     inspection_log: Dict[str, Any] = {
         "date": date_str,
         "datetime": datetime_str,
@@ -79,27 +70,51 @@ def build_inspection_payload(
         "inspector_name": "AI Platform",
     }
 
-    # Optional: map to Procore template ID if configured
     template_id = INSPECTION_TYPE_TO_TEMPLATE_ID.get(
         (inspection_type or "").lower().strip()
     )
     if template_id is not None:
         inspection_log["inspection_type_id"] = template_id
 
+    return {"inspection_log": inspection_log}
+
+
+def build_inspection_payload(
+    db: Session,
+    project_id: int,
+    inspection_run_id: int,
+) -> tuple[Dict[str, Any], Optional[str]]:
+    """
+    Build Procore inspection payload from inspection_run, inspection_result, overlays.
+
+    Returns (payload, error_message). If error_message is set, payload may be partial.
+    Uses build_writeback_contract + translate_contract_to_procore_payload.
+    """
+    try:
+        contract = build_writeback_contract(db, project_id, inspection_run_id)
+    except ValueError as exc:
+        return {}, str(exc)
+
+    procore_payload = translate_contract_to_procore_payload(contract)
+    run_ctx = contract.get("inspection_run") or {}
+    inspection_result = contract.get("inspection_result")
+    outcome = (
+        inspection_result.get("outcome") if inspection_result else "unknown"
+    )
+
     payload: Dict[str, Any] = {
-        "inspection_log": inspection_log,
+        **procore_payload,
         "_meta": {
             "project_id": project_id,
             "inspection_run_id": inspection_run_id,
-            "procore_project_id": contract.project.procore_project_id,
-            "contract_version": contract.version,
-            "run_status": run_ctx.status,
-            "has_finding": contract.finding is not None,
+            "procore_project_id": contract.get("project", {}).get("procore_project_id", ""),
+            "contract_version": contract.get("version", ""),
+            "run_status": run_ctx.get("status"),
+            "has_finding": contract.get("finding") is not None,
             "outcome": outcome,
-            "contract": contract.model_dump(mode="json"),
+            "contract": contract,
         },
     }
-
     return payload, None
 
 

@@ -9,13 +9,16 @@ to reason about.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Set, Union
 
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from models.models import Company, InspectionResult
 from services.storage import StorageService
+
+if TYPE_CHECKING:
+    from models.models import DrawingOverlay
 
 CONTRACT_VERSION = "2025-02-27"
 
@@ -32,6 +35,166 @@ def _safe_dict(value: Any) -> Dict[str, Any]:
     if isinstance(value, dict):
         return dict(value)
     return {}
+
+
+_TITLE_KEYS = ("title", "label", "issue", "problem", "summary", "name")
+_DESCRIPTION_KEYS = ("description", "notes", "note", "detail", "message", "summary", "text", "reason")
+_SEVERITY_KEYS = ("severity", "priority", "impact", "status", "level")
+_LOCATION_KEYS = ("location", "region", "region_label", "region_name", "area", "coordinates")
+_ISSUE_LIST_KEYS = ("issues", "problems", "findings", "items", "anomalies")
+_SEVERITY_ALIASES = {
+    "critical": "critical",
+    "high": "high",
+    "med": "medium",
+    "medium": "medium",
+    "moderate": "medium",
+    "warning": "medium",
+    "low": "low",
+    "minor": "low",
+    "pass": "low",
+    "fail": "high",
+    "severe": "high",
+    "alert": "high",
+}
+
+
+def _pick_first_str(meta: Dict[str, Any], keys: Sequence[str]) -> Optional[str]:
+    for key in keys:
+        value = meta.get(key)
+        if isinstance(value, str):
+            trimmed = value.strip()
+            if trimmed:
+                return trimmed
+    return None
+
+
+def _normalize_severity(raw: Any, status: str) -> str:
+    default = "high" if status == "fail" else "medium" if status == "unknown" else "low"
+    if raw is None:
+        return default
+    if isinstance(raw, (int, float)):
+        if raw >= 0.85:
+            return "critical"
+        if raw >= 0.6:
+            return "high"
+        if raw >= 0.35:
+            return "medium"
+        return "low"
+    value = str(raw).strip().lower()
+    if not value:
+        return default
+    if value in _SEVERITY_ALIASES:
+        return _SEVERITY_ALIASES[value]
+    if value.startswith("crit"):
+        return "critical"
+    if value.startswith("hi"):
+        return "high"
+    if value.startswith("med"):
+        return "medium"
+    if value.startswith("low"):
+        return "low"
+    if value in ("mixed", "unknown"):
+        return "medium"
+    return default
+
+
+def _build_location(meta: Dict[str, Any], geometry: Dict[str, Any]) -> Dict[str, Any]:
+    location: Dict[str, Any] = {}
+    for key in _LOCATION_KEYS:
+        value = meta.get(key)
+        if isinstance(value, dict):
+            location.update(value)
+        elif isinstance(value, str) and value.strip():
+            field = "label" if key in ("location", "region_label", "region_name") else key
+            if field not in location:
+                location[field] = value.strip()
+    page = meta.get("page")
+    if isinstance(page, (int, float)):
+        location.setdefault("page", int(page))
+    if geometry:
+        location.setdefault("geometry", geometry)
+    return location
+
+
+def _coerce_overlay_payload(overlay: Union[Dict[str, Any], "DrawingOverlay"]) -> Dict[str, Any]:
+    if isinstance(overlay, dict):
+        return {
+            "id": overlay.get("id"),
+            "status": str(overlay.get("status", "unknown") or "unknown").lower(),
+            "geometry": _safe_dict(overlay.get("geometry")),
+            "meta": _safe_dict(overlay.get("meta")),
+        }
+    return {
+        "id": getattr(overlay, "id", None),
+        "status": str(getattr(overlay, "status", "unknown") or "unknown").lower(),
+        "geometry": _safe_dict(getattr(overlay, "geometry", None)),
+        "meta": _safe_dict(getattr(overlay, "meta", None)),
+    }
+
+
+def extract_findings_from_overlays(
+    overlays: Sequence[Union[Dict[str, Any], "DrawingOverlay"]],
+) -> List[Dict[str, Any]]:
+    """
+    Derive lightweight finding summaries from overlay metadata.
+    Returns list of dicts with title/description/severity/location.
+    """
+    findings: List[Dict[str, Any]] = []
+    for overlay in overlays:
+        payload = _coerce_overlay_payload(overlay)
+        meta = payload["meta"]
+        geometry = payload["geometry"]
+        status = payload["status"]
+
+        issue_candidates: List[Dict[str, Any]] = []
+        for key in _ISSUE_LIST_KEYS:
+            value = meta.get(key)
+            if isinstance(value, list):
+                issue_candidates.extend([item for item in value if isinstance(item, dict)])
+        if not issue_candidates:
+            issue_candidates = [meta]
+
+        for candidate in issue_candidates:
+            title = _pick_first_str(candidate, _TITLE_KEYS) or _pick_first_str(meta, _TITLE_KEYS)
+            description = _pick_first_str(candidate, _DESCRIPTION_KEYS) or _pick_first_str(
+                meta, _DESCRIPTION_KEYS
+            )
+            severity_value = candidate.get("severity") or _pick_first_str(candidate, _SEVERITY_KEYS)
+            if severity_value is None:
+                for key in _SEVERITY_KEYS:
+                    if key in meta:
+                        severity_value = meta[key]
+                        break
+            severity = _normalize_severity(severity_value, status)
+            location = _build_location(candidate, geometry)
+            if not location:
+                location = _build_location(meta, geometry)
+
+            if not any([title, description, location]):
+                continue
+
+            findings.append(
+                {
+                    "title": title or f"Overlay issue ({status})",
+                    "description": description,
+                    "severity": severity,
+                    "location": location or ({"geometry": geometry} if geometry else {}),
+                }
+            )
+    return findings
+
+
+def _normalize_overlay(overlay: Any) -> Dict[str, Any]:
+    """
+    Normalize a DrawingOverlay ORM instance into a portable dict shape
+    for the writeback layer. Keeps only id, status, geometry, meta.
+    """
+    return {
+        "id": int(getattr(overlay, "id", 0)),
+        "status": str(getattr(overlay, "status", "unknown") or "unknown"),
+        "geometry": _safe_dict(getattr(overlay, "geometry", None)),
+        "meta": _safe_dict(getattr(overlay, "meta", None)),
+    }
 
 
 def _text_excerpt(text: Optional[str], limit: int = 600) -> Optional[str]:
@@ -94,11 +257,11 @@ class InspectionResultContext(BaseModel):
 
 
 class OverlayContext(BaseModel):
+    """Portable overlay shape for the writeback layer (id, status, geometry, meta)."""
     id: int
     status: str
     geometry: Dict[str, Any]
     meta: Dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime
 
 
 class FindingContext(BaseModel):
@@ -124,16 +287,66 @@ class WritebackContract(BaseModel):
     meta: Dict[str, Any] = Field(default_factory=dict)
 
 
+def gather_writeback_raw_records(
+    db: Session,
+    project_id: int,
+    inspection_run_id: int,
+) -> Dict[str, Any]:
+    """
+    Load and return the raw records needed for writeback.
+
+    Returns a dict with keys:
+        - run: InspectionRun (or None if not found)
+        - result: latest InspectionResult for the run (or None)
+        - overlays: list of normalized overlay dicts (id, status, geometry, meta)
+
+    Raises ValueError if the inspection run is not found.
+    """
+    storage = StorageService(db)
+    run = storage.get_inspection_run(project_id, inspection_run_id)
+    if run is None:
+        raise ValueError("Inspection run not found")
+
+    run_id = int(getattr(run, "id", 0))
+    result = (
+        db.query(InspectionResult)
+        .filter(InspectionResult.inspection_run_id == run_id)
+        .order_by(InspectionResult.created_at.desc())
+        .first()
+    )
+
+    master_drawing_id = getattr(run, "master_drawing_id", None)
+    if master_drawing_id is None:
+        raise ValueError("Inspection run has no master_drawing_id")
+
+    raw_overlays = storage.list_drawing_overlays(
+        int(master_drawing_id),
+        inspection_run_id=run_id,
+    )
+    overlays = [_normalize_overlay(o) for o in raw_overlays]
+
+    return {
+        "run": run,
+        "result": result,
+        "overlays": overlays,
+    }
+
+
 def build_writeback_contract(
     db: Session,
     project_id: int,
     inspection_run_id: int,
-) -> WritebackContract:
+) -> Dict[str, Any]:
     """
     Assemble the normalized writeback contract for a given inspection_run.
 
     Raises ValueError when required records are missing (project, run, drawing).
     """
+    raw = gather_writeback_raw_records(db, project_id, inspection_run_id)
+    run = raw["run"]
+    result = raw["result"]
+    overlays = raw["overlays"]
+
     storage = StorageService(db)
     project = storage.get_project(project_id)
     if project is None:
@@ -142,10 +355,6 @@ def build_writeback_contract(
     project_procore_id = getattr(project, "procore_project_id", None)
     if not project_procore_id:
         raise ValueError("Project has no procore_project_id; sync project from Procore first")
-
-    run = storage.get_inspection_run(project_id, inspection_run_id)
-    if run is None:
-        raise ValueError("Inspection run not found")
 
     master_drawing_id = getattr(run, "master_drawing_id", None)
     if master_drawing_id is None:
@@ -157,18 +366,6 @@ def build_writeback_contract(
     evidence = None
     if getattr(run, "evidence_id", None) is not None:
         evidence = storage.get_evidence_record(project_id, int(getattr(run, "evidence_id")))
-
-    result = (
-        db.query(InspectionResult)
-        .filter(InspectionResult.inspection_run_id == int(getattr(run, "id")))
-        .order_by(InspectionResult.created_at.desc())
-        .first()
-    )
-
-    overlays = storage.list_drawing_overlays(
-        int(getattr(master_drawing, "id", 0)),
-        inspection_run_id=int(getattr(run, "id", 0)),
-    )
 
     company = (
         db.query(Company)
@@ -230,17 +427,10 @@ def build_writeback_contract(
             created_at=_ensure_utc(getattr(result, "created_at", None)) or datetime.now(timezone.utc),
         )
 
-    overlay_contexts: List[OverlayContext] = []
-    for overlay in overlays:
-            overlay_contexts.append(
-            OverlayContext(
-                id=int(getattr(overlay, "id", 0)),
-                status=str(getattr(overlay, "status", "unknown") or "unknown"),
-                geometry=_safe_dict(getattr(overlay, "geometry", None)),
-                meta=_safe_dict(getattr(overlay, "meta", None)),
-                created_at=_ensure_utc(getattr(overlay, "created_at", None)) or datetime.now(timezone.utc),
-            )
-        )
+    overlay_contexts: List[OverlayContext] = [
+        OverlayContext(**o) for o in overlays
+    ]
+    overlay_findings = extract_findings_from_overlays(overlays)
 
     finding_ctx: Optional[FindingContext] = None
     finding_id: Optional[int] = None
@@ -286,12 +476,14 @@ def build_writeback_contract(
         },
         "dry_run_supported": True,
     }
+    if overlay_findings:
+        meta["overlay_findings"] = overlay_findings
     if pages:
         meta["pages"] = sorted(pages)
     if evidence_ctx is not None:
         meta["evidence_type"] = evidence_ctx.type
 
-    return WritebackContract(
+    contract = WritebackContract(
         project=project_ctx,
         inspection_run=inspection_run_ctx,
         inspection_result=inspection_result_ctx,
@@ -301,6 +493,13 @@ def build_writeback_contract(
         finding=finding_ctx,
         meta=meta,
     )
+    return contract.model_dump(mode="python")
 
 
-__all__ = ["WritebackContract", "build_writeback_contract", "CONTRACT_VERSION"]
+__all__ = [
+    "WritebackContract",
+    "build_writeback_contract",
+    "gather_writeback_raw_records",
+    "extract_findings_from_overlays",
+    "CONTRACT_VERSION",
+]
