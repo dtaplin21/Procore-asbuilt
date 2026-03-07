@@ -172,6 +172,46 @@ export interface DrawingDiffsListResponse {
   offset: number;
 }
 
+// Inspection runs (Phase 4 pipeline)
+export interface InspectionRun {
+  id: number;
+  project_id: number;
+  master_drawing_id: number;
+  evidence_id: number | null;
+  inspection_type: string | null;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InspectionRunListResponse {
+  items: InspectionRun[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface RunInspectionRequest {
+  master_drawing_id: number;
+  evidence_id?: number | null;
+  inspection_type?: string | null;
+}
+
+// Drawing overlays (inspection or diff geometry on master drawing)
+export interface DrawingOverlay {
+  id: number;
+  master_drawing_id: number;
+  inspection_run_id: number | null;
+  diff_id: number | null;
+  geometry: Record<string, unknown>;
+  status: string;
+  meta: Record<string, unknown> | null;
+  created_at: string;
+}
+
 // Procore Connection Status
 export interface ProcoreConnection {
   connected: boolean;
@@ -241,4 +281,50 @@ export interface DashboardSummary {
   companyContext: CompanyContext;
   syncHealth: SyncHealth;
   currentDrawing: CurrentDrawing | null;
+}
+
+// ----------------------------
+// Inspection runs (Phase 4 pipeline)
+// ----------------------------
+
+/** Single inspection run (API response shape; snake_case from backend). */
+export interface InspectionRun {
+  id: number;
+  project_id: number;
+  master_drawing_id: number;
+  evidence_id: number | null;
+  inspection_type: string | null;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Paginated list of inspection runs. */
+export interface InspectionRunListResponse {
+  items: InspectionRun[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** Body for POST create inspection run. */
+export interface RunInspectionRequest {
+  master_drawing_id: number;
+  evidence_id?: number | null;
+  inspection_type?: string | null;
+}
+
+/** Drawing overlay (API response shape; snake_case from backend). */
+export interface DrawingOverlay {
+  id: number;
+  master_drawing_id: number;
+  inspection_run_id: number | null;
+  diff_id: number | null;
+  geometry: Record<string, unknown>;
+  status: string;
+  meta: Record<string, unknown> | null;
+  created_at: string;
 }

@@ -1,11 +1,11 @@
 from typing import List, Optional, cast
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
 from models.models import Drawing
-from models.schemas import DrawingResponse
+from models.schemas import DrawingOverlayResponse, DrawingResponse
 from services.storage import StorageService
 from services.file_storage import save_upload, get_file_path
 from fastapi.responses import FileResponse
@@ -99,3 +99,33 @@ def download_drawing_file(
         media_type=content_type,
         filename=name,
     )
+
+
+@router.get(
+    "/api/projects/{project_id}/drawings/{drawing_id}/overlays",
+    response_model=List[DrawingOverlayResponse],
+)
+def list_drawing_overlays(
+    project_id: int,
+    drawing_id: int,
+    inspection_run_id: Optional[int] = Query(None, description="Filter by inspection run"),
+    diff_id: Optional[int] = Query(None, description="Filter by diff"),
+    db: Session = Depends(get_db),
+) -> List[DrawingOverlayResponse]:
+    """
+    GET /api/projects/{project_id}/drawings/{drawing_id}/overlays
+
+    List overlays for a drawing (master drawing). Sorted by created_at desc.
+    Optional filters: inspection_run_id, diff_id.
+    """
+    service = StorageService(db)
+    drawing = service.get_drawing(project_id, drawing_id)
+    if not drawing:
+        raise HTTPException(status_code=404, detail="Drawing not found")
+
+    overlays = service.list_drawing_overlays(
+        master_drawing_id=drawing_id,
+        inspection_run_id=inspection_run_id,
+        diff_id=diff_id,
+    )
+    return [DrawingOverlayResponse.model_validate(o) for o in overlays]
