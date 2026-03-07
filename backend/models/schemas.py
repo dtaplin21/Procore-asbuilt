@@ -437,6 +437,19 @@ class InspectionRunCreate(BaseModel):
     inspection_type: Optional[str] = None  # allow override
 
 
+class ProcoreWritebackRequest(BaseModel):
+    """Body for POST Procore writeback."""
+    inspection_run_id: int
+    mode: Literal["dry_run", "commit"]
+
+
+class ProcoreWritebackResponse(BaseModel):
+    """Response for Procore writeback. mode indicates what was done."""
+    mode: str  # "dry_run" | "commit"
+    payload: Optional[dict] = None  # dry_run: full payload that would be sent
+    procore_inspection: Optional[dict] = None  # commit: created inspection from Procore
+
+
 # ----- Response models -----
 
 

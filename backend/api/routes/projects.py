@@ -4,9 +4,20 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, cast
 from api.dependencies import get_db
 from services.storage import StorageService
-from models.schemas import ProjectResponse, ProjectListResponse, DashboardSummaryResponse, DrawingResponse
+from models.schemas import (
+    ProjectResponse,
+    ProjectListResponse,
+    DashboardSummaryResponse,
+    DrawingResponse,
+    ProcoreWritebackRequest,
+    ProcoreWritebackResponse,
+)
 from models.models import Drawing, Project
 from services.file_storage import save_upload, get_file_path
+from services.procore_writeback import build_inspection_payload, build_writeback_payload_for_api
+from services.procore_client import ProcoreAPIClient
+from services.procore_connection_store import get_active_connection
+from errors import ProcoreNotConnected
 from datetime import datetime
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -21,7 +32,12 @@ async def get_projects(
     """List projects with pagination (limit, offset)."""
     storage = StorageService(db)
     items, total = storage.get_projects(company_id=company_id, limit=limit, offset=offset)
-    return ProjectListResponse(items=items, total=total, limit=limit, offset=offset)
+    return ProjectListResponse(
+        items=[ProjectResponse.model_validate(p) for p in items],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(project_id: int, db: Session = Depends(get_db)):
@@ -62,6 +78,64 @@ async def get_project_dashboard_summary(
 
     return summary
 
+
+@router.post(
+    "/{project_id}/procore/writeback",
+    response_model=ProcoreWritebackResponse,
+)
+async def procore_writeback(
+    project_id: int,
+    body: ProcoreWritebackRequest,
+    user_id: str = Query(..., description="Procore user ID for auth"),
+    db: Session = Depends(get_db),
+) -> ProcoreWritebackResponse:
+    """
+    Write inspection run to Procore.
+
+    - **dry_run**: Returns the payload that would be sent (no API call).
+    - **commit**: Calls Procore create_inspection and returns the created inspection.
+
+    Uses Project.procore_project_id for the Procore API.
+    """
+    if body.mode not in ("dry_run", "commit"):
+        raise HTTPException(
+            status_code=400,
+            detail="mode must be 'dry_run' or 'commit'",
+        )
+
+    if body.mode == "dry_run":
+        payload, err = build_inspection_payload(db, project_id, body.inspection_run_id)
+        if err:
+            raise HTTPException(status_code=400, detail=err)
+        # Strip _meta for response (internal only)
+        out = {k: v for k, v in payload.items() if k != "_meta"}
+        return ProcoreWritebackResponse(mode="dry_run", payload=out)
+
+    # commit: require Procore connection
+    if get_active_connection(db, user_id) is None:
+        raise ProcoreNotConnected(details={"user_id": user_id})
+
+    try:
+        api_payload = build_writeback_payload_for_api(
+            db, project_id, body.inspection_run_id
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    procore_project_id = str(getattr(project, "procore_project_id", "") or "")
+
+    async with ProcoreAPIClient(db, user_id) as client:
+        created = await client.create_inspection(
+            project_id=procore_project_id,
+            inspection_data=api_payload,
+        )
+    return ProcoreWritebackResponse(
+        mode="commit",
+        procore_inspection=created,
+    )
 
 
 @router.post("/{project_id}/drawings", response_model=DrawingResponse)

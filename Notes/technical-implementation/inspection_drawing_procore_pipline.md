@@ -176,7 +176,7 @@ UI:
 - Render diff overlays on the master drawing
 - Show a “Mismatch found” banner and link to the related finding
 
-### Phase 4 — Inspection extraction → overlay generation #############################################################################
+### Phase 4 — Inspection extraction → overlay generation  (Done)#############################################################################
 
 Add tables:
 
