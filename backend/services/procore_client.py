@@ -512,6 +512,30 @@ class ProcoreAPIClient:
             headers=headers
         )
     
+    # Observation Methods
+    async def create_observation(
+        self,
+        project_id: str,
+        observation_payload: Dict[str, Any],
+        company_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Create an observation in Procore using the translated payload built upstream.
+        """
+        headers = {}
+        if company_id:
+            headers["Procore-Company-Id"] = company_id
+        
+        params = {"project_id": project_id}
+        
+        return await self._request(
+            "POST",
+            "/observations",
+            params=params,
+            json_data=observation_payload,
+            headers=headers,
+        )
+    
     # Documents Methods
     async def download_document(
         self,
@@ -534,4 +558,3 @@ class ProcoreAPIClient:
             response = await client.get(url, params=params, headers=headers)
             response.raise_for_status()
             return response.content
-
