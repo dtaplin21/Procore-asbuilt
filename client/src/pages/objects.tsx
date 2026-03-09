@@ -35,6 +35,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/status-badge";
 import { DeveloperPanel } from "@/components/developer-panel";
 import { DrawingDiffOverlay } from "@/components/drawing-diff-overlay";
+import { ProcoreWritebackPanel } from "@/components/ProcoreWritebackPanel";
 import type { DrawingObject, ObjectStatus } from "@shared/schema";
 import { useDrawingDiffs } from "@/hooks/use-drawing-diffs";
 
@@ -50,7 +51,7 @@ const statusConfig: Record<ObjectStatus, { label: string; color: string }> = {
   as_built: { label: "As-Built Complete", color: "bg-primary" },
 };
 
-export default function Objects() {
+export default function Objects({ procoreUserId }: { procoreUserId?: string | null }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -212,6 +213,22 @@ export default function Objects() {
         onProjectChange={setSelectedProjectId}
         onDrawingChange={setSelectedMasterDrawingId}
       />
+
+      {/* Procore Writeback */}
+      {selectedProjectId ? (
+        <ProcoreWritebackPanel
+          projectId={selectedProjectId}
+          procoreUserId={procoreUserId ?? null}
+          projectName={projects.find((p) => String(p.id) === selectedProjectId)?.name ?? null}
+          masterDrawingId={selectedMasterDrawingId}
+        />
+      ) : (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            <p className="text-sm">Select a project above to write inspection results back to Procore.</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Drawing Viewer Mockup */}
       <Card>

@@ -115,11 +115,20 @@ class CurrentDrawingSummary(BaseModel):
     updated_at: datetime
 
 
+class ProjectSummaryKpis(BaseModel):
+    total_findings: int = 0
+    open_findings: int = 0
+    drawings_count: int = 0
+    evidence_count: int = 0
+    inspections_count: int = 0
+
+
 class DashboardSummaryResponse(BaseModel):
     project: ProjectSummary
     company_context: CompanyContext
     sync_health: SyncHealth
     current_drawing: Optional[CurrentDrawingSummary] = None
+    kpis: ProjectSummaryKpis = Field(default_factory=ProjectSummaryKpis)
 
 # ============================================
 # INSIGHTS (FINDINGS) SCHEMAS

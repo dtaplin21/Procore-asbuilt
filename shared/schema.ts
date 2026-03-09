@@ -273,6 +273,14 @@ export interface CurrentDrawing {
   updatedAt: string;
 }
 
+export type ProjectSummaryKpis = {
+  total_findings: number;
+  open_findings: number;
+  drawings_count: number;
+  evidence_count: number;
+  inspections_count: number;
+};
+
 // Top-level dashboard summary response type. This matches the shape of the
 // ``DashboardSummaryResponse`` pydantic model on the backend and is returned by
 // GET /api/projects/{project_id}/dashboard/summary.
@@ -281,6 +289,7 @@ export interface DashboardSummary {
   companyContext: CompanyContext;
   syncHealth: SyncHealth;
   currentDrawing: CurrentDrawing | null;
+  kpis: ProjectSummaryKpis;
 }
 
 // ----------------------------
@@ -327,4 +336,18 @@ export interface DrawingOverlay {
   status: string;
   meta: Record<string, unknown> | null;
   created_at: string;
+}
+
+// Procore writeback (Phase 5)
+export interface ProcoreWritebackRequest {
+  inspection_run_id: number;
+  mode: "dry_run" | "commit";
+}
+
+export interface ProcoreWritebackResponse {
+  mode: "dry_run" | "commit";
+  payload?: unknown;
+  committed?: boolean;
+  message?: string;
+  procore_response?: unknown | null;
 }

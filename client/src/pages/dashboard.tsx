@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
-  ClipboardCheck, 
   AlertTriangle,
-  TrendingUp,
   Sparkles,
+  FileText,
+  FolderOpen,
+  FileStack,
+  ClipboardList,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,7 +57,8 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
     getProjectIdFromUrl()
   );
 
-  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
+  // Kept for Critical Alerts Banner only; top section uses projectSummary
+  const { data: stats } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
   });
 
@@ -155,48 +158,54 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {statsLoading ? (
-          <>
-            {[1, 2, 3].map((i) => (
+      {/* Project summary KPIs (top section) */}
+      {selectedProjectId && (
+        projectSummaryLoading ? (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {[1, 2, 3, 4, 5].map((i) => (
               <Card key={i}>
-                <CardContent className="p-6">
-                  <Skeleton className="h-4 w-24 mb-2" />
-                  <Skeleton className="h-8 w-16 mb-2" />
-                  <Skeleton className="h-4 w-32" />
+                <CardContent className="p-4">
+                  <Skeleton className="h-4 w-20 mb-2" />
+                  <Skeleton className="h-7 w-10" />
                 </CardContent>
               </Card>
             ))}
-          </>
-        ) : stats ? (
-          <>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <StatCard
-              title="Active Projects"
-              value={stats.activeProjects}
-              subtitle={`${stats.totalProjects} total projects`}
-              icon={TrendingUp}
+              title="Total Findings"
+              value={projectSummary?.kpis?.total_findings ?? 0}
+              icon={FileText}
               variant="default"
             />
             <StatCard
-              title="Pending Review"
-              value={stats.pendingReview}
-              subtitle={`${stats.approvedToday} approved today`}
-              icon={ClipboardCheck}
+              title="Open Findings"
+              value={projectSummary?.kpis?.open_findings ?? 0}
+              icon={AlertTriangle}
               variant="warning"
-              trend={{ value: 12, label: "vs last week" }}
             />
             <StatCard
-              title="Pass Rate"
-              value={`${stats.passRate}%`}
-              subtitle={`${stats.scheduledInspections} scheduled`}
-              icon={ClipboardCheck}
-              variant="success"
-              trend={{ value: 5, label: "improvement" }}
+              title="Drawings"
+              value={projectSummary?.kpis?.drawings_count ?? 0}
+              icon={FolderOpen}
+              variant="default"
             />
-          </>
-        ) : null}
-      </div>
+            <StatCard
+              title="Evidence"
+              value={projectSummary?.kpis?.evidence_count ?? 0}
+              icon={FileStack}
+              variant="default"
+            />
+            <StatCard
+              title="Inspections"
+              value={projectSummary?.kpis?.inspections_count ?? 0}
+              icon={ClipboardList}
+              variant="default"
+            />
+          </div>
+        )
+      )}
 
       {/* AI Insights Section */}
       <Card>

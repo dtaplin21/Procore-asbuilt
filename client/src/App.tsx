@@ -61,7 +61,9 @@ function Router({
           procoreUserId={procoreUserId ?? undefined}
         />
       </Route>
-      <Route path="/objects" component={Objects} />
+      <Route path="/objects">
+        <Objects procoreUserId={procoreUserId} />
+      </Route>
       <Route path="/settings">
         <SettingsPage 
           procoreConnection={procoreConnection}

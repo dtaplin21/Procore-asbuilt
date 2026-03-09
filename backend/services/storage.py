@@ -75,6 +75,16 @@ class StorageService:
         project_company_id = cast(int, project.company_id)
         matches_active_company = bool(active_company_id == project_company_id) if active_company_id is not None else False
 
+        # KPIs
+        total_findings = self.db.query(Finding).filter(Finding.project_id == project_id).count()
+        open_findings = self.db.query(Finding).filter(
+            Finding.project_id == project_id,
+            Finding.resolved.is_(False),
+        ).count()
+        drawings_count = self.db.query(Drawing).filter(Drawing.project_id == project_id).count()
+        evidence_count = self.db.query(EvidenceRecord).filter(EvidenceRecord.project_id == project_id).count()
+        inspections_count = self.db.query(InspectionRun).filter(InspectionRun.project_id == project_id).count()
+
         # NOTE: Return datetimes as datetime objects. If the route uses a Pydantic response_model
         # (recommended), FastAPI will serialize these. If returning raw dict without a model,
         # you may want to .isoformat() them instead.
@@ -98,6 +108,13 @@ class StorageService:
                 "error_message": None if connected else ("Not connected to Procore" if procore_user_id else None),
             },
             "current_drawing": None,
+            "kpis": {
+                "total_findings": total_findings,
+                "open_findings": open_findings,
+                "drawings_count": drawings_count,
+                "evidence_count": evidence_count,
+                "inspections_count": inspections_count,
+            },
         }
     
         # ------------------------------------------------------------------
