@@ -516,23 +516,26 @@ class ProcoreAPIClient:
     async def create_observation(
         self,
         project_id: str,
-        observation_payload: Dict[str, Any],
-        company_id: Optional[str] = None
+        payload: Dict[str, Any],
+        company_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Create an observation in Procore using the translated payload built upstream.
+        Create an observation in Procore.
+
+        Accepts:
+            - project_id (str): Procore project ID for API context
+            - payload (dict): Translated observation payload from translate_contract_to_procore_observation_payload
+            - company_id (str, optional): Procore company ID for Procore-Company-Id header; uses active connection if omitted
         """
-        headers = {}
+        headers: Dict[str, str] = {}
         if company_id:
             headers["Procore-Company-Id"] = company_id
-        
-        params = {"project_id": project_id}
-        
+
         return await self._request(
             "POST",
             "/observations",
-            params=params,
-            json_data=observation_payload,
+            params={"project_id": project_id},
+            json_data=payload,
             headers=headers,
         )
     

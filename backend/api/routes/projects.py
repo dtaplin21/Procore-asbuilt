@@ -11,11 +11,17 @@ from models.schemas import (
     DrawingResponse,
     ProcoreWritebackRequest,
     ProcoreWritebackResponse,
+    ObservationWritebackRequest,
+    ObservationWritebackResponse,
 )
 from models.models import Drawing, Project
 from services.file_storage import save_upload, get_file_path
 from services.procore_writeback_contract import build_writeback_contract
-from services.procore_writeback import translate_contract_to_procore_payload
+from services.procore_writeback import (
+    translate_contract_to_procore_payload,
+    build_observation_writeback_contract,
+    translate_contract_to_procore_observation_payload,
+)
 from services.procore_client import ProcoreAPIClient
 from services.procore_connection_store import get_active_connection
 from errors import ProcoreNotConnected
@@ -136,6 +142,64 @@ async def procore_writeback(
     return ProcoreWritebackResponse(
         mode="commit",
         procore_inspection=created,
+    )
+
+
+@router.post(
+    "/{project_id}/procore/observations/writeback",
+    response_model=ObservationWritebackResponse,
+)
+async def procore_observation_writeback(
+    project_id: int,
+    body: ObservationWritebackRequest,
+    user_id: str = Query(..., description="Procore user ID for auth"),
+    db: Session = Depends(get_db),
+) -> ObservationWritebackResponse:
+    """
+    Write finding to Procore as an observation.
+
+    - **dry_run**: Returns contract + payload (no API call).
+    - **commit**: Calls Procore create_observation and returns the created observation.
+    """
+    if body.mode not in ("dry_run", "commit"):
+        raise HTTPException(
+            status_code=400,
+            detail="mode must be 'dry_run' or 'commit'",
+        )
+
+    try:
+        contract = build_observation_writeback_contract(db, project_id, body.finding_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    payload = translate_contract_to_procore_observation_payload(contract)
+
+    if body.mode == "dry_run":
+        return ObservationWritebackResponse(
+            mode="dry_run",
+            contract=contract,
+            payload=payload,
+        )
+
+    if get_active_connection(db, user_id) is None:
+        raise ProcoreNotConnected(details={"user_id": user_id})
+
+    procore_project_id = contract.get("procore_project_id", "") or ""
+    if not procore_project_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Project has no procore_project_id; sync project from Procore first",
+        )
+
+    async with ProcoreAPIClient(db, user_id) as client:
+        created = await client.create_observation(
+            project_id=str(procore_project_id),
+            payload=payload,
+        )
+
+    return ObservationWritebackResponse(
+        mode="commit",
+        procore_observation=created,
     )
 
 

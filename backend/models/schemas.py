@@ -443,6 +443,20 @@ class ProcoreWritebackRequest(BaseModel):
     mode: Literal["dry_run", "commit"]
 
 
+class ObservationWritebackRequest(BaseModel):
+    """Body for POST Procore observation writeback (Finding → Procore Observation)."""
+    finding_id: int
+    mode: Literal["dry_run", "commit"]
+
+
+class ObservationWritebackResponse(BaseModel):
+    """Response for observation writeback. mode indicates what was done."""
+    mode: str  # "dry_run" | "commit"
+    contract: Optional[dict] = None  # dry_run: normalized contract
+    payload: Optional[dict] = None  # dry_run: Procore payload that would be sent
+    procore_observation: Optional[dict] = None  # commit: created observation from Procore
+
+
 class ProcoreWritebackResponse(BaseModel):
     """Response for Procore writeback. mode indicates what was done."""
     mode: str  # "dry_run" | "commit"

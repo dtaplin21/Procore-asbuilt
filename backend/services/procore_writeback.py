@@ -3,6 +3,8 @@ Procore writeback service.
 
 Builds inspection payloads from inspection runs and pushes to Procore.
 Supports dry_run (return payload only) and commit (call Procore API).
+
+Observation writeback: Finding → Procore POST /observations.
 """
 from __future__ import annotations
 
@@ -13,8 +15,108 @@ from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
 
 from services.procore_writeback_contract import build_writeback_contract
+from services.storage import StorageService
 
 logger = logging.getLogger(__name__)
+
+
+def gather_observation_raw_records(
+    db: Session,
+    project_id: int,
+    finding_id: int,
+) -> Dict[str, Any]:
+    """
+    Load raw records needed for observation writeback (Finding → Procore Observation).
+
+    Returns a dict with keys:
+        - finding: Finding (validated)
+        - project: Project (validated)
+
+    Raises ValueError if:
+        - finding does not exist
+        - finding does not belong to project
+        - project does not exist
+    """
+    storage = StorageService(db)
+    project = storage.get_project(project_id)
+    if project is None:
+        raise ValueError("Project not found")
+
+    finding = storage.get_finding(finding_id, project_id=project_id)
+    if finding is None:
+        raise ValueError("Finding not found or does not belong to project")
+
+    return {
+        "finding": finding,
+        "project": project,
+    }
+
+
+def build_observation_writeback_contract(
+    db: Session,
+    project_id: int,
+    finding_id: int,
+) -> Dict[str, Any]:
+    """
+    Build the normalized observation writeback contract from raw records.
+
+    This is the app's source-of-truth shape before Procore translation.
+    Use gather_observation_raw_records + this to produce a stable contract.
+    """
+    raw = gather_observation_raw_records(db, project_id, finding_id)
+    finding = raw["finding"]
+    project = raw["project"]
+
+    affected_items = getattr(finding, "affected_items", None)
+    if affected_items is None or not isinstance(affected_items, list):
+        affected_items = []
+
+    procore_project_id = str(getattr(project, "procore_project_id", "") or "")
+
+    return {
+        "project_id": int(getattr(project, "id", 0)),
+        "procore_project_id": procore_project_id,
+        "finding_id": int(getattr(finding, "id", 0)),
+        "title": str(getattr(finding, "title", "") or ""),
+        "description": str(getattr(finding, "description", "") or ""),
+        "severity": str(getattr(finding, "severity", "") or "medium"),
+        "type": str(getattr(finding, "type", "") or "deviation"),
+        "affected_items": affected_items,
+    }
+
+
+def translate_contract_to_procore_observation_payload(contract: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert the observation writeback contract into the payload Procore create_observation expects.
+
+    Keeps Procore field naming isolated here; DB/business logic stays in our contract shape.
+    Procore Observations API uses: name, description, observation_type, priority, etc.
+    """
+    title = str(contract.get("title", "") or "").strip() or "Observation"
+    description = str(contract.get("description", "") or "")
+    severity = str(contract.get("severity", "") or "medium").strip().lower()
+    obs_type = str(contract.get("type", "") or "deviation").strip().lower()
+    affected_items = contract.get("affected_items") or []
+
+    # Build description with affected items if any
+    if affected_items:
+        items_str = ", ".join(
+            str(item) if not isinstance(item, dict) else str(item.get("label", item))
+            for item in affected_items[:20]  # cap for readability
+        )
+        if items_str:
+            description = f"{description}\n\nAffected items: {items_str}".strip()
+
+    # Procore observation payload shape (name, description, observation_type, priority)
+    payload: Dict[str, Any] = {
+        "name": title,
+        "description": description or "(No description)",
+        "observation_type": obs_type,
+        "priority": severity,
+    }
+
+    return payload
+
 
 # Optional mapping: our inspection_type -> Procore inspection_type_id (if required).
 # Set via env or config; if unset, we pass inspection_type as string.
