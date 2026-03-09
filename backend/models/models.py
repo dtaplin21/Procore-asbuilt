@@ -564,3 +564,46 @@ class EvidenceRecord(Base):
     # Relationships
     project = relationship("Project", back_populates="evidence_records")
     inspection_runs = relationship("InspectionRun", back_populates="evidence")
+
+
+class IdempotencyKey(Base):
+    __tablename__ = "idempotency_keys"
+    __table_args__ = (
+        UniqueConstraint("scope", "idempotency_key", name="uq_idempotency_scope_key"),
+        Index("ix_idempotency_keys_scope_status", "scope", "status"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    scope = Column(String, nullable=False)
+    idempotency_key = Column(String, nullable=False)
+    request_hash = Column(String, nullable=False)
+    status = Column(String, nullable=False, server_default="in_progress")
+    response_payload = Column(JSON, nullable=True)
+    resource_reference = Column(JSON, nullable=True)
+    locked_until = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class ProcoreWriteback(Base):
+    __tablename__ = "procore_writebacks"
+    __table_args__ = (
+        Index("ix_procore_writebacks_project_created", "project_id", "created_at"),
+        Index("ix_procore_writebacks_run", "inspection_run_id"),
+        Index("ix_procore_writebacks_finding", "finding_id"),
+        Index("ix_procore_writebacks_type_status", "writeback_type", "status"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    inspection_run_id = Column(Integer, ForeignKey("inspection_runs.id", ondelete="SET NULL"), nullable=True)
+    finding_id = Column(Integer, ForeignKey("findings.id", ondelete="SET NULL"), nullable=True)
+    writeback_type = Column(String, nullable=False)
+    mode = Column(String, nullable=False)
+    status = Column(String, nullable=False, server_default="queued")
+    payload = Column(JSON, nullable=True)
+    procore_response = Column(JSON, nullable=True)
+    resource_reference = Column(JSON, nullable=True)
+    idempotency_key = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())

@@ -25,6 +25,7 @@ from models.models import (
     InspectionRun,
     InspectionResult,
     DrawingOverlay,
+    ProcoreWriteback,
 )
 from services.procore_connection_store import get_active_connection
 
@@ -928,6 +929,52 @@ class StorageService:
             raise
         self.db.refresh(log)
         return log
+
+    def create_procore_writeback(
+        self,
+        *,
+        project_id: int,
+        writeback_type: str,
+        mode: str,
+        idempotency_key: str,
+        inspection_run_id: Optional[int] = None,
+        finding_id: Optional[int] = None,
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> ProcoreWriteback:
+        row = ProcoreWriteback(
+            project_id=project_id,
+            inspection_run_id=inspection_run_id,
+            finding_id=finding_id,
+            writeback_type=writeback_type,
+            mode=mode,
+            status="in_progress",
+            payload=payload,
+            idempotency_key=idempotency_key,
+        )
+        self.db.add(row)
+        self.db.commit()
+        self.db.refresh(row)
+        return row
+
+    def update_procore_writeback(
+        self,
+        writeback_id: int,
+        *,
+        status: str,
+        procore_response: Optional[Dict[str, Any]] = None,
+        resource_reference: Optional[Dict[str, Any]] = None,
+    ) -> Optional[ProcoreWriteback]:
+        row = self.db.query(ProcoreWriteback).filter(ProcoreWriteback.id == writeback_id).first()
+        if row is None:
+            return None
+        row.status = status  # type: ignore[assignment]
+        if procore_response is not None:
+            row.procore_response = procore_response  # type: ignore[assignment]
+        if resource_reference is not None:
+            row.resource_reference = resource_reference  # type: ignore[assignment]
+        self.db.commit()
+        self.db.refresh(row)
+        return row
 
     def get_dashboard_stats(self) -> Dict[str, Any]:
         return {

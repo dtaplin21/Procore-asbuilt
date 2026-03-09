@@ -2,7 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional, cast
-from api.dependencies import get_db
+
+from api.dependencies import get_db, get_idempotency_key
+from services.idempotency import (
+    begin_idempotent_operation,
+    finish_idempotent_operation,
+    fail_idempotent_operation,
+)
 from services.storage import StorageService
 from models.schemas import (
     ProjectResponse,
@@ -179,6 +185,7 @@ async def procore_observation_writeback(
     project_id: int,
     body: ObservationWritebackRequest,
     user_id: str = Query(..., description="Procore user ID for auth"),
+    idempotency_key: str = Depends(get_idempotency_key),
     db: Session = Depends(get_db),
 ) -> ObservationWritebackResponse:
     """
@@ -187,6 +194,36 @@ async def procore_observation_writeback(
     - **dry_run**: Returns contract + payload (no API call).
     - **commit**: Calls Procore create_observation and returns the created observation.
     """
+    request_fingerprint = {
+        "project_id": project_id,
+        "finding_id": body.finding_id,
+        "mode": body.mode,
+        "writeback_type": "observation",
+    }
+    scope = f"procore:observation:{project_id}:{body.finding_id}:{body.mode}"
+
+    try:
+        idem_row, should_execute = begin_idempotent_operation(
+            db,
+            scope=scope,
+            idempotency_key=idempotency_key,
+            request_payload=request_fingerprint,
+            ttl_minutes=60,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not should_execute:
+        row_status = getattr(idem_row, "status", None)
+        cached_resp = dict(getattr(idem_row, "response_payload", None) or {})
+        cached_resp.setdefault("mode", body.mode)
+        if row_status == "completed":
+            return ObservationWritebackResponse(**cached_resp)
+        if row_status == "in_progress":
+            raise HTTPException(status_code=409, detail="Request already in progress")
+        if row_status == "failed":
+            return ObservationWritebackResponse(**cached_resp)
+
     if body.mode not in ("dry_run", "commit"):
         raise HTTPException(
             status_code=400,
@@ -198,14 +235,20 @@ async def procore_observation_writeback(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    payload = translate_contract_to_procore_observation_payload(contract)
+    translated_payload = translate_contract_to_procore_observation_payload(contract)
 
     if body.mode == "dry_run":
-        return ObservationWritebackResponse(
+        dry_run_response = ObservationWritebackResponse(
             mode="dry_run",
             contract=contract,
-            payload=payload,
+            payload=translated_payload,
         )
+        finish_idempotent_operation(
+            db,
+            row_id=cast(int, idem_row.id),
+            response_payload=dry_run_response.model_dump(exclude_none=False),
+        )
+        return dry_run_response
 
     if get_active_connection(db, user_id) is None:
         raise ProcoreNotConnected(details={"user_id": user_id})
@@ -217,16 +260,57 @@ async def procore_observation_writeback(
             detail="Project has no procore_project_id; sync project from Procore first",
         )
 
-    async with ProcoreAPIClient(db, user_id) as client:
-        created = await client.create_observation(
-            project_id=str(procore_project_id),
-            payload=payload,
-        )
-
-    return ObservationWritebackResponse(
-        mode="commit",
-        procore_observation=created,
+    storage = StorageService(db)
+    wb = storage.create_procore_writeback(
+        project_id=project_id,
+        finding_id=body.finding_id,
+        writeback_type="observation",
+        mode=body.mode,
+        idempotency_key=idempotency_key,
+        payload=translated_payload,
     )
+
+    try:
+        async with ProcoreAPIClient(db, user_id) as client:
+            procore_response = await client.create_observation(
+                project_id=str(procore_project_id),
+                payload=translated_payload,
+            )
+
+        response_payload = {
+            "mode": body.mode,
+            "payload": translated_payload,
+            "procore_observation": procore_response,
+        }
+        storage.update_procore_writeback(
+            cast(int, wb.id),
+            status="completed",
+            procore_response=procore_response,
+            resource_reference={"procore_observation_id": procore_response.get("id")},
+        )
+        finish_idempotent_operation(
+            db,
+            row_id=cast(int, idem_row.id),
+            response_payload=response_payload,
+            resource_reference={
+                "writeback_id": cast(int, wb.id),
+                "procore_observation_id": procore_response.get("id"),
+            },
+        )
+        return ObservationWritebackResponse(**response_payload)
+    except Exception as exc:
+        error_payload = {"mode": "commit", "procore_observation": {"error": str(exc)}}
+        storage.update_procore_writeback(
+            cast(int, wb.id),
+            status="failed",
+            procore_response={"error": str(exc)},
+        )
+        fail_idempotent_operation(
+            db,
+            row_id=cast(int, idem_row.id),
+            response_payload=error_payload,
+        )
+        raise
 
 
 @router.post(
