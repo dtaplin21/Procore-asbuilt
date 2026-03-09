@@ -9,8 +9,6 @@ from models.schemas import (
     ProjectListResponse,
     DashboardSummaryResponse,
     DrawingResponse,
-    ProcoreWritebackRequest,
-    ProcoreWritebackResponse,
     InspectionItemWritebackRequest,
     InspectionItemWritebackResponse,
     ObservationWritebackRequest,
@@ -22,7 +20,6 @@ from models.models import Drawing, InspectionRun, Project
 from services.file_storage import save_upload, get_file_path
 from services.procore_writeback_contract import build_writeback_contract
 from services.procore_writeback import (
-    translate_contract_to_procore_payload,
     build_observation_writeback_contract,
     translate_contract_to_procore_observation_payload,
     build_punch_item_writeback_contract,
@@ -33,20 +30,6 @@ from services.procore_writeback import (
 from services.procore_client import ProcoreAPIClient
 from services.procore_connection_store import get_active_connection
 from errors import ProcoreNotConnected
-from datetime import datetime
-
-
-def _extract_procore_inspection_id(created: dict) -> Optional[str]:
-    """Extract Procore inspection ID from create_inspection response for persistence."""
-    if not created or not isinstance(created, dict):
-        return None
-    pid = created.get("id")
-    if pid is not None:
-        return str(pid)
-    inner = created.get("inspection_log") or created.get("inspection")
-    if isinstance(inner, dict) and inner.get("id") is not None:
-        return str(inner["id"])
-    return None
 
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -106,93 +89,6 @@ async def get_project_dashboard_summary(
         raise HTTPException(status_code=404, detail="Project not found")
 
     return summary
-
-
-@router.post(
-    "/{project_id}/procore/writeback",
-    response_model=ProcoreWritebackResponse,
-)
-async def procore_writeback(
-    project_id: int,
-    body: ProcoreWritebackRequest,
-    user_id: str = Query(..., description="Procore user ID for auth"),
-    db: Session = Depends(get_db),
-) -> ProcoreWritebackResponse:
-    """
-    Write inspection run to Procore.
-
-    - **dry_run**: Returns the payload that would be sent (no API call).
-    - **commit**: Calls Procore create_inspection and returns the created inspection.
-
-    Uses Project.procore_project_id for the Procore API.
-    """
-    if body.mode not in ("dry_run", "commit"):
-        raise HTTPException(
-            status_code=400,
-            detail="mode must be 'dry_run' or 'commit'",
-        )
-
-    # 1. Load the internal contract
-    try:
-        contract = build_writeback_contract(db, project_id, body.inspection_run_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    # 2. Translate to Procore format
-    procore_payload = translate_contract_to_procore_payload(contract)
-
-    # 3. Dry-run: return header payload + item contract + translated item payloads (no API call)
-    if body.mode == "dry_run":
-        items_contract = build_inspection_item_contract(db, project_id, body.inspection_run_id)
-        item_payloads = [
-            translate_contract_to_procore_inspection_item_payload(item)
-            for item in items_contract
-        ]
-        return ProcoreWritebackResponse(
-            mode="dry_run",
-            payload=procore_payload,
-            inspection_items_contract=items_contract,
-            inspection_item_payloads=item_payloads,
-        )
-
-    # 4. Commit: require Procore connection and push to Procore
-    if get_active_connection(db, user_id) is None:
-        raise ProcoreNotConnected(details={"user_id": user_id})
-
-    procore_project_id = contract.get("project", {}).get("procore_project_id", "")
-    if not procore_project_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Project has no procore_project_id; sync project from Procore first",
-        )
-
-    async with ProcoreAPIClient(db, user_id) as client:
-        created = await client.create_inspection(
-            project_id=str(procore_project_id),
-            inspection_data=procore_payload,
-        )
-
-        procore_id = _extract_procore_inspection_id(created)
-        if procore_id:
-            db.query(InspectionRun).filter(
-                InspectionRun.project_id == project_id,
-                InspectionRun.id == body.inspection_run_id,
-            ).update({"procore_inspection_id": procore_id})
-            db.commit()
-
-            items = build_inspection_item_contract(db, project_id, body.inspection_run_id)
-            for item in items:
-                item_payload = translate_contract_to_procore_inspection_item_payload(item)
-                await client.create_inspection_item(
-                    project_id=str(procore_project_id),
-                    inspection_id=procore_id,
-                    payload=item_payload,
-                )
-
-    return ProcoreWritebackResponse(
-        mode="commit",
-        procore_inspection=created,
-    )
 
 
 @router.post(

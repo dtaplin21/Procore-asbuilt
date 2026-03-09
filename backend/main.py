@@ -18,6 +18,7 @@ from api.routes import (
     insights,
     procore,
     procore_auth,
+    procore_writeback,
     drawings,
     evidence,
     drawing_alignment,
@@ -156,6 +157,7 @@ app.include_router(objects.router)
 app.include_router(insights.router)
 app.include_router(procore.router)
 app.include_router(procore_auth.router)
+app.include_router(procore_writeback.router)
 app.include_router(drawings.router)
 app.include_router(evidence.router)
 app.include_router(drawing_alignment.router)
