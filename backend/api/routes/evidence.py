@@ -4,11 +4,12 @@ import json
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Depends
 from sqlalchemy.orm import Session
 
-from api.dependencies import get_db
+from api.dependencies import get_db, get_idempotency_key
 from models.models import EvidenceRecord, Project
 from models.schemas import EvidenceRecordResponse, EvidenceListResponse
 from services.storage import StorageService
-from services.file_storage import save_upload, get_file_path
+from services.file_storage import get_file_path, read_and_validate_upload, save_upload_from_bytes, sha256_bytes
+from services.idempotency import begin_idempotent_operation, finish_idempotent_operation
 from fastapi.responses import FileResponse
 
 router = APIRouter(tags=["evidence"])
@@ -24,6 +25,7 @@ async def upload_evidence(
     trade: Optional[str] = Form(None),
     spec_section: Optional[str] = Form(None),
     meta: Optional[str] = Form(None),
+    idempotency_key: str = Depends(get_idempotency_key),
     db: Session = Depends(get_db),
 ):
     """Upload evidence record (photo, video, document, spec, etc.) for a project.
@@ -41,7 +43,6 @@ async def upload_evidence(
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
 
-    # Validate type is one of the allowed values
     type_lower = type.strip().lower() if type else None
     if type_lower not in ("spec", "inspection_doc"):
         raise HTTPException(
@@ -49,17 +50,45 @@ async def upload_evidence(
             detail="type must be 'spec' or 'inspection_doc'",
         )
 
-    # Verify project exists
+    file_bytes, content_type, original_name = read_and_validate_upload(file, category="evidence")
+    checksum = sha256_bytes(file_bytes)
+
+    request_fingerprint = {
+        "project_id": project_id,
+        "checksum": checksum,
+        "type": type_lower,
+    }
+    scope = f"evidence_upload:{project_id}:{checksum}:{type_lower}"
+
+    try:
+        idem_row, should_execute = begin_idempotent_operation(
+            db,
+            scope=scope,
+            idempotency_key=idempotency_key,
+            request_payload=request_fingerprint,
+            ttl_minutes=60,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not should_execute:
+        row_status = getattr(idem_row, "status", None)
+        cached_resp = dict(getattr(idem_row, "response_payload", None) or {})
+        if row_status == "completed" and cached_resp:
+            return EvidenceRecordResponse(**cached_resp)
+        if row_status == "in_progress":
+            raise HTTPException(status_code=409, detail="Request already in progress")
+        if row_status == "failed" and cached_resp:
+            return EvidenceRecordResponse(**cached_resp)
+
     proj = db.query(Project).filter(Project.id == project_id).first()
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Persist file via helper (validates size/type and writes to disk)
-    storage_key, content_type, original_name = save_upload(
-        file, project_id, category="evidence"
+    storage_key = save_upload_from_bytes(
+        file_bytes, project_id, category="evidence", content_type=content_type, original_name=original_name
     )
 
-    # Parse meta JSON if provided
     parsed_meta: Optional[dict] = None
     if meta:
         try:
@@ -67,10 +96,8 @@ async def upload_evidence(
         except json.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Invalid meta JSON")
 
-    # Use provided title or fall back to filename
     evidence_title = title if title else original_name
 
-    # Create evidence record via service layer
     service = StorageService(db)
     evidence = service.create_evidence_record(
         project_id=project_id,
@@ -84,12 +111,19 @@ async def upload_evidence(
         meta=parsed_meta,
     )
 
-    # Set file_url to point to the /file route
-    evidence.file_url = f"/api/projects/{project_id}/evidence/{evidence.id}/file"
+    evidence.file_url = f"/api/projects/{project_id}/evidence/{cast(int, evidence.id)}/file"
     db.commit()
     db.refresh(evidence)
 
-    return evidence
+    response_data = EvidenceRecordResponse.model_validate(evidence).model_dump(mode="json")
+    response_data["file_url"] = f"/api/projects/{project_id}/evidence/{cast(int, evidence.id)}/file"
+    finish_idempotent_operation(
+        db,
+        row_id=cast(int, idem_row.id),
+        response_payload=response_data,
+        resource_reference={"evidence_id": cast(int, evidence.id)},
+    )
+    return EvidenceRecordResponse(**response_data)
 
 
 @router.get("/api/projects/{project_id}/evidence", response_model=EvidenceListResponse)

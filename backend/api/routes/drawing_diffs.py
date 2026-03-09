@@ -5,12 +5,17 @@ Diff analysis results between master and sub drawings.
 """
 import logging
 import time
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from api.dependencies import get_db
+from api.dependencies import get_db, get_idempotency_key
+from services.idempotency import (
+    begin_idempotent_operation,
+    finish_idempotent_operation,
+    fail_idempotent_operation,
+)
 from errors import DrawingDiffPipelineError
 from models.schemas import DrawingDiffListResponse, DrawingDiffResponse, RunDrawingDiffRequest
 from ai.pipelines import run_drawing_diff
@@ -73,6 +78,7 @@ def run_diffs_for_alignment(
     project_id: int,
     master_drawing_id: int,
     body: RunDrawingDiffRequest,
+    idempotency_key: str = Depends(get_idempotency_key),
     user_id: Optional[int] = Query(None, description="Optional: for UsageLog telemetry"),
     company_id: Optional[int] = Query(None, description="Optional: for UsageLog telemetry"),
     db: Session = Depends(get_db),
@@ -82,6 +88,36 @@ def run_diffs_for_alignment(
     Validates alignment exists, project ownership, and master drawing match.
     Logs diff runs for monitoring. Optionally creates UsageLog when user_id provided.
     """
+    alignment_id = body.alignment_id
+    request_fingerprint = {
+        "project_id": project_id,
+        "alignment_id": alignment_id,
+        "strategy": body.strategy,
+    }
+    scope = f"drawing_diff:{project_id}:{alignment_id}:{body.strategy}"
+
+    try:
+        idem_row, should_execute = begin_idempotent_operation(
+            db,
+            scope=scope,
+            idempotency_key=idempotency_key,
+            request_payload=request_fingerprint,
+            ttl_minutes=60,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not should_execute:
+        row_status = getattr(idem_row, "status", None)
+        cached_resp = getattr(idem_row, "response_payload", None)
+        if row_status == "completed" and cached_resp and isinstance(cached_resp, list):
+            return [DrawingDiffResponse.model_validate(d) for d in cached_resp]
+        if row_status == "in_progress":
+            raise HTTPException(status_code=409, detail="Request already in progress")
+        if row_status == "failed":
+            err_msg = cached_resp.get("error", "pipeline failure") if isinstance(cached_resp, dict) else "pipeline failure"
+            raise HTTPException(status_code=500, detail=err_msg)
+
     storage = StorageService(db)
     _ensure_master_drawing_in_project(storage, project_id, master_drawing_id)
 
@@ -144,7 +180,14 @@ def run_diffs_for_alignment(
                     extra={"user_id": user_id, "error": str(e)},
                 )
 
-        return [DrawingDiffResponse.model_validate(d) for d in diffs]
+        result = [DrawingDiffResponse.model_validate(d) for d in diffs]
+        finish_idempotent_operation(
+            db,
+            row_id=cast(int, idem_row.id),
+            response_payload=[r.model_dump(mode="json") for r in result],
+            resource_reference={"alignment_id": alignment_id, "diff_count": len(result)},
+        )
+        return result
     except DrawingDiffPipelineError as e:
         duration_ms = (time.perf_counter() - start) * 1000
         logger.warning(
@@ -156,6 +199,11 @@ def run_diffs_for_alignment(
                 "duration_ms": round(duration_ms, 2),
                 "error": str(e),
             },
+        )
+        fail_idempotent_operation(
+            db,
+            row_id=cast(int, idem_row.id),
+            response_payload={"error": str(e)},
         )
         raise HTTPException(status_code=500, detail="pipeline failure")
 

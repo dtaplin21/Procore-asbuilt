@@ -8,7 +8,8 @@ from typing import List, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from api.dependencies import get_db
+from api.dependencies import get_db, get_idempotency_key
+from services.idempotency import begin_idempotent_operation, finish_idempotent_operation
 from models.schemas import (
     DrawingRegionCreate,
     DrawingRegionResponse,
@@ -49,12 +50,42 @@ def create_drawing_region(
     project_id: int,
     master_drawing_id: int,
     body: DrawingRegionCreate,
+    idempotency_key: str = Depends(get_idempotency_key),
     db: Session = Depends(get_db),
 ) -> DrawingRegionResponse:
     """
     Create a user-defined region on a master drawing.
     Validates that master_drawing belongs to project.
     """
+    request_fingerprint = {
+        "project_id": project_id,
+        "master_drawing_id": master_drawing_id,
+        "label": body.label,
+        "page": body.page,
+    }
+    scope = f"drawing_region:{master_drawing_id}:{body.label}:{body.page}"
+
+    try:
+        idem_row, should_execute = begin_idempotent_operation(
+            db,
+            scope=scope,
+            idempotency_key=idempotency_key,
+            request_payload=request_fingerprint,
+            ttl_minutes=60,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not should_execute:
+        row_status = getattr(idem_row, "status", None)
+        cached_resp = dict(getattr(idem_row, "response_payload", None) or {})
+        if row_status == "completed" and cached_resp:
+            return DrawingRegionResponse(**cached_resp)
+        if row_status == "in_progress":
+            raise HTTPException(status_code=409, detail="Request already in progress")
+        if row_status == "failed" and cached_resp:
+            return DrawingRegionResponse(**cached_resp)
+
     storage = StorageService(db)
     _ensure_master_drawing_in_project(storage, project_id, master_drawing_id)
 
@@ -64,7 +95,14 @@ def create_drawing_region(
         page=body.page,
         geometry=body.geometry,
     )
-    return DrawingRegionResponse.model_validate(region)
+    response = DrawingRegionResponse.model_validate(region)
+    finish_idempotent_operation(
+        db,
+        row_id=cast(int, idem_row.id),
+        response_payload=response.model_dump(mode="json"),
+        resource_reference={"region_id": cast(int, region.id)},
+    )
+    return response
 
 
 @router.get(
@@ -97,12 +135,43 @@ def create_drawing_alignment(
     project_id: int,
     master_drawing_id: int,
     body: DrawingAlignmentCreate,
+    idempotency_key: str = Depends(get_idempotency_key),
     db: Session = Depends(get_db),
 ) -> DrawingAlignmentResponse:
     """
     Create a sub-drawing alignment to a master (and optionally a region).
     Validates master_drawing and sub_drawing belong to project.
     """
+    request_fingerprint = {
+        "project_id": project_id,
+        "master_drawing_id": master_drawing_id,
+        "sub_drawing_id": body.sub_drawing_id,
+        "method": body.method,
+        "region_id": body.region_id,
+    }
+    scope = f"drawing_alignment:{master_drawing_id}:{body.sub_drawing_id}:{body.method}:{body.region_id or 'none'}"
+
+    try:
+        idem_row, should_execute = begin_idempotent_operation(
+            db,
+            scope=scope,
+            idempotency_key=idempotency_key,
+            request_payload=request_fingerprint,
+            ttl_minutes=60,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not should_execute:
+        row_status = getattr(idem_row, "status", None)
+        cached_resp = dict(getattr(idem_row, "response_payload", None) or {})
+        if row_status == "completed" and cached_resp:
+            return DrawingAlignmentResponse(**cached_resp)
+        if row_status == "in_progress":
+            raise HTTPException(status_code=409, detail="Request already in progress")
+        if row_status == "failed" and cached_resp:
+            return DrawingAlignmentResponse(**cached_resp)
+
     storage = StorageService(db)
     _ensure_master_drawing_in_project(storage, project_id, master_drawing_id)
 
@@ -127,7 +196,14 @@ def create_drawing_alignment(
         body.method,
         region_id=body.region_id,
     )
-    return DrawingAlignmentResponse.model_validate(alignment)
+    response = DrawingAlignmentResponse.model_validate(alignment)
+    finish_idempotent_operation(
+        db,
+        row_id=cast(int, idem_row.id),
+        response_payload=response.model_dump(mode="json"),
+        resource_reference={"alignment_id": cast(int, alignment.id)},
+    )
+    return response
 
 
 @router.get(

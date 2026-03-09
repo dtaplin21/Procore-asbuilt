@@ -385,6 +385,7 @@ class StorageService:
         *,
         severity_threshold: str = "high",
         finding_type: str = "deviation",
+        idempotency_key: Optional[str] = None,
     ) -> Optional[Finding]:
         """
         When diff severity exceeds threshold, create a Finding and attach finding_id to diff.
@@ -447,6 +448,7 @@ class StorageService:
         title: str,
         description: str,
         affected_items: Optional[List[str]] = None,
+        idempotency_key: Optional[str] = None,
     ) -> Finding:
         """Create a Finding (used by inspection pipeline, etc.)."""
         finding = Finding(
@@ -537,6 +539,8 @@ class StorageService:
         master_drawing_id: int,
         evidence_id: Optional[int] = None,
         inspection_type: Optional[str] = None,
+        *,
+        idempotency_key: Optional[str] = None,
     ) -> InspectionRun:
         run = InspectionRun(
             project_id=project_id,
@@ -682,6 +686,8 @@ class StorageService:
         run_id: int,
         outcome: str,
         notes: Optional[str] = None,
+        *,
+        idempotency_key: Optional[str] = None,
     ) -> InspectionResult:
         result = InspectionResult(
             inspection_run_id=run_id,
@@ -706,6 +712,7 @@ class StorageService:
         *,
         inspection_run_id: Optional[int] = None,
         diff_id: Optional[int] = None,
+        idempotency_key: Optional[str] = None,
     ) -> DrawingOverlay:
         """Create overlay. Exactly one of inspection_run_id or diff_id must be set (DB constraint)."""
         if (inspection_run_id is None) == (diff_id is None):

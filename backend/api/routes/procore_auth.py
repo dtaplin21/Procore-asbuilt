@@ -5,7 +5,13 @@ Handles OAuth flow and user authentication
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
-from database import get_db
+
+from api.dependencies import get_db, get_idempotency_key
+from services.idempotency import (
+    begin_idempotent_operation,
+    finish_idempotent_operation,
+    fail_idempotent_operation,
+)
 from services.procore_oauth import ProcoreOAuth
 from services.procore_client import ProcoreAPIClient
 from datetime import datetime
@@ -92,18 +98,50 @@ async def procore_oauth_callback(
 @router.post("/oauth/refresh")
 async def refresh_procore_token(
     user_id: str = Query(...),
+    idempotency_key: str = Depends(get_idempotency_key),
     db: Session = Depends(get_db),
 ):
     """Refresh Procore access token for the user's ACTIVE company connection (DB-backed)."""
-    oauth = ProcoreOAuth(db)
+    scope = f"procore_auth:refresh:{user_id}"
+    request_payload = {"user_id": user_id}
 
-    # This refresh loads active connection from DB and persists updated tokens
-    new_payload = await oauth.refresh_token(user_id)
+    try:
+        idem_row, should_execute = begin_idempotent_operation(
+            db,
+            scope=scope,
+            idempotency_key=idempotency_key,
+            request_payload=request_payload,
+            ttl_minutes=60,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-    return {
-        "success": True,
-        "expires_at": new_payload["expires_at"].isoformat(),
-    }
+    if not should_execute:
+        row_status = getattr(idem_row, "status", None)
+        cached_resp = dict(getattr(idem_row, "response_payload", None) or {})
+        if row_status == "completed":
+            return cached_resp
+        if row_status == "in_progress":
+            raise HTTPException(status_code=409, detail="Refresh already in progress")
+        if row_status == "failed":
+            return cached_resp
+
+    try:
+        oauth = ProcoreOAuth(db)
+        new_payload = await oauth.refresh_token(user_id)
+        response = {
+            "success": True,
+            "expires_at": new_payload["expires_at"].isoformat(),
+        }
+        finish_idempotent_operation(db, row_id=int(idem_row.id), response_payload=response)
+        return response
+    except Exception as e:
+        fail_idempotent_operation(
+            db,
+            row_id=int(idem_row.id),
+            response_payload={"success": False, "error": str(e)},
+        )
+        raise
 
 @router.get("/status")
 async def get_procore_status(
@@ -223,21 +261,52 @@ async def get_local_companies(
 async def select_active_company(
     user_id: str = Query(...),
     company_id: int = Query(...),
+    idempotency_key: str = Depends(get_idempotency_key),
     db: Session = Depends(get_db),
 ):
     """
     Switch active Procore company context for this procore_user_id.
     Marks other connections inactive and activates this one.
     """
-    # Require that a connection row exists for this (company_id, user_id)
+    scope = f"procore_auth:company_select:{user_id}:{company_id}"
+    request_payload = {"user_id": user_id, "company_id": company_id}
+
+    try:
+        idem_row, should_execute = begin_idempotent_operation(
+            db,
+            scope=scope,
+            idempotency_key=idempotency_key,
+            request_payload=request_payload,
+            ttl_minutes=60,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not should_execute:
+        row_status = getattr(idem_row, "status", None)
+        cached_resp = dict(getattr(idem_row, "response_payload", None) or {})
+        if row_status == "completed":
+            return cached_resp
+        if row_status == "in_progress":
+            raise HTTPException(status_code=409, detail="Company select already in progress")
+        if row_status == "failed":
+            return cached_resp
+
     conn = get_connection(db, company_id, user_id)
     if not conn:
+        fail_idempotent_operation(
+            db,
+            row_id=int(idem_row.id),
+            response_payload={"success": False, "error": "No Procore connection found for that company/user"},
+        )
         raise HTTPException(status_code=404, detail="No Procore connection found for that company/user")
 
     set_active_company(db, user_id, company_id)
     db.commit()
 
-    return {"success": True, "active_company_id": int(company_id)}
+    response = {"success": True, "active_company_id": int(company_id)}
+    finish_idempotent_operation(db, row_id=int(idem_row.id), response_payload=response)
+    return response
 
 @router.get("/projects")
 async def get_projects(
@@ -290,7 +359,8 @@ async def get_project_team(
 async def disconnect_procore(
     user_id: str = Query(...),
     company_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
+    idempotency_key: str = Depends(get_idempotency_key),
+    db: Session = Depends(get_db),
 ):
     """
     Disconnect Procore.
@@ -298,13 +368,45 @@ async def disconnect_procore(
     If company_id is provided: delete that specific (company_id, user_id) connection.
     If not provided: delete the ACTIVE connection.
     """
+    scope_suffix = company_id if company_id is not None else "active"
+    scope = f"procore_auth:disconnect:{user_id}:{scope_suffix}"
+    request_payload = {"user_id": user_id, "company_id": company_id}
+
+    try:
+        idem_row, should_execute = begin_idempotent_operation(
+            db,
+            scope=scope,
+            idempotency_key=idempotency_key,
+            request_payload=request_payload,
+            ttl_minutes=60,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not should_execute:
+        row_status = getattr(idem_row, "status", None)
+        cached_resp = dict(getattr(idem_row, "response_payload", None) or {})
+        if row_status == "completed":
+            return cached_resp
+        if row_status == "in_progress":
+            raise HTTPException(status_code=409, detail="Disconnect already in progress")
+        if row_status == "failed":
+            return cached_resp
+
     if company_id is None:
         active = get_active_connection(db, user_id)
         if not active:
+            fail_idempotent_operation(
+                db,
+                row_id=int(idem_row.id),
+                response_payload={"success": False, "error": "No Procore connection found"},
+            )
             raise HTTPException(status_code=404, detail="No Procore connection found")
         company_id = cast(int, active.company_id)
 
     delete_connection(db, user_id, company_id)
 
-    return {"success": True, "message": "Disconnected from Procore"}
+    response = {"success": True, "message": "Disconnected from Procore"}
+    finish_idempotent_operation(db, row_id=int(idem_row.id), response_payload=response)
+    return response
 

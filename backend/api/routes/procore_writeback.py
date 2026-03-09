@@ -8,7 +8,15 @@ from sqlalchemy.orm import Session
 from typing import Optional, cast
 
 from api.dependencies import get_db, get_idempotency_key
-from models.schemas import ProcoreWritebackRequest, ProcoreWritebackResponse
+from models.schemas import (
+    InspectionItemWritebackRequest,
+    InspectionItemWritebackResponse,
+    ObservationWritebackRequest,
+    PunchItemWritebackRequest,
+    PunchItemWritebackResponse,
+    ProcoreWritebackRequest,
+    ProcoreWritebackResponse,
+)
 from services.idempotency import (
     begin_idempotent_operation,
     finish_idempotent_operation,
@@ -21,6 +29,10 @@ from services.procore_writeback import (
     translate_contract_to_procore_payload,
     build_inspection_item_contract,
     translate_contract_to_procore_inspection_item_payload,
+    build_observation_writeback_contract,
+    translate_contract_to_procore_observation_payload,
+    build_punch_item_writeback_contract,
+    translate_contract_to_procore_punch_item_payload,
 )
 from services.procore_client import ProcoreAPIClient
 from services.procore_connection_store import get_active_connection
@@ -216,5 +228,437 @@ async def procore_writeback(
     except Exception as exc:
         error_payload = {"mode": "commit", "committed": False, "message": str(exc), "payload": procore_payload, "procore_response": {"error": str(exc)}}
         storage.update_procore_writeback(cast(int, wb.id), status="failed", procore_response={"error": str(exc)})
+        fail_idempotent_operation(db, row_id=cast(int, idem_row.id), response_payload=error_payload)
+        raise
+
+
+@router.post(
+    "/{project_id}/procore/observations/writeback",
+    response_model=ProcoreWritebackResponse,
+)
+async def procore_observation_writeback(
+    project_id: int,
+    body: ObservationWritebackRequest,
+    user_id: str = Query(..., description="Procore user ID for auth"),
+    idempotency_key: str = Depends(get_idempotency_key),
+    db: Session = Depends(get_db),
+) -> ProcoreWritebackResponse:
+    """
+    Write finding to Procore as an observation.
+
+    - **dry_run**: Builds contract, translates to Procore payload, returns payload only. No API call.
+    - **commit**: Calls Procore create_observation, returns payload + Procore response + success status.
+    """
+    if body.mode not in ("dry_run", "commit"):
+        raise HTTPException(
+            status_code=400,
+            detail="mode must be 'dry_run' or 'commit'",
+        )
+
+    request_fingerprint = {
+        "project_id": project_id,
+        "finding_id": body.finding_id,
+        "mode": body.mode,
+        "writeback_type": "observation",
+    }
+    scope = f"procore:observation:{project_id}:{body.finding_id}:{body.mode}"
+
+    try:
+        idem_row, should_execute = begin_idempotent_operation(
+            db,
+            scope=scope,
+            idempotency_key=idempotency_key,
+            request_payload=request_fingerprint,
+            ttl_minutes=60,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not should_execute:
+        row_status = getattr(idem_row, "status", None)
+        cached_resp = dict(getattr(idem_row, "response_payload", None) or {})
+        cached_resp.setdefault("mode", body.mode)
+        if row_status == "completed":
+            return ProcoreWritebackResponse(**cached_resp)
+        if row_status == "in_progress":
+            raise HTTPException(status_code=409, detail="Request already in progress")
+        if row_status == "failed":
+            return ProcoreWritebackResponse(**cached_resp)
+
+    try:
+        contract = build_observation_writeback_contract(db, project_id, body.finding_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    translated_payload = translate_contract_to_procore_observation_payload(contract)
+
+    if body.mode == "dry_run":
+        dry_run_response = ProcoreWritebackResponse(
+            mode="dry_run",
+            payload=translated_payload,
+        )
+        finish_idempotent_operation(
+            db,
+            row_id=cast(int, idem_row.id),
+            response_payload=dry_run_response.model_dump(exclude_none=False),
+        )
+        return dry_run_response
+
+    if get_active_connection(db, user_id) is None:
+        raise ProcoreNotConnected(details={"user_id": user_id})
+
+    procore_project_id = contract.get("procore_project_id", "") or ""
+    if not procore_project_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Project has no procore_project_id; sync project from Procore first",
+        )
+
+    storage = StorageService(db)
+    wb = storage.create_procore_writeback(
+        project_id=project_id,
+        finding_id=body.finding_id,
+        writeback_type="observation",
+        mode=body.mode,
+        idempotency_key=idempotency_key,
+        payload=translated_payload,
+    )
+
+    try:
+        async with ProcoreAPIClient(db, user_id) as client:
+            procore_response = await client.create_observation(
+                project_id=str(procore_project_id),
+                payload=translated_payload,
+            )
+
+        procore_observation_id = procore_response.get("id")
+        response_payload = {
+            "mode": body.mode,
+            "payload": translated_payload,
+            "committed": True,
+            "procore_response": procore_response,
+        }
+        storage.update_procore_writeback(
+            cast(int, wb.id),
+            status="completed",
+            procore_response=procore_response,
+            resource_reference={"procore_observation_id": procore_observation_id},
+        )
+        finish_idempotent_operation(
+            db,
+            row_id=cast(int, idem_row.id),
+            response_payload=response_payload,
+            resource_reference={
+                "writeback_id": cast(int, wb.id),
+                "procore_observation_id": procore_observation_id,
+            },
+        )
+        return ProcoreWritebackResponse(**response_payload)
+    except Exception as exc:
+        error_payload = {"mode": "commit", "committed": False, "message": str(exc), "payload": translated_payload, "procore_response": {"error": str(exc)}}
+        storage.update_procore_writeback(
+            cast(int, wb.id),
+            status="failed",
+            procore_response={"error": str(exc)},
+        )
+        fail_idempotent_operation(db, row_id=cast(int, idem_row.id), response_payload=error_payload)
+        raise
+
+
+@router.post(
+    "/{project_id}/procore/punch_items/writeback",
+    response_model=PunchItemWritebackResponse,
+)
+async def procore_punch_item_writeback(
+    project_id: int,
+    body: PunchItemWritebackRequest,
+    user_id: str = Query(..., description="Procore user ID for auth"),
+    idempotency_key: str = Depends(get_idempotency_key),
+    db: Session = Depends(get_db),
+) -> PunchItemWritebackResponse:
+    """
+    Write finding to Procore as a punch item.
+
+    - **dry_run**: Builds contract, translates to Procore payload, returns payload only. No API call.
+    - **commit**: Calls Procore create_punch_item, returns created punch item.
+    """
+    if body.mode not in ("dry_run", "commit"):
+        raise HTTPException(
+            status_code=400,
+            detail="mode must be 'dry_run' or 'commit'",
+        )
+
+    request_fingerprint = {
+        "project_id": project_id,
+        "finding_id": body.finding_id,
+        "mode": body.mode,
+        "writeback_type": "punch_item",
+    }
+    scope = f"procore:punch_item:{project_id}:{body.finding_id}:{body.mode}"
+
+    try:
+        idem_row, should_execute = begin_idempotent_operation(
+            db,
+            scope=scope,
+            idempotency_key=idempotency_key,
+            request_payload=request_fingerprint,
+            ttl_minutes=60,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not should_execute:
+        row_status = getattr(idem_row, "status", None)
+        cached_resp = dict(getattr(idem_row, "response_payload", None) or {})
+        cached_resp.setdefault("mode", body.mode)
+        if row_status == "completed":
+            return PunchItemWritebackResponse(**cached_resp)
+        if row_status == "in_progress":
+            raise HTTPException(status_code=409, detail="Request already in progress")
+        if row_status == "failed":
+            return PunchItemWritebackResponse(**cached_resp)
+
+    try:
+        contract = build_punch_item_writeback_contract(db, project_id, body.finding_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    translated_payload = translate_contract_to_procore_punch_item_payload(contract)
+
+    if body.mode == "dry_run":
+        dry_run_response = PunchItemWritebackResponse(
+            mode="dry_run",
+            contract=contract,
+            payload=translated_payload,
+        )
+        finish_idempotent_operation(
+            db,
+            row_id=cast(int, idem_row.id),
+            response_payload=dry_run_response.model_dump(exclude_none=False),
+        )
+        return dry_run_response
+
+    if get_active_connection(db, user_id) is None:
+        raise ProcoreNotConnected(details={"user_id": user_id})
+
+    procore_project_id = contract.get("procore_project_id", "") or ""
+    if not procore_project_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Project has no procore_project_id; sync project from Procore first",
+        )
+
+    storage = StorageService(db)
+    wb = storage.create_procore_writeback(
+        project_id=project_id,
+        finding_id=body.finding_id,
+        writeback_type="punch_item",
+        mode=body.mode,
+        idempotency_key=idempotency_key,
+        payload=translated_payload,
+    )
+
+    try:
+        async with ProcoreAPIClient(db, user_id) as client:
+            procore_response = await client.create_punch_item(
+                project_id=str(procore_project_id),
+                payload=translated_payload,
+            )
+
+        procore_punch_item_id = procore_response.get("id") if isinstance(procore_response, dict) else None
+        response_payload = {
+            "mode": body.mode,
+            "contract": contract,
+            "payload": translated_payload,
+            "procore_punch_item": procore_response,
+        }
+        storage.update_procore_writeback(
+            cast(int, wb.id),
+            status="completed",
+            procore_response=procore_response,
+            resource_reference={"procore_punch_item_id": procore_punch_item_id},
+        )
+        finish_idempotent_operation(
+            db,
+            row_id=cast(int, idem_row.id),
+            response_payload=response_payload,
+            resource_reference={
+                "writeback_id": cast(int, wb.id),
+                "procore_punch_item_id": procore_punch_item_id,
+            },
+        )
+        return PunchItemWritebackResponse(**response_payload)
+    except Exception as exc:
+        error_payload = {"mode": "commit", "contract": contract, "payload": translated_payload, "procore_punch_item": {"error": str(exc)}}
+        storage.update_procore_writeback(
+            cast(int, wb.id),
+            status="failed",
+            procore_response={"error": str(exc)},
+        )
+        fail_idempotent_operation(db, row_id=cast(int, idem_row.id), response_payload=error_payload)
+        raise
+
+
+@router.post(
+    "/{project_id}/procore/inspection_items/writeback",
+    response_model=InspectionItemWritebackResponse,
+)
+async def procore_inspection_items_writeback(
+    project_id: int,
+    body: InspectionItemWritebackRequest,
+    user_id: str = Query(..., description="Procore user ID for auth"),
+    idempotency_key: str = Depends(get_idempotency_key),
+    db: Session = Depends(get_db),
+) -> InspectionItemWritebackResponse:
+    """
+    Write inspection items to Procore (second phase; inspection header must already exist).
+
+    Requires inspection_run to have procore_inspection_id set (from prior writeback commit).
+    - **dry_run**: Returns item contract + translated payloads (no API call).
+    - **commit**: Calls create_inspection_item for each item.
+    """
+    if body.mode not in ("dry_run", "commit"):
+        raise HTTPException(
+            status_code=400,
+            detail="mode must be 'dry_run' or 'commit'",
+        )
+
+    request_fingerprint = {
+        "project_id": project_id,
+        "inspection_run_id": body.inspection_run_id,
+        "mode": body.mode,
+        "writeback_type": "inspection_item",
+    }
+    scope = f"procore:inspection_item:{project_id}:{body.inspection_run_id}:{body.mode}"
+
+    try:
+        idem_row, should_execute = begin_idempotent_operation(
+            db,
+            scope=scope,
+            idempotency_key=idempotency_key,
+            request_payload=request_fingerprint,
+            ttl_minutes=60,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not should_execute:
+        row_status = getattr(idem_row, "status", None)
+        cached_resp = dict(getattr(idem_row, "response_payload", None) or {})
+        cached_resp.setdefault("mode", body.mode)
+        if row_status == "completed":
+            return InspectionItemWritebackResponse(**cached_resp)
+        if row_status == "in_progress":
+            raise HTTPException(status_code=409, detail="Request already in progress")
+        if row_status == "failed":
+            return InspectionItemWritebackResponse(**cached_resp)
+
+    try:
+        contract = build_writeback_contract(db, project_id, body.inspection_run_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    procore_project_id = contract.get("project", {}).get("procore_project_id", "") or ""
+    if not procore_project_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Project has no procore_project_id; sync project from Procore first",
+        )
+
+    items_contract = build_inspection_item_contract(db, project_id, body.inspection_run_id)
+    item_payloads = [
+        translate_contract_to_procore_inspection_item_payload(item)
+        for item in items_contract
+    ]
+
+    if body.mode == "dry_run":
+        dry_run_response = InspectionItemWritebackResponse(
+            mode="dry_run",
+            inspection_items_contract=items_contract,
+            inspection_item_payloads=item_payloads,
+        )
+        finish_idempotent_operation(
+            db,
+            row_id=cast(int, idem_row.id),
+            response_payload=dry_run_response.model_dump(exclude_none=False),
+        )
+        return dry_run_response
+
+    run = (
+        db.query(InspectionRun)
+        .filter(
+            InspectionRun.project_id == project_id,
+            InspectionRun.id == body.inspection_run_id,
+        )
+        .first()
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Inspection run not found")
+    procore_inspection_id = getattr(run, "procore_inspection_id", None)
+    if not procore_inspection_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Inspection run has no procore_inspection_id; run header writeback (commit) first",
+        )
+
+    if get_active_connection(db, user_id) is None:
+        raise ProcoreNotConnected(details={"user_id": user_id})
+
+    storage = StorageService(db)
+    wb = storage.create_procore_writeback(
+        project_id=project_id,
+        inspection_run_id=body.inspection_run_id,
+        writeback_type="inspection_item",
+        mode=body.mode,
+        idempotency_key=idempotency_key,
+        payload={"item_count": len(item_payloads), "items": item_payloads},
+    )
+
+    try:
+        created_items: list = []
+        async with ProcoreAPIClient(db, user_id) as client:
+            for item_payload in item_payloads:
+                created = await client.create_inspection_item(
+                    project_id=str(procore_project_id),
+                    inspection_id=str(procore_inspection_id),
+                    payload=item_payload,
+                )
+                created_items.append(created)
+
+        procore_inspection_item_ids = [c.get("id") for c in created_items if isinstance(c, dict) and c.get("id") is not None]
+        response_payload = {
+            "mode": body.mode,
+            "inspection_items_contract": items_contract,
+            "inspection_item_payloads": item_payloads,
+            "procore_inspection_items": created_items,
+        }
+        storage.update_procore_writeback(
+            cast(int, wb.id),
+            status="completed",
+            procore_response={"items": created_items},
+            resource_reference={"procore_inspection_item_ids": procore_inspection_item_ids},
+        )
+        finish_idempotent_operation(
+            db,
+            row_id=cast(int, idem_row.id),
+            response_payload=response_payload,
+            resource_reference={
+                "writeback_id": cast(int, wb.id),
+                "procore_inspection_item_ids": procore_inspection_item_ids,
+            },
+        )
+        return InspectionItemWritebackResponse(**response_payload)
+    except Exception as exc:
+        error_payload = {
+            "mode": "commit",
+            "inspection_items_contract": items_contract,
+            "inspection_item_payloads": item_payloads,
+            "procore_inspection_items": [{"error": str(exc)}],
+        }
+        storage.update_procore_writeback(
+            cast(int, wb.id),
+            status="failed",
+            procore_response={"error": str(exc)},
+        )
         fail_idempotent_operation(db, row_id=cast(int, idem_row.id), response_payload=error_payload)
         raise

@@ -357,6 +357,7 @@ class DrawingDiffCreate(BaseModel):
 class RunDrawingDiffRequest(BaseModel):
     """Body for POST run drawing diff pipeline."""
     alignment_id: int
+    strategy: str = "default"
 
 
 class DrawingDiffResponse(BaseModel):

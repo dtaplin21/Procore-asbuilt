@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 from pathlib import Path
@@ -23,6 +24,48 @@ ALLOWED_CONTENT_TYPES = {
 
 # Maximum acceptable upload size in bytes (e.g., 50 MiB)
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024
+
+
+def sha256_bytes(data: bytes) -> str:
+    """Compute SHA-256 hash of bytes as hex digest."""
+    return hashlib.sha256(data).hexdigest()
+
+
+def read_and_validate_upload(file: UploadFile, category: str) -> tuple[bytes, str, str]:
+    """Read and validate upload file. Returns (contents, content_type, original_name)."""
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+    size = 0
+    contents = b""
+    while True:
+        chunk = file.file.read(1024 * 1024)
+        if not chunk:
+            break
+        size += len(chunk)
+        if size > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=413, detail="File too large")
+        contents += chunk
+    return contents, file.content_type, file.filename or "upload"
+
+
+def save_upload_from_bytes(
+    contents: bytes,
+    project_id: int,
+    category: str,
+    content_type: str,
+    original_name: str,
+) -> str:
+    """Save pre-read bytes to disk. Returns storage_key."""
+    sanitized = _sanitize_filename(original_name)
+    key = f"projects/{project_id}/{category}/{uuid4().hex}_{sanitized}"
+    dest_path = BASE_UPLOAD_DIR / key
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(dest_path, "wb") as f:
+            f.write(contents)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save upload: {str(e)}")
+    return key
 
 
 def _sanitize_filename(filename: str) -> str:

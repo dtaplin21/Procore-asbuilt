@@ -3,11 +3,17 @@ from typing import List, Optional, cast
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from api.dependencies import get_db
+from api.dependencies import get_db, get_idempotency_key
 from models.models import Drawing
 from models.schemas import DrawingOverlayResponse, DrawingResponse
 from services.storage import StorageService
-from services.file_storage import save_upload, get_file_path
+from services.file_storage import (
+    get_file_path,
+    read_and_validate_upload,
+    save_upload_from_bytes,
+    sha256_bytes,
+)
+from services.idempotency import begin_idempotent_operation, finish_idempotent_operation
 from fastapi.responses import FileResponse
 
 router = APIRouter(tags=["drawings"])
@@ -18,6 +24,7 @@ router = APIRouter(tags=["drawings"])
 async def upload_drawing(
     project_id: int,
     file: UploadFile = File(...),
+    idempotency_key: str = Depends(get_idempotency_key),
     db: Session = Depends(get_db),
 ) -> DrawingResponse:
     """
@@ -27,21 +34,62 @@ async def upload_drawing(
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
 
-    # Save file to disk with validation
-    storage_key, content_type, original_name = save_upload(file, project_id, category="drawings")
+    file_bytes, content_type, original_name = read_and_validate_upload(file, category="drawings")
+    checksum = sha256_bytes(file_bytes)
+    source = "upload"
 
-    # Create database record
+    request_fingerprint = {
+        "project_id": project_id,
+        "checksum": checksum,
+        "source": source,
+    }
+    scope = f"drawing_upload:{project_id}:{checksum}:{source}"
+
+    try:
+        idem_row, should_execute = begin_idempotent_operation(
+            db,
+            scope=scope,
+            idempotency_key=idempotency_key,
+            request_payload=request_fingerprint,
+            ttl_minutes=60,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not should_execute:
+        row_status = getattr(idem_row, "status", None)
+        cached_resp = dict(getattr(idem_row, "response_payload", None) or {})
+        if row_status == "completed" and cached_resp:
+            return DrawingResponse(**cached_resp)
+        if row_status == "in_progress":
+            raise HTTPException(status_code=409, detail="Request already in progress")
+        if row_status == "failed" and cached_resp:
+            return DrawingResponse(**cached_resp)
+
+    storage_key = save_upload_from_bytes(
+        file_bytes, project_id, category="drawings", content_type=content_type, original_name=original_name
+    )
+
     service = StorageService(db)
     drawing = service.create_drawing(
         project_id=project_id,
-        source="upload",
+        source=source,
         name=original_name,
         storage_key=storage_key,
         content_type=content_type,
         page_count=None,
     )
 
-    return DrawingResponse.from_orm(drawing)
+    response = DrawingResponse.model_validate(drawing)
+    response_data = response.model_dump(mode="json")
+    response_data["file_url"] = f"/api/projects/{project_id}/drawings/{cast(int, drawing.id)}/file"
+    finish_idempotent_operation(
+        db,
+        row_id=cast(int, idem_row.id),
+        response_payload=response_data,
+        resource_reference={"drawing_id": cast(int, drawing.id)},
+    )
+    return DrawingResponse(**response_data)
 
 
 @router.get("/api/projects/{project_id}/drawings", response_model=List[DrawingResponse])
