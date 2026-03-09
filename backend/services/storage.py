@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, Sequence, Set, cast
 
 from models.models import (
     Project,
@@ -612,6 +612,66 @@ class StorageService:
         self.db.refresh(run)
         return run
 
+    def get_inspection_run_with_details(
+        self,
+        project_id: int,
+        inspection_run_id: int,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Convenience helper for builder/writeback flows.
+
+        Returns dict with:
+          - run: InspectionRun
+          - project: Project (validated)
+          - master_drawing: Drawing
+          - evidence: EvidenceRecord | None
+          - inspection_result: latest InspectionResult | None
+          - overlays: List[DrawingOverlay] filtered to this run
+          - findings: List[Finding] linked via overlays/diffs
+        """
+        run = self.get_inspection_run(project_id, inspection_run_id)
+        if run is None:
+            return None
+
+        project = self.get_project(project_id)
+        if project is None:
+            return None
+
+        master_drawing = (
+            self.db.query(Drawing)
+            .filter(Drawing.id == cast(int, run.master_drawing_id))
+            .first()
+        )
+        if master_drawing is None:
+            return None
+
+        evidence: Optional[EvidenceRecord] = None
+        if getattr(run, "evidence_id", None) is not None:
+            evidence = self.get_evidence_record(project_id, cast(int, run.evidence_id))
+
+        inspection_result = (
+            self.db.query(InspectionResult)
+            .filter(InspectionResult.inspection_run_id == cast(int, run.id))
+            .order_by(InspectionResult.created_at.desc())
+            .first()
+        )
+
+        overlays = self.list_overlays_for_inspection_run(cast(int, run.id))
+        findings = self.list_findings_for_inspection_run(
+            cast(int, run.id),
+            overlays=overlays,
+        )
+
+        return {
+            "run": run,
+            "project": project,
+            "master_drawing": master_drawing,
+            "evidence": evidence,
+            "inspection_result": inspection_result,
+            "overlays": overlays,
+            "findings": findings,
+        }
+
     # ------------------------------------------------------------------
     # Inspection Results + Overlays
     # ------------------------------------------------------------------
@@ -683,6 +743,72 @@ class StorageService:
             q = q.filter(DrawingOverlay.diff_id == diff_id)
         return (
             q.order_by(DrawingOverlay.created_at.desc(), DrawingOverlay.id.desc())
+            .all()
+        )
+
+    def list_overlays_for_inspection_run(
+        self,
+        inspection_run_id: int,
+    ) -> List[DrawingOverlay]:
+        """List overlays originating from a specific inspection run."""
+        return (
+            self.db.query(DrawingOverlay)
+            .filter(DrawingOverlay.inspection_run_id == inspection_run_id)
+            .order_by(DrawingOverlay.created_at.desc(), DrawingOverlay.id.desc())
+            .all()
+        )
+
+    def list_findings_for_inspection_run(
+        self,
+        inspection_run_id: int,
+        *,
+        overlays: Optional[Sequence[DrawingOverlay]] = None,
+    ) -> List[Finding]:
+        """
+        Return Findings associated with an inspection run.
+
+        Looks for finding_id stored in overlay meta or linked via drawing diffs.
+        Optionally accept pre-fetched overlays to avoid duplicate queries.
+        """
+        overlay_records = list(overlays) if overlays is not None else self.list_overlays_for_inspection_run(inspection_run_id)
+        finding_ids: Set[int] = set()
+
+        diff_ids: Set[int] = set()
+        for overlay in overlay_records:
+            diff_id = getattr(overlay, "diff_id", None)
+            if isinstance(diff_id, int):
+                diff_ids.add(diff_id)
+
+            meta = getattr(overlay, "meta", None)
+            if isinstance(meta, dict):
+                candidate = meta.get("finding_id")
+                if isinstance(candidate, int):
+                    finding_ids.add(candidate)
+                elif candidate is not None:
+                    try:
+                        candidate_int = int(candidate)
+                    except (TypeError, ValueError):
+                        candidate_int = None
+                    if candidate_int is not None:
+                        finding_ids.add(candidate_int)
+
+        if diff_ids:
+            diff_rows = (
+                self.db.query(DrawingDiff.id, DrawingDiff.finding_id)
+                .filter(DrawingDiff.id.in_(diff_ids))
+                .all()
+            )
+            for diff_id, linked_finding_id in diff_rows:
+                if linked_finding_id is not None:
+                    finding_ids.add(int(linked_finding_id))
+
+        if not finding_ids:
+            return []
+
+        return (
+            self.db.query(Finding)
+            .filter(Finding.id.in_(finding_ids))
+            .order_by(Finding.created_at.desc(), Finding.id.desc())
             .all()
         )
 
@@ -817,4 +943,3 @@ class StorageService:
             "ai_insights_count": 0,
             "critical_alerts": 0,
         }
-

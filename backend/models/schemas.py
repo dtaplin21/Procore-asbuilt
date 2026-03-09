@@ -488,11 +488,10 @@ class ObservationWritebackResponse(BaseModel):
 class ProcoreWritebackResponse(BaseModel):
     """Response for Procore writeback. mode indicates what was done."""
     mode: str  # "dry_run" | "commit"
-    payload: Optional[dict] = None  # inspection header payload (dry_run: would be sent; commit: was sent)
-    inspection_item_payloads: Optional[list] = None  # item payloads (dry_run: would be sent; commit: were sent)
-    procore_inspection: Optional[dict] = None  # commit: Procore response from create_inspection
-    success: Optional[bool] = None  # commit: True if all API calls succeeded, False otherwise
-    error: Optional[str] = None  # commit: error message if success=False
+    payload: Optional[dict] = None
+    committed: Optional[bool] = None  # commit: True if write succeeded, False otherwise
+    procore_response: Optional[dict] = None  # commit: Procore API response (nullable)
+    message: Optional[str] = None
 
 
 # ----- Response models -----

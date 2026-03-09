@@ -298,39 +298,42 @@ def gather_writeback_raw_records(
     Load and return the raw records needed for writeback.
 
     Returns a dict with keys:
-        - run: InspectionRun (or None if not found)
-        - result: latest InspectionResult for the run (or None)
+        - run: InspectionRun
+        - project: Project
+        - master_drawing: Drawing
+        - evidence: EvidenceRecord | None
+        - inspection_result/result: latest InspectionResult | None
         - overlays: list of normalized overlay dicts (id, status, geometry, meta)
+        - raw_overlays: ORM instances (pre-normalization)
+        - findings: List[Finding] associated with the run
 
     Raises ValueError if the inspection run is not found.
     """
     storage = StorageService(db)
-    run = storage.get_inspection_run(project_id, inspection_run_id)
-    if run is None:
+    details = storage.get_inspection_run_with_details(project_id, inspection_run_id)
+    if details is None:
         raise ValueError("Inspection run not found")
 
-    run_id = int(getattr(run, "id", 0))
-    result = (
-        db.query(InspectionResult)
-        .filter(InspectionResult.inspection_run_id == run_id)
-        .order_by(InspectionResult.created_at.desc())
-        .first()
-    )
+    run = details["run"]
+    project = details["project"]
+    master_drawing = details["master_drawing"]
+    evidence = details["evidence"]
+    inspection_result = details["inspection_result"]
+    overlays = details["overlays"]
+    findings = details["findings"]
 
-    master_drawing_id = getattr(run, "master_drawing_id", None)
-    if master_drawing_id is None:
-        raise ValueError("Inspection run has no master_drawing_id")
-
-    raw_overlays = storage.list_drawing_overlays(
-        int(master_drawing_id),
-        inspection_run_id=run_id,
-    )
-    overlays = [_normalize_overlay(o) for o in raw_overlays]
+    normalized_overlays = [_normalize_overlay(o) for o in overlays]
 
     return {
         "run": run,
-        "result": result,
-        "overlays": overlays,
+        "project": project,
+        "master_drawing": master_drawing,
+        "evidence": evidence,
+        "inspection_result": inspection_result,
+        "result": inspection_result,
+        "overlays": normalized_overlays,
+        "raw_overlays": overlays,
+        "findings": findings,
     }
 
 
@@ -346,11 +349,11 @@ def build_writeback_contract(
     """
     raw = gather_writeback_raw_records(db, project_id, inspection_run_id)
     run = raw["run"]
-    result = raw["result"]
+    result = raw.get("inspection_result") or raw.get("result")
     overlays = raw["overlays"]
 
     storage = StorageService(db)
-    project = storage.get_project(project_id)
+    project = raw.get("project")
     if project is None:
         raise ValueError("Project not found")
 
@@ -358,16 +361,11 @@ def build_writeback_contract(
     if not project_procore_id:
         raise ValueError("Project has no procore_project_id; sync project from Procore first")
 
-    master_drawing_id = getattr(run, "master_drawing_id", None)
-    if master_drawing_id is None:
-        raise ValueError("Inspection run has no master_drawing_id")
-    master_drawing = storage.get_drawing(project_id, int(master_drawing_id))
+    master_drawing = raw.get("master_drawing")
     if master_drawing is None:
         raise ValueError("Master drawing not found")
 
-    evidence = None
-    if getattr(run, "evidence_id", None) is not None:
-        evidence = storage.get_evidence_record(project_id, int(getattr(run, "evidence_id")))
+    evidence = raw.get("evidence")
 
     company = (
         db.query(Company)
@@ -434,6 +432,12 @@ def build_writeback_contract(
     ]
     overlay_findings = extract_findings_from_overlays(overlays)
 
+    findings_lookup = {
+        int(getattr(f, "id", 0)): f
+        for f in (raw.get("findings") or [])
+        if getattr(f, "id", None) is not None
+    }
+
     finding_ctx: Optional[FindingContext] = None
     finding_id: Optional[int] = None
     for overlay in overlay_contexts:
@@ -444,7 +448,9 @@ def build_writeback_contract(
             break
 
     if finding_id is not None:
-        finding = storage.get_finding(finding_id, project_id=project_id)
+        finding = findings_lookup.get(finding_id)
+        if finding is None:
+            finding = storage.get_finding(finding_id, project_id=project_id)
         if finding is not None:
             finding_ctx = FindingContext(
                 id=int(getattr(finding, "id", 0)),

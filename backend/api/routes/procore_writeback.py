@@ -18,7 +18,7 @@ from services.procore_writeback import (
 )
 from services.procore_client import ProcoreAPIClient
 from services.procore_connection_store import get_active_connection
-from errors import ProcoreNotConnected
+from errors import AppError, ProcoreNotConnected
 
 
 def _extract_procore_inspection_id(created: dict) -> Optional[str]:
@@ -64,6 +64,29 @@ async def procore_writeback(
             detail="mode must be 'dry_run' or 'commit'",
         )
 
+    run = (
+        db.query(InspectionRun)
+        .filter(
+            InspectionRun.project_id == project_id,
+            InspectionRun.id == body.inspection_run_id,
+        )
+        .first()
+    )
+    if run is None:
+        raise HTTPException(status_code=404, detail="Inspection run not found")
+    status = str(run.status) if run.status is not None else ""
+    if status != "complete":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Run is incomplete (status: {status}); only completed runs can be written back",
+        )
+    existing_procore_id = getattr(run, "procore_inspection_id", None)
+    if existing_procore_id:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Inspection run already written to Procore (procore_inspection_id: {existing_procore_id})",
+        )
+
     try:
         contract = build_writeback_contract(db, project_id, body.inspection_run_id)
     except ValueError as e:
@@ -72,15 +95,9 @@ async def procore_writeback(
     procore_payload = translate_contract_to_procore_payload(contract)
 
     if body.mode == "dry_run":
-        items_contract = build_inspection_item_contract(db, project_id, body.inspection_run_id)
-        item_payloads = [
-            translate_contract_to_procore_inspection_item_payload(item)
-            for item in items_contract
-        ]
         return ProcoreWritebackResponse(
             mode="dry_run",
             payload=procore_payload,
-            inspection_item_payloads=item_payloads,
         )
 
     if get_active_connection(db, user_id) is None:
@@ -125,16 +142,16 @@ async def procore_writeback(
         return ProcoreWritebackResponse(
             mode="commit",
             payload=procore_payload,
-            inspection_item_payloads=item_payloads,
-            procore_inspection=created,
-            success=True,
+            committed=True,
+            procore_response=created,
         )
+    except AppError:
+        raise
     except Exception as e:
         return ProcoreWritebackResponse(
             mode="commit",
             payload=procore_payload,
-            inspection_item_payloads=item_payloads,
-            procore_inspection=created,
-            success=False,
-            error=str(e),
+            committed=False,
+            procore_response=created,
+            message=str(e),
         )
