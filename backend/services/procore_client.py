@@ -511,7 +511,35 @@ class ProcoreAPIClient:
             json_data=inspection_data,
             headers=headers
         )
-    
+
+    async def create_inspection_item(
+        self,
+        project_id: str,
+        inspection_id: str,
+        payload: Dict[str, Any],
+        company_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create an inspection item (checklist item) for an existing inspection.
+
+        Call after create_inspection to add item-level data. Accepts:
+            - project_id (str): Procore project ID
+            - inspection_id (str): Procore inspection ID from create_inspection
+            - payload (dict): Translated item from translate_contract_to_procore_inspection_item_payload
+            - company_id (str, optional): Procore company ID for header
+        """
+        headers: Dict[str, str] = {}
+        if company_id:
+            headers["Procore-Company-Id"] = company_id
+
+        return await self._request(
+            "POST",
+            f"/inspections/{inspection_id}/items",
+            params={"project_id": project_id},
+            json_data=payload,
+            headers=headers,
+        )
+
     # Observation Methods
     async def create_observation(
         self,
@@ -538,7 +566,33 @@ class ProcoreAPIClient:
             json_data=payload,
             headers=headers,
         )
-    
+
+    async def create_punch_item(
+        self,
+        project_id: str,
+        payload: Dict[str, Any],
+        company_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a punch item in Procore.
+
+        Accepts:
+            - project_id (str): Procore project ID for API context
+            - payload (dict): Translated punch item payload from translate_contract_to_procore_punch_item_payload
+            - company_id (str, optional): Procore company ID for Procore-Company-Id header; uses active connection if omitted
+        """
+        headers: Dict[str, str] = {}
+        if company_id:
+            headers["Procore-Company-Id"] = company_id
+
+        return await self._request(
+            "POST",
+            "/punch_items",
+            params={"project_id": project_id},
+            json_data=payload,
+            headers=headers,
+        )
+
     # Documents Methods
     async def download_document(
         self,

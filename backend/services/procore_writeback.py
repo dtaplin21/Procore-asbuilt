@@ -5,16 +5,20 @@ Builds inspection payloads from inspection runs and pushes to Procore.
 Supports dry_run (return payload only) and commit (call Procore API).
 
 Observation writeback: Finding → Procore POST /observations.
+Punch item writeback: Finding → Procore POST /punch_items.
 """
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from services.procore_writeback_contract import build_writeback_contract
+from services.procore_writeback_contract import (
+    build_writeback_contract,
+    build_inspection_item_contract as _items_from_contract,
+)
 from services.storage import StorageService
 
 logger = logging.getLogger(__name__)
@@ -52,6 +56,19 @@ def gather_observation_raw_records(
     }
 
 
+def gather_punch_item_raw_records(
+    db: Session,
+    project_id: int,
+    finding_id: int,
+) -> Dict[str, Any]:
+    """
+    Load raw records needed for punch item writeback (Finding → Procore Punch Item).
+
+    Reuses the same logic as observation writeback: Finding + Project.
+    """
+    return gather_observation_raw_records(db, project_id, finding_id)
+
+
 def build_observation_writeback_contract(
     db: Session,
     project_id: int,
@@ -85,6 +102,20 @@ def build_observation_writeback_contract(
     }
 
 
+def build_punch_item_writeback_contract(
+    db: Session,
+    project_id: int,
+    finding_id: int,
+) -> Dict[str, Any]:
+    """
+    Build the normalized punch item writeback contract from raw records.
+
+    Reuses the same Finding fields as observation: title, description,
+    severity, type, affected_items. Same source-of-truth shape before Procore translation.
+    """
+    return build_observation_writeback_contract(db, project_id, finding_id)
+
+
 def translate_contract_to_procore_observation_payload(contract: Dict[str, Any]) -> Dict[str, Any]:
     """
     Convert the observation writeback contract into the payload Procore create_observation expects.
@@ -114,6 +145,93 @@ def translate_contract_to_procore_observation_payload(contract: Dict[str, Any]) 
         "observation_type": obs_type,
         "priority": severity,
     }
+
+    return payload
+
+
+def translate_contract_to_procore_punch_item_payload(contract: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert the punch item writeback contract into the payload Procore create_punch_item expects.
+
+    Keeps Procore field naming isolated here; DB/business logic stays in our contract shape.
+    Procore Punch Items API typically uses: title, description, punch_item_type, status, etc.
+    """
+    title = str(contract.get("title", "") or "").strip() or "Punch Item"
+    description = str(contract.get("description", "") or "")
+    severity = str(contract.get("severity", "") or "medium").strip().lower()
+    item_type = str(contract.get("type", "") or "deviation").strip().lower()
+    affected_items = contract.get("affected_items") or []
+
+    if affected_items:
+        items_str = ", ".join(
+            str(item) if not isinstance(item, dict) else str(item.get("label", item))
+            for item in affected_items[:20]
+        )
+        if items_str:
+            description = f"{description}\n\nAffected items: {items_str}".strip()
+
+    payload: Dict[str, Any] = {
+        "title": title,
+        "description": description or "(No description)",
+        "punch_item_type": item_type,
+        "status": "open",
+        "priority": severity,
+    }
+
+    return payload
+
+
+def build_inspection_item_contract(
+    db: Session,
+    project_id: int,
+    inspection_run_id: int,
+) -> List[Dict[str, Any]]:
+    """
+    Build inspection item contract from inspection run data.
+
+    Reuses the inspection writeback flow: loads raw data via build_writeback_contract,
+    then converts overlay findings and overlays into item-like entries.
+    """
+    contract = build_writeback_contract(db, project_id, inspection_run_id)
+    return _items_from_contract(contract)
+
+
+_STATUS_TO_CORRESPONDING: Dict[str, str] = {
+    "pass": "yes",
+    "yes": "yes",
+    "fail": "no",
+    "no": "no",
+    "mixed": "n/a",
+    "unknown": "n/a",
+    "n/a": "n/a",
+}
+
+
+def translate_contract_to_procore_inspection_item_payload(
+    item: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Map one internal inspection item to the payload required by Procore's
+    checklist/item endpoint (e.g. Item Response Set Response or create item).
+
+    Procore uses corresponding_status: yes | no | n/a for pass/fail/unknown.
+    """
+    status = str(item.get("status", "unknown") or "unknown").strip().lower()
+    corresponding = _STATUS_TO_CORRESPONDING.get(status, "n/a")
+
+    title = str(item.get("title", "") or "").strip() or "Inspection item"
+    description = str(item.get("description", "") or "").strip()
+
+    payload: Dict[str, Any] = {
+        "name": title,
+        "corresponding_status": corresponding,
+    }
+    if description:
+        payload["description"] = description
+
+    location = item.get("location")
+    if location and isinstance(location, dict) and location:
+        payload["location"] = location
 
     return payload
 

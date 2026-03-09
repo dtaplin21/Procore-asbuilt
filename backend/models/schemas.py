@@ -443,10 +443,38 @@ class ProcoreWritebackRequest(BaseModel):
     mode: Literal["dry_run", "commit"]
 
 
+class InspectionItemWritebackRequest(BaseModel):
+    """Body for POST Procore inspection items writeback (items only; inspection header must exist)."""
+    inspection_run_id: int
+    mode: Literal["dry_run", "commit"]
+
+
+class InspectionItemWritebackResponse(BaseModel):
+    """Response for inspection items writeback. mode indicates what was done."""
+    mode: str  # "dry_run" | "commit"
+    inspection_items_contract: Optional[list] = None  # dry_run: derived item contract
+    inspection_item_payloads: Optional[list] = None  # dry_run: translated item payloads
+    procore_inspection_items: Optional[list] = None  # commit: created items from Procore
+
+
 class ObservationWritebackRequest(BaseModel):
     """Body for POST Procore observation writeback (Finding → Procore Observation)."""
     finding_id: int
     mode: Literal["dry_run", "commit"]
+
+
+class PunchItemWritebackRequest(BaseModel):
+    """Body for POST Procore punch item writeback (Finding → Procore Punch Item)."""
+    finding_id: int
+    mode: Literal["dry_run", "commit"]
+
+
+class PunchItemWritebackResponse(BaseModel):
+    """Response for punch item writeback. mode indicates what was done."""
+    mode: str  # "dry_run" | "commit"
+    contract: Optional[dict] = None  # dry_run: normalized contract
+    payload: Optional[dict] = None  # dry_run: Procore payload that would be sent
+    procore_punch_item: Optional[dict] = None  # commit: created punch item from Procore
 
 
 class ObservationWritebackResponse(BaseModel):
@@ -460,7 +488,9 @@ class ObservationWritebackResponse(BaseModel):
 class ProcoreWritebackResponse(BaseModel):
     """Response for Procore writeback. mode indicates what was done."""
     mode: str  # "dry_run" | "commit"
-    payload: Optional[dict] = None  # dry_run: full payload that would be sent
+    payload: Optional[dict] = None  # dry_run: inspection header payload that would be sent
+    inspection_items_contract: Optional[list] = None  # dry_run: derived item contract
+    inspection_item_payloads: Optional[list] = None  # dry_run: translated item payloads per item
     procore_inspection: Optional[dict] = None  # commit: created inspection from Procore
 
 

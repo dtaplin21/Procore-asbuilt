@@ -438,6 +438,9 @@ class InspectionRun(Base):
     inspection_type = Column(String, nullable=True)
     status = Column(String, nullable=False, server_default="queued")  # queued | processing | complete | failed
 
+    # Procore sync: set after successful inspection writeback (commit) for item-level writeback
+    procore_inspection_id = Column(String, nullable=True, index=True)
+
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     error_message = Column(Text, nullable=True)

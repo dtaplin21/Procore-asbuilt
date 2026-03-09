@@ -175,6 +175,8 @@ def extract_findings_from_overlays(
 
             findings.append(
                 {
+                    "overlay_id": payload.get("id"),
+                    "status": status,
                     "title": title or f"Overlay issue ({status})",
                     "description": description,
                     "severity": severity,
@@ -496,9 +498,80 @@ def build_writeback_contract(
     return contract.model_dump(mode="python")
 
 
+def build_inspection_item_contract(contract: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Build normalized checklist items from the writeback contract.
+
+    Derives items from:
+      - meta.overlay_findings: rich items (title, description, severity, location, status)
+      - overlays: overlays that did not produce overlay_findings get minimal items
+      - inspection_result: one summary item (outcome + notes)
+
+    Returns a list of dicts with: overlay_id?, status, title, description, severity, location, source.
+    """
+    items: List[Dict[str, Any]] = []
+    overlays = contract.get("overlays") or []
+    overlay_findings = (contract.get("meta") or {}).get("overlay_findings") or []
+    inspection_result = contract.get("inspection_result") or {}
+
+    overlay_ids_with_findings: Set[int] = set()
+    for f in overlay_findings:
+        oid = f.get("overlay_id")
+        if oid is not None and oid != 0:
+            overlay_ids_with_findings.add(int(oid))
+        items.append({
+            "overlay_id": oid,
+            "status": str(f.get("status", "unknown") or "unknown"),
+            "title": str(f.get("title", "") or ""),
+            "description": str(f.get("description", "") or ""),
+            "severity": str(f.get("severity", "") or "medium"),
+            "location": _safe_dict(f.get("location")),
+            "source": "overlay_finding",
+        })
+
+    for ov in overlays:
+        oid = ov.get("id") if isinstance(ov, dict) else getattr(ov, "id", None)
+        if oid is None:
+            continue
+        oid_int = int(oid)
+        if oid_int in overlay_ids_with_findings:
+            continue
+        status = "unknown"
+        if isinstance(ov, dict):
+            status = str(ov.get("status", "unknown") or "unknown")
+        else:
+            status = str(getattr(ov, "status", "unknown") or "unknown")
+        geometry = _safe_dict(ov.get("geometry") if isinstance(ov, dict) else getattr(ov, "geometry", None))
+        items.append({
+            "overlay_id": oid_int,
+            "status": status,
+            "title": f"Overlay {oid_int}",
+            "description": "",
+            "severity": "high" if status == "fail" else "medium" if status == "unknown" else "low",
+            "location": {"geometry": geometry} if geometry else {},
+            "source": "overlay",
+        })
+
+    outcome = str(inspection_result.get("outcome", "unknown") or "unknown")
+    notes = str(inspection_result.get("notes", "") or "").strip()
+    if outcome or notes:
+        items.append({
+            "overlay_id": None,
+            "status": outcome,
+            "title": "Inspection result",
+            "description": notes or f"Overall outcome: {outcome}",
+            "severity": "high" if outcome == "fail" else "medium" if outcome == "mixed" else "low",
+            "location": {},
+            "source": "inspection_result",
+        })
+
+    return items
+
+
 __all__ = [
     "WritebackContract",
     "build_writeback_contract",
+    "build_inspection_item_contract",
     "gather_writeback_raw_records",
     "extract_findings_from_overlays",
     "CONTRACT_VERSION",
