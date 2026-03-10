@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Sequence, Set, cast
 from models.models import (
     Project,
     Finding,
+    JobQueue,
     Drawing,
     DrawingRegion,
     DrawingAlignment,
@@ -116,6 +117,21 @@ class StorageService:
                 "inspections_count": inspections_count,
             },
         }
+    
+    def get_project_jobs(
+        self,
+        project_id: int,
+        status: Optional[str] = None,
+    ) -> List[JobQueue]:
+        q = self.db.query(JobQueue).filter(JobQueue.project_id == project_id)
+
+        if status == "active":
+            q = q.filter(JobQueue.status.in_(["queued", "running", "processing"]))
+        elif status is not None:
+            q = q.filter(JobQueue.status == status)
+
+        q = q.order_by(JobQueue.updated_at.desc(), JobQueue.id.desc())
+        return q.all()
     
         # ------------------------------------------------------------------
     # Drawings (Phase 1)

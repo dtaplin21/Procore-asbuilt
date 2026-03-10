@@ -573,6 +573,10 @@ class JobResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class JobListResponse(BaseModel):
+    jobs: List[JobResponse]
+
 # Usage Log Schemas
 class UsageLogCreate(BaseModel):
     user_id: int

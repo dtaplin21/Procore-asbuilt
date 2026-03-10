@@ -10,6 +10,8 @@ from models.schemas import (
     ProjectListResponse,
     DashboardSummaryResponse,
     DrawingResponse,
+    JobResponse,
+    JobListResponse,
 )
 from models.models import Drawing, Project
 from services.file_storage import save_upload, get_file_path
@@ -71,6 +73,21 @@ async def get_project_dashboard_summary(
         raise HTTPException(status_code=404, detail="Project not found")
 
     return summary
+
+
+@router.get("/{project_id}/jobs", response_model=JobListResponse)
+def get_project_jobs(
+    project_id: int,
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    storage = StorageService(db)
+    project = storage.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    jobs = storage.get_project_jobs(project_id=project_id, status=status)
+    return JobListResponse(jobs=[JobResponse.model_validate(job) for job in jobs])
 
 
 @router.post("/{project_id}/drawings", response_model=DrawingResponse)
@@ -232,4 +249,3 @@ def download_project_drawing_file(
         media_type=content_type,
         filename=name,
     )
-
