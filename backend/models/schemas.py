@@ -170,6 +170,11 @@ class InsightListResponse(BaseModel):
     offset: int
 
 
+class FindingListResponse(BaseModel):
+    """Project-scoped findings list (dashboard)."""
+    findings: List[AIInsightResponse]
+
+
 # Procore Connection Schemas
 class ProcoreTokenCreate(BaseModel):
     company_id: int

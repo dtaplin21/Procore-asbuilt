@@ -261,6 +261,22 @@ export interface AIInsight {
 
 export type InsertAIInsight = Omit<AIInsight, "id">;
 
+/** Single finding (matches API response). Aliased from AIInsight for consistent naming. */
+export type FindingResponse = AIInsight;
+
+/** Response for GET /api/projects/{id}/findings (matches backend FindingListResponse). */
+export type FindingListResponse = {
+  findings: FindingResponse[];
+};
+
+/** Paginated response for insights (matches backend InsightListResponse). */
+export interface InsightListResponse {
+  items: AIInsight[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 // Drawing Diff types (matches backend DrawingDiffResponse, RunDrawingDiffRequest)
 export type DrawingDiffSeverity = "low" | "medium" | "high" | "critical";
 

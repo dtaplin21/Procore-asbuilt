@@ -918,6 +918,22 @@ class StorageService:
         items = base.limit(limit).offset(offset).all()
         return items, total
 
+    def get_project_findings(
+        self,
+        project_id: int,
+        limit: Optional[int] = None,
+    ) -> List[Finding]:
+        """List findings for a project (dashboard). Use get_insights for paginated insights page."""
+        q = self.db.query(Finding).filter(Finding.project_id == project_id)
+        q = q.order_by(Finding.created_at.desc(), Finding.id.desc())
+        if limit is not None:
+            q = q.limit(limit)
+        return q.all()
+
+    def count_project_findings(self, project_id: int) -> int:
+        """Count findings for a project (for pagination metadata)."""
+        return self.db.query(Finding).filter(Finding.project_id == project_id).count()
+
     def get_finding(
         self,
         finding_id: int,

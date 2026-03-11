@@ -21,8 +21,10 @@ import type {
   DashboardSummary,
   ProjectListResponse,
   JobListResponse,
+  FindingListResponse,
 } from "@shared/schema";
 import JobQueueList from "@/components/JobQueueList";
+import RecentFindingsList from "@/components/RecentFindingsList";
 
 function getProjectIdFromUrl(): string | null {
   const sp = new URLSearchParams(window.location.search);
@@ -75,6 +77,31 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
   });
 
   const projects = projectsData?.items ?? [];
+
+  const {
+    data: recentFindings,
+    isLoading: findingsLoading,
+    error: findingsError,
+  } = useQuery<FindingListResponse>({
+    queryKey: ["projectFindings", selectedProjectId],
+    queryFn: async () => {
+      if (!selectedProjectId) {
+        throw new Error("No project selected");
+      }
+
+      const res = await fetch(
+        `/api/projects/${selectedProjectId}/findings?limit=5`,
+        { credentials: "include" }
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to load project findings");
+      }
+
+      return res.json();
+    },
+    enabled: !!selectedProjectId,
+  });
 
   // Project jobs (GET /api/projects/{id}/jobs?status=active)
   const {
@@ -278,6 +305,21 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
             jobs={projectJobs?.jobs ?? []}
             isLoading={jobsLoading}
             error={jobsError ? "Failed to load jobs" : null}
+          />
+        )}
+      </div>
+
+      <div className="mt-8">
+        <h2 className="text-xl font-semibold mb-4">Bottom: Recent findings</h2>
+
+        {!selectedProjectId ? (
+          <div>Select a project to view recent findings.</div>
+        ) : (
+          <RecentFindingsList
+            findings={recentFindings?.findings ?? []}
+            isLoading={findingsLoading}
+            error={findingsError ? "Failed to load recent findings" : null}
+            projectId={selectedProjectId ? Number(selectedProjectId) : null}
           />
         )}
       </div>

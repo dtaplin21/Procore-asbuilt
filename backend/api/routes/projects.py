@@ -11,6 +11,8 @@ from models.schemas import (
     DashboardSummaryResponse,
     DrawingResponse,
     JobListResponse,
+    AIInsightResponse,
+    FindingListResponse,
 )
 from models.models import Drawing, Project
 from services.file_storage import save_upload, get_file_path
@@ -87,6 +89,23 @@ def get_project_jobs(
 
     jobs = storage.get_project_jobs(project_id=project_id, status=status)
     return {"jobs": jobs}
+
+
+@router.get("/{project_id}/findings", response_model=FindingListResponse)
+def get_project_findings(
+    project_id: int,
+    limit: Optional[int] = Query(5),
+    db: Session = Depends(get_db),
+):
+    """Return recent findings for a project. Findings are ordered by created_at desc."""
+    storage = StorageService(db)
+    project = storage.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    findings = storage.get_project_findings(project_id=project_id, limit=limit)
+    insight_items = [AIInsightResponse.model_validate(f) for f in findings]
+    return FindingListResponse(findings=insight_items)
 
 
 @router.post("/{project_id}/drawings", response_model=DrawingResponse)
