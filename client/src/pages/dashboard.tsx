@@ -76,17 +76,29 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
 
   const projects = projectsData?.items ?? [];
 
-  // Project jobs (GET /api/projects/{id}/jobs)
+  // Project jobs (GET /api/projects/{id}/jobs?status=active)
   const {
-    data: jobsData,
+    data: projectJobs,
     isLoading: jobsLoading,
     error: jobsError,
   } = useQuery<JobListResponse>({
-    queryKey: [
-      selectedProjectId
-        ? `/api/projects/${selectedProjectId}/jobs`
-        : "/api/projects/",
-    ],
+    queryKey: ["projectJobs", selectedProjectId],
+    queryFn: async () => {
+      if (!selectedProjectId) {
+        throw new Error("No project selected");
+      }
+
+      const res = await fetch(
+        `/api/projects/${selectedProjectId}/jobs?status=active`,
+        { credentials: "include" }
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to load project jobs");
+      }
+
+      return res.json();
+    },
     enabled: !!selectedProjectId,
   });
 
@@ -255,21 +267,20 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
       </Card>
 
 
-      {/* Job Queue */}
-      {selectedProjectId && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Job Queue</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <JobQueueList
-              jobs={jobsData?.jobs ?? []}
-              isLoading={jobsLoading}
-              error={jobsError instanceof Error ? jobsError.message : null}
-            />
-          </CardContent>
-        </Card>
-      )}
+      {/* Active Jobs */}
+      <div className="mt-8">
+        <h2 className="text-xl font-semibold mb-4">Active Jobs</h2>
+
+        {!selectedProjectId ? (
+          <div>Select a project to view active jobs.</div>
+        ) : (
+          <JobQueueList
+            jobs={projectJobs?.jobs ?? []}
+            isLoading={jobsLoading}
+            error={jobsError ? "Failed to load jobs" : null}
+          />
+        )}
+      </div>
 
       {/* Critical Alerts Banner */}
       {stats && stats.criticalAlerts > 0 && (
