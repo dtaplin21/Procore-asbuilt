@@ -104,7 +104,7 @@ Frontend:
 
 ---
 
-### Step 6 — Findings endpoint + Bottom section
+### Step 6 — Findings endpoint + Bottom section 
 
 Backend:
 - `GET /api/projects/{project_id}/findings?limit=…`
@@ -120,7 +120,7 @@ Frontend:
 
 ---
 
-## Phase 3 — Drawing workspace stub (so links have a home)
+## Phase 3 — Drawing workspace stub (so links have a home) ###########################################################################
 
 ### Step 7 — Add a new route/page stub
 
@@ -132,7 +132,7 @@ Frontend:
 
 ---
 
-## Phase 4 — Evidence system for AI markup (documents)
+## Phase 4 — Evidence system for AI markup (documents) ################################################################################
 
 This is where your non-drawing docs become useful.
 
@@ -180,7 +180,7 @@ When marking up a drawing sheet, query top `EvidenceRecords` by:
 
 ---
 
-## Phase 5 — Logging + tests (after endpoints exist)
+## Phase 5 — Logging + tests (after endpoints exist) #################################################################################
 
 ### Step 12 — Structured logs for job transitions + finding creation
 

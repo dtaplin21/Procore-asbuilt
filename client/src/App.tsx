@@ -12,6 +12,7 @@ import Inspections from "@/pages/inspections";
 import Objects from "@/pages/objects";
 import SettingsPage from "@/pages/settings";
 import WorkspaceStub from "@/pages/workspace";
+import DrawingWorkspacePage from "@/pages/drawing_workspace";
 import NotFound from "@/pages/not-found";
 import type { ProcoreConnection } from "@shared/schema";
 
@@ -66,9 +67,8 @@ function Router({
         <Objects procoreUserId={procoreUserId} />
       </Route>
       <Route path="/workspace/:projectId" component={WorkspaceStub} />
-      <Route path="/projects/:projectId/workspace">
-        <div>Drawing workspace stub</div>
-      </Route>
+      <Route path="/projects/:projectId/workspace" component={DrawingWorkspacePage} />
+      <Route path="/projects/:projectId/drawings/:drawingId" component={DrawingWorkspacePage} />
       <Route path="/settings">
         <SettingsPage 
           procoreConnection={procoreConnection}

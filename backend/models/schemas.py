@@ -155,6 +155,7 @@ class AIInsightResponse(BaseModel):
     related_submittal_id: Optional[str] = Field(default=None, serialization_alias="relatedSubmittalId")
     related_rfi_id: Optional[str] = Field(default=None, serialization_alias="relatedRFIId")
     related_inspection_id: Optional[str] = Field(default=None, serialization_alias="relatedInspectionId")
+    drawing_id: Optional[int] = Field(default=None, serialization_alias="relatedDrawingId")
 
     @field_validator("affected_items", mode="before")
     @classmethod

@@ -203,8 +203,17 @@ class Finding(Base):
     related_rfi_id = Column(String, nullable=True)
     related_inspection_id = Column(String, nullable=True)
 
+    # Optional link to a specific drawing (e.g. master drawing where finding was detected)
+    drawing_id = Column(
+        Integer,
+        ForeignKey("drawings.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # Relationships
     project = relationship("Project", back_populates="findings")
+    drawing = relationship("Drawing", back_populates="findings")
     drawing_diffs = relationship("DrawingDiff", back_populates="finding", passive_deletes=True)
 
 # Usage Tracking
@@ -298,6 +307,7 @@ class Drawing(Base):
         cascade="all, delete-orphan",
     )
     inspection_runs = relationship("InspectionRun", back_populates="master_drawing", cascade="all, delete-orphan")
+    findings = relationship("Finding", back_populates="drawing")
 
 
 class DrawingRegion(Base):

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { 
   AlertTriangle,
@@ -52,6 +53,8 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ procoreConnection, procoreUserId, onProcoreSync }: DashboardProps) {
+  const [, setLocation] = useLocation();
+
   // Selected project context (scopes the dashboard structurally)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() =>
     getProjectIdFromUrl()
@@ -263,9 +266,11 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
             <Sparkles className="w-5 h-5 text-primary" />
             <CardTitle>AI Insights</CardTitle>
           </div>
-          <Button variant="ghost" size="sm" data-testid="button-view-all-insights">
-            View All
-          </Button>
+          <Link href="/insights">
+            <Button variant="ghost" size="sm" data-testid="button-view-all-insights">
+              View All
+            </Button>
+          </Link>
         </CardHeader>
         <CardContent className="space-y-3">
           {insightsLoading ? (
@@ -276,10 +281,15 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
             </>
           ) : insights && insights.length > 0 ? (
             insights.slice(0, 3).map((insight) => (
-              <AIInsightCard 
-                key={insight.id} 
+              <AIInsightCard
+                key={insight.id}
                 insight={insight}
-                onViewDetails={(id) => console.log("View insight:", id)}
+                onViewDetails={(id) => {
+                  if (!selectedProjectId) return;
+                  setLocation(
+                    `/projects/${selectedProjectId}/workspace?findingId=${encodeURIComponent(id)}`
+                  );
+                }}
                 onResolve={(id) => console.log("Resolve insight:", id)}
               />
             ))
@@ -340,9 +350,11 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
                   Immediate attention required for compliance issues
                 </p>
               </div>
-              <Button variant="destructive" size="sm" data-testid="button-view-alerts">
-                View Alerts
-              </Button>
+              <Link href="/insights">
+                <Button variant="destructive" size="sm" data-testid="button-view-alerts">
+                  View Alerts
+                </Button>
+              </Link>
             </div>
           </CardContent>
         </Card>
