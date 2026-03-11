@@ -4,26 +4,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type Drawing = { id: number; name?: string };
-
-type Alignment = {
-  id: number;
-  master_drawing_id: number;
-  sub_drawing_id: number;
-  region_id: number | null;
-  method: string;
-  status: "queued" | "processing" | "complete" | "failed";
-  error_message: string | null;
-};
+import type {
+  DrawingResponse,
+  DrawingAlignmentResponse,
+  DrawingAlignmentListResponse,
+  AlignmentUpdate,
+} from "@shared/schema";
 
 interface AlignmentsListProps {
   projectId: string | null;
   masterDrawingId: string | null;
-  drawings: Drawing[];
+  drawings: DrawingResponse[];
 }
 
 const statusConfig: Record<
-  Alignment["status"],
+  "queued" | "processing" | "complete" | "failed",
   { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
 > = {
   queued: { label: "Queued", variant: "secondary" },
@@ -32,7 +27,7 @@ const statusConfig: Record<
   failed: { label: "Failed", variant: "destructive" },
 };
 
-function resolveDrawingName(drawings: Drawing[], id: number): string {
+function resolveDrawingName(drawings: DrawingResponse[], id: number): string {
   const d = drawings.find((x) => x.id === id);
   return d?.name || `Drawing ${id}`;
 }
@@ -42,7 +37,7 @@ export function AlignmentsList({
   masterDrawingId,
   drawings,
 }: AlignmentsListProps) {
-  const { data: alignments, isLoading } = useQuery<Alignment[]>({
+  const { data: alignmentsData, isLoading } = useQuery<DrawingAlignmentListResponse>({
     queryKey: [
       `/api/projects/${projectId}/drawings/${masterDrawingId}/alignments`,
     ],
@@ -87,7 +82,7 @@ export function AlignmentsList({
     );
   }
 
-  const list = alignments ?? [];
+  const list: DrawingAlignmentResponse[] = alignmentsData?.items ?? [];
 
   return (
     <Card>
@@ -105,7 +100,7 @@ export function AlignmentsList({
         ) : (
           <div className="space-y-3">
             {list.map((a) => {
-              const config = statusConfig[a.status] ?? {
+              const config = statusConfig[a.status as keyof typeof statusConfig] ?? {
                 label: a.status,
                 variant: "outline" as const,
               };

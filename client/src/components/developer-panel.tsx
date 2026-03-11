@@ -16,19 +16,19 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRunDrawingDiff } from "@/hooks/use-drawing-diffs";
 import { useToast } from "@/hooks/use-toast";
-
-type Project = { id: string | number; name: string };
-type Drawing = { id: number; name?: string };
-type Region = { id: number; label: string };
-type Alignment = {
-  id: number;
-  sub_drawing_id: number;
-  status: "queued" | "processing" | "complete" | "failed";
-  error_message: string | null;
-};
+import type {
+  ProjectListResponse,
+  ProjectResponse,
+  DrawingResponse,
+  DrawingRegionResponse,
+  DrawingAlignmentCreate,
+  DrawingAlignmentResponse,
+  DrawingAlignmentListResponse,
+  DrawingDiffResponse,
+} from "@shared/schema";
 
 const ALIGNMENT_STATUS_CONFIG: Record<
-  Alignment["status"],
+  "queued" | "processing" | "complete" | "failed",
   { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
 > = {
   queued: { label: "Queued", variant: "secondary" },
@@ -37,7 +37,7 @@ const ALIGNMENT_STATUS_CONFIG: Record<
   failed: { label: "Failed", variant: "destructive" },
 };
 
-function resolveDrawingName(drawings: Drawing[], id: number): string {
+function resolveDrawingName(drawings: DrawingResponse[], id: number): string {
   const d = drawings.find((x) => x.id === id);
   return d?.name || `Drawing ${id}`;
 }
@@ -83,7 +83,7 @@ async function createAlignment(
 async function fetchAlignments(
   projectId: string,
   masterDrawingId: string
-): Promise<Alignment[]> {
+): Promise<DrawingAlignmentListResponse> {
   const res = await fetch(
     `/api/projects/${projectId}/drawings/${masterDrawingId}/alignments`,
     { credentials: "include" }
@@ -92,24 +92,14 @@ async function fetchAlignments(
   return res.json();
 }
 
-type DiffItem = {
-  id: number;
-  alignment_id: number;
-  finding_id: number | null;
-  summary: string;
-  severity: string;
-  diff_regions: Array<{ page: number; type: string; points: number[][]; label?: string; confidence: number }>;
-  created_at: string;
-};
-
 interface DeveloperPanelProps {
   projectId: string | null;
   masterDrawingId: string | null;
   selectedAlignmentId: number | null;
   onAlignmentChange: (id: number | null) => void;
-  projects: Project[];
-  drawings: Drawing[];
-  diffs?: DiffItem[];
+  projects: ProjectResponse[];
+  drawings: DrawingResponse[];
+  diffs?: DrawingDiffResponse[];
   diffsLoading?: boolean;
   onDiffRunningChange?: (running: boolean) => void;
   projectsLoading?: boolean;
@@ -166,7 +156,7 @@ export function DeveloperPanel({
   });
 
   // Section B
-  const { data: regions } = useQuery<Region[]>({
+  const { data: regions } = useQuery<DrawingRegionResponse[]>({
     queryKey: [`/api/projects/${projectId}/drawings/${masterDrawingId}/regions`],
     enabled: !!projectId && !!masterDrawingId,
   });
@@ -180,7 +170,7 @@ export function DeveloperPanel({
 
   const alignmentMutation = useMutation({
     mutationFn: () => {
-      const body: { sub_drawing_id: number; region_id?: number; method: string } = {
+      const body: DrawingAlignmentCreate = {
         sub_drawing_id: parseInt(subDrawingId!, 10),
         method: "manual",
       };
@@ -204,14 +194,12 @@ export function DeveloperPanel({
     isLoading: alignmentsLoading,
     refetch: refetchAlignments,
     isFetching: alignmentsFetching,
-  } = useQuery<{ items: Alignment[] } | Alignment[]>({
+  } = useQuery<DrawingAlignmentListResponse>({
     queryKey: [`/api/projects/${projectId}/drawings/${masterDrawingId}/alignments`],
     enabled: !!projectId && !!masterDrawingId,
   });
 
-  const alignments = Array.isArray(alignmentsData)
-    ? alignmentsData
-    : (alignmentsData?.items ?? []);
+  const alignments: DrawingAlignmentResponse[] = alignmentsData?.items ?? [];
 
   const canCreateRegion = projectId && masterDrawingId && regionLabel.trim();
   const canCreateAlignment = projectId && masterDrawingId && subDrawingId;
@@ -431,7 +419,7 @@ export function DeveloperPanel({
               ) : (
                 <div className="space-y-2">
                   {(alignments ?? []).map((a) => {
-                    const config = ALIGNMENT_STATUS_CONFIG[a.status] ?? {
+                    const config = ALIGNMENT_STATUS_CONFIG[a.status as keyof typeof ALIGNMENT_STATUS_CONFIG] ?? {
                       label: a.status,
                       variant: "outline" as const,
                     };

@@ -12,21 +12,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-
-type Drawing = { id: number; name?: string };
-type Region = { id: number; label: string };
+import type {
+  DrawingResponse,
+  DrawingRegionResponse,
+  DrawingAlignmentCreate,
+} from "@shared/schema";
 
 interface AttachSubDrawingFormProps {
   projectId: string | null;
   masterDrawingId: string | null;
-  drawings: Drawing[];
+  drawings: DrawingResponse[];
   drawingsLoading?: boolean;
 }
 
 async function fetchRegions(
   projectId: string,
   masterDrawingId: string
-): Promise<Region[]> {
+): Promise<DrawingRegionResponse[]> {
   const res = await fetch(
     `/api/projects/${projectId}/drawings/${masterDrawingId}/regions`,
     { credentials: "include" }
@@ -38,7 +40,7 @@ async function fetchRegions(
 async function createAlignment(
   projectId: string,
   masterDrawingId: string,
-  body: { sub_drawing_id: number; region_id?: number; method: string }
+  body: DrawingAlignmentCreate
 ) {
   const res = await fetch(
     `/api/projects/${projectId}/drawings/${masterDrawingId}/alignments`,
@@ -72,7 +74,7 @@ export function AttachSubDrawingForm({
   const [regionId, setRegionId] = useState<string | null>(null);
   const method = "manual";
 
-  const { data: regions, isLoading: regionsLoading } = useQuery<Region[]>({
+  const { data: regions, isLoading: regionsLoading } = useQuery<DrawingRegionResponse[]>({
     queryKey: [
       `/api/projects/${projectId}/drawings/${masterDrawingId}/regions`,
     ],
@@ -84,11 +86,7 @@ export function AttachSubDrawingForm({
   ) ?? [];
 
   const createMutation = useMutation({
-    mutationFn: (body: {
-      sub_drawing_id: number;
-      region_id?: number;
-      method: string;
-    }) =>
+    mutationFn: (body: DrawingAlignmentCreate) =>
       createAlignment(projectId!, masterDrawingId!, body),
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -119,11 +117,10 @@ export function AttachSubDrawingForm({
     e.preventDefault();
     if (!canSubmit) return;
 
-    const body: { sub_drawing_id: number; region_id?: number; method: string } =
-      {
-        sub_drawing_id: parseInt(subDrawingId!, 10),
-        method,
-      };
+    const body: DrawingAlignmentCreate = {
+      sub_drawing_id: parseInt(subDrawingId!, 10),
+      method,
+    };
     if (regionId) body.region_id = parseInt(regionId, 10);
 
     createMutation.mutate(body);

@@ -10,7 +10,6 @@ from models.schemas import (
     ProjectListResponse,
     DashboardSummaryResponse,
     DrawingResponse,
-    JobResponse,
     JobListResponse,
 )
 from models.models import Drawing, Project
@@ -83,11 +82,11 @@ def get_project_jobs(
 ):
     storage = StorageService(db)
     project = storage.get_project(project_id)
-    if not project:
+    if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
     jobs = storage.get_project_jobs(project_id=project_id, status=status)
-    return JobListResponse(jobs=[JobResponse.model_validate(job) for job in jobs])
+    return {"jobs": jobs}
 
 
 @router.post("/{project_id}/drawings", response_model=DrawingResponse)

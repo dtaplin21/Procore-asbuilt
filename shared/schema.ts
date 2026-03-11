@@ -29,6 +29,132 @@ export interface Project {
 
 export type InsertProject = Omit<Project, "id">;
 
+// ----------------------------
+// Project API types (matches backend ProjectCreate, ProjectUpdate, ProjectResponse, ProjectListResponse)
+// ----------------------------
+
+export interface ProjectCreate {
+  company_id: number;
+  name: string;
+  status?: ProjectStatus;
+  procore_project_id?: string | null;
+}
+
+export interface ProjectUpdate {
+  name?: string | null;
+  status?: ProjectStatus | null;
+  procore_project_id?: string | null;
+}
+
+export interface ProjectResponse {
+  id: number;
+  company_id: number;
+  name: string;
+  status: ProjectStatus;
+  procore_project_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectListResponse {
+  items: ProjectResponse[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+// ----------------------------
+// Drawing API types (matches backend DrawingResponse)
+// ----------------------------
+
+export interface DrawingResponse {
+  id: number;
+  name: string;
+  file_url?: string | null;
+  content_type?: string | null;
+  page_count?: number | null;
+  created_at: string;
+}
+
+// ----------------------------
+// Evidence API types (matches backend EvidenceRecordResponse, EvidenceListResponse)
+// ----------------------------
+
+export interface EvidenceRecordResponse {
+  id: number;
+  type: string;
+  trade?: string | null;
+  spec_section?: string | null;
+  title: string;
+  file_url?: string | null;
+  content_type?: string | null;
+  created_at: string;
+}
+
+export interface EvidenceListResponse {
+  items: EvidenceRecordResponse[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+// ----------------------------
+// Drawing Region API types (matches backend DrawingRegionCreate, DrawingRegionResponse)
+// geometry: rect { type, x, y, width, height } or polygon { type, points } — normalized 0-1
+// ----------------------------
+
+export interface DrawingRegionCreate {
+  label: string;
+  page?: number;
+  geometry: Record<string, unknown>; // { type: "rect", x, y, width, height } or { type: "polygon", points }
+}
+
+export interface DrawingRegionResponse {
+  id: number;
+  master_drawing_id: number;
+  label: string;
+  page: number;
+  geometry: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+// ----------------------------
+// Drawing Alignment API types (matches backend DrawingAlignmentCreate, DrawingAlignmentResponse, AlignmentUpdate)
+// ----------------------------
+
+export interface DrawingAlignmentCreate {
+  sub_drawing_id: number;
+  region_id?: number | null;
+  method: string; // "manual" | "feature_match" | "vision"
+}
+
+export interface DrawingAlignmentResponse {
+  id: number;
+  master_drawing_id: number;
+  sub_drawing_id: number;
+  region_id?: number | null;
+  method: string;
+  transform?: Record<string, unknown> | null;
+  status: string;
+  error_message?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AlignmentUpdate {
+  status?: string | null;
+  transform?: Record<string, unknown> | null;
+  error_message?: string | null;
+}
+
+export interface DrawingAlignmentListResponse {
+  items: DrawingAlignmentResponse[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 // Submittal (Shop Drawing) interface
 export interface Submittal {
   id: string;
@@ -135,8 +261,14 @@ export interface AIInsight {
 
 export type InsertAIInsight = Omit<AIInsight, "id">;
 
-// Drawing Diff types (matches backend DrawingDiffResponse)
+// Drawing Diff types (matches backend DrawingDiffResponse, RunDrawingDiffRequest)
 export type DrawingDiffSeverity = "low" | "medium" | "high" | "critical";
+
+/** Body for POST run drawing diff pipeline (matches backend RunDrawingDiffRequest). */
+export interface RunDrawingDiffRequest {
+  alignment_id: number;
+  strategy?: string;
+}
 
 export interface DrawingDiffRegion {
   page: number;
@@ -156,17 +288,20 @@ export interface DrawingDiff {
   createdAt: string;
 }
 
+/** Single diff item (matches backend DrawingDiffResponse; snake_case from API). */
+export interface DrawingDiffResponse {
+  id: number;
+  alignment_id: number;
+  finding_id: number | null;
+  summary: string;
+  severity: DrawingDiffSeverity;
+  diff_regions: DrawingDiffRegion[];
+  created_at: string;
+}
+
 /** Paginated list of diffs (API response shape; items use snake_case from backend). */
 export interface DrawingDiffsListResponse {
-  items: Array<{
-    id: number;
-    alignment_id: number;
-    finding_id: number | null;
-    summary: string;
-    severity: DrawingDiffSeverity;
-    diff_regions: DrawingDiffRegion[];
-    created_at: string;
-  }>;
+  items: DrawingDiffResponse[];
   total: number;
   limit: number;
   offset: number;
@@ -243,34 +378,38 @@ export interface DashboardStats {
 // A minimal project summary returned by the dashboard endpoint. This mirrors
 // ``ProjectSummary`` on the backend and is intentionally small so the UI can
 // show basic information even before the full project record is fetched.
+// Uses snake_case to match API response.
 export interface ProjectSummary {
-  id: string;
+  id: number;
   name: string;
-  companyId: string;
-  procoreProjectId?: string;
+  company_id: number;
+  procore_project_id?: string | null;
 }
 
 // Active company context information used for display/validation.
+// Uses snake_case to match API response.
 export interface CompanyContext {
-  activeCompanyId?: string; // null when there is no active connection
-  projectCompanyId: string;
-  matchesActiveCompany: boolean;
+  active_company_id?: number | null;
+  project_company_id: number;
+  matches_active_company: boolean;
 }
 
 // Synchronization health status shown on the dashboard header.
+// Uses snake_case to match API response.
 export interface SyncHealth {
   connected: boolean;
-  syncStatus: "idle" | "syncing" | "error";
-  projectLastSyncAt?: string;
-  tokenExpiresAt?: string;
-  errorMessage?: string;
+  sync_status: "idle" | "syncing" | "error";
+  project_last_sync_at?: string | null;
+  token_expires_at?: string | null;
+  error_message?: string | null;
 }
 
 // Summary for the currently selected drawing, if any.
+// Uses snake_case to match API response.
 export interface CurrentDrawing {
-  id: string;
+  id: number;
   name: string;
-  updatedAt: string;
+  updated_at: string;
 }
 
 export type ProjectSummaryKpis = {
@@ -284,11 +423,12 @@ export type ProjectSummaryKpis = {
 // Top-level dashboard summary response type. This matches the shape of the
 // ``DashboardSummaryResponse`` pydantic model on the backend and is returned by
 // GET /api/projects/{project_id}/dashboard/summary.
+// Uses snake_case to match API response.
 export interface DashboardSummary {
   project: ProjectSummary;
-  companyContext: CompanyContext;
-  syncHealth: SyncHealth;
-  currentDrawing: CurrentDrawing | null;
+  company_context: CompanyContext;
+  sync_health: SyncHealth;
+  current_drawing: CurrentDrawing | null;
   kpis: ProjectSummaryKpis;
 }
 
@@ -351,3 +491,24 @@ export interface ProcoreWritebackResponse {
   message?: string;
   procore_response?: unknown | null;
 }
+
+// Job Queue (matches backend JobResponse)
+export type JobResponse = {
+  id: number;
+  user_id?: number | null;
+  company_id?: number | null;
+  project_id?: number | null;
+  job_type: string;
+  status: string;
+  input_data?: Record<string, unknown> | null;
+  output_url?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  error_message?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type JobListResponse = {
+  jobs: JobResponse[];
+};

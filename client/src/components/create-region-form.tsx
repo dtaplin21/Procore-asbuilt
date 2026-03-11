@@ -14,15 +14,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-
-type Project = { id: string | number; name: string };
-type Drawing = { id: number; name?: string };
+import type {
+  ProjectResponse,
+  DrawingResponse,
+  DrawingRegionCreate,
+  DrawingRegionResponse,
+} from "@shared/schema";
 
 interface CreateRegionFormProps {
   projectId: string | null;
   masterDrawingId: string | null;
-  projects: Project[];
-  drawings: Drawing[];
+  projects: ProjectResponse[];
+  drawings: DrawingResponse[];
   projectsLoading?: boolean;
   drawingsLoading?: boolean;
   onProjectChange: (id: string | null) => void;
@@ -47,8 +50,8 @@ interface PolygonGeometry {
 async function createRegion(
   projectId: string,
   masterDrawingId: string,
-  body: { label: string; page: number; geometry: RectGeometry | PolygonGeometry }
-) {
+  body: DrawingRegionCreate
+): Promise<DrawingRegionResponse> {
   const res = await fetch(
     `/api/projects/${projectId}/drawings/${masterDrawingId}/regions`,
     {
@@ -105,18 +108,14 @@ export function CreateRegionForm({
     "[[0.1,0.2],[0.2,0.25],[0.18,0.35]]"
   );
 
-  const createMutation = useMutation({
-    mutationFn: (body: {
-      label: string;
-      page: number;
-      geometry: RectGeometry | PolygonGeometry;
-    }) =>
+  const createMutation = useMutation<DrawingRegionResponse, Error, DrawingRegionCreate>({
+    mutationFn: (body) =>
       createRegion(
         projectId!,
         masterDrawingId!,
         body
       ),
-    onSuccess: () => {
+    onSuccess: (region: DrawingRegionResponse) => {
       queryClient.invalidateQueries({
         queryKey: [
           `/api/projects/${projectId}/drawings/${masterDrawingId}/regions`,

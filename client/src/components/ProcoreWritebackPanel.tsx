@@ -24,7 +24,7 @@ import { useInspectionRuns } from "@/hooks/use-inspection-runs";
 import { useProcoreWriteback } from "@/hooks/use-procore-writeback";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import type { ProcoreWritebackResponse } from "@shared/schema";
+import type { ProcoreWritebackResponse, ProjectListResponse } from "@shared/schema";
 import { AlertTriangle, Loader2, Upload } from "lucide-react";
 
 interface ProcoreWritebackPanelProps {
@@ -60,11 +60,11 @@ export function ProcoreWritebackPanel({
   const { toast } = useToast();
   const [selectedInspectionRunId, setSelectedInspectionRunId] = useState<number | null>(null);
 
-  const { data: projectsData } = useQuery<{ items: { id: number | string; name: string }[] } | { id: number | string; name: string }[]>({
+  const { data: projectsData } = useQuery<ProjectListResponse>({
     queryKey: ["/api/projects"],
     enabled: !!projectId && !projectName,
   });
-  const projects = Array.isArray(projectsData) ? projectsData : (projectsData?.items ?? []);
+  const projects = projectsData?.items ?? [];
   const resolvedProjectName = projectName ?? projects.find((p) => String(p.id) === String(projectId))?.name ?? null;
   const [previewData, setPreviewData] = useState<ProcoreWritebackResponse | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);

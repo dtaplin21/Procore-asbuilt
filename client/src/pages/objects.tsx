@@ -36,11 +36,13 @@ import { StatusBadge } from "@/components/status-badge";
 import { DeveloperPanel } from "@/components/developer-panel";
 import { DrawingDiffOverlay } from "@/components/drawing-diff-overlay";
 import { ProcoreWritebackPanel } from "@/components/ProcoreWritebackPanel";
-import type { DrawingObject, ObjectStatus } from "@shared/schema";
+import type {
+  DrawingObject,
+  ObjectStatus,
+  ProjectListResponse,
+  DrawingResponse,
+} from "@shared/schema";
 import { useDrawingDiffs } from "@/hooks/use-drawing-diffs";
-
-type Project = { id: string | number; name: string };
-type Drawing = { id: number; name?: string };
 
 const statusConfig: Record<ObjectStatus, { label: string; color: string }> = {
   not_started: { label: "Not Started", color: "bg-foreground/30" },
@@ -62,21 +64,17 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
   const [showDiffOverlay, setShowDiffOverlay] = useState(true);
   const [diffRunning, setDiffRunning] = useState(false);
 
-  const { data: projectsData, isLoading: projectsLoading } = useQuery<
-    Project[] | { items: Project[] }
-  >({
+  const { data: projectsData, isLoading: projectsLoading } = useQuery<ProjectListResponse>({
     queryKey: ["/api/projects"],
   });
 
-  const { data: drawingsData, isLoading: drawingsLoading } = useQuery<
-    Drawing[] | { items: Drawing[] }
-  >({
+  const { data: drawingsData, isLoading: drawingsLoading } = useQuery<DrawingResponse[]>({
     queryKey: [`/api/projects/${selectedProjectId}/drawings`],
     enabled: !!selectedProjectId,
   });
 
-  const projects = Array.isArray(projectsData) ? projectsData : (projectsData?.items ?? []);
-  const drawings = Array.isArray(drawingsData) ? drawingsData : (drawingsData?.items ?? []);
+  const projects = projectsData?.items ?? [];
+  const drawings = drawingsData ?? [];
 
   const { data: objects, isLoading } = useQuery<DrawingObject[]>({
     queryKey: ["/api/objects"],

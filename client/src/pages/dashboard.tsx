@@ -18,13 +18,11 @@ import type {
   DashboardStats,
   AIInsight,
   ProcoreConnection,
-  DashboardSummary
+  DashboardSummary,
+  ProjectListResponse,
+  JobListResponse,
 } from "@shared/schema";
-
-type Project = {
-  id: string | number;
-  name: string;
-};
+import JobQueueList from "@/components/JobQueueList";
 
 function getProjectIdFromUrl(): string | null {
   const sp = new URLSearchParams(window.location.search);
@@ -72,13 +70,25 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
   });
 
   // Projects list for selector (Phase 1 / Step 3)
-  const { data: projectsData, isLoading: projectsLoading } = useQuery<
-    Project[] | { items: Project[] }
-  >({
+  const { data: projectsData, isLoading: projectsLoading } = useQuery<ProjectListResponse>({
     queryKey: ["/api/projects"],
   });
 
-  const projects = Array.isArray(projectsData) ? projectsData : (projectsData?.items ?? []);
+  const projects = projectsData?.items ?? [];
+
+  // Project jobs (GET /api/projects/{id}/jobs)
+  const {
+    data: jobsData,
+    isLoading: jobsLoading,
+    error: jobsError,
+  } = useQuery<JobListResponse>({
+    queryKey: [
+      selectedProjectId
+        ? `/api/projects/${selectedProjectId}/jobs`
+        : "/api/projects/",
+    ],
+    enabled: !!selectedProjectId,
+  });
 
   // Project-specific summary (Phase 0 change)
   const { data: projectSummary, isLoading: projectSummaryLoading } = useQuery<DashboardSummary>({
@@ -244,6 +254,22 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
         </CardContent>
       </Card>
 
+
+      {/* Job Queue */}
+      {selectedProjectId && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Job Queue</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <JobQueueList
+              jobs={jobsData?.jobs ?? []}
+              isLoading={jobsLoading}
+              error={jobsError instanceof Error ? jobsError.message : null}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Critical Alerts Banner */}
       {stats && stats.criticalAlerts > 0 && (

@@ -9,25 +9,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { DrawingDiffSeverity } from "@shared/schema";
-
-type DiffRegion = {
-  page: number;
-  type: "rect" | "polygon";
-  points: number[][];
-  label?: string;
-  confidence: number;
-};
-
-type DiffItem = {
-  id: number;
-  alignment_id: number;
-  finding_id: number | null;
-  summary: string;
-  severity: DrawingDiffSeverity;
-  diff_regions: DiffRegion[];
-  created_at: string;
-};
+import type {
+  DrawingDiffSeverity,
+  DrawingDiffRegion,
+  DrawingDiffResponse,
+} from "@shared/schema";
 
 const SEVERITY_STYLES: Record<
   DrawingDiffSeverity,
@@ -43,7 +29,7 @@ const SEVERITY_STYLES: Record<
  * Converts normalized (0-1) region points to SVG polygon/rect coordinates.
  * SVG uses viewBox="0 0 1 1" so normalized coords map directly.
  */
-function regionToPathData(region: DiffRegion): string {
+function regionToPathData(region: DrawingDiffRegion): string {
   const { type, points } = region;
   if (!points || points.length === 0) return "";
 
@@ -66,7 +52,7 @@ function regionToPathData(region: DiffRegion): string {
 }
 
 interface DrawingDiffOverlayProps {
-  diffs: DiffItem[];
+  diffs: DrawingDiffResponse[];
   visible: boolean;
   onVisibilityChange: (visible: boolean) => void;
   diffRunning?: boolean;
@@ -84,7 +70,7 @@ export function DrawingDiffOverlay({
   page = 1,
 }: DrawingDiffOverlayProps) {
   const regions = useMemo(() => {
-    const out: { diff: DiffItem; region: DiffRegion; regionIdx: number }[] = [];
+    const out: { diff: DrawingDiffResponse; region: DrawingDiffRegion; regionIdx: number }[] = [];
     for (const diff of diffs) {
       (diff.diff_regions ?? []).forEach((region, idx) => {
         if (region.page === page) {

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DrawingDiffsListResponse } from "@shared/schema";
+import type { DrawingDiffsListResponse, RunDrawingDiffRequest } from "@shared/schema";
 
 /**
  * Fetch drawing diffs for a master drawing.
@@ -24,20 +24,10 @@ export function useDrawingDiffs(
   });
 }
 
-type DiffItem = {
-  id: number;
-  alignment_id: number;
-  finding_id: number | null;
-  summary: string;
-  severity: string;
-  diff_regions: unknown[];
-  created_at: string;
-};
-
 /**
  * Run the diff pipeline for an alignment.
  * POST /api/projects/${projectId}/drawings/${masterDrawingId}/diffs
- * Body: { alignment_id: number }
+ * Body: RunDrawingDiffRequest
  *
  * Invalidates all diff queries for this project+drawing on success.
  */
@@ -47,17 +37,22 @@ export function useRunDrawingDiff(
 ) {
   const queryClient = useQueryClient();
 
-  return useMutation<DiffItem[], Error, { alignmentId: number }>({
+  return useMutation<
+    DrawingDiffsListResponse["items"],
+    Error,
+    { alignmentId: number }
+  >({
     mutationFn: async ({ alignmentId }) => {
       if (!projectId || !masterDrawingId) {
         throw new Error("Project and master drawing required");
       }
       const url = `/api/projects/${projectId}/drawings/${masterDrawingId}/diffs`;
+      const body: RunDrawingDiffRequest = { alignment_id: alignmentId };
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ alignment_id: alignmentId }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
