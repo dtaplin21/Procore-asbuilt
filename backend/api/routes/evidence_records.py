@@ -10,6 +10,9 @@ from models.schemas import (
     EvidenceRecordUpdate,
     EvidenceRecordResponse,
     EvidenceRecordListResponse,
+    EvidenceDrawingLinkResponse,
+    EvidenceDrawingLinkListResponse,
+    EvidenceDrawingLinkCreate,
 )
 
 router = APIRouter(prefix="/api/projects", tags=["evidence-records"])
@@ -99,3 +102,84 @@ def delete_evidence_record(
         raise HTTPException(status_code=404, detail="Evidence record not found")
 
     return {"ok": True}
+
+
+@router.post(
+    "/{project_id}/evidence-records/{evidence_id}/link-drawings",
+    response_model=EvidenceDrawingLinkListResponse,
+)
+def link_evidence_to_drawings(
+    project_id: int,
+    evidence_id: int,
+    db: Session = Depends(get_db),
+):
+    storage = StorageService(db)
+
+    project = storage.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    record = storage.get_evidence_record(project_id=project_id, evidence_id=evidence_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Evidence record not found")
+
+    links = storage.relink_evidence_to_drawings(
+        project_id=project_id,
+        evidence_id=evidence_id,
+    )
+    return {"links": links}
+
+
+@router.get(
+    "/{project_id}/evidence-records/{evidence_id}/drawing-links",
+    response_model=EvidenceDrawingLinkListResponse,
+)
+def list_evidence_drawing_links(
+    project_id: int,
+    evidence_id: int,
+    db: Session = Depends(get_db),
+):
+    storage = StorageService(db)
+
+    project = storage.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    links = storage.list_evidence_drawing_links(
+        project_id=project_id,
+        evidence_id=evidence_id,
+    )
+    return {"links": links}
+
+
+@router.post(
+    "/{project_id}/evidence-records/{evidence_id}/drawing-links",
+    response_model=EvidenceDrawingLinkResponse,
+)
+def create_manual_evidence_drawing_link(
+    project_id: int,
+    evidence_id: int,
+    payload: EvidenceDrawingLinkCreate,
+    db: Session = Depends(get_db),
+):
+    storage = StorageService(db)
+
+    project = storage.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    record = storage.get_evidence_record(project_id=project_id, evidence_id=evidence_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Evidence record not found")
+
+    link = storage.create_manual_evidence_drawing_link(
+        project_id=project_id,
+        evidence_id=evidence_id,
+        drawing_id=payload.drawing_id,
+        link_type=payload.link_type,
+        matched_text=payload.matched_text,
+        confidence=payload.confidence,
+        source=payload.source,
+        is_primary=payload.is_primary,
+    )
+    return link

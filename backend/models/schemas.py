@@ -272,6 +272,36 @@ class RfiIngestionResponse(BaseModel):
     records: List[EvidenceRecordResponse]
 
 
+class EvidenceDrawingLinkResponse(BaseModel):
+    id: int
+    project_id: int
+    evidence_id: int
+    drawing_id: int
+    link_type: str
+    matched_text: str | None = None
+    confidence: float | None = None
+    source: str
+    is_primary: bool
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class EvidenceDrawingLinkCreate(BaseModel):
+    drawing_id: int
+    link_type: str = "manual"
+    matched_text: Optional[str] = None
+    confidence: Optional[float] = None
+    source: str = "manual"
+    is_primary: bool = False
+
+
+class EvidenceDrawingLinkListResponse(BaseModel):
+    links: List[EvidenceDrawingLinkResponse]
+
+
 class InspectionListResponse(BaseModel):
     """Paginated list of inspection records (dict items)."""
     items: List[Dict[str, Any]]

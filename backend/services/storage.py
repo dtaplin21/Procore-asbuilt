@@ -22,6 +22,7 @@ from models.models import (
     DrawingAlignment,
     DrawingDiff,
     EvidenceRecord,
+    EvidenceDrawingLink,
     UsageLog,
     InspectionRun,
     InspectionResult,
@@ -29,6 +30,7 @@ from models.models import (
     ProcoreWriteback,
 )
 from services.procore_connection_store import get_active_connection
+from services.evidence_linking import replace_evidence_drawing_links
 
 
 class StorageService:
@@ -614,6 +616,62 @@ class StorageService:
 
         self.db.refresh(record)
         return record
+
+    def relink_evidence_to_drawings(
+        self,
+        project_id: int,
+        evidence_id: int,
+    ) -> List[EvidenceDrawingLink]:
+        record = self.get_evidence_record(project_id=project_id, evidence_id=evidence_id)
+        if record is None:
+            return []
+        return replace_evidence_drawing_links(self.db, record)
+
+    def list_evidence_drawing_links(
+        self,
+        project_id: int,
+        evidence_id: int,
+    ) -> List[EvidenceDrawingLink]:
+        return (
+            self.db.query(EvidenceDrawingLink)
+            .filter(
+                EvidenceDrawingLink.project_id == project_id,
+                EvidenceDrawingLink.evidence_id == evidence_id,
+            )
+            .order_by(EvidenceDrawingLink.id.asc())
+            .all()
+        )
+
+    def create_manual_evidence_drawing_link(
+        self,
+        project_id: int,
+        evidence_id: int,
+        *,
+        drawing_id: int,
+        link_type: str = "manual",
+        matched_text: Optional[str] = None,
+        confidence: Optional[float] = None,
+        source: str = "manual",
+        is_primary: bool = False,
+    ) -> EvidenceDrawingLink:
+        link = EvidenceDrawingLink(
+            project_id=project_id,
+            evidence_id=evidence_id,
+            drawing_id=drawing_id,
+            link_type=link_type,
+            matched_text=matched_text,
+            confidence=confidence,
+            source=source,
+            is_primary=is_primary,
+        )
+        self.db.add(link)
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(link)
+        return link
 
     def delete_evidence_record(
         self,

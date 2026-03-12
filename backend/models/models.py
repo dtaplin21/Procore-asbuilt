@@ -581,6 +581,32 @@ class EvidenceRecord(Base):
     inspection_runs = relationship("InspectionRun", back_populates="evidence")
 
 
+class EvidenceDrawingLink(Base):
+    __tablename__ = "evidence_drawing_links"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    evidence_id = Column(Integer, ForeignKey("evidence_records.id"), nullable=False, index=True)
+    drawing_id = Column(Integer, ForeignKey("drawings.id"), nullable=False, index=True)
+
+    link_type = Column(String(50), nullable=False, default="sheet_ref")
+    matched_text = Column(String(100), nullable=True)
+    confidence = Column(Float, nullable=True)
+    source = Column(String(50), nullable=False, default="regex")
+    is_primary = Column(Boolean, nullable=False, default=False)
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    project = relationship("Project", backref="evidence_drawing_links")
+    evidence = relationship("EvidenceRecord", backref="drawing_links")
+    drawing = relationship("Drawing", backref="evidence_links")
+
+
 class IdempotencyKey(Base):
     __tablename__ = "idempotency_keys"
     __table_args__ = (
