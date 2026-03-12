@@ -452,8 +452,10 @@ class StorageService:
             if isinstance(r, dict) and r.get("label")
         ]
 
+        master_drawing_id = cast(int, master.id)
         finding = Finding(
             project_id=project_id,
+            drawing_id=master_drawing_id,
             type=finding_type,
             severity=diff_severity,
             title=f"Mismatch on {drawing_name}",
@@ -481,6 +483,7 @@ class StorageService:
         title: str,
         description: str,
         affected_items: Optional[List[str]] = None,
+        drawing_id: Optional[int] = None,
         idempotency_key: Optional[str] = None,
     ) -> Finding:
         """Create a Finding (used by inspection pipeline, etc.)."""
@@ -491,6 +494,7 @@ class StorageService:
             title=title,
             description=description,
             affected_items=affected_items or [],
+            drawing_id=drawing_id,
         )
         self.db.add(finding)
         try:
@@ -561,6 +565,119 @@ class StorageService:
             .filter(EvidenceRecord.project_id == project_id, EvidenceRecord.id == evidence_id)
             .first()
         )
+
+    def create_evidence_record_from_data(
+        self,
+        project_id: int,
+        data: dict,
+    ) -> EvidenceRecord:
+        """Create evidence record from a dict (type, title, status, etc.)."""
+        record = EvidenceRecord(
+            project_id=project_id,
+            type=data["type"],
+            title=data["title"],
+            status=data.get("status", "new"),
+            source_id=data.get("source_id"),
+            text_content=data.get("text_content"),
+            dates=data.get("dates"),
+            attachments_json=data.get("attachments_json"),
+            cross_refs_json=data.get("cross_refs_json"),
+        )
+        self.db.add(record)
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(record)
+        return record
+
+    def update_evidence_record(
+        self,
+        project_id: int,
+        evidence_id: int,
+        updates: dict,
+    ) -> Optional[EvidenceRecord]:
+        record = self.get_evidence_record(project_id, evidence_id)
+        if record is None:
+            return None
+
+        for key, value in updates.items():
+            if hasattr(record, key):
+                setattr(record, key, value)
+
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+
+        self.db.refresh(record)
+        return record
+
+    def delete_evidence_record(
+        self,
+        project_id: int,
+        evidence_id: int,
+    ) -> bool:
+        record = self.get_evidence_record(project_id, evidence_id)
+        if record is None:
+            return False
+
+        try:
+            self.db.delete(record)
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+
+        return True
+
+    def upsert_rfi_evidence_record(
+        self,
+        project_id: int,
+        *,
+        source_id: str,
+        title: str,
+        status: str,
+        text_content: Optional[str] = None,
+        dates: Optional[Dict[str, Any]] = None,
+        attachments_json: Optional[List[Any]] = None,
+        cross_refs_json: Optional[List[Any]] = None,
+    ) -> EvidenceRecord:
+        record = (
+            self.db.query(EvidenceRecord)
+            .filter(
+                EvidenceRecord.project_id == project_id,
+                EvidenceRecord.type == "rfi",
+                EvidenceRecord.source_id == source_id,
+            )
+            .first()
+        )
+
+        if record is None:
+            record = EvidenceRecord(
+                project_id=project_id,
+                type="rfi",
+                source_id=source_id,
+            )
+            self.db.add(record)
+
+        record.title = title
+        record.status = status
+        record.text_content = text_content
+        record.dates = dates or {}
+        record.attachments_json = attachments_json or []
+        record.cross_refs_json = cross_refs_json or []
+
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+
+        self.db.refresh(record)
+        return record
 
     # ------------------------------------------------------------------
     # Inspection Runs

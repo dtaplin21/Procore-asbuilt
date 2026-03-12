@@ -218,12 +218,45 @@ class EvidenceRecordResponse(BaseModel):
     trade: Optional[str] = None
     spec_section: Optional[str] = None
     title: str
+    status: Optional[str] = None
+    source_id: Optional[str] = None
+    text_content: Optional[str] = None
+    dates: Optional[Dict[str, Any]] = None
+    attachments_json: Optional[List[Any]] = None
+    cross_refs_json: Optional[List[Any]] = None
     file_url: Optional[str] = None
     content_type: Optional[str] = None
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+
+class EvidenceRecordCreate(BaseModel):
+    type: str
+    title: str
+    status: Optional[str] = "new"
+    source_id: Optional[str] = None
+    text_content: Optional[str] = None
+    dates: Optional[Dict[str, Any]] = None
+    attachments_json: Optional[List[Any]] = None
+    cross_refs_json: Optional[List[Any]] = None
+
+
+class EvidenceRecordUpdate(BaseModel):
+    type: Optional[str] = None
+    title: Optional[str] = None
+    status: Optional[str] = None
+    source_id: Optional[str] = None
+    text_content: Optional[str] = None
+    dates: Optional[Dict[str, Any]] = None
+    attachments_json: Optional[List[Any]] = None
+    cross_refs_json: Optional[List[Any]] = None
+
+
+class EvidenceRecordListResponse(BaseModel):
+    evidence_records: List[EvidenceRecordResponse]
 
 
 class EvidenceListResponse(BaseModel):
@@ -232,6 +265,11 @@ class EvidenceListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class RfiIngestionResponse(BaseModel):
+    imported_count: int
+    records: List[EvidenceRecordResponse]
 
 
 class InspectionListResponse(BaseModel):

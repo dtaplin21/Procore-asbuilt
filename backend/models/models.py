@@ -553,13 +553,18 @@ class EvidenceRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
     
-    type = Column(String, nullable=False)  # 'spec' or 'inspection_doc'
+    type = Column(String(50), nullable=False)  # 'spec' or 'inspection_doc'
     trade = Column(String, nullable=True)  # e.g., 'HVAC', 'Electrical'
     spec_section = Column(String, nullable=True)  # e.g., '15830 - HVAC Controls'
-    title = Column(String, nullable=False)
+    title = Column(String(255), nullable=False)
+    status = Column(String(50), nullable=False, default="new")
+    source_id = Column(String(255), nullable=True)
     storage_key = Column(String, nullable=True)  # path in backend/uploads/
     content_type = Column(String, nullable=True)  # 'application/pdf', 'image/png', etc.
     text_content = Column(Text, nullable=True)  # Phase 4: extracted text from PDFs
+    dates = Column(JSON, nullable=True)
+    attachments_json = Column(JSON, nullable=True)
+    cross_refs_json = Column(JSON, nullable=True)
     
     # Flexible metadata for future extensions
     meta = Column(JSON, nullable=True)

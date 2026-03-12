@@ -251,6 +251,7 @@ def _create_and_persist_finding(
         title=title,
         description=description,
         affected_items=affected_items,
+        drawing_id=master_drawing_id,
     )
     return finding
 

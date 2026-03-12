@@ -3,6 +3,9 @@ from sqlalchemy.orm import Session
 
 from api.dependencies import get_db, get_idempotency_key
 from services.procore_client import ProcoreAPIClient
+from services.storage import StorageService
+from services.rfi_ingestion import ingest_rfis_for_project
+from models.schemas import RfiIngestionResponse
 from typing import Optional
 from errors import ProcoreNotConnected
 from services.procore_connection_store import get_active_connection
@@ -75,4 +78,31 @@ async def sync_procore(
             response_payload={"error": str(e), "synced": False},
         )
         raise
+
+
+@router.post("/projects/{project_id}/rfis/ingest", response_model=RfiIngestionResponse)
+async def ingest_project_rfis(
+    project_id: int,
+    user_id: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    storage = StorageService(db)
+
+    project = storage.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    records = await ingest_rfis_for_project(
+        db,
+        user_id=user_id,
+        project=project,
+    )
+
+    # Return hydrated records if you prefer, or keep the summary list from the service
+    full_records, _ = storage.list_evidence_records(project_id=project_id)
+
+    return {
+        "imported_count": len(records),
+        "records": full_records,
+    }
 
