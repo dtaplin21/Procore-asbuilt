@@ -302,6 +302,29 @@ class EvidenceDrawingLinkListResponse(BaseModel):
     links: List[EvidenceDrawingLinkResponse]
 
 
+class EvidenceMatchReason(BaseModel):
+    reason: str
+    weight: float
+    details: Optional[Dict[str, Any]] = None
+
+
+class EvidenceContextMatch(BaseModel):
+    evidence: EvidenceRecordResponse
+    score: float
+    reasons: List[EvidenceMatchReason]
+    direct_links: List[EvidenceDrawingLinkResponse] = Field(default_factory=list, serialization_alias="directLinks")
+    discipline_overlap: List[str] = Field(default_factory=list, serialization_alias="disciplineOverlap")
+    revision_proximity_days: Optional[int] = Field(
+        default=None,
+        serialization_alias="revisionProximityDays",
+    )
+
+
+class EvidenceContextResponse(BaseModel):
+    drawing: DrawingResponse
+    matches: List[EvidenceContextMatch]
+
+
 class InspectionListResponse(BaseModel):
     """Paginated list of inspection records (dict items)."""
     items: List[Dict[str, Any]]

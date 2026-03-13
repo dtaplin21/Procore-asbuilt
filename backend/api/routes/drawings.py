@@ -5,8 +5,17 @@ from sqlalchemy.orm import Session
 
 from api.dependencies import get_db, get_idempotency_key
 from models.models import Drawing
-from models.schemas import DrawingOverlayResponse, DrawingResponse
+from models.schemas import (
+    DrawingOverlayResponse,
+    DrawingResponse,
+    EvidenceContextMatch,
+    EvidenceContextResponse,
+    EvidenceMatchReason,
+    EvidenceRecordResponse,
+    EvidenceDrawingLinkResponse,
+)
 from services.storage import StorageService
+from services.evidence_retrieval import EvidenceRetrievalService
 from services.file_storage import (
     get_file_path,
     read_and_validate_upload,
@@ -118,6 +127,59 @@ def get_drawing(
     if not drawing:
         raise HTTPException(status_code=404, detail="Drawing not found")
     return DrawingResponse.from_orm(drawing)
+
+
+@router.get(
+    "/api/projects/{project_id}/drawings/{drawing_id}/evidence-context",
+    response_model=EvidenceContextResponse,
+)
+def get_drawing_evidence_context(
+    project_id: int,
+    drawing_id: int,
+    limit: int = Query(15, ge=1, le=50),
+    db: Session = Depends(get_db),
+) -> EvidenceContextResponse:
+    """
+    GET /api/projects/{project_id}/drawings/{drawing_id}/evidence-context
+
+    Return ranked evidence matches for a drawing using direct links, discipline overlap, and revision timing.
+    """
+    retrieval = EvidenceRetrievalService(db)
+    result = retrieval.get_context_for_drawing(project_id, drawing_id, limit=limit)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Drawing not found")
+
+    drawing_response = DrawingResponse.model_validate(result.drawing).model_copy(
+        update={
+            "file_url": f"/api/projects/{project_id}/drawings/{drawing_id}/file",
+        }
+    )
+    matches: List[EvidenceContextMatch] = []
+    for match in result.matches:
+        evidence_schema = EvidenceRecordResponse.model_validate(match.evidence)
+        link_schemas = [
+            EvidenceDrawingLinkResponse.model_validate(link) for link in match.direct_links
+        ]
+        reason_schemas = [
+            EvidenceMatchReason(
+                reason=reason["reason"],
+                weight=reason["weight"],
+                details=reason.get("details"),
+            )
+            for reason in match.reasons
+        ]
+        matches.append(
+            EvidenceContextMatch(
+                evidence=evidence_schema,
+                score=match.score,
+                reasons=reason_schemas,
+                direct_links=link_schemas,
+                discipline_overlap=match.discipline_overlap,
+                revision_proximity_days=match.revision_proximity_days,
+            )
+        )
+
+    return EvidenceContextResponse(drawing=drawing_response, matches=matches)
 
 
 @router.get("/api/projects/{project_id}/drawings/{drawing_id}/file", response_class=FileResponse)
