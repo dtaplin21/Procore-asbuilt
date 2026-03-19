@@ -212,17 +212,22 @@ class DrawingResponse(BaseModel):
         from_attributes = True
 
 
+class DrawingCompareRequest(BaseModel):
+    sub_drawing_id: int = Field(..., serialization_alias="subDrawingId")
+
+    model_config = {"populate_by_name": True}
+
+
 class DrawingSummary(BaseModel):
     id: int
-    project_id: int
-    source: str
+    project_id: int = Field(..., serialization_alias="projectId")
+    source: Optional[str] = None
     name: str
-    file_url: Optional[str] = None
-    content_type: Optional[str] = None
-    page_count: Optional[int] = None
+    file_url: Optional[str] = Field(default=None, serialization_alias="fileUrl")
+    content_type: Optional[str] = Field(default=None, serialization_alias="contentType")
+    page_count: Optional[int] = Field(default=None, serialization_alias="pageCount")
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
 
 class EvidenceRecordResponse(BaseModel):
@@ -424,6 +429,21 @@ class AlignmentTransform(BaseModel):
     page: int = 1
 
 
+class DrawingTransformResponse(BaseModel):
+    """
+    Rich transform shape for production alignments.
+    Supports affine/homography math, confidence + error metrics for QC.
+    """
+    type: str
+    matrix: Optional[Dict[str, float]] = None
+    homography: Optional[List[float]] = None
+    confidence: Optional[float] = None
+    residual_error: Optional[float] = None
+    source_points: Optional[List[Dict[str, float]]] = None
+    target_points: Optional[List[Dict[str, float]]] = None
+    page: Optional[int] = None
+
+
 class AlignmentUpdate(BaseModel):
     """Body for PATCH alignment status/transform."""
     status: Optional[str] = None  # queued | processing | complete | failed
@@ -433,18 +453,23 @@ class AlignmentUpdate(BaseModel):
 
 class DrawingAlignmentResponse(BaseModel):
     id: int
-    master_drawing_id: int
-    sub_drawing_id: int
-    region_id: Optional[int] = None
-    method: str
-    transform: Optional[dict] = None
-    status: str
-    error_message: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
+    project_id: Optional[int] = Field(default=None, serialization_alias="projectId")
+    master_drawing_id: int = Field(..., serialization_alias="masterDrawingId")
+    sub_drawing_id: int = Field(..., serialization_alias="subDrawingId")
+    transform_matrix: Optional[Dict[str, Any]] = Field(default=None, serialization_alias="transformMatrix", validation_alias="transform")
+    alignment_status: Optional[str] = Field(default=None, serialization_alias="alignmentStatus", validation_alias="status")
+    created_at: Optional[str] = Field(default=None, serialization_alias="createdAt")
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True, "populate_by_name": True}
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def _created_at_to_str(cls, v: Any) -> Optional[str]:
+        if v is None:
+            return None
+        if hasattr(v, "isoformat"):
+            return v.isoformat()
+        return str(v) if v else None
 
 
 class DrawingAlignmentListResponse(BaseModel):
@@ -457,11 +482,12 @@ class DrawingAlignmentListResponse(BaseModel):
 
 class DrawingDiffRegion(BaseModel):
     """A single diff region; geometry normalized 0-1."""
-    page: int
-    type: Literal["rect", "polygon"]
-    points: List[List[float]]  # polygon: [[x,y],...]; rect: [[x,y],[x+w,y],[x+w,y+h],[x,y+h]] or [x,y,w,h]
-    label: Optional[str] = None
-    confidence: float = Field(ge=0.0, le=1.0, default=1.0)
+    page: Optional[int] = None
+    bbox: Optional[Dict[str, Any]] = None
+    change_type: Optional[str] = Field(default=None, serialization_alias="changeType")
+    note: Optional[str] = None
+
+    model_config = {"populate_by_name": True, "extra": "allow"}
 
 
 class DrawingDiffCreate(BaseModel):
@@ -480,22 +506,14 @@ class RunDrawingDiffRequest(BaseModel):
 
 
 class DrawingDiffResponse(BaseModel):
-    """
-    Returned by API. Includes:
-    - diff metadata: id, alignment_id, summary, severity, created_at
-    - diff_regions: list of DrawingDiffRegion
-    - finding_id: optional link to finding
-    """
     id: int
-    alignment_id: int
-    finding_id: Optional[int] = None
-    summary: str
-    severity: str
-    diff_regions: List[DrawingDiffRegion]
-    created_at: datetime
+    alignment_id: int = Field(..., serialization_alias="alignmentId")
+    summary: Optional[str] = None
+    status: Optional[str] = Field(default=None, validation_alias="severity")
+    diff_regions: List[DrawingDiffRegion] = Field(default_factory=list, serialization_alias="diffRegions")
+    created_at: Optional[str] = Field(default=None, serialization_alias="createdAt")
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
     @field_validator("diff_regions", mode="before")
     @classmethod
@@ -503,6 +521,15 @@ class DrawingDiffResponse(BaseModel):
         if isinstance(v, list):
             return [DrawingDiffRegion.model_validate(x) if isinstance(x, dict) else x for x in v]
         return v
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def _created_at_to_str(cls, v: Any) -> Optional[str]:
+        if v is None:
+            return None
+        if hasattr(v, "isoformat"):
+            return v.isoformat()
+        return str(v) if v else None
 
 
 class DrawingDiffListResponse(BaseModel):
@@ -514,10 +541,12 @@ class DrawingDiffListResponse(BaseModel):
 
 
 class DrawingComparisonWorkspaceResponse(BaseModel):
-    master_drawing: DrawingSummary
-    sub_drawing: DrawingSummary
+    master_drawing: DrawingSummary = Field(..., serialization_alias="masterDrawing")
+    sub_drawing: DrawingSummary = Field(..., serialization_alias="subDrawing")
     alignment: DrawingAlignmentResponse
     diffs: List[DrawingDiffResponse]
+
+    model_config = {"populate_by_name": True}
 
 
 # ============================================
