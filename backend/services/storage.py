@@ -181,6 +181,10 @@ class StorageService:
             .first()
         )
 
+    def get_drawing_by_id(self, drawing_id: int) -> Optional[Drawing]:
+        """Get a drawing by ID only (no project scope)."""
+        return self.db.query(Drawing).filter(Drawing.id == drawing_id).first()
+
     # ------------------------------------------------------------------
     # Drawing Regions (Phase 2)
     # ------------------------------------------------------------------
@@ -235,9 +239,10 @@ class StorageService:
     # ------------------------------------------------------------------
 
     IDENTITY_TRANSFORM: Dict[str, Any] = {
-        "type": "homography",
+        "type": "identity",
         "matrix": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
-        "confidence": 1.0,
+        "confidence": 0.0,
+        "residual_error": None,
         "page": 1,
     }
 
@@ -249,7 +254,11 @@ class StorageService:
         *,
         region_id: Optional[int] = None,
     ) -> DrawingAlignment:
-        # MVP: manual alignments complete immediately with identity transform
+        """
+        Create alignment row. Lifecycle status:
+        - manual: complete immediately with identity transform
+        - feature_match | vision: queued (caller runs pipeline -> processing -> complete/failed)
+        """
         if method.strip().lower() == "manual":
             status = "complete"
             transform = self.IDENTITY_TRANSFORM
@@ -264,6 +273,44 @@ class StorageService:
             method=method,
             status=status,
             transform=transform,
+        )
+        self.db.add(alignment)
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(alignment)
+        return alignment
+
+    def create_drawing_alignment_with_transform(
+        self,
+        project_id: int,
+        master_drawing_id: int,
+        sub_drawing_id: int,
+        transform_matrix: Dict[str, Any],
+        alignment_status: str = "manual_mvp",
+        *,
+        region_id: Optional[int] = None,
+    ) -> DrawingAlignment:
+        """
+        Create alignment with explicit transform and status.
+        project_id is used for validation (drawings must belong to project).
+        Maps transform_matrix -> transform, alignment_status -> status.
+        """
+        if self.get_drawing(project_id, master_drawing_id) is None:
+            raise ValueError(f"Master drawing {master_drawing_id} not found in project")
+        if self.get_drawing(project_id, sub_drawing_id) is None:
+            raise ValueError(f"Sub drawing {sub_drawing_id} not found in project")
+
+        method = "manual"
+        alignment = DrawingAlignment(
+            master_drawing_id=master_drawing_id,
+            sub_drawing_id=sub_drawing_id,
+            region_id=region_id,
+            method=method,
+            status=alignment_status,
+            transform=transform_matrix,
         )
         self.db.add(alignment)
         try:
@@ -319,16 +366,50 @@ class StorageService:
         self,
         master_drawing_id: int,
         sub_drawing_id: int,
+        project_id: Optional[int] = None,
     ) -> Optional[DrawingAlignment]:
-        return (
+        """
+        Get alignment for a master/sub drawing pair.
+        If project_id is provided, validates master drawing belongs to project.
+        """
+        base = (
             self.db.query(DrawingAlignment)
             .filter(
                 DrawingAlignment.master_drawing_id == master_drawing_id,
                 DrawingAlignment.sub_drawing_id == sub_drawing_id,
             )
-            .order_by(DrawingAlignment.updated_at.desc(), DrawingAlignment.id.desc())
+        )
+        if project_id is not None:
+            base = base.join(Drawing, DrawingAlignment.master_drawing_id == Drawing.id).filter(
+                Drawing.project_id == project_id
+            )
+        return (
+            base.order_by(DrawingAlignment.updated_at.desc(), DrawingAlignment.id.desc())
             .first()
         )
+
+    def get_reusable_alignment(
+        self,
+        master_drawing_id: int,
+        sub_drawing_id: int,
+    ) -> Optional[DrawingAlignment]:
+        """
+        Return alignment with a valid transform if one exists.
+        Reusable = status complete and transform present with matrix.
+        """
+        alignment = self.get_alignment_by_drawing_pair(
+            master_drawing_id=master_drawing_id,
+            sub_drawing_id=sub_drawing_id,
+        )
+        if alignment is None:
+            return None
+        transform = getattr(alignment, "transform", None)
+        if not transform or not transform.get("matrix"):
+            return None
+        status = getattr(alignment, "status", "")
+        if status != "complete":
+            return None
+        return alignment
 
     def update_alignment_status(
         self,
@@ -413,14 +494,11 @@ class StorageService:
         )
         return items, total
 
-    def list_drawing_diffs_by_alignment(
-        self,
-        alignment_id: int,
-    ) -> List[DrawingDiff]:
+    def list_drawing_diffs_by_alignment(self, alignment_id: int) -> List[DrawingDiff]:
         return (
             self.db.query(DrawingDiff)
             .filter(DrawingDiff.alignment_id == alignment_id)
-            .order_by(DrawingDiff.created_at.desc(), DrawingDiff.id.desc())
+            .order_by(DrawingDiff.created_at.asc())
             .all()
         )
 
@@ -747,12 +825,12 @@ class StorageService:
             )
             self.db.add(record)
 
-        record.title = title
-        record.status = status
-        record.text_content = text_content
-        record.dates = dates or {}
-        record.attachments_json = attachments_json or []
-        record.cross_refs_json = cross_refs_json or []
+        setattr(record, "title", title)
+        setattr(record, "status", status)
+        setattr(record, "text_content", text_content)
+        setattr(record, "dates", dates or {})
+        setattr(record, "attachments_json", attachments_json or [])
+        setattr(record, "cross_refs_json", cross_refs_json or [])
 
         try:
             self.db.commit()
