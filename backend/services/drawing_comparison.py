@@ -10,8 +10,14 @@ from models.models import Drawing, DrawingAlignment, DrawingDiff
 from models.schemas import (
     DrawingSummary,
     DrawingAlignmentResponse,
+    DrawingAlignmentHistoryResponse,
+    DrawingAlignmentHistoryListResponse,
+    DrawingBasicSummary,
     DrawingDiffResponse,
     DrawingDiffRegion,
+    DrawingDiffHistoryResponse,
+    DrawingDiffHistoryListResponse,
+    DrawingDiffRegionResponse,
 )
 from services.file_storage import get_file_path
 from services.storage import StorageService
@@ -59,6 +65,30 @@ class DrawingComparisonService:
             page_count=getattr(drawing, "page_count", None),
         )
 
+    def _serialize_alignment_history(self, alignment: DrawingAlignment) -> DrawingAlignmentHistoryResponse:
+        """Serialize alignment for history view with sub drawing metadata."""
+        sub_drawing = getattr(alignment, "sub_drawing", None)
+        if sub_drawing is None:
+            sub_drawing = self.storage.get_drawing_by_id(cast(int, alignment.sub_drawing_id))
+        if sub_drawing is None:
+            raise ValueError(f"Sub drawing {alignment.sub_drawing_id} not found")
+        project_id = None
+        if getattr(alignment, "master_drawing", None) is not None:
+            project_id = cast(int, alignment.master_drawing.project_id)
+        return DrawingAlignmentHistoryResponse(
+            id=cast(int, alignment.id),
+            project_id=project_id,
+            master_drawing_id=cast(int, alignment.master_drawing_id),
+            sub_drawing_id=cast(int, alignment.sub_drawing_id),
+            alignment_status=getattr(alignment, "alignment_status", None) or getattr(alignment, "status", None),
+            transform_matrix=getattr(alignment, "transform_matrix", None) or getattr(alignment, "transform", None),
+            created_at=alignment.created_at.isoformat() if getattr(alignment, "created_at", None) else None,
+            sub_drawing=DrawingBasicSummary(
+                id=cast(int, sub_drawing.id),
+                name=cast(str, sub_drawing.name),
+            ),
+        )
+
     def _serialize_alignment(self, alignment: DrawingAlignment) -> DrawingAlignmentResponse:
         project_id = None
         if alignment.master_drawing is not None:
@@ -94,6 +124,43 @@ class DrawingComparisonService:
             diff_regions=diff_regions,
             created_at=diff.created_at.isoformat() if getattr(diff, "created_at", None) else None,
         )
+
+    def _serialize_diff_history(self, diff: DrawingDiff) -> DrawingDiffHistoryResponse:
+        """Serialize diff for history view."""
+        raw_regions = getattr(diff, "diff_regions", None) or []
+
+        return DrawingDiffHistoryResponse(
+            id=cast(int, diff.id),
+            alignment_id=cast(int, diff.alignment_id),
+            summary=getattr(diff, "summary", None),
+            severity=getattr(diff, "severity", None),
+            created_at=diff.created_at.isoformat() if getattr(diff, "created_at", None) else None,
+            diff_regions=[
+                DrawingDiffRegionResponse(
+                    page=region.get("page"),
+                    bbox=region.get("bbox"),
+                    change_type=region.get("change_type"),
+                    note=region.get("note"),
+                )
+                for region in raw_regions
+            ],
+        )
+
+    def _validate_master_drawing(
+        self, project_id: int, master_drawing_id: int
+    ) -> Drawing:
+        """Validate master drawing exists and belongs to project."""
+        master_drawing = self.storage.get_drawing_by_id(master_drawing_id)
+
+        if not master_drawing:
+            raise ValueError(f"Master drawing {master_drawing_id} not found")
+
+        if cast(int, master_drawing.project_id) != project_id:
+            raise ValueError(
+                f"Master drawing {master_drawing_id} does not belong to project {project_id}"
+            )
+
+        return master_drawing
 
     def _validate_project_drawings(
         self, project_id: int, master_drawing_id: int, sub_drawing_id: int
@@ -468,6 +535,86 @@ class DrawingComparisonService:
             "alignment": self._serialize_alignment(alignment),
             "diffs": [self._serialize_diff(diff) for diff in diffs],
         }
+
+    def list_alignments(
+        self,
+        project_id: int,
+        master_drawing_id: int,
+    ) -> Dict[str, Any]:
+        """List alignments for a master drawing with sub drawing metadata."""
+        self._validate_master_drawing(project_id, master_drawing_id)
+
+        alignments = self.storage.list_alignments_by_master_drawing(
+            project_id=project_id,
+            master_drawing_id=master_drawing_id,
+        )
+
+        return {
+            "alignments": [
+                self._serialize_alignment_history(alignment)
+                for alignment in alignments
+            ]
+        }
+
+    def get_alignment_history(
+        self,
+        project_id: int,
+        master_drawing_id: int,
+    ) -> DrawingAlignmentHistoryListResponse:
+        """
+        List alignment history for a master drawing.
+        Validates master drawing exists and belongs to project.
+        """
+        self._validate_master_drawing(project_id, master_drawing_id)
+        alignments = self.storage.list_alignments_by_master_drawing(
+            project_id=project_id,
+            master_drawing_id=master_drawing_id,
+        )
+        return DrawingAlignmentHistoryListResponse(
+            alignments=[self._serialize_alignment_history(a) for a in alignments],
+        )
+
+    def list_diffs(
+        self,
+        project_id: int,
+        master_drawing_id: int,
+        alignment_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """List diffs for a master drawing, optionally filtered by alignment."""
+        self._validate_master_drawing(project_id, master_drawing_id)
+
+        diffs = self.storage.list_diffs_for_master_drawing(
+            project_id=project_id,
+            master_drawing_id=master_drawing_id,
+            alignment_id=alignment_id,
+        )
+
+        return {
+            "diffs": [
+                self._serialize_diff_history(diff)
+                for diff in diffs
+            ]
+        }
+
+    def get_diff_history(
+        self,
+        project_id: int,
+        master_drawing_id: int,
+        alignment_id: Optional[int] = None,
+    ) -> DrawingDiffHistoryListResponse:
+        """
+        List diff history for a master drawing, optionally filtered by alignment.
+        Validates master drawing exists and belongs to project.
+        """
+        self._validate_master_drawing(project_id, master_drawing_id)
+        diffs = self.storage.list_diffs_for_master_drawing(
+            project_id=project_id,
+            master_drawing_id=master_drawing_id,
+            alignment_id=alignment_id,
+        )
+        return DrawingDiffHistoryListResponse(
+            diffs=[self._serialize_diff_history(d) for d in diffs],
+        )
 
     def compute_alignment_transform(
         self,

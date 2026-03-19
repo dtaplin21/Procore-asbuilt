@@ -9,7 +9,7 @@ so routes can continue to import it while the new data model is designed.
 from __future__ import annotations
 
 from datetime import datetime
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from typing import Any, Dict, List, Optional, Sequence, Set, cast
 
@@ -388,6 +388,27 @@ class StorageService:
             .first()
         )
 
+    def list_alignments_by_master_drawing(
+        self,
+        project_id: int,
+        master_drawing_id: int,
+    ):
+        """List alignments for a master drawing, sorted by created_at desc (history view)."""
+        return (
+            self.db.query(DrawingAlignment)
+            .join(Drawing, DrawingAlignment.master_drawing_id == Drawing.id)
+            .options(
+                joinedload(DrawingAlignment.master_drawing),
+                joinedload(DrawingAlignment.sub_drawing),
+            )
+            .filter(
+                Drawing.project_id == project_id,
+                DrawingAlignment.master_drawing_id == master_drawing_id,
+            )
+            .order_by(DrawingAlignment.created_at.desc())
+            .all()
+        )
+
     def get_reusable_alignment(
         self,
         master_drawing_id: int,
@@ -501,6 +522,28 @@ class StorageService:
             .order_by(DrawingDiff.created_at.asc())
             .all()
         )
+
+    def list_diffs_for_master_drawing(
+        self,
+        project_id: int,
+        master_drawing_id: int,
+        alignment_id: int | None = None,
+    ):
+        """List diffs for a master drawing, optionally filtered by alignment. Ensures diffs belong to the given project."""
+        query = (
+            self.db.query(DrawingDiff)
+            .join(DrawingAlignment, DrawingDiff.alignment_id == DrawingAlignment.id)
+            .join(Drawing, DrawingAlignment.master_drawing_id == Drawing.id)
+            .filter(
+                Drawing.project_id == project_id,
+                DrawingAlignment.master_drawing_id == master_drawing_id,
+            )
+        )
+
+        if alignment_id is not None:
+            query = query.filter(DrawingAlignment.id == alignment_id)
+
+        return query.order_by(DrawingDiff.created_at.desc()).all()
 
     def get_drawing_diff(
         self,

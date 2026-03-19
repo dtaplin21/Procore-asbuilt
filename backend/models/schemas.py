@@ -6,7 +6,7 @@ scaffolding, but removing the current table-specific schemas so new schemas can 
 against the redesigned data model.
 """
 # models/schemas.py
-from pydantic import AliasChoices, BaseModel, EmailStr, Field, ConfigDict, field_validator
+from pydantic import AliasChoices, BaseModel, EmailStr, Field, ConfigDict, field_validator, model_validator
 from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime
 
@@ -549,6 +549,124 @@ class DrawingComparisonWorkspaceResponse(BaseModel):
     sub_drawing: DrawingSummary = Field(..., serialization_alias="subDrawing")
     alignment: DrawingAlignmentResponse
     diffs: List[DrawingDiffResponse]
+
+    model_config = {"populate_by_name": True}
+
+
+class DrawingBasicSummary(BaseModel):
+    id: int
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
+class DrawingAlignmentHistoryResponse(BaseModel):
+    id: int
+    project_id: Optional[int] = Field(default=None, serialization_alias="projectId")
+    master_drawing_id: int = Field(..., serialization_alias="masterDrawingId")
+    sub_drawing_id: int = Field(..., serialization_alias="subDrawingId")
+    alignment_status: Optional[str] = Field(
+        default=None,
+        serialization_alias="alignmentStatus",
+        validation_alias="status",
+    )
+    transform_matrix: Optional[Dict[str, Any]] = Field(
+        default=None,
+        serialization_alias="transformMatrix",
+        validation_alias="transform",
+    )
+    created_at: Optional[str] = Field(default=None, serialization_alias="createdAt")
+    sub_drawing: DrawingBasicSummary = Field(..., serialization_alias="subDrawing")
+
+    model_config = {"from_attributes": True, "populate_by_name": True}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _infer_from_orm(cls, data: Any) -> Any:
+        """When validating from ORM, infer project_id and build sub_drawing from relationships."""
+        if isinstance(data, dict):
+            return data
+        sd = getattr(data, "sub_drawing", None)
+        if sd is None:
+            return data
+        md = getattr(data, "master_drawing", None)
+        return {
+            "id": getattr(data, "id", 0),
+            "project_id": getattr(md, "project_id", None) if md else None,
+            "master_drawing_id": getattr(data, "master_drawing_id", 0),
+            "sub_drawing_id": getattr(data, "sub_drawing_id", 0),
+            "alignment_status": getattr(data, "status", None),
+            "transform_matrix": getattr(data, "transform", None),
+            "created_at": getattr(data, "created_at", None),
+            "sub_drawing": DrawingBasicSummary(
+                id=getattr(sd, "id", 0),
+                name=getattr(sd, "name", ""),
+            ),
+        }
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def _created_at_to_str(cls, v: Any) -> Optional[str]:
+        if v is None:
+            return None
+        if hasattr(v, "isoformat"):
+            return v.isoformat()
+        return str(v) if v else None
+
+
+class DrawingAlignmentHistoryListResponse(BaseModel):
+    alignments: List[DrawingAlignmentHistoryResponse] = Field(
+        default_factory=list,
+        serialization_alias="alignments",
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class DrawingDiffRegionResponse(BaseModel):
+    page: Optional[int] = None
+    bbox: Optional[Dict[str, Any]] = None
+    change_type: Optional[str] = Field(default=None, serialization_alias="changeType")
+    note: Optional[str] = None
+
+    model_config = {"populate_by_name": True}
+
+
+class DrawingDiffHistoryResponse(BaseModel):
+    id: int
+    alignment_id: int = Field(..., serialization_alias="alignmentId")
+    summary: Optional[str] = None
+    severity: Optional[str] = None
+    created_at: Optional[str] = Field(default=None, serialization_alias="createdAt")
+    diff_regions: List[DrawingDiffRegionResponse] = Field(
+        default_factory=list,
+        serialization_alias="diffRegions",
+    )
+
+    model_config = {"from_attributes": True, "populate_by_name": True}
+
+    @field_validator("diff_regions", mode="before")
+    @classmethod
+    def parse_diff_regions(cls, v: Any) -> Any:
+        if isinstance(v, list):
+            return [
+                DrawingDiffRegionResponse.model_validate(x) if isinstance(x, dict) else x
+                for x in v
+            ]
+        return v
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def _created_at_to_str(cls, v: Any) -> Optional[str]:
+        if v is None:
+            return None
+        if hasattr(v, "isoformat"):
+            return v.isoformat()
+        return str(v) if v else None
+
+
+class DrawingDiffHistoryListResponse(BaseModel):
+    diffs: List[DrawingDiffHistoryResponse] = Field(default_factory=list)
 
     model_config = {"populate_by_name": True}
 
