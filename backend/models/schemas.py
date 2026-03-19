@@ -6,7 +6,7 @@ scaffolding, but removing the current table-specific schemas so new schemas can 
 against the redesigned data model.
 """
 # models/schemas.py
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+from pydantic import AliasChoices, BaseModel, EmailStr, Field, ConfigDict, field_validator
 from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime
 
@@ -213,7 +213,11 @@ class DrawingResponse(BaseModel):
 
 
 class DrawingCompareRequest(BaseModel):
-    sub_drawing_id: int = Field(..., serialization_alias="subDrawingId")
+    sub_drawing_id: int = Field(
+        ...,
+        serialization_alias="subDrawingId",
+        validation_alias=AliasChoices("subDrawingId", "sub_drawing_id"),
+    )
 
     model_config = {"populate_by_name": True}
 
