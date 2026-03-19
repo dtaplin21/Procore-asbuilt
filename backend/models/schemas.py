@@ -212,6 +212,19 @@ class DrawingResponse(BaseModel):
         from_attributes = True
 
 
+class DrawingSummary(BaseModel):
+    id: int
+    project_id: int
+    source: str
+    name: str
+    file_url: Optional[str] = None
+    content_type: Optional[str] = None
+    page_count: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
 class EvidenceRecordResponse(BaseModel):
     id: int
     type: str
@@ -498,6 +511,13 @@ class DrawingDiffListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class DrawingComparisonWorkspaceResponse(BaseModel):
+    master_drawing: DrawingSummary
+    sub_drawing: DrawingSummary
+    alignment: DrawingAlignmentResponse
+    diffs: List[DrawingDiffResponse]
 
 
 # ============================================

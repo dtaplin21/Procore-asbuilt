@@ -24,6 +24,7 @@ from api.routes import (
     evidence_records,
     drawing_alignment,
     drawing_diffs,
+    drawing_comparison,
 )
 from database import init_db
 import os
@@ -164,6 +165,7 @@ app.include_router(evidence.router)
 app.include_router(evidence_records.router)
 app.include_router(drawing_alignment.router)
 app.include_router(drawing_diffs.router)
+app.include_router(drawing_comparison.router)
 
 # Serve static files in production (if needed)
 # static_dir = os.path.join(os.path.dirname(__file__), "..", "dist", "public")

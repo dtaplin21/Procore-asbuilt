@@ -315,6 +315,21 @@ class StorageService:
             return None
         return alignment
 
+    def get_alignment_by_drawing_pair(
+        self,
+        master_drawing_id: int,
+        sub_drawing_id: int,
+    ) -> Optional[DrawingAlignment]:
+        return (
+            self.db.query(DrawingAlignment)
+            .filter(
+                DrawingAlignment.master_drawing_id == master_drawing_id,
+                DrawingAlignment.sub_drawing_id == sub_drawing_id,
+            )
+            .order_by(DrawingAlignment.updated_at.desc(), DrawingAlignment.id.desc())
+            .first()
+        )
+
     def update_alignment_status(
         self,
         alignment_id: int,
@@ -397,6 +412,17 @@ class StorageService:
             .all()
         )
         return items, total
+
+    def list_drawing_diffs_by_alignment(
+        self,
+        alignment_id: int,
+    ) -> List[DrawingDiff]:
+        return (
+            self.db.query(DrawingDiff)
+            .filter(DrawingDiff.alignment_id == alignment_id)
+            .order_by(DrawingDiff.created_at.desc(), DrawingDiff.id.desc())
+            .all()
+        )
 
     def get_drawing_diff(
         self,
