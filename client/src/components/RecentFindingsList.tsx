@@ -58,7 +58,7 @@ export default function RecentFindingsList({
           <div className="mt-3">
             {projectId != null ? (
               <Link
-                href={`/projects/${projectId}/workspace?findingId=${encodeURIComponent(finding.id)}`}
+                href={`/projects/${projectId}/drawings?findingId=${encodeURIComponent(finding.id)}`}
                 className="text-sm text-blue-600 hover:underline"
               >
                 Open drawing workspace

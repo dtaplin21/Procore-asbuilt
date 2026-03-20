@@ -287,7 +287,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
                 onViewDetails={(id) => {
                   if (!selectedProjectId) return;
                   setLocation(
-                    `/projects/${selectedProjectId}/workspace?findingId=${encodeURIComponent(id)}`
+                    `/projects/${selectedProjectId}/drawings?findingId=${encodeURIComponent(id)}`
                   );
                 }}
                 onResolve={(id) => console.log("Resolve insight:", id)}
