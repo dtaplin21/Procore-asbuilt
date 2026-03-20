@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useParams } from "wouter";
 
+import DrawingViewer from "@/components/drawing-workspace/drawing_viewer";
 import { useDrawingWorkspace } from "@/hooks/use_drawing_workspace";
 import type { WorkspaceRouteParams } from "@/types/drawing_workspace";
 
@@ -28,6 +29,7 @@ export default function DrawingWorkspacePage() {
     selectedAlignmentId,
     selectedDiffId,
     selectedDiffs,
+    selectedDiff,
     workspaceLoading,
     diffsLoading,
     workspaceError,
@@ -68,40 +70,16 @@ export default function DrawingWorkspacePage() {
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="rounded-xl border bg-white p-4">
-          {workspaceLoading ? (
-            <div className="text-sm text-slate-500">Loading master drawing...</div>
-          ) : masterDrawing ? (
-            <>
-              <div className="mb-3">
-                <div className="text-lg font-semibold">{masterDrawing.name}</div>
-                <div className="text-sm text-slate-500">
-                  Drawing #{masterDrawing.id}
-                </div>
-              </div>
-
-              {masterDrawing.fileUrl ? (
-                masterDrawing.contentType === "application/pdf" ? (
-                  <iframe
-                    title={masterDrawing.name}
-                    src={masterDrawing.fileUrl}
-                    className="h-[75vh] w-full rounded border"
-                  />
-                ) : (
-                  <img
-                    src={masterDrawing.fileUrl}
-                    alt={masterDrawing.name}
-                    className="h-[75vh] w-full rounded border object-contain"
-                  />
-                )
-              ) : (
-                <div className="rounded border border-dashed p-6 text-sm text-slate-500">
-                  Drawing file URL is not available.
-                </div>
-              )}
-            </>
-          ) : null}
-        </div>
+        {workspaceLoading ? (
+          <div className="flex min-h-[70vh] items-center justify-center rounded-xl border bg-white p-8 text-sm text-slate-500">
+            Loading master drawing...
+          </div>
+        ) : (
+          <DrawingViewer
+            drawing={masterDrawing}
+            selectedDiff={selectedDiff}
+          />
+        )}
 
         <div className="flex flex-col gap-4">
           <section className="overflow-hidden rounded-xl border bg-white">
