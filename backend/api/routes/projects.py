@@ -10,6 +10,7 @@ from models.schemas import (
     ProjectListResponse,
     DashboardSummaryResponse,
     DrawingResponse,
+    DrawingSummary,
     JobListResponse,
     AIInsightResponse,
     FindingListResponse,
@@ -174,28 +175,28 @@ def list_project_drawings(
     return drawings
 
 
-@router.get("/{project_id}/drawings/{drawing_id}", response_model=DrawingResponse)
+@router.get("/{project_id}/drawings/{drawing_id}", response_model=DrawingSummary)
 def get_project_drawing(
     project_id: int,
     drawing_id: int,
     db: Session = Depends(get_db),
 ):
-    """Get metadata for a specific drawing.
-    
+    """Get metadata for a specific drawing (DrawingSummary shape for production frontend).
+
     - Metadata comes from database, no filesystem reads
-    - Returns drawing details including file_url
+    - Returns drawing details including file_url, project_id, source
     """
     service = StorageService(db)
     drawing = service.get_drawing(project_id, drawing_id)
-    
+
     if not drawing:
         raise HTTPException(status_code=404, detail="Drawing not found")
-    
+
     # Set file_url to point to /file endpoint
     setattr(drawing, "file_url", f"/api/projects/{project_id}/drawings/{cast(int, drawing.id)}/file")
     db.commit()
 
-    return drawing
+    return DrawingSummary.model_validate(drawing)
 
 
 @router.get(

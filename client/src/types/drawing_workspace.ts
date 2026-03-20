@@ -52,5 +52,5 @@ export type DrawingResponse = DrawingSummary;
 
 export type WorkspaceRouteParams = {
   projectId?: string;
-  masterDrawingId?: string;
+  drawingId?: string;
 };

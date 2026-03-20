@@ -90,7 +90,7 @@ export default function DrawingPickerPage() {
           {list.map((drawing) => (
             <Link
               key={drawing.id}
-              href={`/projects/${projectId}/drawings/${drawing.id}${preserveSearchParams()}`}
+              href={`/projects/${projectId}/drawings/${drawing.id}/workspace${preserveSearchParams()}`}
             >
               <Card className="cursor-pointer transition hover:bg-slate-50 hover:border-slate-300">
                 <CardHeader className="pb-2">

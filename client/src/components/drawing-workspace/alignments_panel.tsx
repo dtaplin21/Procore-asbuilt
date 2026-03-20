@@ -5,7 +5,7 @@ type Props = {
   alignments: DrawingAlignment[];
   selectedAlignmentId: number | null;
   loading: boolean;
-  onSelectAlignment: (alignmentId: number) => void;
+  onSelectAlignment: (alignmentId: number) => void | Promise<void>;
 };
 
 function formatStatus(status?: string | null) {

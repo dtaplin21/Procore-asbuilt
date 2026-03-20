@@ -1,19 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  fetchAlignmentDiffs,
+  fetchMasterDrawing,
+  fetchMasterDrawingAlignments,
+} from "@/lib/api/drawing_workspace";
+import type {
   DrawingAlignment,
   DrawingDiff,
   DrawingSummary,
 } from "@/types/drawing_workspace";
-import {
-  fetchAlignments,
-  fetchDiffs,
-  fetchDrawing,
-} from "@/lib/api/drawing_workspace";
-import { getErrorMessage } from "@/lib/errors";
 
 type UseDrawingWorkspaceArgs = {
   projectId: number;
-  masterDrawingId: number;
+  drawingId: number;
 };
 
 type UseDrawingWorkspaceResult = {
@@ -29,11 +28,11 @@ type UseDrawingWorkspaceResult = {
   workspaceError: string | null;
   diffsError: string | null;
 
-  selectedAlignment: DrawingAlignment | null;
   selectedDiffs: DrawingDiff[];
+  selectedAlignment: DrawingAlignment | null;
   selectedDiff: DrawingDiff | null;
 
-  selectAlignment: (alignmentId: number) => void;
+  selectAlignment: (alignmentId: number) => Promise<void>;
   selectDiff: (diffId: number) => void;
 
   reloadWorkspace: () => Promise<void>;
@@ -42,7 +41,7 @@ type UseDrawingWorkspaceResult = {
 
 export function useDrawingWorkspace({
   projectId,
-  masterDrawingId,
+  drawingId,
 }: UseDrawingWorkspaceArgs): UseDrawingWorkspaceResult {
   const [masterDrawing, setMasterDrawing] = useState<DrawingSummary | null>(null);
   const [alignments, setAlignments] = useState<DrawingAlignment[]>([]);
@@ -54,50 +53,11 @@ export function useDrawingWorkspace({
 
   const [workspaceLoading, setWorkspaceLoading] = useState(true);
   const [diffsLoading, setDiffsLoading] = useState(false);
-
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [diffsError, setDiffsError] = useState<string | null>(null);
 
-  const workspaceRequestRef = useRef(0);
-  const diffsRequestRef = useRef(0);
-
-  const loadWorkspace = useCallback(async () => {
-    const requestId = ++workspaceRequestRef.current;
-
-    setWorkspaceLoading(true);
-    setWorkspaceError(null);
-
-    try {
-      const [drawingResponse, alignmentsResponse] = await Promise.all([
-        fetchDrawing(projectId, masterDrawingId),
-        fetchAlignments(projectId, masterDrawingId),
-      ]);
-
-      if (requestId !== workspaceRequestRef.current) return;
-
-      const nextAlignments = alignmentsResponse.alignments ?? [];
-
-      setMasterDrawing(drawingResponse);
-      setAlignments(nextAlignments);
-
-      setSelectedAlignmentId((current) => {
-        if (current && nextAlignments.some((item) => item.id === current)) {
-          return current;
-        }
-        return nextAlignments[0]?.id ?? null;
-      });
-
-      setSelectedDiffId(null);
-      setDiffsByAlignmentId({});
-    } catch (error) {
-      if (requestId !== workspaceRequestRef.current) return;
-      setWorkspaceError(getErrorMessage(error, "Failed to load workspace."));
-    } finally {
-      if (requestId === workspaceRequestRef.current) {
-        setWorkspaceLoading(false);
-      }
-    }
-  }, [projectId, masterDrawingId]);
+  const workspaceRequestIdRef = useRef(0);
+  const diffsRequestIdRef = useRef(0);
 
   const loadDiffsForAlignment = useCallback(
     async (alignmentId: number, force = false) => {
@@ -105,15 +65,17 @@ export function useDrawingWorkspace({
         return;
       }
 
-      const requestId = ++diffsRequestRef.current;
+      const requestId = ++diffsRequestIdRef.current;
 
       setDiffsLoading(true);
       setDiffsError(null);
 
       try {
-        const response = await fetchDiffs(projectId, masterDrawingId, alignmentId);
+        const response = await fetchAlignmentDiffs(projectId, drawingId, alignmentId);
 
-        if (requestId !== diffsRequestRef.current) return;
+        if (requestId !== diffsRequestIdRef.current) {
+          return;
+        }
 
         const nextDiffs = response.diffs ?? [];
 
@@ -123,50 +85,87 @@ export function useDrawingWorkspace({
         }));
 
         setSelectedDiffId((current) => {
-          if (current && nextDiffs.some((item) => item.id === current)) {
+          if (current && nextDiffs.some((diff) => diff.id === current)) {
             return current;
           }
           return nextDiffs[0]?.id ?? null;
         });
       } catch (error) {
-        if (requestId !== diffsRequestRef.current) return;
-        setDiffsError(getErrorMessage(error, "Failed to load diffs."));
+        if (requestId !== diffsRequestIdRef.current) {
+          return;
+        }
+
+        setDiffsError(error instanceof Error ? error.message : "Failed to load diffs.");
       } finally {
-        if (requestId === diffsRequestRef.current) {
+        if (requestId === diffsRequestIdRef.current) {
           setDiffsLoading(false);
         }
       }
     },
-    [projectId, masterDrawingId, diffsByAlignmentId]
+    [projectId, drawingId, diffsByAlignmentId]
   );
+
+  const loadWorkspace = useCallback(async () => {
+    const requestId = ++workspaceRequestIdRef.current;
+
+    setWorkspaceLoading(true);
+    setWorkspaceError(null);
+    setDiffsError(null);
+
+    try {
+      const [drawingResponse, alignmentsResponse] = await Promise.all([
+        fetchMasterDrawing(projectId, drawingId),
+        fetchMasterDrawingAlignments(projectId, drawingId),
+      ]);
+
+      if (requestId !== workspaceRequestIdRef.current) {
+        return;
+      }
+
+      const nextAlignments = alignmentsResponse.alignments ?? [];
+
+      setMasterDrawing(drawingResponse);
+      setAlignments(nextAlignments);
+
+      setDiffsByAlignmentId({});
+      setSelectedDiffId(null);
+
+      if (nextAlignments.length > 0) {
+        const mostRecentAlignment = nextAlignments[0];
+        setSelectedAlignmentId(mostRecentAlignment.id);
+
+        await loadDiffsForAlignment(mostRecentAlignment.id, true);
+      } else {
+        setSelectedAlignmentId(null);
+      }
+    } catch (error) {
+      if (requestId !== workspaceRequestIdRef.current) {
+        return;
+      }
+
+      setWorkspaceError(
+        error instanceof Error ? error.message : "Failed to load drawing workspace."
+      );
+    } finally {
+      if (requestId === workspaceRequestIdRef.current) {
+        setWorkspaceLoading(false);
+      }
+    }
+  }, [projectId, drawingId, loadDiffsForAlignment]);
 
   useEffect(() => {
     void loadWorkspace();
   }, [loadWorkspace]);
 
-  useEffect(() => {
-    if (selectedAlignmentId == null) return;
-    void loadDiffsForAlignment(selectedAlignmentId);
-  }, [selectedAlignmentId, loadDiffsForAlignment]);
-
-  const selectedAlignment = useMemo(() => {
-    return alignments.find((item) => item.id === selectedAlignmentId) ?? null;
-  }, [alignments, selectedAlignmentId]);
-
-  const selectedDiffs = useMemo(() => {
-    if (selectedAlignmentId == null) return [];
-    return diffsByAlignmentId[selectedAlignmentId] ?? [];
-  }, [selectedAlignmentId, diffsByAlignmentId]);
-
-  const selectedDiff = useMemo(() => {
-    return selectedDiffs.find((item) => item.id === selectedDiffId) ?? null;
-  }, [selectedDiffId, selectedDiffs]);
-
-  const selectAlignment = useCallback((alignmentId: number) => {
-    setSelectedAlignmentId(alignmentId);
-    setSelectedDiffId(null);
-    setDiffsError(null);
-  }, []);
+  const selectAlignment = useCallback(
+    async (alignmentId: number) => {
+      setSelectedAlignmentId(alignmentId);
+      setSelectedDiffId(null);
+      setDiffsError(null);
+      await loadDiffsForAlignment(alignmentId);
+    },
+    [loadDiffsForAlignment]
+  );
 
   const selectDiff = useCallback((diffId: number) => {
     setSelectedDiffId(diffId);
@@ -181,6 +180,19 @@ export function useDrawingWorkspace({
     await loadDiffsForAlignment(selectedAlignmentId, true);
   }, [selectedAlignmentId, loadDiffsForAlignment]);
 
+  const selectedDiffs = useMemo(() => {
+    if (selectedAlignmentId == null) return [];
+    return diffsByAlignmentId[selectedAlignmentId] ?? [];
+  }, [selectedAlignmentId, diffsByAlignmentId]);
+
+  const selectedAlignment = useMemo(() => {
+    return alignments.find((alignment) => alignment.id === selectedAlignmentId) ?? null;
+  }, [alignments, selectedAlignmentId]);
+
+  const selectedDiff = useMemo(() => {
+    return selectedDiffs.find((diff) => diff.id === selectedDiffId) ?? null;
+  }, [selectedDiffs, selectedDiffId]);
+
   return {
     masterDrawing,
     alignments,
@@ -194,8 +206,8 @@ export function useDrawingWorkspace({
     workspaceError,
     diffsError,
 
-    selectedAlignment,
     selectedDiffs,
+    selectedAlignment,
     selectedDiff,
 
     selectAlignment,

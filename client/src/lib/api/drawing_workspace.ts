@@ -1,9 +1,13 @@
-import {
+import type {
   DrawingAlignmentsResponse,
   DrawingDiffsResponse,
-  DrawingResponse,
+  DrawingSummary,
 } from "@/types/drawing_workspace";
-import { ApiError } from "@/lib/errors";
+
+type ApiErrorPayload = {
+  detail?: string;
+  message?: string;
+};
 
 async function parseJsonSafe(response: Response) {
   const contentType = response.headers.get("content-type");
@@ -15,8 +19,8 @@ async function parseJsonSafe(response: Response) {
   return null;
 }
 
-async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, {
+async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
@@ -25,44 +29,44 @@ async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Pro
     ...init,
   });
 
-  const data = await parseJsonSafe(response);
+  const data = (await parseJsonSafe(response)) as ApiErrorPayload | T | null;
 
   if (!response.ok) {
     const message =
-      data?.detail ||
-      data?.message ||
+      (data as ApiErrorPayload | null)?.detail ||
+      (data as ApiErrorPayload | null)?.message ||
       `Request failed with status ${response.status}`;
-    throw new ApiError(message, response.status);
+    throw new Error(message);
   }
 
   return data as T;
 }
 
-export async function fetchDrawing(
+export async function fetchMasterDrawing(
   projectId: number,
   drawingId: number
-): Promise<DrawingResponse> {
-  return requestJson<DrawingResponse>(
+): Promise<DrawingSummary> {
+  return requestJson<DrawingSummary>(
     `/api/projects/${projectId}/drawings/${drawingId}`
   );
 }
 
-export async function fetchAlignments(
+export async function fetchMasterDrawingAlignments(
   projectId: number,
-  masterDrawingId: number
+  drawingId: number
 ): Promise<DrawingAlignmentsResponse> {
   return requestJson<DrawingAlignmentsResponse>(
-    `/api/projects/${projectId}/drawings/${masterDrawingId}/alignments`
+    `/api/projects/${projectId}/drawings/${drawingId}/alignments`
   );
 }
 
-export async function fetchDiffs(
+export async function fetchAlignmentDiffs(
   projectId: number,
-  masterDrawingId: number,
+  drawingId: number,
   alignmentId: number
 ): Promise<DrawingDiffsResponse> {
   const url = new URL(
-    `/api/projects/${projectId}/drawings/${masterDrawingId}/diffs`,
+    `/api/projects/${projectId}/drawings/${drawingId}/diffs`,
     window.location.origin
   );
 

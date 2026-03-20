@@ -68,7 +68,7 @@ function Router({
         <Objects procoreUserId={procoreUserId} />
       </Route>
       <Route path="/workspace/:projectId" component={WorkspaceStub} />
-      <Route path="/projects/:projectId/drawings/:drawingId" component={DrawingWorkspacePage} />
+      <Route path="/projects/:projectId/drawings/:drawingId/workspace" component={DrawingWorkspacePage} />
       <Route path="/projects/:projectId/drawings" component={DrawingPickerPage} />
       <Route path="/settings">
         <SettingsPage 
