@@ -427,3 +427,149 @@ def test_run_alignment_lifecycle_updates_to_failed_on_error(
     db.refresh(alignment)
     assert getattr(alignment, "status", None) == "failed"
     assert "Compute failed" in str(getattr(alignment, "error_message", "") or "")
+
+
+# ---------------------------------------------------------------------------
+# Integration tests — alignments history
+# ---------------------------------------------------------------------------
+
+
+def test_list_alignments_returns_newest_first_with_sub_drawing(
+    db: Session,
+    project: Project,
+    master_drawing: Drawing,
+    sub_drawing: Drawing,
+) -> None:
+    """Alignments history: newest first, subDrawing.id and subDrawing.name included."""
+    storage = StorageService(db)
+    a1 = storage.create_drawing_alignment(
+        master_drawing.id, sub_drawing.id, "manual"
+    )
+    db.refresh(a1)
+
+    svc = DrawingComparisonService(db)
+    result = svc.list_alignments(project.id, master_drawing.id)
+
+    assert "alignments" in result
+    alignments = result["alignments"]
+    assert len(alignments) >= 1
+    first = alignments[0]
+    assert first.id == a1.id
+    assert first.project_id == project.id
+    assert first.master_drawing_id == master_drawing.id
+    assert first.sub_drawing_id == sub_drawing.id
+    assert first.sub_drawing is not None
+    assert first.sub_drawing.id == sub_drawing.id
+    assert first.sub_drawing.name == sub_drawing.name
+
+
+def test_list_alignments_raises_when_master_not_found(
+    db: Session, project: Project
+) -> None:
+    svc = DrawingComparisonService(db)
+    with pytest.raises(ValueError, match="Master drawing 99999 not found"):
+        svc.list_alignments(project.id, 99999)
+
+
+# ---------------------------------------------------------------------------
+# Integration tests — diffs history
+# ---------------------------------------------------------------------------
+
+
+def test_list_diffs_returns_newest_first_with_required_fields(
+    db: Session,
+    project: Project,
+    master_drawing: Drawing,
+    sub_drawing: Drawing,
+) -> None:
+    """Diffs history: newest first, includes summary, severity, createdAt, diffRegions."""
+    storage = StorageService(db)
+    alignment = storage.create_drawing_alignment(
+        master_drawing.id, sub_drawing.id, "manual"
+    )
+    diff = storage.create_drawing_diff(
+        alignment.id,
+        summary="Three differences detected",
+        severity="medium",
+        diff_regions=[
+            {
+                "page": 1,
+                "bbox": {"x": 120, "y": 300, "width": 42, "height": 25},
+                "changeType": "added_markup",
+                "note": "New inspection symbol",
+            }
+        ],
+    )
+    db.refresh(diff)
+
+    svc = DrawingComparisonService(db)
+    result = svc.list_diffs(project.id, master_drawing.id)
+
+    assert "diffs" in result
+    diffs = result["diffs"]
+    assert len(diffs) >= 1
+    first = diffs[0]
+    assert first.id == diff.id
+    assert first.alignment_id == alignment.id
+    assert first.summary == "Three differences detected"
+    assert first.severity == "medium"
+    assert first.created_at is not None
+    assert len(first.diff_regions) == 1
+    assert first.diff_regions[0].page == 1
+    assert first.diff_regions[0].change_type == "added_markup"
+    assert first.diff_regions[0].note == "New inspection symbol"
+
+
+def test_list_diffs_filtered_by_alignment_id(
+    db: Session,
+    project: Project,
+    master_drawing: Drawing,
+    sub_drawing: Drawing,
+) -> None:
+    """Diffs filtered to one alignment only returns diffs from that alignment."""
+    storage = StorageService(db)
+    a1 = storage.create_drawing_alignment(
+        master_drawing.id, sub_drawing.id, "manual"
+    )
+    sub2 = Drawing(
+        project_id=project.id,
+        source="upload",
+        name="sub2.pdf",
+        storage_key=None,
+        content_type="application/pdf",
+    )
+    db.add(sub2)
+    db.commit()
+    db.refresh(sub2)
+    a2 = storage.create_drawing_alignment(master_drawing.id, sub2.id, "manual")
+
+    storage.create_drawing_diff(
+        a1.id,
+        summary="Diff for alignment 1",
+        severity="low",
+        diff_regions=[{"page": 1, "bbox": {"x": 0, "y": 0, "width": 10, "height": 10}}],
+    )
+    storage.create_drawing_diff(
+        a2.id,
+        summary="Diff for alignment 2",
+        severity="high",
+        diff_regions=[{"page": 1, "bbox": {"x": 0, "y": 0, "width": 20, "height": 20}}],
+    )
+
+    svc = DrawingComparisonService(db)
+    result = svc.list_diffs(project.id, master_drawing.id, alignment_id=a1.id)
+
+    assert "diffs" in result
+    diffs = result["diffs"]
+    assert len(diffs) == 1
+    assert diffs[0].alignment_id == a1.id
+    assert diffs[0].summary == "Diff for alignment 1"
+    assert diffs[0].severity == "low"
+
+
+def test_list_diffs_raises_when_master_not_found(
+    db: Session, project: Project
+) -> None:
+    svc = DrawingComparisonService(db)
+    with pytest.raises(ValueError, match="Master drawing 99999 not found"):
+        svc.list_diffs(project.id, 99999)
