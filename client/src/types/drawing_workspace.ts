@@ -28,9 +28,43 @@ export type DrawingAlignmentsResponse = {
   alignments: DrawingAlignment[];
 };
 
+export type NormalizedPoint = {
+  x: number;
+  y: number;
+};
+
+export type NormalizedRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export type DrawingDiffRegion = {
+  id?: string | number;
   page?: number | null;
-  bbox?: Record<string, unknown> | null;
+
+  /**
+   * Supported shapes:
+   * - rect: uses rect
+   * - polygon: uses points
+   */
+  shapeType?: "rect" | "polygon" | null;
+
+  rect?: NormalizedRect | null;
+  points?: NormalizedPoint[] | null;
+
+  /**
+   * Backward-compatible support if backend still sends bbox.
+   * We convert bbox -> rect in the viewer layer.
+   */
+  bbox?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
+
   changeType?: string | null;
   note?: string | null;
 };
