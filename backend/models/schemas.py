@@ -234,6 +234,31 @@ class DrawingSummary(BaseModel):
     model_config = {"from_attributes": True, "populate_by_name": True}
 
 
+class DrawingRenditionResponse(BaseModel):
+    page_number: int
+    file_url: str
+    mime_type: str
+    width_px: Optional[int] = None
+    height_px: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DrawingViewerAssetResponse(BaseModel):
+    id: int
+    name: str
+    file_url: str  # rendered image URL for workspace
+    source_file_url: str  # original pdf/image file
+    page_count: Optional[int] = None
+    active_page: int = 1
+    width_px: Optional[int] = None
+    height_px: Optional[int] = None
+    processing_status: str
+    processing_error: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class EvidenceRecordResponse(BaseModel):
     id: int
     type: str

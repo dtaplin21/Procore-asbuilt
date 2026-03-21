@@ -282,6 +282,11 @@ class Drawing(Base):
     file_url = Column(String, nullable=True)  # API endpoint for download
     content_type = Column(String, nullable=True)  # 'application/pdf', 'image/png', etc.
     page_count = Column(Integer, nullable=True)  # for PDFs
+
+    # Rendition processing metadata
+    original_filename = Column(String, nullable=True)
+    processing_status = Column(String, nullable=False, default="pending")  # pending, processing, ready, failed
+    processing_error = Column(Text, nullable=True)
     
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
@@ -292,6 +297,11 @@ class Drawing(Base):
     
     # Relationships
     project = relationship("Project", back_populates="drawings")
+    renditions = relationship(
+        "DrawingRendition",
+        back_populates="drawing",
+        cascade="all, delete-orphan",
+    )
     regions = relationship("DrawingRegion", back_populates="master_drawing", cascade="all, delete-orphan")
     overlays = relationship("DrawingOverlay", back_populates="master_drawing", cascade="all, delete-orphan")
     alignments_as_master = relationship(
@@ -308,6 +318,37 @@ class Drawing(Base):
     )
     inspection_runs = relationship("InspectionRun", back_populates="master_drawing", cascade="all, delete-orphan")
     findings = relationship("Finding", back_populates="drawing")
+
+
+class DrawingRendition(Base):
+    """Rendered image page for a drawing (e.g. PNG from PDF)."""
+    __tablename__ = "drawing_renditions"
+    __table_args__ = (
+        UniqueConstraint("drawing_id", "page_number", name="uq_drawing_renditions_drawing_page"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    drawing_id = Column(Integer, ForeignKey("drawings.id"), nullable=False, index=True)
+    page_number = Column(Integer, nullable=False)  # 1-based page number
+
+    image_storage_key = Column(String, nullable=False)
+    mime_type = Column(String, nullable=False, default="image/png")
+    width_px = Column(Integer, nullable=True)
+    height_px = Column(Integer, nullable=True)
+    file_size = Column(Integer, nullable=True)
+
+    render_status = Column(String, nullable=False, default="ready")  # ready | failed
+    error_message = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    drawing = relationship("Drawing", back_populates="renditions")
 
 
 class DrawingRegion(Base):

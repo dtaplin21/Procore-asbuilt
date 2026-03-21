@@ -8,8 +8,49 @@ so routes can continue to import it while the new data model is designed.
 
 from __future__ import annotations
 
+from pathlib import Path
 from datetime import datetime
 from sqlalchemy.orm import Session, joinedload
+
+# ---------------------------------------------------------------------------
+# Rendered page image storage helpers (local storage, storage-key-based)
+# ---------------------------------------------------------------------------
+
+UPLOAD_ROOT = Path(__file__).parent.parent / "uploads"
+
+
+def ensure_parent_dir(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def build_drawing_source_storage_key(project_id: int, drawing_id: int, filename: str) -> str:
+    return f"drawings/source/project-{project_id}/drawing-{drawing_id}/{filename}"
+
+
+def build_drawing_render_storage_key(project_id: int, drawing_id: int, page_number: int) -> str:
+    return f"drawings/rendered/project-{project_id}/drawing-{drawing_id}/page-{page_number}.png"
+
+
+def storage_key_to_abs_path(storage_key: str) -> Path:
+    return UPLOAD_ROOT / storage_key
+
+
+def write_bytes_to_storage_key(storage_key: str, data: bytes) -> Path:
+    abs_path = storage_key_to_abs_path(storage_key)
+    ensure_parent_dir(abs_path)
+    abs_path.write_bytes(data)
+    return abs_path
+
+
+def get_storage_file_size(storage_key: str) -> int | None:
+    abs_path = storage_key_to_abs_path(storage_key)
+    if not abs_path.exists():
+        return None
+    return abs_path.stat().st_size
+
+
+def open_storage_path(storage_key: str) -> Path:
+    return storage_key_to_abs_path(storage_key)
 from sqlalchemy.exc import SQLAlchemyError
 from typing import Any, Dict, List, Optional, Sequence, Set, cast
 
@@ -21,6 +62,7 @@ from models.models import (
     DrawingRegion,
     DrawingAlignment,
     DrawingDiff,
+    DrawingRendition,
     EvidenceRecord,
     EvidenceDrawingLink,
     UsageLog,
@@ -184,6 +226,88 @@ class StorageService:
     def get_drawing_by_id(self, drawing_id: int) -> Optional[Drawing]:
         """Get a drawing by ID only (no project scope)."""
         return self.db.query(Drawing).filter(Drawing.id == drawing_id).first()
+
+    def set_drawing_processing_status(
+        self,
+        drawing_id: int,
+        status: str,
+        error: Optional[str] = None,
+        page_count: Optional[int] = None,
+    ) -> Drawing:
+        drawing = self.get_drawing_by_id(drawing_id)
+        if not drawing:
+            raise ValueError(f"Drawing {drawing_id} not found")
+
+        drawing.processing_status = status
+        drawing.processing_error = error
+        if page_count is not None:
+            drawing.page_count = page_count
+
+        self.db.add(drawing)
+        self.db.commit()
+        self.db.refresh(drawing)
+        return drawing
+
+    def upsert_drawing_rendition(
+        self,
+        drawing_id: int,
+        page_number: int,
+        image_storage_key: str,
+        mime_type: str,
+        width_px: Optional[int],
+        height_px: Optional[int],
+        file_size: Optional[int],
+        render_status: str = "ready",
+        error_message: Optional[str] = None,
+    ) -> DrawingRendition:
+        rendition = (
+            self.db.query(DrawingRendition)
+            .filter(
+                DrawingRendition.drawing_id == drawing_id,
+                DrawingRendition.page_number == page_number,
+            )
+            .first()
+        )
+
+        if rendition is None:
+            rendition = DrawingRendition(
+                drawing_id=drawing_id,
+                page_number=page_number,
+            )
+
+        rendition.image_storage_key = image_storage_key
+        rendition.mime_type = mime_type
+        rendition.width_px = width_px
+        rendition.height_px = height_px
+        rendition.file_size = file_size
+        rendition.render_status = render_status
+        rendition.error_message = error_message
+
+        self.db.add(rendition)
+        self.db.commit()
+        self.db.refresh(rendition)
+        return rendition
+
+    def get_drawing_rendition(
+        self, drawing_id: int, page_number: int
+    ) -> Optional[DrawingRendition]:
+        return (
+            self.db.query(DrawingRendition)
+            .filter(
+                DrawingRendition.drawing_id == drawing_id,
+                DrawingRendition.page_number == page_number,
+                DrawingRendition.render_status == "ready",
+            )
+            .first()
+        )
+
+    def list_drawing_renditions(self, drawing_id: int) -> List[DrawingRendition]:
+        return (
+            self.db.query(DrawingRendition)
+            .filter(DrawingRendition.drawing_id == drawing_id)
+            .order_by(DrawingRendition.page_number.asc())
+            .all()
+        )
 
     # ------------------------------------------------------------------
     # Drawing Regions (Phase 2)
