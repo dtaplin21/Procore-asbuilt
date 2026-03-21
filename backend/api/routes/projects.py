@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional, cast
 
 from api.dependencies import get_db
+from services.drawing_comparison import serialize_drawing_for_workspace
+from services.drawing_render_jobs import enqueue_drawing_render_job
 from services.storage import StorageService
 from models.schemas import (
     ProjectResponse,
@@ -11,6 +13,7 @@ from models.schemas import (
     DashboardSummaryResponse,
     DrawingResponse,
     DrawingSummary,
+    DrawingWorkspaceDrawingResponse,
     JobListResponse,
     AIInsightResponse,
     FindingListResponse,
@@ -145,6 +148,9 @@ async def upload_project_drawing(
     db.commit()
     db.refresh(drawing)
 
+    # Enqueue async render job for PDF/image rendition generation
+    enqueue_drawing_render_job(db, project_id, cast(int, drawing.id))
+
     return drawing
 
 
@@ -175,16 +181,20 @@ def list_project_drawings(
     return drawings
 
 
-@router.get("/{project_id}/drawings/{drawing_id}", response_model=DrawingSummary)
+@router.get(
+    "/{project_id}/drawings/{drawing_id}",
+    response_model=DrawingWorkspaceDrawingResponse,
+)
 def get_project_drawing(
     project_id: int,
     drawing_id: int,
+    page: int = Query(1, ge=1, description="Active page for rendered image URL"),
     db: Session = Depends(get_db),
 ):
-    """Get metadata for a specific drawing (DrawingSummary shape for production frontend).
+    """Get metadata for a specific drawing (rendition-aware workspace payload).
 
-    - Metadata comes from database, no filesystem reads
-    - Returns drawing details including file_url, project_id, source
+    - Prefers rendered page image URL when rendition is ready; falls back to source file
+    - Returns drawing details including fileUrl, sourceFileUrl, widthPx, heightPx
     """
     service = StorageService(db)
     drawing = service.get_drawing(project_id, drawing_id)
@@ -192,11 +202,21 @@ def get_project_drawing(
     if not drawing:
         raise HTTPException(status_code=404, detail="Drawing not found")
 
-    # Set file_url to point to /file endpoint
-    setattr(drawing, "file_url", f"/api/projects/{project_id}/drawings/{cast(int, drawing.id)}/file")
-    db.commit()
-
-    return DrawingSummary.model_validate(drawing)
+    serialized = serialize_drawing_for_workspace(db, drawing, active_page=page)
+    return DrawingWorkspaceDrawingResponse(
+        id=serialized["id"],
+        name=serialized["name"],
+        file_url=serialized["fileUrl"],
+        source_file_url=serialized["sourceFileUrl"],
+        page_count=serialized["pageCount"],
+        active_page=serialized["activePage"],
+        width_px=serialized.get("widthPx"),
+        height_px=serialized.get("heightPx"),
+        processing_status=serialized.get("processingStatus", "pending"),
+        processing_error=serialized.get("processingError"),
+        project_id=serialized.get("projectId"),
+        source=serialized.get("source"),
+    )
 
 
 @router.get(

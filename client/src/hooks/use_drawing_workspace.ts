@@ -7,7 +7,7 @@ import {
 import type {
   DrawingAlignment,
   DrawingDiff,
-  DrawingSummary,
+  DrawingWorkspaceDrawing,
 } from "@/types/drawing_workspace";
 
 type UseDrawingWorkspaceArgs = {
@@ -16,7 +16,7 @@ type UseDrawingWorkspaceArgs = {
 };
 
 type UseDrawingWorkspaceResult = {
-  masterDrawing: DrawingSummary | null;
+  masterDrawing: DrawingWorkspaceDrawing | null;
   alignments: DrawingAlignment[];
   selectedAlignmentId: number | null;
   selectedDiffId: number | null;
@@ -43,7 +43,7 @@ export function useDrawingWorkspace({
   projectId,
   drawingId,
 }: UseDrawingWorkspaceArgs): UseDrawingWorkspaceResult {
-  const [masterDrawing, setMasterDrawing] = useState<DrawingSummary | null>(null);
+  const [masterDrawing, setMasterDrawing] = useState<DrawingWorkspaceDrawing | null>(null);
   const [alignments, setAlignments] = useState<DrawingAlignment[]>([]);
   const [selectedAlignmentId, setSelectedAlignmentId] = useState<number | null>(null);
   const [selectedDiffId, setSelectedDiffId] = useState<number | null>(null);
@@ -156,6 +156,26 @@ export function useDrawingWorkspace({
   useEffect(() => {
     void loadWorkspace();
   }, [loadWorkspace]);
+
+  // Poll for drawing when rendering (pending/processing) until ready or failed
+  useEffect(() => {
+    if (!masterDrawing || workspaceLoading) return;
+
+    const status = (masterDrawing.processingStatus ?? "").toLowerCase();
+    if (status !== "pending" && status !== "processing") return;
+
+    const pollIntervalMs = 2000;
+    const timer = setInterval(async () => {
+      try {
+        const updated = await fetchMasterDrawing(projectId, drawingId);
+        setMasterDrawing(updated);
+      } catch {
+        // Ignore poll errors; next poll will retry
+      }
+    }, pollIntervalMs);
+
+    return () => clearInterval(timer);
+  }, [masterDrawing, projectId, drawingId, workspaceLoading]);
 
   const selectAlignment = useCallback(
     async (alignmentId: number) => {

@@ -14,6 +14,7 @@ from models.schemas import (
     EvidenceRecordResponse,
     EvidenceDrawingLinkResponse,
 )
+from services.drawing_render_jobs import enqueue_drawing_render_job
 from services.storage import StorageService
 from services.evidence_retrieval import EvidenceRetrievalService
 from services.file_storage import (
@@ -92,6 +93,10 @@ async def upload_drawing(
     response = DrawingResponse.model_validate(drawing)
     response_data = response.model_dump(mode="json")
     response_data["file_url"] = f"/api/projects/{project_id}/drawings/{cast(int, drawing.id)}/file"
+
+    # Enqueue async render job for PDF/image rendition generation
+    enqueue_drawing_render_job(db, project_id, cast(int, drawing.id))
+
     finish_idempotent_operation(
         db,
         row_id=cast(int, idem_row.id),

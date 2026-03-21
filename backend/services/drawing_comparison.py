@@ -25,6 +25,41 @@ from ai.pipelines.drawing_diff import run_drawing_diff
 
 logger = logging.getLogger(__name__)
 
+
+def serialize_drawing_for_workspace(db: Session, drawing: Drawing, active_page: int = 1) -> Dict[str, Any]:
+    """Serialize a drawing for workspace viewer, preferring rendered page image URL."""
+    storage = StorageService(db)
+    rendition = storage.get_drawing_rendition(cast(int, drawing.id), active_page)
+
+    if rendition:
+        file_url = (
+            f"/api/projects/{drawing.project_id}/drawings/{drawing.id}/pages/{active_page}/image"
+        )
+        width_px = rendition.width_px
+        height_px = rendition.height_px
+    else:
+        file_url = (
+            f"/api/projects/{drawing.project_id}/drawings/{drawing.id}/file"
+        )
+        width_px = None
+        height_px = None
+
+    return {
+        "id": cast(int, drawing.id),
+        "name": cast(str, drawing.name),
+        "fileUrl": file_url,
+        "sourceFileUrl": f"/api/projects/{drawing.project_id}/drawings/{drawing.id}/file",
+        "pageCount": drawing.page_count or 1,
+        "activePage": active_page,
+        "widthPx": width_px,
+        "heightPx": height_px,
+        "processingStatus": getattr(drawing, "processing_status", "pending"),
+        "processingError": getattr(drawing, "processing_error", None),
+        "source": getattr(drawing, "source", None),
+        "contentType": getattr(drawing, "content_type", None),
+        "projectId": cast(int, drawing.project_id),
+    }
+
 # Production validation thresholds
 MIN_MATCHED_POINTS = 4
 MIN_CONFIDENCE = 0.75
@@ -54,15 +89,17 @@ class DrawingComparisonService:
         self.db = db
         self.storage = StorageService(db)
 
-    def _serialize_drawing(self, drawing: Drawing) -> DrawingSummary:
+    def _serialize_drawing(self, drawing: Drawing, active_page: int = 1) -> DrawingSummary:
+        """Serialize drawing for workspace, preferring rendered page image URL."""
+        serialized = serialize_drawing_for_workspace(self.db, drawing, active_page=active_page)
         return DrawingSummary(
-            id=cast(int, drawing.id),
-            project_id=cast(int, drawing.project_id),
-            source=getattr(drawing, "source", None),
-            name=cast(str, drawing.name),
-            file_url=getattr(drawing, "file_url", None),
-            content_type=getattr(drawing, "content_type", None),
-            page_count=getattr(drawing, "page_count", None),
+            id=serialized["id"],
+            project_id=serialized["projectId"],
+            source=serialized.get("source"),
+            name=serialized["name"],
+            file_url=serialized["fileUrl"],
+            content_type=serialized.get("contentType"),
+            page_count=serialized["pageCount"],
         )
 
     def _serialize_alignment_history(self, alignment: DrawingAlignment) -> DrawingAlignmentHistoryResponse:

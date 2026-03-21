@@ -8,7 +8,7 @@ is CPU-bound and runs via asyncio.to_thread() or a worker process.
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
+from typing import Optional, cast
 
 from sqlalchemy.orm import Session
 
@@ -30,12 +30,12 @@ def _resolve_user_id_for_project(db: Session, project_id: int) -> int:
         .first()
     )
     if uc:
-        return uc.user_id
+        return cast(int, uc.user_id)
 
     user = db.query(User).order_by(User.id.asc()).first()
     if not user:
         raise ValueError("No users in database; cannot enqueue drawing render job")
-    return user.id
+    return cast(int, user.id)
 
 
 def enqueue_drawing_render_job(

@@ -1,7 +1,7 @@
 import type {
   DrawingAlignmentsResponse,
   DrawingDiffsResponse,
-  DrawingSummary,
+  DrawingWorkspaceDrawing,
 } from "@/types/drawing_workspace";
 
 type ApiErrorPayload = {
@@ -44,11 +44,17 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 export async function fetchMasterDrawing(
   projectId: number,
-  drawingId: number
-): Promise<DrawingSummary> {
-  return requestJson<DrawingSummary>(
-    `/api/projects/${projectId}/drawings/${drawingId}`
+  drawingId: number,
+  page?: number
+): Promise<DrawingWorkspaceDrawing> {
+  const url = new URL(
+    `/api/projects/${projectId}/drawings/${drawingId}`,
+    window.location.origin
   );
+  if (page != null && page >= 1) {
+    url.searchParams.set("page", String(page));
+  }
+  return requestJson<DrawingWorkspaceDrawing>(url.pathname + url.search);
 }
 
 export async function fetchMasterDrawingAlignments(

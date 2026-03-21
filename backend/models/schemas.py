@@ -259,6 +259,25 @@ class DrawingViewerAssetResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class DrawingWorkspaceDrawingResponse(BaseModel):
+    """Rendition-aware drawing payload for workspace viewer."""
+
+    id: int
+    name: str
+    file_url: str = Field(..., serialization_alias="fileUrl")
+    source_file_url: str = Field(..., serialization_alias="sourceFileUrl")
+    page_count: int = Field(1, serialization_alias="pageCount")
+    active_page: int = Field(1, serialization_alias="activePage")
+    width_px: Optional[int] = Field(None, serialization_alias="widthPx")
+    height_px: Optional[int] = Field(None, serialization_alias="heightPx")
+    processing_status: str = Field(..., serialization_alias="processingStatus")
+    processing_error: Optional[str] = Field(None, serialization_alias="processingError")
+    project_id: Optional[int] = Field(None, serialization_alias="projectId")
+    source: Optional[str] = Field(None, serialization_alias="source")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class EvidenceRecordResponse(BaseModel):
     id: int
     type: str

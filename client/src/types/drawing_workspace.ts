@@ -8,6 +8,22 @@ export type DrawingSummary = {
   pageCount?: number | null;
 };
 
+/** Rendition-aware drawing payload for workspace viewer (GET /projects/:id/drawings/:id) */
+export type DrawingWorkspaceDrawing = {
+  id: number;
+  name: string;
+  fileUrl: string;
+  sourceFileUrl: string;
+  pageCount: number;
+  activePage: number;
+  widthPx?: number | null;
+  heightPx?: number | null;
+  processingStatus: string;
+  processingError?: string | null;
+  projectId?: number | null;
+  source?: string | null;
+};
+
 export type DrawingBasicSummary = {
   id: number;
   name: string;
