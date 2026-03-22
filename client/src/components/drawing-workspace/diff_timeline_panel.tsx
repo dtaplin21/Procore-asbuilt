@@ -63,6 +63,7 @@ export default function DiffTimelinePanel({
                 key={diff.id}
                 type="button"
                 onClick={() => onSelectDiff(diff.id)}
+                data-testid={`diff-timeline-item-${diff.id}`}
                 className={`w-full border-b px-4 py-3 text-left transition hover:bg-slate-50 ${
                   selected ? "bg-slate-100" : "bg-white"
                 }`}

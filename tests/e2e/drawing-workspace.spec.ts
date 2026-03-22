@@ -33,6 +33,60 @@ const mockAlignments = [
   },
 ];
 
+/** 1x1 transparent PNG so img loads in tests */
+const DATA_URL_1X1_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+const mockDrawingWithOverlays = {
+  id: 10,
+  projectId: 1,
+  source: 'master',
+  name: 'Level 1 Master Plan',
+  fileUrl: DATA_URL_1X1_PNG,
+  sourceFileUrl: '/api/projects/1/drawings/10/file',
+  pageCount: 1,
+  activePage: 1,
+  widthPx: 800,
+  heightPx: 600,
+  processingStatus: 'ready',
+  processingError: null,
+};
+
+const mockDiffsWithOverlays = {
+  diffs: [
+    {
+      id: 1,
+      alignmentId: 1,
+      summary: 'Diff 1',
+      severity: 'low',
+      createdAt: '2025-02-13T14:00:00Z',
+      diffRegions: [
+        {
+          shapeType: 'rect',
+          rect: { x: 0.1, y: 0.2, width: 0.25, height: 0.15 },
+        },
+      ],
+    },
+    {
+      id: 2,
+      alignmentId: 1,
+      summary: 'Diff 2',
+      severity: 'medium',
+      createdAt: '2025-02-13T13:00:00Z',
+      diffRegions: [
+        {
+          shapeType: 'polygon',
+          points: [
+            { x: 0.2, y: 0.3 },
+            { x: 0.4, y: 0.3 },
+            { x: 0.3, y: 0.5 },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 const mockDiffsA = {
   diffs: [
     { id: 1, alignmentId: 1, summary: 'Diff 1', severity: 'low', createdAt: '2025-02-13T14:00:00Z', diffRegions: [] },
@@ -196,5 +250,88 @@ test.describe('Drawing Workspace', () => {
 
     const alignment1Requests = diffsRequestLog.filter((id) => id === 1);
     expect(alignment1Requests.length).toBe(1);
+  });
+});
+
+test.describe('drawing workspace viewer', () => {
+  test('supports zoom, pan, and reset', async ({ page }) => {
+    await page.route(/\/api\/projects\/1\/drawings\/10$/, (route) =>
+      route.fulfill({ json: mockDrawingWithOverlays })
+    );
+    await page.route(/\/api\/projects\/1\/drawings\/10\/alignments$/, (route) =>
+      route.fulfill({ json: { alignments: mockAlignments } })
+    );
+    await page.route(/\/api\/projects\/1\/drawings\/10\/diffs/, (route) => {
+      const url = new URL(route.request().url());
+      const alignmentId = url.searchParams.get('alignment_id');
+      if (alignmentId === '1') return route.fulfill({ json: mockDiffsWithOverlays });
+      if (alignmentId === '2') return route.fulfill({ json: mockDiffsA });
+      return route.fulfill({ json: { diffs: [] } });
+    });
+
+    await page.goto(DRAWING_URL);
+
+    await expect(page.getByTestId('drawing-viewer-image')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('pan-zoom-container')).toBeVisible();
+
+    await expect(page.getByText(/Zoom:/)).toContainText('100%');
+
+    const panZoomContainer = page.getByTestId('pan-zoom-container');
+    await panZoomContainer.hover();
+
+    await page.mouse.wheel(0, -500);
+
+    await expect(page.getByText(/Zoom:/)).not.toContainText('100%');
+
+    const content = page.getByTestId('pan-zoom-content');
+    const transformBefore = await content.getAttribute('style');
+
+    const box = await panZoomContainer.boundingBox();
+    if (!box) throw new Error('Pan zoom container not found');
+
+    await page.mouse.move(box.x + 150, box.y + 150);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 260, box.y + 240, { steps: 6 });
+    await page.mouse.up();
+
+    const transformAfter = await content.getAttribute('style');
+    expect(transformAfter).not.toBe(transformBefore);
+
+    await page.getByRole('button', { name: 'Reset view' }).click();
+    await expect(page.getByText(/Zoom:/)).toContainText('100%');
+  });
+});
+
+test.describe('drawing workspace overlays', () => {
+
+  test('switching selected diff keeps overlay rendering visible', async ({
+    page,
+  }) => {
+    await page.route(/\/api\/projects\/1\/drawings\/10$/, (route) =>
+      route.fulfill({ json: mockDrawingWithOverlays })
+    );
+    await page.route(/\/api\/projects\/1\/drawings\/10\/alignments$/, (route) =>
+      route.fulfill({ json: { alignments: mockAlignments } })
+    );
+    await page.route(/\/api\/projects\/1\/drawings\/10\/diffs/, (route) =>
+      route.fulfill({ json: mockDiffsWithOverlays })
+    );
+
+    await page.goto(DRAWING_URL);
+
+    await expect(page.getByTestId('drawing-viewer-image')).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(page.getByTestId('drawing-overlay-layer')).toBeVisible({
+      timeout: 3000,
+    });
+
+    const diff1 = page.getByTestId('diff-1');
+    const diff2 = page.getByTestId('diff-2');
+    await expect(diff1).toBeVisible();
+    await expect(diff2).toBeVisible();
+
+    await diff2.click();
+    await expect(page.getByTestId('drawing-overlay-layer')).toBeVisible();
   });
 });

@@ -1,5 +1,16 @@
 import { ReactNode, useCallback, useMemo, useRef, useState } from "react";
 
+type Point = {
+  x: number;
+  y: number;
+};
+
+type TransformState = {
+  scale: number;
+  x: number;
+  y: number;
+};
+
 type Props = {
   children: ReactNode;
   minScale?: number;
@@ -7,89 +18,121 @@ type Props = {
   initialScale?: number;
 };
 
-type PanState = {
-  x: number;
-  y: number;
-};
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
 
 export default function PanZoomContainer({
   children,
   minScale = 0.5,
-  maxScale = 4,
+  maxScale = 5,
   initialScale = 1,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [scale, setScale] = useState(initialScale);
-  const [pan, setPan] = useState<PanState>({ x: 0, y: 0 });
+
+  const [transform, setTransform] = useState<TransformState>({
+    scale: initialScale,
+    x: 0,
+    y: 0,
+  });
+
   const [isDragging, setIsDragging] = useState(false);
 
   const dragRef = useRef<{
-    originX: number;
-    originY: number;
-    startPanX: number;
-    startPanY: number;
+    pointerId: number;
+    startPointer: Point;
+    startTransform: TransformState;
   } | null>(null);
-
-  const clampedScale = useMemo(() => {
-    return Math.max(minScale, Math.min(maxScale, scale));
-  }, [scale, minScale, maxScale]);
 
   const handleWheel = useCallback(
     (event: React.WheelEvent<HTMLDivElement>) => {
       event.preventDefault();
 
-      const delta = event.deltaY;
-      const zoomStep = delta > 0 ? -0.1 : 0.1;
+      const container = containerRef.current;
+      if (!container) return;
 
-      setScale((current) => {
-        const next = current + zoomStep;
-        return Math.max(minScale, Math.min(maxScale, next));
+      const rect = container.getBoundingClientRect();
+      const pointerX = event.clientX - rect.left;
+      const pointerY = event.clientY - rect.top;
+
+      const zoomIntensity = 0.0015;
+      const scaleDelta = Math.exp(-event.deltaY * zoomIntensity);
+
+      setTransform((current) => {
+        const nextScale = clamp(current.scale * scaleDelta, minScale, maxScale);
+
+        const worldX = (pointerX - current.x) / current.scale;
+        const worldY = (pointerY - current.y) / current.scale;
+
+        const nextX = pointerX - worldX * nextScale;
+        const nextY = pointerY - worldY * nextScale;
+
+        return {
+          scale: nextScale,
+          x: nextX,
+          y: nextY,
+        };
       });
     },
     [minScale, maxScale]
   );
 
-  const handleMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+  const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
+
+    const target = event.currentTarget;
+    target.setPointerCapture(event.pointerId);
 
     setIsDragging(true);
 
     dragRef.current = {
-      originX: event.clientX,
-      originY: event.clientY,
-      startPanX: pan.x,
-      startPanY: pan.y,
+      pointerId: event.pointerId,
+      startPointer: {
+        x: event.clientX,
+        y: event.clientY,
+      },
+      startTransform: transform,
     };
-  }, [pan.x, pan.y]);
+  }, [transform]);
 
-  const handleMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    if (!dragRef.current) return;
+  const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const dragState = dragRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
 
-    const deltaX = event.clientX - dragRef.current.originX;
-    const deltaY = event.clientY - dragRef.current.originY;
+    const deltaX = event.clientX - dragState.startPointer.x;
+    const deltaY = event.clientY - dragState.startPointer.y;
 
-    setPan({
-      x: dragRef.current.startPanX + deltaX,
-      y: dragRef.current.startPanY + deltaY,
+    setTransform({
+      ...dragState.startTransform,
+      x: dragState.startTransform.x + deltaX,
+      y: dragState.startTransform.y + deltaY,
     });
   }, []);
 
-  const stopDragging = useCallback(() => {
+  const stopDragging = useCallback((event?: React.PointerEvent<HTMLDivElement>) => {
+    if (event && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
     setIsDragging(false);
     dragRef.current = null;
   }, []);
 
   const resetView = useCallback(() => {
-    setScale(initialScale);
-    setPan({ x: 0, y: 0 });
+    setTransform({
+      scale: initialScale,
+      x: 0,
+      y: 0,
+    });
   }, [initialScale]);
+
+  const percent = useMemo(() => Math.round(transform.scale * 100), [transform.scale]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center justify-between border-b px-4 py-2">
-        <div className="text-xs text-slate-500">
-          Zoom: {Math.round(clampedScale * 100)}%
-        </div>
+        <div className="text-xs text-slate-500">Zoom: {percent}%</div>
+
         <button
           type="button"
           onClick={resetView}
@@ -101,19 +144,21 @@ export default function PanZoomContainer({
 
       <div
         ref={containerRef}
-        className={`relative flex-1 overflow-hidden bg-slate-100 ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+        className={`relative flex-1 overflow-hidden bg-slate-100 touch-none ${
+          isDragging ? "cursor-grabbing" : "cursor-grab"
+        }`}
         onWheel={handleWheel}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={stopDragging}
-        onMouseLeave={stopDragging}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={stopDragging}
+        onPointerCancel={stopDragging}
         data-testid="pan-zoom-container"
       >
         <div
-          className="absolute left-1/2 top-1/2 origin-center"
+          className="absolute left-0 top-0 will-change-transform"
           style={{
-            transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${clampedScale})`,
-            transformOrigin: "center center",
+            transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
+            transformOrigin: "0 0",
           }}
           data-testid="pan-zoom-content"
         >

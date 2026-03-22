@@ -17,6 +17,7 @@
     "db:init": "cd backend && python3 scripts/init_db.py",
     "db:reset": "cd backend && python3 scripts/reset_db.py",
     "test": "playwright test",
+    "test:unit": "vitest run",
     "test:ui": "playwright test --ui",
     "test:regression": "playwright test --grep @regression",
     "test:e2e": "playwright test",
@@ -83,6 +84,8 @@
     "zod-validation-error": "^3.4.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.0.1",
     "@playwright/test": "^1.40.0",
     "@replit/vite-plugin-cartographer": "^0.4.4",
     "@replit/vite-plugin-dev-banner": "^0.1.1",
@@ -104,7 +107,9 @@
     "tailwindcss": "^3.4.17",
     "tsx": "^4.20.5",
     "typescript": "5.6.3",
-    "vite": "^7.3.0"
+    "vite": "^7.3.0",
+    "vitest": "^3.0.0",
+    "jsdom": "^25.0.0"
   },
   "overrides": {
     "drizzle-kit": {

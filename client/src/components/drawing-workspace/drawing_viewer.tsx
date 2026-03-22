@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import PanZoomContainer from "@/components/drawing-workspace/pan_zoom_container";
 import DrawingOverlayLayer from "@/components/drawing-workspace/drawing_overlay_layer";
 import WorkspaceEmptyState from "@/components/drawing-workspace/workspace_empty_state";
+import { useResizeObserver } from "@/hooks/use_resize_observer";
 import type {
   DrawingDiff,
   DrawingWorkspaceDrawing,
 } from "@/types/drawing_workspace";
-import type { ViewerSize } from "@/lib/drawing-overlays/overlay-types";
 
 type Props = {
   drawing: DrawingWorkspaceDrawing | null;
@@ -14,34 +14,20 @@ type Props = {
 };
 
 export default function DrawingViewer({ drawing, selectedDiff }: Props) {
-  const imgRef = useRef<HTMLImageElement | null>(null);
-  const [viewerSize, setViewerSize] = useState<ViewerSize>({ width: 0, height: 0 });
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const imageBounds = useResizeObserver(stageRef);
+
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
 
   useEffect(() => {
     setImageLoaded(false);
     setImageError(null);
-    setViewerSize({ width: 0, height: 0 });
   }, [drawing?.fileUrl]);
 
   const canRenderOverlay = useMemo(() => {
-    return viewerSize.width > 0 && viewerSize.height > 0;
-  }, [viewerSize]);
-
-  const updateViewerSize = () => {
-    if (!imgRef.current) return;
-
-    const nextWidth = imgRef.current.clientWidth;
-    const nextHeight = imgRef.current.clientHeight;
-
-    if (!nextWidth || !nextHeight) return;
-
-    setViewerSize({
-      width: nextWidth,
-      height: nextHeight,
-    });
-  };
+    return imageLoaded && imageBounds.width > 0 && imageBounds.height > 0;
+  }, [imageLoaded, imageBounds.width, imageBounds.height]);
 
   if (!drawing) {
     return (
@@ -124,9 +110,13 @@ export default function DrawingViewer({ drawing, selectedDiff }: Props) {
       </div>
 
       <PanZoomContainer>
-        <div className="relative inline-block" data-testid="drawing-viewer-stage">
+        <div
+          ref={stageRef}
+          className="relative inline-block"
+          data-testid="drawing-viewer-stage"
+        >
           {!imageLoaded && !imageError ? (
-            <div className="absolute inset-0 z-10 flex items-center justify-center rounded bg-white/80 text-sm text-slate-500">
+            <div className="absolute inset-0 z-10 flex min-h-[240px] min-w-[320px] items-center justify-center rounded bg-white/80 text-sm text-slate-500">
               Loading drawing image...
             </div>
           ) : null}
@@ -138,13 +128,11 @@ export default function DrawingViewer({ drawing, selectedDiff }: Props) {
           ) : (
             <>
               <img
-                ref={imgRef}
                 src={drawing.fileUrl}
                 alt={drawing.name}
                 className="block max-h-[80vh] max-w-[1200px] select-none rounded"
                 onLoad={() => {
                   setImageLoaded(true);
-                  updateViewerSize();
                 }}
                 onError={() => {
                   setImageError("Failed to load drawing image.");
@@ -153,10 +141,13 @@ export default function DrawingViewer({ drawing, selectedDiff }: Props) {
                 draggable={false}
               />
 
-              {imageLoaded && canRenderOverlay ? (
+              {canRenderOverlay ? (
                 <DrawingOverlayLayer
                   diff={selectedDiff}
-                  viewerSize={viewerSize}
+                  viewerSize={{
+                    width: imageBounds.width,
+                    height: imageBounds.height,
+                  }}
                 />
               ) : null}
             </>
