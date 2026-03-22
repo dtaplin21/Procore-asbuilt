@@ -78,7 +78,8 @@ The dashboard should act as an entry point into this workspace; the workspace it
   - For the selected diff:
     - Render `diff_regions` as simple overlays:
       - Use normalized coordinates to position rectangles/polygons over the drawing.
-      - Keep implementation minimal but structured so pan/zoom can be added later.
+      -add pan to zoom
+      - make sure plan is production ready.
 
 **Done when:** Navigating to `/projects/{projectId}/drawings/{drawingId}` shows the master drawing, existing alignments, and diff regions for at least one alignment.
 

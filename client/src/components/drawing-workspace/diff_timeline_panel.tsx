@@ -41,6 +41,7 @@ export default function DiffTimelinePanel({
                   type="button"
                   onClick={onRetry}
                   className="mt-3 rounded-md border border-red-300 bg-white px-3 py-2 text-sm text-red-700 hover:bg-red-50"
+                  data-testid="retry-diffs"
                 >
                   Retry
                 </button>
@@ -63,7 +64,7 @@ export default function DiffTimelinePanel({
                 key={diff.id}
                 type="button"
                 onClick={() => onSelectDiff(diff.id)}
-                data-testid={`diff-timeline-item-${diff.id}`}
+                data-testid={`diff-${diff.id}`}
                 className={`w-full border-b px-4 py-3 text-left transition hover:bg-slate-50 ${
                   selected ? "bg-slate-100" : "bg-white"
                 }`}

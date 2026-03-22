@@ -44,7 +44,7 @@ export default function AlignmentsPanel({
                 key={alignment.id}
                 type="button"
                 onClick={() => onSelectAlignment(alignment.id)}
-                data-testid={`alignment-item-${alignment.id}`}
+                data-testid={`alignment-${alignment.id}`}
                 className={`w-full border-b px-4 py-3 text-left transition hover:bg-slate-50 ${
                   selected ? "bg-slate-100" : "bg-white"
                 }`}
