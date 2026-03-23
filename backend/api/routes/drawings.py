@@ -14,9 +14,10 @@ from models.schemas import (
     EvidenceMatchReason,
     EvidenceRecordResponse,
     EvidenceDrawingLinkResponse,
-    ProjectDrawingsResponse,
+    ProjectDrawingsListResponse,
 )
 from services.drawing_render_jobs import enqueue_drawing_render_job
+from services.drawings import DrawingService
 from services.storage import StorageService
 from services.evidence_retrieval import EvidenceRetrievalService
 from services.file_storage import (
@@ -108,27 +109,28 @@ async def upload_drawing(
     return DrawingResponse(**response_data)
 
 
-@router.get("/api/projects/{project_id}/drawings", response_model=ProjectDrawingsResponse)
-def list_drawings(project_id: int, db: Session = Depends(get_db)) -> ProjectDrawingsResponse:
+@router.get(
+    "/api/projects/{project_id}/drawings",
+    response_model=ProjectDrawingsListResponse,
+)
+def list_drawings(
+    project_id: int,
+    db: Session = Depends(get_db),
+):
     """
     GET /api/projects/{project_id}/drawings
     List all drawings for a project. Returns workspace-ready candidates with camelCase fields.
     """
-    service = StorageService(db)
-    drawings = service.list_drawings(project_id)
-
-    result = []
-    for d in drawings:
-        item = DrawingSummary.model_validate(d)
-        if not item.file_url:
-            item = item.model_copy(
-                update={
-                    "file_url": f"/api/projects/{project_id}/drawings/{d.id}/file"
-                }
-            )
-        result.append(item)
-
-    return ProjectDrawingsResponse(drawings=result)
+    service = DrawingService(db)
+    try:
+        return service.list_project_drawings(project_id=project_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load project drawings: {str(e)}",
+        )
 
 
 @router.get("/api/projects/{project_id}/drawings/{drawing_id}", response_model=DrawingResponse)

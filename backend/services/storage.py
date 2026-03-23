@@ -216,6 +216,15 @@ class StorageService:
             .all()
         )
 
+    def list_drawings_by_project(self, project_id: int) -> List[Drawing]:
+        """List drawings for a project, newest-first. Stable ordering for selection UIs."""
+        return (
+            self.db.query(Drawing)
+            .filter(Drawing.project_id == project_id)
+            .order_by(Drawing.created_at.desc(), Drawing.id.desc())
+            .all()
+        )
+
     def get_drawing(self, project_id: int, drawing_id: int) -> Optional[Drawing]:
         return (
             self.db.query(Drawing)

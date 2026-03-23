@@ -244,6 +244,14 @@ class ProjectDrawingsResponse(BaseModel):
     drawings: List[DrawingSummary]
 
 
+class ProjectDrawingsListResponse(BaseModel):
+    """Typed response for project drawings list - matches frontend ProjectDrawingsResponse."""
+
+    drawings: List[DrawingSummary]
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class DrawingRenditionResponse(BaseModel):
     page_number: int
     file_url: str
