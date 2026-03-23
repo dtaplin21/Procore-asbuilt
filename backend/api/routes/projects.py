@@ -17,6 +17,7 @@ from models.schemas import (
     JobListResponse,
     AIInsightResponse,
     FindingListResponse,
+    ProjectDrawingsResponse,
 )
 from models.models import Drawing, Project
 from services.file_storage import save_upload, get_file_path
@@ -154,31 +155,36 @@ async def upload_project_drawing(
     return drawing
 
 
-@router.get("/{project_id}/drawings", response_model=List[DrawingResponse])
+@router.get("/{project_id}/drawings", response_model=ProjectDrawingsResponse)
 def list_project_drawings(
     project_id: int,
     db: Session = Depends(get_db),
 ):
     """List all drawings for a project.
-    
+
     - Metadata comes from database, no filesystem reads
-    - Returns drawings sorted by creation date (newest first)
+    - Returns drawings with camelCase fields for workspace/sub-drawing selection
+    - Response shape: { drawings: [...] }
     """
-    # Verify project exists
     proj = db.query(Project).filter(Project.id == project_id).first()
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
 
     service = StorageService(db)
     drawings = service.list_drawings(project_id)
-    
-    # Set file_url on each drawing to point to /file endpoint
-    for drawing in drawings:
-        setattr(drawing, "file_url", f"/api/projects/{project_id}/drawings/{cast(int, drawing.id)}/file")
-    
-    db.commit()  # Persist file_url changes
-    
-    return drawings
+
+    result = []
+    for d in drawings:
+        item = DrawingSummary.model_validate(d)
+        if not item.file_url:
+            item = item.model_copy(
+                update={
+                    "file_url": f"/api/projects/{project_id}/drawings/{d.id}/file"
+                }
+            )
+        result.append(item)
+
+    return ProjectDrawingsResponse(drawings=result)
 
 
 @router.get(

@@ -8,11 +8,13 @@ from models.models import Drawing
 from models.schemas import (
     DrawingOverlayResponse,
     DrawingResponse,
+    DrawingSummary,
     EvidenceContextMatch,
     EvidenceContextResponse,
     EvidenceMatchReason,
     EvidenceRecordResponse,
     EvidenceDrawingLinkResponse,
+    ProjectDrawingsResponse,
 )
 from services.drawing_render_jobs import enqueue_drawing_render_job
 from services.storage import StorageService
@@ -106,15 +108,27 @@ async def upload_drawing(
     return DrawingResponse(**response_data)
 
 
-@router.get("/api/projects/{project_id}/drawings", response_model=List[DrawingResponse])
-def list_drawings(project_id: int, db: Session = Depends(get_db)) -> List[DrawingResponse]:
+@router.get("/api/projects/{project_id}/drawings", response_model=ProjectDrawingsResponse)
+def list_drawings(project_id: int, db: Session = Depends(get_db)) -> ProjectDrawingsResponse:
     """
     GET /api/projects/{project_id}/drawings
-    List all drawings for a project.
+    List all drawings for a project. Returns workspace-ready candidates with camelCase fields.
     """
     service = StorageService(db)
     drawings = service.list_drawings(project_id)
-    return [DrawingResponse.from_orm(d) for d in drawings]
+
+    result = []
+    for d in drawings:
+        item = DrawingSummary.model_validate(d)
+        if not item.file_url:
+            item = item.model_copy(
+                update={
+                    "file_url": f"/api/projects/{project_id}/drawings/{d.id}/file"
+                }
+            )
+        result.append(item)
+
+    return ProjectDrawingsResponse(drawings=result)
 
 
 @router.get("/api/projects/{project_id}/drawings/{drawing_id}", response_model=DrawingResponse)

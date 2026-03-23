@@ -13,6 +13,7 @@ import type { WorkspaceRouteParams } from "@/types/drawing_workspace";
 export default function DrawingWorkspacePage() {
   const { projectId, drawingId } = useParams<WorkspaceRouteParams>();
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+  const [selectedSubDrawingId, setSelectedSubDrawingId] = useState<number | null>(null);
 
   const openCompareModal = () => {
     setIsCompareModalOpen(true);
@@ -20,6 +21,10 @@ export default function DrawingWorkspacePage() {
 
   const closeCompareModal = () => {
     setIsCompareModalOpen(false);
+  };
+
+  const handleSelectSubDrawing = (drawingId: number | null) => {
+    setSelectedSubDrawingId(drawingId);
   };
 
   const parsedProjectId = Number(projectId);
@@ -124,7 +129,10 @@ export default function DrawingWorkspacePage() {
 
       <CompareSubDrawingModal
         isOpen={isCompareModalOpen}
+        projectId={parsedProjectId}
+        masterDrawingId={parsedDrawingId}
         onClose={closeCompareModal}
+        onSelectSubDrawing={handleSelectSubDrawing}
       />
     </>
   );

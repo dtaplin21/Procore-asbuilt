@@ -234,6 +234,12 @@ class DrawingSummary(BaseModel):
     model_config = {"from_attributes": True, "populate_by_name": True}
 
 
+class ProjectDrawingsResponse(BaseModel):
+    """Response for GET /api/projects/{project_id}/drawings - list of drawing candidates."""
+
+    drawings: List[DrawingSummary]
+
+
 class DrawingRenditionResponse(BaseModel):
     page_number: int
     file_url: str

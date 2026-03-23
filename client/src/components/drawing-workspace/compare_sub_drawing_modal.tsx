@@ -1,14 +1,32 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import SubDrawingList from "@/components/drawing-workspace/sub_drawing_list";
+import SubDrawingSearchInput from "@/components/drawing-workspace/sub_drawing_search_input";
+import { useProjectDrawings } from "@/hooks/use_project_drawings";
 
 type Props = {
   isOpen: boolean;
+  projectId: number;
+  masterDrawingId: number;
   onClose: () => void;
+  onSelectSubDrawing?: (drawingId: number | null) => void;
 };
 
 export default function CompareSubDrawingModal({
   isOpen,
+  projectId,
+  masterDrawingId,
   onClose,
+  onSelectSubDrawing,
 }: Props) {
+  const [search, setSearch] = useState("");
+  const [selectedDrawingId, setSelectedDrawingId] = useState<number | null>(null);
+
+  const { drawings, loading, error, reload } = useProjectDrawings({
+    projectId,
+    masterDrawingId,
+    enabled: isOpen,
+  });
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -24,6 +42,30 @@ export default function CompareSubDrawingModal({
     };
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      setSearch("");
+      setSelectedDrawingId(null);
+    }
+  }, [isOpen]);
+
+  const filteredDrawings = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) {
+      return drawings;
+    }
+
+    return drawings.filter((drawing) =>
+      drawing.name.toLowerCase().includes(query)
+    );
+  }, [drawings, search]);
+
+  const handleSelectDrawing = (drawingId: number) => {
+    setSelectedDrawingId(drawingId);
+    onSelectSubDrawing?.(drawingId);
+  };
+
   if (!isOpen) {
     return null;
   }
@@ -35,7 +77,7 @@ export default function CompareSubDrawingModal({
       data-testid="compare-sub-drawing-modal-backdrop"
     >
       <div
-        className="w-full max-w-lg rounded-xl bg-white shadow-xl"
+        className="w-full max-w-2xl rounded-xl bg-white shadow-xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -51,7 +93,7 @@ export default function CompareSubDrawingModal({
               Compare a sub drawing
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Select a sub drawing to compare against the current master drawing.
+              Select a project drawing to compare against the current master drawing.
             </p>
           </div>
 
@@ -65,19 +107,35 @@ export default function CompareSubDrawingModal({
           </button>
         </div>
 
-        <div className="p-5">
-          <div className="rounded-lg border border-dashed p-4 text-sm text-slate-500">
-            Sub drawing selection UI goes here in Phase 3.2.
-          </div>
+        <div className="space-y-4 p-5">
+          <SubDrawingSearchInput
+            value={search}
+            onChange={setSearch}
+          />
+
+          <SubDrawingList
+            drawings={filteredDrawings}
+            selectedDrawingId={selectedDrawingId}
+            loading={loading}
+            error={error}
+            onSelect={handleSelectDrawing}
+            onRetry={() => void reload()}
+          />
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t px-5 py-4">
+        <div className="flex items-center justify-between border-t px-5 py-4">
+          <div className="text-sm text-slate-500">
+            {selectedDrawingId
+              ? `Selected drawing #${selectedDrawingId}`
+              : "No sub drawing selected"}
+          </div>
+
           <button
             type="button"
             onClick={onClose}
             className="rounded-md border px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
           >
-            Cancel
+            Done
           </button>
         </div>
       </div>

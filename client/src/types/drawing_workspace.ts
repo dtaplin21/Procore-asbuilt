@@ -29,6 +29,20 @@ export type DrawingBasicSummary = {
   name: string;
 };
 
+export type ProjectDrawingCandidate = {
+  id: number;
+  projectId: number;
+  name: string;
+  source?: string | null;
+  fileUrl?: string | null;
+  contentType?: string | null;
+  pageCount?: number | null;
+};
+
+export type ProjectDrawingsResponse = {
+  drawings: ProjectDrawingCandidate[];
+};
+
 export type DrawingAlignment = {
   id: number;
   projectId: number;
