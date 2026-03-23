@@ -231,7 +231,11 @@ class DrawingSummary(BaseModel):
     content_type: Optional[str] = Field(default=None, serialization_alias="contentType")
     page_count: Optional[int] = Field(default=None, serialization_alias="pageCount")
 
-    model_config = {"from_attributes": True, "populate_by_name": True}
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        serialize_by_alias=True,
+    )
 
 
 class ProjectDrawingsResponse(BaseModel):
