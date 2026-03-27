@@ -14,6 +14,8 @@ import type {
 type UseDrawingWorkspaceArgs = {
   projectId: number;
   drawingId: number;
+  initialAlignmentId?: number | null;
+  initialDiffId?: number | null;
 };
 
 type UseDrawingWorkspaceResult = {
@@ -50,6 +52,8 @@ type UseDrawingWorkspaceResult = {
 export function useDrawingWorkspace({
   projectId,
   drawingId,
+  initialAlignmentId = null,
+  initialDiffId = null,
 }: UseDrawingWorkspaceArgs): UseDrawingWorkspaceResult {
   const [masterDrawing, setMasterDrawing] = useState<DrawingWorkspaceDrawing | null>(null);
   const [alignments, setAlignments] = useState<DrawingAlignment[]>([]);
@@ -69,8 +73,15 @@ export function useDrawingWorkspace({
   const workspaceRequestIdRef = useRef(0);
   const diffsRequestIdRef = useRef(0);
   const compareRequestIdRef = useRef(0);
+  const hasAppliedInitialAlignmentRef = useRef(false);
+  const hasAppliedInitialDiffRef = useRef(false);
   const diffsByAlignmentIdRef = useRef<Record<number, DrawingDiff[]>>({});
   diffsByAlignmentIdRef.current = diffsByAlignmentId;
+
+  useEffect(() => {
+    hasAppliedInitialAlignmentRef.current = false;
+    hasAppliedInitialDiffRef.current = false;
+  }, [projectId, drawingId]);
 
   const loadDiffsForAlignment = useCallback(
     async (alignmentId: number, force = false) => {
@@ -98,9 +109,25 @@ export function useDrawingWorkspace({
         }));
 
         setSelectedDiffId((current) => {
+          if (
+            !hasAppliedInitialDiffRef.current &&
+            initialDiffId != null
+          ) {
+            const matchedInitialDiff = nextDiffs.find(
+              (diff) => diff.id === initialDiffId
+            );
+
+            hasAppliedInitialDiffRef.current = true;
+
+            if (matchedInitialDiff) {
+              return matchedInitialDiff.id;
+            }
+          }
+
           if (current && nextDiffs.some((diff) => diff.id === current)) {
             return current;
           }
+
           return nextDiffs[0]?.id ?? null;
         });
       } catch (error) {
@@ -115,7 +142,7 @@ export function useDrawingWorkspace({
         }
       }
     },
-    [projectId, drawingId]
+    [projectId, drawingId, initialDiffId]
   );
 
   const loadWorkspace = useCallback(async () => {
@@ -144,10 +171,26 @@ export function useDrawingWorkspace({
       setSelectedDiffId(null);
 
       if (nextAlignments.length > 0) {
-        const mostRecentAlignment = nextAlignments[0];
-        setSelectedAlignmentId(mostRecentAlignment.id);
+        let nextSelectedAlignment = nextAlignments[0];
 
-        await loadDiffsForAlignment(mostRecentAlignment.id, true);
+        if (
+          !hasAppliedInitialAlignmentRef.current &&
+          initialAlignmentId != null
+        ) {
+          const matchedAlignment = nextAlignments.find(
+            (alignment) => alignment.id === initialAlignmentId
+          );
+
+          if (matchedAlignment) {
+            nextSelectedAlignment = matchedAlignment;
+          }
+
+          hasAppliedInitialAlignmentRef.current = true;
+        }
+
+        setSelectedAlignmentId(nextSelectedAlignment.id);
+
+        await loadDiffsForAlignment(nextSelectedAlignment.id, true);
       } else {
         setSelectedAlignmentId(null);
       }
@@ -164,7 +207,7 @@ export function useDrawingWorkspace({
         setWorkspaceLoading(false);
       }
     }
-  }, [projectId, drawingId, loadDiffsForAlignment]);
+  }, [projectId, drawingId, initialAlignmentId, initialDiffId, loadDiffsForAlignment]);
 
   useEffect(() => {
     void loadWorkspace();

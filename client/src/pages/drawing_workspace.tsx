@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "wouter";
 
 import AlignmentsPanel from "@/components/drawing-workspace/alignments_panel";
@@ -8,10 +8,25 @@ import DiffTimelinePanel from "@/components/drawing-workspace/diff_timeline_pane
 import DrawingViewer from "@/components/drawing-workspace/drawing_viewer";
 import DrawingWorkspaceLayout from "@/components/drawing-workspace/drawing_workspace_layout";
 import { useDrawingWorkspace } from "@/hooks/use_drawing_workspace";
+import { useWorkspaceSelectionQueryParams } from "@/hooks/use_workspace_selection_query_params";
 import type { WorkspaceRouteParams } from "@/types/drawing_workspace";
 
-export default function DrawingWorkspacePage() {
-  const { projectId, drawingId } = useParams<WorkspaceRouteParams>();
+type DrawingWorkspaceContentProps = {
+  projectId: number;
+  drawingId: number;
+  idsAreValid: boolean;
+};
+
+function DrawingWorkspaceContent({
+  projectId,
+  drawingId,
+  idsAreValid,
+}: DrawingWorkspaceContentProps) {
+  const {
+    alignmentIdFromUrl,
+    diffIdFromUrl,
+    setSelectionQueryParams,
+  } = useWorkspaceSelectionQueryParams();
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const [selectedSubDrawingId, setSelectedSubDrawingId] = useState<number | null>(null);
 
@@ -26,21 +41,6 @@ export default function DrawingWorkspacePage() {
   const handleSelectSubDrawing = (drawingId: number | null) => {
     setSelectedSubDrawingId(drawingId);
   };
-
-  const parsedProjectId = Number(projectId);
-  const parsedDrawingId = Number(drawingId);
-
-  const idsAreValid = useMemo(() => {
-    return Number.isFinite(parsedProjectId) && Number.isFinite(parsedDrawingId);
-  }, [parsedProjectId, parsedDrawingId]);
-
-  if (!idsAreValid) {
-    return (
-      <div className="p-4 text-red-600">
-        Invalid project id or drawing id.
-      </div>
-    );
-  }
 
   const {
     masterDrawing,
@@ -61,9 +61,25 @@ export default function DrawingWorkspacePage() {
     reloadSelectedDiffs,
     runCompare,
   } = useDrawingWorkspace({
-    projectId: parsedProjectId,
-    drawingId: parsedDrawingId,
+    projectId,
+    drawingId,
+    initialAlignmentId: alignmentIdFromUrl,
+    initialDiffId: diffIdFromUrl,
   });
+
+  useEffect(() => {
+    if (!idsAreValid) return;
+
+    setSelectionQueryParams({
+      alignmentId: selectedAlignmentId,
+      diffId: selectedDiffId,
+    });
+  }, [
+    idsAreValid,
+    selectedAlignmentId,
+    selectedDiffId,
+    setSelectionQueryParams,
+  ]);
 
   const handleConfirmCompare = async (subDrawingId: number) => {
     await runCompare(subDrawingId);
@@ -75,7 +91,7 @@ export default function DrawingWorkspacePage() {
     <>
       <h1 className="text-xl font-semibold">Drawing Workspace</h1>
       <p className="text-sm text-slate-500">
-        Project {parsedProjectId} • Drawing {parsedDrawingId}
+        Project {projectId} • Drawing {drawingId}
       </p>
 
       {workspaceError ? (
@@ -138,8 +154,8 @@ export default function DrawingWorkspacePage() {
 
       <CompareSubDrawingModal
         isOpen={isCompareModalOpen}
-        projectId={parsedProjectId}
-        masterDrawingId={parsedDrawingId}
+        projectId={projectId}
+        masterDrawingId={drawingId}
         onClose={closeCompareModal}
         onSelectSubDrawing={handleSelectSubDrawing}
         onConfirmCompare={handleConfirmCompare}
@@ -147,5 +163,32 @@ export default function DrawingWorkspacePage() {
         compareError={compareError}
       />
     </>
+  );
+}
+
+export default function DrawingWorkspacePage() {
+  const { projectId, drawingId } = useParams<WorkspaceRouteParams>();
+
+  const parsedProjectId = Number(projectId);
+  const parsedDrawingId = Number(drawingId);
+
+  const idsAreValid = useMemo(() => {
+    return Number.isFinite(parsedProjectId) && Number.isFinite(parsedDrawingId);
+  }, [parsedProjectId, parsedDrawingId]);
+
+  if (!idsAreValid) {
+    return (
+      <div className="p-4 text-red-600">
+        Invalid project id or drawing id.
+      </div>
+    );
+  }
+
+  return (
+    <DrawingWorkspaceContent
+      projectId={parsedProjectId}
+      drawingId={parsedDrawingId}
+      idsAreValid={idsAreValid}
+    />
   );
 }
