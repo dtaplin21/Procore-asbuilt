@@ -7,28 +7,29 @@ import CompareSubDrawingModal from "@/components/drawing-workspace/compare_sub_d
 import DiffTimelinePanel from "@/components/drawing-workspace/diff_timeline_panel";
 import DrawingViewer from "@/components/drawing-workspace/drawing_viewer";
 import DrawingWorkspaceLayout from "@/components/drawing-workspace/drawing_workspace_layout";
+import WorkspaceErrorState from "@/components/drawing-workspace/workspace_error_state";
+import WorkspaceLoadingState from "@/components/drawing-workspace/workspace_loading_state";
 import { useDrawingWorkspace } from "@/hooks/use_drawing_workspace";
 import { useWorkspaceSelectionQueryParams } from "@/hooks/use_workspace_selection_query_params";
 import type { WorkspaceRouteParams } from "@/types/drawing_workspace";
 
-type DrawingWorkspaceContentProps = {
-  projectId: number;
-  drawingId: number;
-  idsAreValid: boolean;
+type DrawingWorkspaceBodyProps = {
+  parsedProjectId: number;
+  parsedDrawingId: number;
 };
 
-function DrawingWorkspaceContent({
-  projectId,
-  drawingId,
-  idsAreValid,
-}: DrawingWorkspaceContentProps) {
+function DrawingWorkspaceBody({
+  parsedProjectId,
+  parsedDrawingId,
+}: DrawingWorkspaceBodyProps) {
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+  const [selectedSubDrawingId, setSelectedSubDrawingId] = useState<number | null>(null);
+
   const {
     alignmentIdFromUrl,
     diffIdFromUrl,
     setSelectionQueryParams,
   } = useWorkspaceSelectionQueryParams();
-  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
-  const [selectedSubDrawingId, setSelectedSubDrawingId] = useState<number | null>(null);
 
   const openCompareModal = () => {
     setIsCompareModalOpen(true);
@@ -61,25 +62,18 @@ function DrawingWorkspaceContent({
     reloadSelectedDiffs,
     runCompare,
   } = useDrawingWorkspace({
-    projectId,
-    drawingId,
+    projectId: parsedProjectId,
+    drawingId: parsedDrawingId,
     initialAlignmentId: alignmentIdFromUrl,
     initialDiffId: diffIdFromUrl,
   });
 
   useEffect(() => {
-    if (!idsAreValid) return;
-
     setSelectionQueryParams({
       alignmentId: selectedAlignmentId,
       diffId: selectedDiffId,
     });
-  }, [
-    idsAreValid,
-    selectedAlignmentId,
-    selectedDiffId,
-    setSelectionQueryParams,
-  ]);
+  }, [selectedAlignmentId, selectedDiffId, setSelectionQueryParams]);
 
   const handleConfirmCompare = async (subDrawingId: number) => {
     await runCompare(subDrawingId);
@@ -88,46 +82,71 @@ function DrawingWorkspaceContent({
   };
 
   const header = (
-    <>
-      <h1 className="text-xl font-semibold">Drawing Workspace</h1>
+    <div>
+      <h1 className="text-xl font-semibold text-slate-900">Drawing Workspace</h1>
       <p className="text-sm text-slate-500">
-        Project {projectId} • Drawing {drawingId}
+        Project {parsedProjectId} • Drawing {parsedDrawingId}
       </p>
-
-      {workspaceError ? (
-        <div className="mt-4 rounded border border-red-200 bg-red-50 p-4">
-          <div className="text-sm font-medium text-red-700">
-            Failed to load workspace
-          </div>
-          <div className="mt-1 text-sm text-red-600">{workspaceError}</div>
-          <button
-            type="button"
-            onClick={() => void reloadWorkspace()}
-            className="mt-3 rounded border border-red-300 bg-white px-3 py-2 text-sm text-red-700"
-            data-testid="retry-workspace"
-          >
-            Retry
-          </button>
-        </div>
-      ) : null}
-    </>
+    </div>
   );
+
+  const compareModal = (
+    <CompareSubDrawingModal
+      isOpen={isCompareModalOpen}
+      projectId={parsedProjectId}
+      masterDrawingId={parsedDrawingId}
+      onClose={closeCompareModal}
+      onSelectSubDrawing={handleSelectSubDrawing}
+      onConfirmCompare={handleConfirmCompare}
+      compareLoading={compareLoading}
+      compareError={compareError}
+    />
+  );
+
+  if (workspaceLoading) {
+    return (
+      <>
+        <DrawingWorkspaceLayout
+          header={header}
+          viewer={<WorkspaceLoadingState />}
+          sidebar={
+            <CompareSubDrawingButton onClick={openCompareModal} disabled />
+          }
+        />
+
+        {compareModal}
+      </>
+    );
+  }
+
+  if (workspaceError) {
+    return (
+      <>
+        <DrawingWorkspaceLayout
+          header={header}
+          viewer={
+            <WorkspaceErrorState
+              message={workspaceError}
+              onRetry={() => void reloadWorkspace()}
+            />
+          }
+          sidebar={<CompareSubDrawingButton onClick={openCompareModal} />}
+        />
+
+        {compareModal}
+      </>
+    );
+  }
 
   return (
     <>
       <DrawingWorkspaceLayout
         header={header}
         viewer={
-          workspaceLoading ? (
-            <div className="flex min-h-[70vh] items-center justify-center rounded-xl border bg-white p-8 text-sm text-slate-500">
-              Loading master drawing...
-            </div>
-          ) : (
-            <DrawingViewer
-              drawing={masterDrawing}
-              selectedDiff={selectedDiff}
-            />
-          )
+          <DrawingViewer
+            drawing={masterDrawing}
+            selectedDiff={selectedDiff}
+          />
         }
         sidebar={
           <>
@@ -152,16 +171,7 @@ function DrawingWorkspaceContent({
         }
       />
 
-      <CompareSubDrawingModal
-        isOpen={isCompareModalOpen}
-        projectId={projectId}
-        masterDrawingId={drawingId}
-        onClose={closeCompareModal}
-        onSelectSubDrawing={handleSelectSubDrawing}
-        onConfirmCompare={handleConfirmCompare}
-        compareLoading={compareLoading}
-        compareError={compareError}
-      />
+      {compareModal}
     </>
   );
 }
@@ -178,17 +188,16 @@ export default function DrawingWorkspacePage() {
 
   if (!idsAreValid) {
     return (
-      <div className="p-4 text-red-600">
-        Invalid project id or drawing id.
+      <div className="p-4">
+        <WorkspaceErrorState message="Invalid project or drawing id." />
       </div>
     );
   }
 
   return (
-    <DrawingWorkspaceContent
-      projectId={parsedProjectId}
-      drawingId={parsedDrawingId}
-      idsAreValid={idsAreValid}
+    <DrawingWorkspaceBody
+      parsedProjectId={parsedProjectId}
+      parsedDrawingId={parsedDrawingId}
     />
   );
 }
