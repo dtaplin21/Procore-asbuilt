@@ -1,5 +1,6 @@
 import type {
   DrawingAlignmentsResponse,
+  DrawingComparisonWorkspaceResponse,
   DrawingDiffsResponse,
   DrawingWorkspaceDrawing,
 } from "@/types/drawing_workspace";
@@ -79,4 +80,20 @@ export async function fetchAlignmentDiffs(
   url.searchParams.set("alignment_id", String(alignmentId));
 
   return requestJson<DrawingDiffsResponse>(url.pathname + url.search);
+}
+
+export async function compareSubDrawing(
+  projectId: number,
+  drawingId: number,
+  subDrawingId: number
+): Promise<DrawingComparisonWorkspaceResponse> {
+  return requestJson<DrawingComparisonWorkspaceResponse>(
+    `/api/projects/${projectId}/drawings/${drawingId}/compare`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        sub_drawing_id: subDrawingId,
+      }),
+    }
+  );
 }

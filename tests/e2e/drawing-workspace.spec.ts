@@ -335,3 +335,179 @@ test.describe('drawing workspace overlays', () => {
     await expect(page.getByTestId('drawing-overlay-layer')).toBeVisible();
   });
 });
+
+test.describe('compare sub drawing', () => {
+  test('opens modal, posts compare with body, closes on success, updates alignments, diffs, and viewer', async ({
+    page,
+  }) => {
+    let comparePosted: unknown;
+    const compareResponse = {
+      masterDrawing: null,
+      subDrawing: { id: 201, projectId: 1, name: 'Compare pick', source: 'procore' },
+      alignment: {
+        id: 3,
+        projectId: 1,
+        masterDrawingId: 10,
+        subDrawingId: 201,
+        alignmentStatus: 'complete',
+        subDrawing: { id: 201, name: 'Compare pick' },
+        createdAt: '2025-02-15T12:00:00Z',
+      },
+      diffs: [
+        {
+          id: 501,
+          alignmentId: 3,
+          summary: 'From compare',
+          severity: 'high',
+          createdAt: '2025-02-15T12:00:00Z',
+          diffRegions: [
+            {
+              shapeType: 'rect',
+              rect: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
+            },
+          ],
+        },
+      ],
+    };
+
+    await page.route(
+      (url) => url.pathname === '/api/projects/1/drawings',
+      (route) =>
+        route.fulfill({
+          json: {
+            drawings: [
+              { id: 201, projectId: 1, name: 'Compare pick', source: 'procore' },
+            ],
+          },
+        })
+    );
+
+    await page.route('**/api/projects/1/drawings/10/compare', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      comparePosted = route.request().postDataJSON();
+      await new Promise((r) => setTimeout(r, 50));
+      await route.fulfill({ json: compareResponse });
+    });
+
+    await page.route(/\/api\/projects\/1\/drawings\/10$/, (route) =>
+      route.fulfill({ json: mockDrawing })
+    );
+    await page.route(/\/api\/projects\/1\/drawings\/10\/alignments$/, (route) =>
+      route.fulfill({ json: { alignments: mockAlignments } })
+    );
+    await page.route(/\/api\/projects\/1\/drawings\/10\/diffs/, (route) => {
+      const url = new URL(route.request().url());
+      const alignmentId = url.searchParams.get('alignment_id');
+      if (alignmentId === '1') return route.fulfill({ json: mockDiffsA });
+      if (alignmentId === '2') return route.fulfill({ json: mockDiffsB });
+      if (alignmentId === '3')
+        return route.fulfill({ json: { diffs: compareResponse.diffs } });
+      return route.fulfill({ json: { diffs: [] } });
+    });
+
+    await page.goto(DRAWING_URL);
+
+    await expect(page.getByText('Sub A')).toBeVisible({ timeout: 5000 });
+
+    await page.getByTestId('compare-sub-drawing-button').click();
+    await expect(page.getByTestId('compare-sub-drawing-modal')).toBeVisible();
+
+    await page.getByTestId('sub-drawing-item-201').click();
+    await page.getByTestId('confirm-compare-sub-drawing-button').click();
+
+    await expect(page.getByTestId('confirm-compare-sub-drawing-button')).toHaveText(
+      'Comparing...'
+    );
+
+    await expect(
+      page.locator('[data-testid="compare-sub-drawing-modal"]')
+    ).toHaveCount(0, { timeout: 8000 });
+
+    expect(comparePosted).toEqual({ sub_drawing_id: 201 });
+
+    await expect(page.getByTestId('alignment-3')).toBeVisible();
+    await expect(page.getByTestId('alignment-3')).toHaveClass(/bg-slate-100/);
+
+    await expect(page.getByTestId('diff-501')).toBeVisible();
+    await expect(page.getByText(/Selected diff #501/)).toBeVisible();
+  });
+
+  test('compare failure keeps modal open with error; retry succeeds', async ({ page }) => {
+    let compareCalls = 0;
+    const successPayload = {
+      masterDrawing: null,
+      subDrawing: { id: 201, projectId: 1, name: 'Compare pick', source: 'procore' },
+      alignment: {
+        id: 3,
+        projectId: 1,
+        masterDrawingId: 10,
+        subDrawingId: 201,
+        alignmentStatus: 'complete',
+        subDrawing: { id: 201, name: 'Compare pick' },
+        createdAt: '2025-02-15T12:00:00Z',
+      },
+      diffs: [
+        {
+          id: 501,
+          alignmentId: 3,
+          summary: 'Retry ok',
+          severity: 'low',
+          createdAt: '2025-02-15T12:00:00Z',
+          diffRegions: [],
+        },
+      ],
+    };
+
+    await page.route(
+      (url) => url.pathname === '/api/projects/1/drawings',
+      (route) =>
+        route.fulfill({
+          json: {
+            drawings: [
+              { id: 201, projectId: 1, name: 'Compare pick', source: 'procore' },
+            ],
+          },
+        })
+    );
+
+    await page.route('**/api/projects/1/drawings/10/compare', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      compareCalls++;
+      if (compareCalls === 1) {
+        return route.fulfill({ status: 500, json: { detail: 'Compare failed' } });
+      }
+      return route.fulfill({ json: successPayload });
+    });
+
+    await page.route(/\/api\/projects\/1\/drawings\/10$/, (route) =>
+      route.fulfill({ json: mockDrawing })
+    );
+    await page.route(/\/api\/projects\/1\/drawings\/10\/alignments$/, (route) =>
+      route.fulfill({ json: { alignments: mockAlignments } })
+    );
+    await page.route(/\/api\/projects\/1\/drawings\/10\/diffs/, (route) => {
+      const url = new URL(route.request().url());
+      const alignmentId = url.searchParams.get('alignment_id');
+      if (alignmentId === '1') return route.fulfill({ json: mockDiffsA });
+      if (alignmentId === '2') return route.fulfill({ json: mockDiffsB });
+      if (alignmentId === '3')
+        return route.fulfill({ json: { diffs: successPayload.diffs } });
+      return route.fulfill({ json: { diffs: [] } });
+    });
+
+    await page.goto(DRAWING_URL);
+    await expect(page.getByText('Sub A')).toBeVisible({ timeout: 5000 });
+
+    await page.getByTestId('compare-sub-drawing-button').click();
+    await page.getByTestId('sub-drawing-item-201').click();
+    await page.getByTestId('confirm-compare-sub-drawing-button').click();
+
+    await expect(page.getByText('Compare failed')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('compare-sub-drawing-modal')).toBeVisible();
+
+    await page.getByTestId('confirm-compare-sub-drawing-button').click();
+    await expect(
+      page.locator('[data-testid="compare-sub-drawing-modal"]')
+    ).toHaveCount(0, { timeout: 8000 });
+  });
+});

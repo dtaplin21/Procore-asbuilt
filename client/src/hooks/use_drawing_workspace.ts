@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  compareSubDrawing,
   fetchAlignmentDiffs,
   fetchMasterDrawing,
   fetchMasterDrawingAlignments,
@@ -24,9 +25,11 @@ type UseDrawingWorkspaceResult = {
 
   workspaceLoading: boolean;
   diffsLoading: boolean;
+  compareLoading: boolean;
 
   workspaceError: string | null;
   diffsError: string | null;
+  compareError: string | null;
 
   selectedDiffs: DrawingDiff[];
   selectedAlignment: DrawingAlignment | null;
@@ -37,6 +40,11 @@ type UseDrawingWorkspaceResult = {
 
   reloadWorkspace: () => Promise<void>;
   reloadSelectedDiffs: () => Promise<void>;
+
+  runCompare: (subDrawingId: number) => Promise<{
+    alignment: DrawingAlignment;
+    diffs: DrawingDiff[];
+  }>;
 };
 
 export function useDrawingWorkspace({
@@ -53,15 +61,20 @@ export function useDrawingWorkspace({
 
   const [workspaceLoading, setWorkspaceLoading] = useState(true);
   const [diffsLoading, setDiffsLoading] = useState(false);
+  const [compareLoading, setCompareLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [diffsError, setDiffsError] = useState<string | null>(null);
+  const [compareError, setCompareError] = useState<string | null>(null);
 
   const workspaceRequestIdRef = useRef(0);
   const diffsRequestIdRef = useRef(0);
+  const compareRequestIdRef = useRef(0);
+  const diffsByAlignmentIdRef = useRef<Record<number, DrawingDiff[]>>({});
+  diffsByAlignmentIdRef.current = diffsByAlignmentId;
 
   const loadDiffsForAlignment = useCallback(
     async (alignmentId: number, force = false) => {
-      if (!force && diffsByAlignmentId[alignmentId]) {
+      if (!force && diffsByAlignmentIdRef.current[alignmentId]) {
         return;
       }
 
@@ -102,7 +115,7 @@ export function useDrawingWorkspace({
         }
       }
     },
-    [projectId, drawingId, diffsByAlignmentId]
+    [projectId, drawingId]
   );
 
   const loadWorkspace = useCallback(async () => {
@@ -200,6 +213,108 @@ export function useDrawingWorkspace({
     await loadDiffsForAlignment(selectedAlignmentId, true);
   }, [selectedAlignmentId, loadDiffsForAlignment]);
 
+  const mergeAlignmentIntoList = useCallback(
+    (incomingAlignment: DrawingAlignment) => {
+      setAlignments((prev) => {
+        const existingIndex = prev.findIndex(
+          (item) => item.id === incomingAlignment.id
+        );
+
+        if (existingIndex === -1) {
+          return [incomingAlignment, ...prev];
+        }
+
+        const next = [...prev];
+        next[existingIndex] = incomingAlignment;
+
+        next.sort((a, b) => {
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
+        });
+
+        return next;
+      });
+    },
+    []
+  );
+
+  const storeDiffsForAlignment = useCallback(
+    (alignmentId: number, diffs: DrawingDiff[]) => {
+      setDiffsByAlignmentId((prev) => ({
+        ...prev,
+        [alignmentId]: diffs,
+      }));
+    },
+    []
+  );
+
+  const runCompare = useCallback(
+    async (subDrawingId: number) => {
+      const requestId = ++compareRequestIdRef.current;
+      setCompareLoading(true);
+      setCompareError(null);
+
+      try {
+        const response = await compareSubDrawing(projectId, drawingId, subDrawingId);
+
+        const incomingAlignment = response.alignment;
+        const incomingDiffs = response.diffs ?? [];
+
+        const sortedDiffs = [...incomingDiffs].sort((a, b) => {
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
+        });
+
+        if (requestId !== compareRequestIdRef.current) {
+          return { alignment: incomingAlignment, diffs: sortedDiffs };
+        }
+
+        mergeAlignmentIntoList(incomingAlignment);
+        storeDiffsForAlignment(incomingAlignment.id, sortedDiffs);
+
+        setSelectedAlignmentId(incomingAlignment.id);
+
+        const latestDiff = sortedDiffs[0] ?? null;
+        setSelectedDiffId(latestDiff?.id ?? null);
+
+        setDiffsError(null);
+
+        if (response.masterDrawing) {
+          try {
+            const refreshed = await fetchMasterDrawing(projectId, drawingId);
+            if (requestId !== compareRequestIdRef.current) {
+              return { alignment: incomingAlignment, diffs: sortedDiffs };
+            }
+            setMasterDrawing(refreshed);
+          } catch {
+            /* keep existing master */
+          }
+        }
+
+        return {
+          alignment: incomingAlignment,
+          diffs: sortedDiffs,
+        };
+      } catch (error) {
+        if (requestId !== compareRequestIdRef.current) {
+          throw error;
+        }
+
+        const message =
+          error instanceof Error ? error.message : "Failed to compare sub drawing.";
+        setCompareError(message);
+        throw error;
+      } finally {
+        if (requestId === compareRequestIdRef.current) {
+          setCompareLoading(false);
+        }
+      }
+    },
+    [projectId, drawingId, mergeAlignmentIntoList, storeDiffsForAlignment]
+  );
+
   const selectedDiffs = useMemo(() => {
     if (selectedAlignmentId == null) return [];
     return diffsByAlignmentId[selectedAlignmentId] ?? [];
@@ -222,9 +337,11 @@ export function useDrawingWorkspace({
 
     workspaceLoading,
     diffsLoading,
+    compareLoading,
 
     workspaceError,
     diffsError,
+    compareError,
 
     selectedDiffs,
     selectedAlignment,
@@ -235,5 +352,6 @@ export function useDrawingWorkspace({
 
     reloadWorkspace,
     reloadSelectedDiffs,
+    runCompare,
   };
 }

@@ -108,6 +108,14 @@ export type DrawingDiff = {
   diffRegions: DrawingDiffRegion[];
 };
 
+/** Response from POST compare — workspace-ready payload */
+export type DrawingComparisonWorkspaceResponse = {
+  masterDrawing: DrawingSummary;
+  subDrawing: DrawingSummary;
+  alignment: DrawingAlignment;
+  diffs: DrawingDiff[];
+};
+
 export type DrawingDiffsResponse = {
   diffs: DrawingDiff[];
 };

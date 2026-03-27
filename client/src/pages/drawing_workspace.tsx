@@ -47,20 +47,29 @@ export default function DrawingWorkspacePage() {
     alignments,
     selectedAlignmentId,
     selectedDiffId,
-    selectedDiffs,
-    selectedDiff,
     workspaceLoading,
     diffsLoading,
+    compareLoading,
     workspaceError,
     diffsError,
+    compareError,
+    selectedDiffs,
+    selectedDiff,
     selectAlignment,
     selectDiff,
     reloadWorkspace,
     reloadSelectedDiffs,
+    runCompare,
   } = useDrawingWorkspace({
     projectId: parsedProjectId,
     drawingId: parsedDrawingId,
   });
+
+  const handleConfirmCompare = async (subDrawingId: number) => {
+    await runCompare(subDrawingId);
+    setSelectedSubDrawingId(subDrawingId);
+    closeCompareModal();
+  };
 
   const header = (
     <>
@@ -133,6 +142,9 @@ export default function DrawingWorkspacePage() {
         masterDrawingId={parsedDrawingId}
         onClose={closeCompareModal}
         onSelectSubDrawing={handleSelectSubDrawing}
+        onConfirmCompare={handleConfirmCompare}
+        compareLoading={compareLoading}
+        compareError={compareError}
       />
     </>
   );

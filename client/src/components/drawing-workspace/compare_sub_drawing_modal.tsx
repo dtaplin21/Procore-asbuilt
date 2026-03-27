@@ -9,6 +9,9 @@ type Props = {
   masterDrawingId: number;
   onClose: () => void;
   onSelectSubDrawing?: (drawingId: number | null) => void;
+  onConfirmCompare: (drawingId: number) => Promise<void>;
+  compareLoading: boolean;
+  compareError: string | null;
 };
 
 export default function CompareSubDrawingModal({
@@ -17,6 +20,9 @@ export default function CompareSubDrawingModal({
   masterDrawingId,
   onClose,
   onSelectSubDrawing,
+  onConfirmCompare,
+  compareLoading,
+  compareError,
 }: Props) {
   const [search, setSearch] = useState("");
   const [selectedDrawingId, setSelectedDrawingId] = useState<number | null>(null);
@@ -31,7 +37,7 @@ export default function CompareSubDrawingModal({
     if (!isOpen) return;
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !compareLoading) {
         onClose();
       }
     };
@@ -40,7 +46,7 @@ export default function CompareSubDrawingModal({
     return () => {
       window.removeEventListener("keydown", handleEscape);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, compareLoading]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -66,6 +72,11 @@ export default function CompareSubDrawingModal({
     onSelectSubDrawing?.(drawingId);
   };
 
+  const handleConfirm = async () => {
+    if (selectedDrawingId == null || compareLoading) return;
+    await onConfirmCompare(selectedDrawingId);
+  };
+
   if (!isOpen) {
     return null;
   }
@@ -73,7 +84,9 @@ export default function CompareSubDrawingModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
+      onClick={() => {
+        if (!compareLoading) onClose();
+      }}
       data-testid="compare-sub-drawing-modal-backdrop"
     >
       <div
@@ -100,7 +113,8 @@ export default function CompareSubDrawingModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+            disabled={compareLoading}
+            className="rounded-md border px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
             aria-label="Close compare sub drawing modal"
           >
             Close
@@ -121,6 +135,15 @@ export default function CompareSubDrawingModal({
             onSelect={handleSelectDrawing}
             onRetry={() => void reload()}
           />
+
+          {compareError ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+              <div className="text-sm font-medium text-red-700">
+                Compare failed
+              </div>
+              <div className="mt-1 text-sm text-red-600">{compareError}</div>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center justify-between border-t px-5 py-4">
@@ -130,13 +153,26 @@ export default function CompareSubDrawingModal({
               : "No sub drawing selected"}
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            Done
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={compareLoading}
+              className="rounded-md border px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleConfirm()}
+              disabled={selectedDrawingId == null || compareLoading}
+              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              data-testid="confirm-compare-sub-drawing-button"
+            >
+              {compareLoading ? "Comparing..." : "Compare"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
