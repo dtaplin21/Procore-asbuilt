@@ -399,7 +399,23 @@ class StorageService:
             status = "queued"
             transform = None
 
+        master = (
+            self.db.query(Drawing)
+            .filter(Drawing.id == master_drawing_id)
+            .first()
+        )
+        if master is None:
+            raise ValueError(f"Master drawing {master_drawing_id} not found")
+        sub = self.db.query(Drawing).filter(Drawing.id == sub_drawing_id).first()
+        if sub is None:
+            raise ValueError(f"Sub drawing {sub_drawing_id} not found")
+        if sub.project_id != master.project_id:
+            raise ValueError(
+                "Master and sub drawings must belong to the same project"
+            )
+
         alignment = DrawingAlignment(
+            project_id=master.project_id,
             master_drawing_id=master_drawing_id,
             sub_drawing_id=sub_drawing_id,
             region_id=region_id,
@@ -438,6 +454,7 @@ class StorageService:
 
         method = "manual"
         alignment = DrawingAlignment(
+            project_id=project_id,
             master_drawing_id=master_drawing_id,
             sub_drawing_id=sub_drawing_id,
             region_id=region_id,
@@ -486,6 +503,7 @@ class StorageService:
             .filter(
                 DrawingAlignment.id == alignment_id,
                 DrawingAlignment.master_drawing_id == master_drawing_id,
+                DrawingAlignment.project_id == project_id,
             )
             .first()
         )

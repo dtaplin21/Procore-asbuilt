@@ -210,10 +210,20 @@ class Finding(Base):
         nullable=True,
         index=True,
     )
+    drawing_diff_id = Column(
+        Integer,
+        ForeignKey("drawing_diffs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Relationships
     project = relationship("Project", back_populates="findings")
     drawing = relationship("Drawing", back_populates="findings")
+    drawing_diff = relationship(
+        "DrawingDiff",
+        foreign_keys=[drawing_diff_id],
+    )
     drawing_diffs = relationship("DrawingDiff", back_populates="finding", passive_deletes=True)
 
 # Usage Tracking
@@ -381,6 +391,7 @@ class DrawingAlignment(Base):
     __tablename__ = "drawing_alignments"
 
     id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
     master_drawing_id = Column(
         Integer,
         ForeignKey("drawings.id", ondelete="CASCADE"),

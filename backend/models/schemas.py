@@ -135,6 +135,16 @@ class DashboardSummaryResponse(BaseModel):
 # Frontend contract: shared/schema.ts -> AIInsight (camelCase)
 # ============================================
 
+
+class WorkspaceLinkMetadata(BaseModel):
+    project_id: int = Field(..., serialization_alias="projectId")
+    master_drawing_id: int = Field(..., serialization_alias="masterDrawingId")
+    alignment_id: Optional[int] = Field(default=None, serialization_alias="alignmentId")
+    diff_id: Optional[int] = Field(default=None, serialization_alias="diffId")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 AIInsightType = Literal["compliance", "deviation", "recommendation", "warning"]
 AIInsightSeverity = Literal["low", "medium", "high", "critical"]
 
