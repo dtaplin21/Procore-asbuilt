@@ -25,7 +25,7 @@ import type {
   FindingListResponse,
 } from "@shared/schema";
 import JobQueueList from "@/components/JobQueueList";
-import RecentFindingsList from "@/components/RecentFindingsList";
+import RecentFindingsCard from "@/components/dashboard/recent_findings_card";
 
 function getProjectIdFromUrl(): string | null {
   const sp = new URLSearchParams(window.location.search);
@@ -340,13 +340,12 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
 
         {!selectedProjectId ? (
           <div>Select a project to view recent findings.</div>
+        ) : findingsLoading ? (
+          <div className="text-sm text-muted-foreground">Loading recent findings…</div>
+        ) : findingsError ? (
+          <div className="text-sm text-destructive">Failed to load recent findings</div>
         ) : (
-          <RecentFindingsList
-            findings={recentFindings?.findings ?? []}
-            isLoading={findingsLoading}
-            error={findingsError ? "Failed to load recent findings" : null}
-            projectId={selectedProjectId ? Number(selectedProjectId) : null}
-          />
+          <RecentFindingsCard findings={recentFindings?.findings ?? []} />
         )}
       </div>
       )}
