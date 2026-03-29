@@ -1404,7 +1404,13 @@ class StorageService:
         limit: Optional[int] = None,
     ) -> List[Finding]:
         """List findings for a project (dashboard). Use get_insights for paginated insights page."""
-        q = self.db.query(Finding).filter(Finding.project_id == project_id)
+        q = (
+            self.db.query(Finding)
+            .options(
+                joinedload(Finding.drawing_diff).joinedload(DrawingDiff.alignment),
+            )
+            .filter(Finding.project_id == project_id)
+        )
         q = q.order_by(Finding.created_at.desc(), Finding.id.desc())
         if limit is not None:
             q = q.limit(limit)

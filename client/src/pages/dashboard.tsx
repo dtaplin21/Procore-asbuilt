@@ -24,7 +24,10 @@ import type {
   FindingListResponse,
 } from "@shared/schema";
 import JobQueueList from "@/components/JobQueueList";
-import { buildDrawingPickerUrl, buildWorkspaceUrl } from "@/lib/workspace-links";
+import {
+  buildDrawingPickerUrl,
+  buildWorkspaceUrlWithFinding,
+} from "@/lib/workspace-links";
 
 function getProjectIdFromUrl(): string | null {
   const sp = new URLSearchParams(window.location.search);
@@ -324,18 +327,20 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
                     return (
                       <Link
                         key={insight.id}
-                        href={buildWorkspaceUrl({
-                          projectId: ws.projectId,
-                          masterDrawingId: ws.masterDrawingId,
-                          alignmentId: ws.alignmentId,
-                          diffId: ws.diffId,
-                        })}
+                        href={buildWorkspaceUrlWithFinding(ws, insight.id)}
                       >
                         {content}
                       </Link>
                     );
                   }
-                  return <div key={insight.id}>{content}</div>;
+                  return (
+                    <Link
+                      key={insight.id}
+                      href={buildDrawingPickerUrl(Number(insight.projectId), insight.id)}
+                    >
+                      {content}
+                    </Link>
+                  );
                 })
               )}
             </div>
@@ -391,24 +396,11 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
                     </div>
                   );
                   const ws = finding.workspaceLink;
-                  if (ws) {
-                    return (
-                      <Link
-                        key={finding.id}
-                        href={buildWorkspaceUrl({
-                          projectId: ws.projectId,
-                          masterDrawingId: ws.masterDrawingId,
-                          alignmentId: ws.alignmentId,
-                          diffId: ws.diffId,
-                        })}
-                      >
-                        {content}
-                      </Link>
-                    );
-                  }
-                  const pickerHref = buildDrawingPickerUrl(finding.projectId, finding.id);
+                  const href = ws
+                    ? buildWorkspaceUrlWithFinding(ws, finding.id)
+                    : buildDrawingPickerUrl(finding.projectId, finding.id);
                   return (
-                    <Link key={finding.id} href={pickerHref}>
+                    <Link key={finding.id} href={href}>
                       {content}
                     </Link>
                   );

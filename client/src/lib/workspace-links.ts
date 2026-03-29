@@ -45,10 +45,15 @@ export function buildWorkspaceUrlFromMetadata(meta: WorkspaceLinkMetadata): stri
  * Use when the workspace supports highlighting a finding via `findingId`.
  */
 export function buildWorkspaceUrlWithFinding(
-  input: WorkspaceLinkInput,
+  input: WorkspaceLinkInput | WorkspaceLinkMetadata,
   findingId: string | number | null | undefined,
 ): string {
-  const base = buildWorkspaceUrl(input);
+  const base = buildWorkspaceUrl({
+    projectId: input.projectId,
+    masterDrawingId: input.masterDrawingId,
+    alignmentId: input.alignmentId,
+    diffId: input.diffId,
+  });
   if (findingId == null || String(findingId) === "") {
     return base;
   }

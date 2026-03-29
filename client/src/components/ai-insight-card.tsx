@@ -49,15 +49,7 @@ export function AIInsightCard({ insight, onResolve }: AIInsightCardProps) {
 
   const pid = Number(projectId);
   const workspaceHref = workspaceLink
-    ? buildWorkspaceUrlWithFinding(
-        {
-          projectId: workspaceLink.projectId,
-          masterDrawingId: workspaceLink.masterDrawingId,
-          alignmentId: workspaceLink.alignmentId,
-          diffId: workspaceLink.diffId,
-        },
-        insight.id,
-      )
+    ? buildWorkspaceUrlWithFinding(workspaceLink, insight.id)
     : buildDrawingPickerUrl(pid, insight.id);
   
   const formatDate = (date: string) => {

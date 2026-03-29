@@ -12,29 +12,18 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 
-def workspace_link_metadata_for_finding(
-    finding: Finding,
-    storage: StorageService,
-) -> WorkspaceLinkMetadata | None:
-    """Resolve workspace deep link for a finding when it is tied to a drawing diff + alignment."""
-    drawing_diff_id = getattr(finding, "drawing_diff_id", None)
-    if not drawing_diff_id:
-        return None
+def workspace_link_metadata_for_finding(finding: Finding) -> WorkspaceLinkMetadata | None:
+    """
+    Full workspace deep link for a finding: project, master drawing, optional alignment + diff.
 
-    drawing_diff = storage.get_drawing_diff(drawing_diff_id)
-    if not drawing_diff:
+    Delegates to :py:attr:`Finding.workspace_link` so insights (ORM) and findings (serialized)
+    stay consistent and diff-backed rows always carry alignmentId + diffId when the ORM can
+    resolve relationships.
+    """
+    raw = finding.workspace_link
+    if raw is None:
         return None
-
-    alignment = storage.get_alignment(drawing_diff.alignment_id)
-    if not alignment:
-        return None
-
-    return WorkspaceLinkMetadata(
-        project_id=alignment.project_id,
-        master_drawing_id=alignment.master_drawing_id,
-        alignment_id=alignment.id,
-        diff_id=drawing_diff.id,
-    )
+    return WorkspaceLinkMetadata.model_validate(raw)
 
 
 class FindingService:
@@ -43,7 +32,7 @@ class FindingService:
         self.storage = StorageService(db)
 
     def _build_workspace_link_for_finding(self, finding: Finding) -> WorkspaceLinkMetadata | None:
-        return workspace_link_metadata_for_finding(finding, self.storage)
+        return workspace_link_metadata_for_finding(finding)
 
     def serialize_finding(self, finding: Finding) -> FindingResponse:
         return FindingResponse(
