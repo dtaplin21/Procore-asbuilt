@@ -513,6 +513,13 @@ class StorageService:
             return None
         return alignment
 
+    def get_alignment(self, alignment_id: int) -> Optional[DrawingAlignment]:
+        return (
+            self.db.query(DrawingAlignment)
+            .filter(DrawingAlignment.id == alignment_id)
+            .first()
+        )
+
     def get_alignment_by_drawing_pair(
         self,
         master_drawing_id: int,
@@ -696,17 +703,10 @@ class StorageService:
 
         return query.order_by(DrawingDiff.created_at.desc()).all()
 
-    def get_drawing_diff(
-        self,
-        alignment_id: int,
-        diff_id: int,
-    ) -> Optional[DrawingDiff]:
+    def get_drawing_diff(self, diff_id: int) -> Optional[DrawingDiff]:
         return (
             self.db.query(DrawingDiff)
-            .filter(
-                DrawingDiff.alignment_id == alignment_id,
-                DrawingDiff.id == diff_id,
-            )
+            .filter(DrawingDiff.id == diff_id)
             .first()
         )
 
@@ -1388,7 +1388,14 @@ class StorageService:
             q = q.filter(Finding.project_id == project_id)
         base = q.order_by(Finding.created_at.desc(), Finding.id.desc())
         total = base.count()
-        items = base.limit(limit).offset(offset).all()
+        items = (
+            base.options(
+                joinedload(Finding.drawing_diff).joinedload(DrawingDiff.alignment),
+            )
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
         return items, total
 
     def get_project_findings(
@@ -1402,6 +1409,14 @@ class StorageService:
         if limit is not None:
             q = q.limit(limit)
         return q.all()
+
+    def list_findings_by_project(
+        self,
+        project_id: int,
+        limit: Optional[int] = None,
+    ) -> List[Finding]:
+        """List findings for a project (same as get_project_findings; alias for callers expecting this name)."""
+        return self.get_project_findings(project_id, limit=limit)
 
     def count_project_findings(self, project_id: int) -> int:
         """Count findings for a project (for pagination metadata)."""

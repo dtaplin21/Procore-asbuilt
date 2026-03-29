@@ -1,6 +1,10 @@
 import React from "react";
 import { Link } from "wouter";
 import type { FindingResponse } from "@shared/schema";
+import {
+  buildDrawingPickerUrl,
+  buildWorkspaceUrlWithFinding,
+} from "@/lib/workspace-links";
 
 type RecentFindingsListProps = {
   findings: FindingResponse[];
@@ -29,19 +33,38 @@ export default function RecentFindingsList({
 
   return (
     <div className="space-y-3">
-      {findings.map((finding) => (
+      {findings.map((finding) => {
+        const pid = finding.projectId ?? projectId;
+        const workspaceHref =
+          pid != null
+            ? finding.workspaceLink
+              ? buildWorkspaceUrlWithFinding(
+                  {
+                    projectId: finding.workspaceLink.projectId,
+                    masterDrawingId: finding.workspaceLink.masterDrawingId,
+                    alignmentId: finding.workspaceLink.alignmentId,
+                    diffId: finding.workspaceLink.diffId,
+                  },
+                  finding.id,
+                )
+              : buildDrawingPickerUrl(pid, finding.id)
+            : null;
+
+        return (
         <div
           key={finding.id}
           className="rounded-lg border p-4 shadow-sm bg-white"
         >
           <div className="flex items-center justify-between">
             <div className="font-medium">{finding.title}</div>
-            <div className="text-sm">{finding.resolved ? "Resolved" : "Open"}</div>
+            {finding.severity != null && finding.severity !== "" && (
+              <div className="text-sm text-gray-600">{finding.severity}</div>
+            )}
           </div>
 
-          <div className="mt-1 text-sm text-gray-600">
-            Type: {finding.type}
-          </div>
+          {finding.type != null && finding.type !== "" && (
+            <div className="mt-1 text-sm text-gray-600">Type: {finding.type}</div>
+          )}
 
           {finding.description && (
             <div className="mt-2 text-sm text-gray-700">
@@ -49,16 +72,10 @@ export default function RecentFindingsList({
             </div>
           )}
 
-          {finding.affectedItems && finding.affectedItems.length > 0 && (
-            <div className="mt-2 text-sm text-gray-600">
-              Affected: {finding.affectedItems.join(", ")}
-            </div>
-          )}
-
           <div className="mt-3">
-            {projectId != null ? (
+            {workspaceHref != null ? (
               <Link
-                href={`/projects/${projectId}/drawings?findingId=${encodeURIComponent(finding.id)}`}
+                href={workspaceHref}
                 className="text-sm text-blue-600 hover:underline"
               >
                 Open drawing workspace
@@ -70,7 +87,8 @@ export default function RecentFindingsList({
             )}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

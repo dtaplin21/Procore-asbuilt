@@ -1,13 +1,14 @@
 import { AlertTriangle, CheckCircle, Info, AlertCircle, Sparkles } from "lucide-react";
+import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { buildDrawingPickerUrl, buildWorkspaceUrlWithFinding } from "@/lib/workspace-links";
 import type { AIInsight } from "@shared/schema";
 
 interface AIInsightCardProps {
   insight: AIInsight;
   onResolve?: (id: string) => void;
-  onViewDetails?: (id: string) => void;
 }
 
 const typeConfig = {
@@ -40,10 +41,24 @@ const severityConfig = {
   critical: { className: "border-l-foreground" },
 };
 
-export function AIInsightCard({ insight, onResolve, onViewDetails }: AIInsightCardProps) {
-  const { type, severity, title, description, affectedItems, resolved, createdAt } = insight;
+export function AIInsightCard({ insight, onResolve }: AIInsightCardProps) {
+  const { type, severity, title, description, affectedItems, resolved, createdAt, projectId, workspaceLink } =
+    insight;
   const { icon: Icon, label, className: typeClassName } = typeConfig[type];
   const { className: severityClassName } = severityConfig[severity];
+
+  const pid = Number(projectId);
+  const workspaceHref = workspaceLink
+    ? buildWorkspaceUrlWithFinding(
+        {
+          projectId: workspaceLink.projectId,
+          masterDrawingId: workspaceLink.masterDrawingId,
+          alignmentId: workspaceLink.alignmentId,
+          diffId: workspaceLink.diffId,
+        },
+        insight.id,
+      )
+    : buildDrawingPickerUrl(pid, insight.id);
   
   const formatDate = (date: string) => {
     const d = new Date(date);
@@ -109,16 +124,9 @@ export function AIInsightCard({ insight, onResolve, onViewDetails }: AIInsightCa
             )}
             
             <div className="flex items-center gap-2 mt-3">
-              {onViewDetails && (
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => onViewDetails(insight.id)}
-                  data-testid={`button-view-insight-${insight.id}`}
-                >
-                  View Details
-                </Button>
-              )}
+              <Button variant="ghost" size="sm" asChild data-testid={`button-view-insight-${insight.id}`}>
+                <Link href={workspaceHref}>Open workspace</Link>
+              </Button>
               {onResolve && !resolved && (
                 <Button 
                   variant="outline" 

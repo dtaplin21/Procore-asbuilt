@@ -244,6 +244,14 @@ export interface DrawingObject {
 export type InsertDrawingObject = Omit<DrawingObject, "id">;
 
 // AI Insight interface
+/** Deep link into workspace (matches backend WorkspaceLinkMetadata). */
+export interface WorkspaceLinkMetadata {
+  projectId: number;
+  masterDrawingId: number;
+  alignmentId?: number;
+  diffId?: number;
+}
+
 export interface AIInsight {
   id: string;
   projectId: string;
@@ -257,12 +265,22 @@ export interface AIInsight {
   relatedSubmittalId?: string;
   relatedRFIId?: string;
   relatedInspectionId?: string;
+  workspaceLink?: WorkspaceLinkMetadata;
 }
 
 export type InsertAIInsight = Omit<AIInsight, "id">;
 
-/** Single finding (matches API response). Aliased from AIInsight for consistent naming. */
-export type FindingResponse = AIInsight;
+/** Single finding row from GET /api/projects/{id}/findings (matches backend FindingResponse). */
+export interface FindingResponse {
+  id: number;
+  projectId: number;
+  title: string;
+  description?: string | null;
+  severity?: string | null;
+  type?: string | null;
+  createdAt?: string | null;
+  workspaceLink?: WorkspaceLinkMetadata;
+}
 
 /** Response for GET /api/projects/{id}/findings (matches backend FindingListResponse). */
 export type FindingListResponse = {

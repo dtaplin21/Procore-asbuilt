@@ -226,6 +226,27 @@ class Finding(Base):
     )
     drawing_diffs = relationship("DrawingDiff", back_populates="finding", passive_deletes=True)
 
+    @property
+    def workspace_link(self):
+        """Payload for API workspaceLink (WorkspaceLinkMetadata); None if no drawing/diff context."""
+        diff_id = self.drawing_diff_id
+        master_id = self.drawing_id
+        alignment_id = None
+        if diff_id is not None:
+            diff = self.drawing_diff
+            if diff is not None:
+                alignment_id = diff.alignment_id
+                if master_id is None and diff.alignment is not None:
+                    master_id = diff.alignment.master_drawing_id
+        if master_id is None:
+            return None
+        return {
+            "project_id": self.project_id,
+            "master_drawing_id": master_id,
+            "alignment_id": alignment_id,
+            "diff_id": diff_id,
+        }
+
 # Usage Tracking
 class UsageLog(Base):
     __tablename__ = "usage_logs"

@@ -229,8 +229,8 @@ def get_drawing_diff(
     if alignment is None:
         raise HTTPException(status_code=404, detail="alignment not found")
 
-    diff = storage.get_drawing_diff(alignment_id, diff_id)
-    if diff is None:
+    diff = storage.get_drawing_diff(diff_id)
+    if diff is None or diff.alignment_id != alignment_id:
         raise HTTPException(
             status_code=404,
             detail=f"Diff {diff_id} not found",

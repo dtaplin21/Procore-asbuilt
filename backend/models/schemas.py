@@ -142,6 +142,50 @@ class WorkspaceLinkMetadata(BaseModel):
     alignment_id: Optional[int] = Field(default=None, serialization_alias="alignmentId")
     diff_id: Optional[int] = Field(default=None, serialization_alias="diffId")
 
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+class FindingResponse(BaseModel):
+    id: int
+    project_id: int = Field(..., serialization_alias="projectId")
+    title: str
+    description: Optional[str] = None
+    severity: Optional[str] = None
+    type: Optional[str] = None
+    created_at: Optional[str] = Field(default=None, serialization_alias="createdAt")
+    workspace_link: Optional[WorkspaceLinkMetadata] = Field(
+        default=None,
+        serialization_alias="workspaceLink",
+    )
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def _created_at_to_str(cls, v: Any) -> Optional[str]:
+        if v is None:
+            return None
+        if hasattr(v, "isoformat"):
+            return v.isoformat()
+        return str(v) if v else None
+
+
+class InsightResponse(BaseModel):
+    """Slim insight DTO (optional fields align with partial / embed use cases)."""
+
+    id: str
+    title: str
+    body: Optional[str] = None
+    type: Optional[str] = None
+    workspace_link: Optional[WorkspaceLinkMetadata] = Field(
+        default=None,
+        serialization_alias="workspaceLink",
+    )
+
     model_config = ConfigDict(populate_by_name=True)
 
 
@@ -150,7 +194,12 @@ AIInsightSeverity = Literal["low", "medium", "high", "critical"]
 
 
 class AIInsightResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True, coerce_numbers_to_str=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        coerce_numbers_to_str=True,
+        serialize_by_alias=True,
+    )
 
     # Store as snake_case in Python (matches ORM) but serialize as camelCase (matches frontend)
     id: str
@@ -166,6 +215,10 @@ class AIInsightResponse(BaseModel):
     related_rfi_id: Optional[str] = Field(default=None, serialization_alias="relatedRFIId")
     related_inspection_id: Optional[str] = Field(default=None, serialization_alias="relatedInspectionId")
     drawing_id: Optional[int] = Field(default=None, serialization_alias="relatedDrawingId")
+    workspace_link: Optional[WorkspaceLinkMetadata] = Field(
+        default=None,
+        serialization_alias="workspaceLink",
+    )
 
     @field_validator("affected_items", mode="before")
     @classmethod
@@ -180,10 +233,14 @@ class InsightListResponse(BaseModel):
     limit: int
     offset: int
 
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
 
 class FindingListResponse(BaseModel):
     """Project-scoped findings list (dashboard)."""
-    findings: List[AIInsightResponse]
+    findings: List[FindingResponse]
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 
 
 # Procore Connection Schemas

@@ -11,6 +11,7 @@ from errors import AppError
 from api.routes import (
     dashboard,
     projects,
+    findings,
     submittals,
     rfis,
     inspections,
@@ -39,6 +40,7 @@ tags_metadata = [
     {"name": "drawing-diffs", "description": "Compute and fetch drawing diffs for a master drawing."},
     {"name": "drawing-alignment", "description": "Regions and alignments linking master and sub-drawings."},
     {"name": "projects", "description": "Projects, drawings, and project-scoped resources."},
+    {"name": "findings", "description": "Project findings with serialized API rows."},
     {"name": "insights", "description": "AI findings and insights."},
     {"name": "evidence", "description": "Document evidence (specs, inspection docs)."},
 ]
@@ -153,6 +155,7 @@ app.add_middleware(
 # Include routers
 app.include_router(dashboard.router)
 app.include_router(projects.router)
+app.include_router(findings.router)
 app.include_router(submittals.router)
 app.include_router(rfis.router)
 app.include_router(inspections.router)

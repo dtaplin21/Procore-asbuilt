@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
+import type { InsightListResponse } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { 
   AlertTriangle,
@@ -17,7 +18,6 @@ import { AIInsightCard } from "@/components/ai-insight-card";
 import { ProcoreStatus } from "@/components/procore-status";
 import type {
   DashboardStats,
-  AIInsight,
   ProcoreConnection,
   DashboardSummary,
   ProjectListResponse,
@@ -53,7 +53,8 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ procoreConnection, procoreUserId, onProcoreSync }: DashboardProps) {
-  const [, setLocation] = useLocation();
+  const [location] = useLocation();
+  const isInsightsView = location === "/insights";
 
   // Selected project context (scopes the dashboard structurally)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() =>
@@ -65,14 +66,19 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
     queryKey: ["/api/dashboard/stats"],
   });
 
-  const { data: insights, isLoading: insightsLoading } = useQuery<AIInsight[]>({
+  const insightsLimit = isInsightsView ? 100 : 4;
+
+  const { data: insightsPage, isLoading: insightsLoading } = useQuery<InsightListResponse>({
     queryKey: [
       selectedProjectId
-        ? `/api/insights?project_id=${encodeURIComponent(selectedProjectId)}&limit=4`
-        : "/api/insights?limit=4",
+        ? `/api/insights?project_id=${encodeURIComponent(selectedProjectId)}&limit=${insightsLimit}`
+        : `/api/insights?limit=${insightsLimit}`,
     ],
     enabled: !!selectedProjectId,
   });
+
+  const insights = insightsPage?.items ?? [];
+  const insightsPreview = isInsightsView ? insights : insights.slice(0, 3);
 
   // Projects list for selector (Phase 1 / Step 3)
   const { data: projectsData, isLoading: projectsLoading } = useQuery<ProjectListResponse>({
@@ -172,8 +178,14 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Dashboard</h1>
-          <p className="text-muted-foreground">Quality control overview and AI insights</p>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">
+            {isInsightsView ? "Insights" : "Dashboard"}
+          </h1>
+          <p className="text-muted-foreground">
+            {isInsightsView
+              ? "AI findings and drawing comparison context"
+              : "Quality control overview and AI insights"}
+          </p>
           {selectedProjectName && (
             <p className="text-sm text-muted-foreground mt-1" data-testid="text-selected-project">
               Project: <span className="font-medium text-foreground">{selectedProjectName}</span>
@@ -210,8 +222,8 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
         </div>
       </div>
 
-      {/* Project summary KPIs (top section) */}
-      {selectedProjectId && (
+      {/* Project summary KPIs (top section) — hide on dedicated insights view */}
+      {selectedProjectId && !isInsightsView && (
         projectSummaryLoading ? (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -264,32 +276,34 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
         <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
-            <CardTitle>AI Insights</CardTitle>
+            <CardTitle>{isInsightsView ? "All insights" : "AI Insights"}</CardTitle>
           </div>
-          <Link href="/insights">
-            <Button variant="ghost" size="sm" data-testid="button-view-all-insights">
-              View All
-            </Button>
-          </Link>
+          {!isInsightsView ? (
+            <Link href="/insights">
+              <Button variant="ghost" size="sm" data-testid="button-view-all-insights">
+                View All
+              </Button>
+            </Link>
+          ) : (
+            <Link href="/">
+              <Button variant="ghost" size="sm" data-testid="button-back-dashboard">
+                Back to dashboard
+              </Button>
+            </Link>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           {insightsLoading ? (
             <>
-              {[1, 2, 3].map((i) => (
+              {(isInsightsView ? [1, 2, 3, 4, 5, 6] : [1, 2, 3]).map((i) => (
                 <Skeleton key={i} className="h-24 w-full" />
               ))}
             </>
-          ) : insights && insights.length > 0 ? (
-            insights.slice(0, 3).map((insight) => (
+          ) : insightsPreview.length > 0 ? (
+            insightsPreview.map((insight) => (
               <AIInsightCard
                 key={insight.id}
                 insight={insight}
-                onViewDetails={(id) => {
-                  if (!selectedProjectId) return;
-                  setLocation(
-                    `/projects/${selectedProjectId}/drawings?findingId=${encodeURIComponent(id)}`
-                  );
-                }}
                 onResolve={(id) => console.log("Resolve insight:", id)}
               />
             ))
@@ -303,8 +317,8 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
         </CardContent>
       </Card>
 
-
       {/* Active Jobs */}
+      {!isInsightsView && (
       <div className="mt-8">
         <h2 className="text-xl font-semibold mb-4">Active Jobs</h2>
 
@@ -318,7 +332,9 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
           />
         )}
       </div>
+      )}
 
+      {!isInsightsView && (
       <div className="mt-8">
         <h2 className="text-xl font-semibold mb-4">Bottom: Recent findings</h2>
 
@@ -333,6 +349,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
           />
         )}
       </div>
+      )}
 
       {/* Critical Alerts Banner */}
       {stats && stats.criticalAlerts > 0 && (
