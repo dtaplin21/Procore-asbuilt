@@ -14,7 +14,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/stat-card";
-import { AIInsightCard } from "@/components/ai-insight-card";
 import { ProcoreStatus } from "@/components/procore-status";
 import type {
   DashboardStats,
@@ -25,7 +24,7 @@ import type {
   FindingListResponse,
 } from "@shared/schema";
 import JobQueueList from "@/components/JobQueueList";
-import RecentFindingsCard from "@/components/dashboard/recent_findings_card";
+import { buildDrawingPickerUrl, buildWorkspaceUrl } from "@/lib/workspace-links";
 
 function getProjectIdFromUrl(): string | null {
   const sp = new URLSearchParams(window.location.search);
@@ -272,11 +271,13 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
       )}
 
       {/* AI Insights Section */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
+      <div className="space-y-3">
+        <div className="flex flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
-            <CardTitle>{isInsightsView ? "All insights" : "AI Insights"}</CardTitle>
+            <h2 className="text-lg font-semibold">
+              {isInsightsView ? "All insights" : "AI Insights"}
+            </h2>
           </div>
           {!isInsightsView ? (
             <Link href="/insights">
@@ -291,31 +292,56 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
               </Button>
             </Link>
           )}
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {insightsLoading ? (
-            <>
-              {(isInsightsView ? [1, 2, 3, 4, 5, 6] : [1, 2, 3]).map((i) => (
-                <Skeleton key={i} className="h-24 w-full" />
-              ))}
-            </>
-          ) : insightsPreview.length > 0 ? (
-            insightsPreview.map((insight) => (
-              <AIInsightCard
-                key={insight.id}
-                insight={insight}
-                onResolve={(id) => console.log("Resolve insight:", id)}
-              />
-            ))
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-50" />
-              <p>No AI insights yet</p>
-              <p className="text-sm">Insights will appear as documents are analyzed</p>
+        </div>
+        {insightsLoading ? (
+          <div className="space-y-3">
+            {(isInsightsView ? [1, 2, 3, 4, 5, 6] : [1, 2, 3]).map((i) => (
+              <Skeleton key={i} className="h-24 w-full" />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border bg-white">
+            <div className="border-b px-4 py-3">
+              <h3 className="text-sm font-semibold text-slate-900">Insights</h3>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <div className="divide-y">
+              {insightsPreview.length === 0 ? (
+                <div className="px-4 py-6 text-sm text-slate-500">
+                  No insights yet for this project.
+                </div>
+              ) : (
+                insightsPreview.map((insight) => {
+                  const content = (
+                    <div className="px-4 py-3 hover:bg-slate-50">
+                      <div className="text-sm font-medium text-slate-900">{insight.title}</div>
+                      {insight.description ? (
+                        <div className="mt-1 text-sm text-slate-500">{insight.description}</div>
+                      ) : null}
+                    </div>
+                  );
+                  const ws = insight.workspaceLink;
+                  if (ws) {
+                    return (
+                      <Link
+                        key={insight.id}
+                        href={buildWorkspaceUrl({
+                          projectId: ws.projectId,
+                          masterDrawingId: ws.masterDrawingId,
+                          alignmentId: ws.alignmentId,
+                          diffId: ws.diffId,
+                        })}
+                      >
+                        {content}
+                      </Link>
+                    );
+                  }
+                  return <div key={insight.id}>{content}</div>;
+                })
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Active Jobs */}
       {!isInsightsView && (
@@ -345,7 +371,51 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
         ) : findingsError ? (
           <div className="text-sm text-destructive">Failed to load recent findings</div>
         ) : (
-          <RecentFindingsCard findings={recentFindings?.findings ?? []} />
+          <div className="rounded-xl border bg-white">
+            <div className="border-b px-4 py-3">
+              <h3 className="text-sm font-semibold text-slate-900">Recent Findings</h3>
+            </div>
+            <div className="divide-y">
+              {(recentFindings?.findings ?? []).length === 0 ? (
+                <div className="px-4 py-6 text-sm text-slate-500">
+                  No recent findings for this project.
+                </div>
+              ) : (
+                (recentFindings?.findings ?? []).map((finding) => {
+                  const content = (
+                    <div className="px-4 py-3 hover:bg-slate-50">
+                      <div className="text-sm font-medium text-slate-900">{finding.title}</div>
+                      {finding.severity ? (
+                        <div className="mt-1 text-xs text-slate-500">Severity: {finding.severity}</div>
+                      ) : null}
+                    </div>
+                  );
+                  const ws = finding.workspaceLink;
+                  if (ws) {
+                    return (
+                      <Link
+                        key={finding.id}
+                        href={buildWorkspaceUrl({
+                          projectId: ws.projectId,
+                          masterDrawingId: ws.masterDrawingId,
+                          alignmentId: ws.alignmentId,
+                          diffId: ws.diffId,
+                        })}
+                      >
+                        {content}
+                      </Link>
+                    );
+                  }
+                  const pickerHref = buildDrawingPickerUrl(finding.projectId, finding.id);
+                  return (
+                    <Link key={finding.id} href={pickerHref}>
+                      {content}
+                    </Link>
+                  );
+                })
+              )}
+            </div>
+          </div>
         )}
       </div>
       )}
