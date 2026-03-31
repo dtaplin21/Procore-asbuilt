@@ -12,7 +12,7 @@ pip install -r requirements.txt
 2. **Set up environment variables:**
 Create a `.env` file in the `backend/` directory:
 ```env
-DATABASE_URL=postgresql://user:password@localhost/procore_integrator
+DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/procore_int
 PROCORE_CLIENT_ID=your_client_id
 PROCORE_CLIENT_SECRET=your_client_secret
 PROCORE_REDIRECT_URI=http://localhost:2000/api/procore/oauth/callback

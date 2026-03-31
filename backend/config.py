@@ -3,7 +3,7 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # Use psycopg v3 driver by default (matches requirements.txt: psycopg[binary])
-    database_url: str = "postgresql+psycopg://user:password@localhost/procore_integrator"
+    database_url: str = "postgresql+psycopg://user:password@localhost:5432/procore_int"
     procore_client_id: Optional[str] = None
     procore_client_secret: Optional[str] = None
     procore_redirect_uri: str = "http://localhost:2000/api/procore/oauth/callback"

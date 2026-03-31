@@ -27,6 +27,7 @@ from api.routes import (
     drawing_alignment,
     drawing_diffs,
     drawing_comparison,
+    drawing_progress,
 )
 from database import init_db
 import os
@@ -43,6 +44,7 @@ tags_metadata = [
     {"name": "findings", "description": "Project findings with serialized API rows."},
     {"name": "insights", "description": "AI findings and insights."},
     {"name": "evidence", "description": "Document evidence (specs, inspection docs)."},
+    {"name": "drawing-progress", "description": "Per-master drawing comparison coverage and severity counts."},
 ]
 
 app = FastAPI(
@@ -171,6 +173,7 @@ app.include_router(evidence_records.router)
 app.include_router(drawing_alignment.router)
 app.include_router(drawing_diffs.router)
 app.include_router(drawing_comparison.router)
+app.include_router(drawing_progress.router)
 
 # Serve static files in production (if needed)
 # static_dir = os.path.join(os.path.dirname(__file__), "..", "dist", "public")

@@ -23,3 +23,5 @@ backend/ENV/
 .pytest_cache/
 .mypy_cache/
 backend/.env
+# Repo root (e.g. Drizzle); do not commit secrets
+.env

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from datetime import datetime
+from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session, joinedload
 
 # ---------------------------------------------------------------------------
@@ -709,6 +710,37 @@ class StorageService:
             .filter(DrawingDiff.id == diff_id)
             .first()
         )
+
+    def count_compared_sub_drawings_for_master(self, project_id: int, master_drawing_id: int) -> int:
+        """Distinct sub drawings with an alignment row for this master within the project."""
+        result = (
+            self.db.query(func.count(distinct(DrawingAlignment.sub_drawing_id)))
+            .filter(
+                DrawingAlignment.project_id == project_id,
+                DrawingAlignment.master_drawing_id == master_drawing_id,
+            )
+            .scalar()
+        )
+        return int(result or 0)
+
+    def count_open_high_severity_diffs_for_master(self, project_id: int, master_drawing_id: int) -> int:
+        """
+        High/critical diffs for this master in the project.
+
+        DrawingDiff has no `status` column in this schema; if one is added later, filter by
+        open/active/unresolved statuses here instead of counting all high/critical rows.
+        """
+        result = (
+            self.db.query(func.count(DrawingDiff.id))
+            .join(DrawingAlignment, DrawingDiff.alignment_id == DrawingAlignment.id)
+            .filter(
+                DrawingAlignment.project_id == project_id,
+                DrawingAlignment.master_drawing_id == master_drawing_id,
+                DrawingDiff.severity.in_(["high", "critical"]),
+            )
+            .scalar()
+        )
+        return int(result or 0)
 
     SEVERITY_ORDER = {"low": 1, "medium": 2, "high": 3, "critical": 4}
 

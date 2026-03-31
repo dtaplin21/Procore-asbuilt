@@ -267,6 +267,23 @@ class ProcoreTokenResponse(BaseModel):
 # ============================================
 
 
+class DrawingProgressSummary(BaseModel):
+    """Reusable progress snapshot for workspace and dashboard (per master drawing)."""
+
+    master_drawing_id: int = Field(..., serialization_alias="masterDrawingId")
+    compared_sub_drawings_count: int = Field(
+        ...,
+        serialization_alias="comparedSubDrawingsCount",
+    )
+    open_high_severity_diffs_count: int = Field(
+        ...,
+        serialization_alias="openHighSeverityDiffsCount",
+    )
+
+    class Config:
+        populate_by_name = True
+
+
 class DrawingResponse(BaseModel):
     id: int
     name: str
