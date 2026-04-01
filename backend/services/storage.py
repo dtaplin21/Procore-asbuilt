@@ -233,6 +233,19 @@ class StorageService:
             .first()
         )
 
+    def drawing_exists_in_project(self, project_id: int, drawing_id: int) -> bool:
+        """Whether a drawing exists in the project (single-column SELECT on ``drawings.id``).
+
+        Prefer this for cheap existence checks when the DB may be behind the ORM (e.g. missing
+        newer ``drawings.*`` columns); full row loads use ``get_drawing`` and require a migrated schema.
+        """
+        row = (
+            self.db.query(Drawing.id)
+            .filter(Drawing.project_id == project_id, Drawing.id == drawing_id)
+            .first()
+        )
+        return row is not None
+
     def get_drawing_by_id(self, drawing_id: int) -> Optional[Drawing]:
         """Get a drawing by ID only (no project scope)."""
         return self.db.query(Drawing).filter(Drawing.id == drawing_id).first()

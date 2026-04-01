@@ -17,7 +17,7 @@ This document captures the current end-to-end database implementation for the ba
 
 ```4:21:backend/config.py
 class Settings(BaseSettings):
-    database_url: str = "postgresql://user:password@localhost/procore_integrator"
+    database_url: str = "postgresql+psycopg://user:password@localhost:5432/procore_int"
     # ...
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -31,14 +31,14 @@ settings = Settings()
 Example values live in `backend/.env.example`:
 
 ```4:7:backend/.env.example
-# Format: postgresql://username:password@host:port/database_name
-DATABASE_URL=postgresql://user:password@localhost/procore_integrator
+# Format: postgresql+psycopg://username:password@host:port/database_name
+DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/procore_int
 ```
 
 Recommended (psycopg v3) SQLAlchemy URL format:
 
 ```env
-DATABASE_URL=postgresql+psycopg://USERNAME:PASSWORD@localhost:5432/DBNAME
+DATABASE_URL=postgresql+psycopg://USERNAME:PASSWORD@localhost:5432/procore_int
 ```
 
 ## Engine, session factory, and FastAPI dependency

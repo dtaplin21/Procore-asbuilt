@@ -19,15 +19,8 @@ class DrawingProgressService:
         project_id: int,
         master_drawing_id: int,
     ) -> DrawingProgressSummary:
-        drawing = self.storage.get_drawing(project_id, master_drawing_id)
-        if not drawing:
+        if not self.storage.drawing_exists_in_project(project_id, master_drawing_id):
             raise HTTPException(status_code=404, detail=f"Drawing {master_drawing_id} not found")
-
-        if drawing.project_id != project_id:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Drawing {master_drawing_id} does not belong to project {project_id}",
-            )
 
         compared_sub_drawings_count = self.storage.count_compared_sub_drawings_for_master(
             project_id=project_id,

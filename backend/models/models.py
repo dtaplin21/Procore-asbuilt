@@ -224,7 +224,14 @@ class Finding(Base):
         "DrawingDiff",
         foreign_keys=[drawing_diff_id],
     )
-    drawing_diffs = relationship("DrawingDiff", back_populates="finding", passive_deletes=True)
+    # Diffs that reference this finding (via drawing_diffs.finding_id). Distinct from
+    # `drawing_diff` (this row's optional pointer to one diff via findings.drawing_diff_id).
+    drawing_diffs = relationship(
+        "DrawingDiff",
+        back_populates="finding",
+        foreign_keys="[DrawingDiff.finding_id]",
+        passive_deletes=True,
+    )
 
     @property
     def workspace_link(self):
@@ -482,7 +489,11 @@ class DrawingDiff(Base):
 
     # Relationships
     alignment = relationship("DrawingAlignment", back_populates="drawing_diffs")
-    finding = relationship("Finding", back_populates="drawing_diffs")
+    finding = relationship(
+        "Finding",
+        back_populates="drawing_diffs",
+        foreign_keys=[finding_id],
+    )
     overlays = relationship("DrawingOverlay", back_populates="diff", passive_deletes=True)
 
 
