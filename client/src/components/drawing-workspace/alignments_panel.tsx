@@ -1,8 +1,8 @@
-import { DrawingAlignment } from "@/types/drawing_workspace";
+import type { DrawingAlignmentListItem } from "@/types/drawing_workspace";
 import WorkspaceEmptyState from "@/components/drawing-workspace/workspace_empty_state";
 
 type Props = {
-  alignments: DrawingAlignment[];
+  alignments: DrawingAlignmentListItem[];
   selectedAlignmentId: number | null;
   loading: boolean;
   onSelectAlignment: (alignmentId: number) => void | Promise<void>;

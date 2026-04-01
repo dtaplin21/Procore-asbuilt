@@ -12,18 +12,65 @@ from models.schemas import (
     DrawingAlignmentResponse,
     DrawingAlignmentHistoryResponse,
     DrawingAlignmentHistoryListResponse,
+    DrawingAlignmentOverlayResponse,
+    DrawingAlignmentTransformResponse,
+    DrawingOverlaySubDrawingSummary,
     DrawingBasicSummary,
+    DrawingComparisonWorkspaceResponse,
     DrawingDiffResponse,
     DrawingDiffRegion,
     DrawingDiffHistoryResponse,
     DrawingDiffHistoryListResponse,
     DrawingDiffRegionResponse,
+    DrawingOverlayDrawingSummary,
+    TransformKind,
 )
 from services.file_storage import get_file_path
 from services.storage import StorageService
 from ai.pipelines.drawing_diff import run_drawing_diff
 
 logger = logging.getLogger(__name__)
+
+
+def parse_alignment_transform_for_overlay(raw: Any) -> Optional[DrawingAlignmentTransformResponse]:
+    """Normalize DB/JSON alignment.transform into overlay response shape."""
+    if raw is None:
+        return None
+    if isinstance(raw, DrawingAlignmentTransformResponse):
+        return raw
+    if not isinstance(raw, dict):
+        return None
+    raw_t = raw.get("type") or "homography"
+    if raw_t not in ("identity", "affine", "homography"):
+        raw_t = "homography"
+    t = cast(TransformKind, raw_t)
+    m = raw.get("matrix") or raw.get("homography")
+    matrix: List[float]
+    if m is None:
+        matrix = []
+    elif isinstance(m, dict):
+        matrix = [float(x) for x in m.values()]
+    elif isinstance(m, (list, tuple)):
+        matrix = [float(x) for x in m]
+    else:
+        matrix = []
+    if t == "identity" and not matrix:
+        matrix = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    conf = raw.get("confidence")
+    if conf is not None:
+        try:
+            conf = float(conf)
+        except (TypeError, ValueError):
+            conf = None
+    meta = raw.get("meta")
+    if meta is not None and not isinstance(meta, dict):
+        meta = None
+    return DrawingAlignmentTransformResponse(
+        type=t,
+        matrix=matrix,
+        confidence=conf,
+        meta=meta,
+    )
 
 
 def serialize_drawing_for_workspace(db: Session, drawing: Drawing, active_page: int = 1) -> Dict[str, Any]:
@@ -102,6 +149,40 @@ class DrawingComparisonService:
             page_count=serialized["pageCount"],
         )
 
+    def _serialize_overlay_drawing(self, drawing: Drawing, active_page: int = 1) -> DrawingOverlayDrawingSummary:
+        """Overlay-friendly drawing summary (URL, content type, pages) for comparison workspace."""
+        s = serialize_drawing_for_workspace(self.db, drawing, active_page=active_page)
+        return DrawingOverlayDrawingSummary(
+            id=s["id"],
+            name=s["name"],
+            file_url=s["fileUrl"],
+            content_type=s.get("contentType"),
+            page_count=s.get("pageCount"),
+        )
+
+    def _serialize_alignment_overlay(self, alignment: DrawingAlignment) -> DrawingAlignmentOverlayResponse:
+        raw_tf = getattr(alignment, "transform", None)
+        transform = parse_alignment_transform_for_overlay(raw_tf)
+        sub = getattr(alignment, "sub_drawing", None)
+        if sub is None:
+            sub = self.storage.get_drawing_by_id(cast(int, alignment.sub_drawing_id))
+        if sub is None:
+            raise ValueError(f"Sub drawing {alignment.sub_drawing_id} not found for alignment overlay")
+        st = cast(str, getattr(alignment, "status", ""))
+        return DrawingAlignmentOverlayResponse(
+            id=cast(int, alignment.id),
+            method=cast(str, getattr(alignment, "method", "")),
+            status=st,
+            alignment_status=st,
+            sub_drawing=DrawingOverlaySubDrawingSummary(
+                id=cast(int, sub.id),
+                name=cast(str, sub.name),
+            ),
+            created_at=getattr(alignment, "created_at", None),
+            transform=transform,
+            error_message=getattr(alignment, "error_message", None),
+        )
+
     def _serialize_alignment_history(self, alignment: DrawingAlignment) -> DrawingAlignmentHistoryResponse:
         """Serialize alignment for history view with sub drawing metadata."""
         sub_drawing = getattr(alignment, "sub_drawing", None)
@@ -176,8 +257,9 @@ class DrawingComparisonService:
                 DrawingDiffRegionResponse(
                     page=region.get("page"),
                     bbox=region.get("bbox"),
-                    change_type=region.get("change_type"),
-                    note=region.get("note"),
+                    change_type=region.get("change_type")
+                    or region.get("changeType"),
+                    note=region.get("note") or region.get("label"),
                 )
                 for region in raw_regions
             ],
@@ -510,7 +592,7 @@ class DrawingComparisonService:
         sub_drawing_id: int,
         *,
         force_recompute: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> DrawingComparisonWorkspaceResponse:
         """
         Main orchestration: validate, load/create alignment, reuse or compute transform,
         run diff pipeline, return serialized workspace.
@@ -566,12 +648,12 @@ class DrawingComparisonService:
                     cast(int, alignment.id)
                 )
 
-        return {
-            "master_drawing": self._serialize_drawing(master_drawing),
-            "sub_drawing": self._serialize_drawing(sub_drawing),
-            "alignment": self._serialize_alignment(alignment),
-            "diffs": [self._serialize_diff(diff) for diff in diffs],
-        }
+        return DrawingComparisonWorkspaceResponse(
+            master_drawing=self._serialize_overlay_drawing(master_drawing),
+            sub_drawing=self._serialize_overlay_drawing(sub_drawing),
+            alignment=self._serialize_alignment_overlay(alignment),
+            diffs=[self._serialize_diff(diff) for diff in diffs],
+        )
 
     def list_alignments(
         self,
@@ -777,7 +859,7 @@ def compare_sub_drawing_to_master(
     master_drawing_id: int,
     sub_drawing_id: int,
     force_recompute: bool = False,
-) -> Dict[str, Any]:
+) -> DrawingComparisonWorkspaceResponse:
     """
     Compare sub drawing to master. Validates, loads/creates alignment,
     reuses or computes transform, persists, runs diff pipeline.

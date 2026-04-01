@@ -6,7 +6,7 @@ import {
   fetchMasterDrawingAlignments,
 } from "@/lib/api/drawing_workspace";
 import type {
-  DrawingAlignment,
+  DrawingAlignmentListItem,
   DrawingDiff,
   DrawingWorkspaceDrawing,
 } from "@/types/drawing_workspace";
@@ -20,7 +20,7 @@ type UseDrawingWorkspaceArgs = {
 
 type UseDrawingWorkspaceResult = {
   masterDrawing: DrawingWorkspaceDrawing | null;
-  alignments: DrawingAlignment[];
+  alignments: DrawingAlignmentListItem[];
   selectedAlignmentId: number | null;
   selectedDiffId: number | null;
   diffsByAlignmentId: Record<number, DrawingDiff[]>;
@@ -34,7 +34,7 @@ type UseDrawingWorkspaceResult = {
   compareError: string | null;
 
   selectedDiffs: DrawingDiff[];
-  selectedAlignment: DrawingAlignment | null;
+  selectedAlignment: DrawingAlignmentListItem | null;
   selectedDiff: DrawingDiff | null;
 
   selectAlignment: (alignmentId: number) => Promise<void>;
@@ -44,7 +44,7 @@ type UseDrawingWorkspaceResult = {
   reloadSelectedDiffs: () => Promise<void>;
 
   runCompare: (subDrawingId: number) => Promise<{
-    alignment: DrawingAlignment;
+    alignment: DrawingAlignmentListItem;
     diffs: DrawingDiff[];
   }>;
 };
@@ -56,7 +56,7 @@ export function useDrawingWorkspace({
   initialDiffId = null,
 }: UseDrawingWorkspaceArgs): UseDrawingWorkspaceResult {
   const [masterDrawing, setMasterDrawing] = useState<DrawingWorkspaceDrawing | null>(null);
-  const [alignments, setAlignments] = useState<DrawingAlignment[]>([]);
+  const [alignments, setAlignments] = useState<DrawingAlignmentListItem[]>([]);
   const [selectedAlignmentId, setSelectedAlignmentId] = useState<number | null>(null);
   const [selectedDiffId, setSelectedDiffId] = useState<number | null>(null);
   const [diffsByAlignmentId, setDiffsByAlignmentId] = useState<Record<number, DrawingDiff[]>>(
@@ -257,7 +257,7 @@ export function useDrawingWorkspace({
   }, [selectedAlignmentId, loadDiffsForAlignment]);
 
   const mergeAlignmentIntoList = useCallback(
-    (incomingAlignment: DrawingAlignment) => {
+    (incomingAlignment: DrawingAlignmentListItem) => {
       setAlignments((prev) => {
         const existingIndex = prev.findIndex(
           (item) => item.id === incomingAlignment.id

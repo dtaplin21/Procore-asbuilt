@@ -690,13 +690,76 @@ class DrawingDiffListResponse(BaseModel):
     offset: int
 
 
-class DrawingComparisonWorkspaceResponse(BaseModel):
-    master_drawing: DrawingSummary = Field(..., serialization_alias="masterDrawing")
-    sub_drawing: DrawingSummary = Field(..., serialization_alias="subDrawing")
-    alignment: DrawingAlignmentResponse
-    diffs: List[DrawingDiffResponse]
+class DrawingOverlayDrawingSummary(BaseModel):
+    """Minimal drawing payload for overlay/comparison: URL + type + page count (no inference on client)."""
 
-    model_config = {"populate_by_name": True}
+    id: int
+    name: str
+    file_url: str = Field(..., serialization_alias="fileUrl")
+    content_type: Optional[str] = Field(default=None, serialization_alias="contentType")
+    page_count: Optional[int] = Field(default=None, serialization_alias="pageCount")
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+TransformKind = Literal["identity", "affine", "homography"]
+
+
+class DrawingAlignmentTransformResponse(BaseModel):
+    """Structured alignment transform for rendering (matrix + type + confidence)."""
+
+    type: TransformKind
+    matrix: List[float]
+    confidence: Optional[float] = None
+    meta: Optional[Dict[str, Any]] = None
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+class DrawingOverlaySubDrawingSummary(BaseModel):
+    """Sub drawing identity for overlay alignment rows (sidebar labels)."""
+
+    id: int
+    name: str
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+class DrawingAlignmentOverlayResponse(BaseModel):
+    """Alignment row with transform and status for workspace overlay flows."""
+
+    id: int
+    method: str
+    status: str
+    alignment_status: Optional[str] = Field(
+        default=None,
+        serialization_alias="alignmentStatus",
+        description="Same as status; mirrors list/history payloads for UI.",
+    )
+    sub_drawing: DrawingOverlaySubDrawingSummary = Field(..., serialization_alias="subDrawing")
+    created_at: Optional[str] = Field(default=None, serialization_alias="createdAt")
+    transform: Optional[DrawingAlignmentTransformResponse] = None
+    error_message: Optional[str] = Field(default=None, serialization_alias="errorMessage")
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def _created_at_to_str(cls, v: Any) -> Optional[str]:
+        if v is None:
+            return None
+        if hasattr(v, "isoformat"):
+            return v.isoformat()
+        return str(v) if v else None
+
+
+class DrawingComparisonWorkspaceResponse(BaseModel):
+    master_drawing: DrawingOverlayDrawingSummary = Field(..., serialization_alias="masterDrawing")
+    sub_drawing: DrawingOverlayDrawingSummary = Field(..., serialization_alias="subDrawing")
+    alignment: DrawingAlignmentOverlayResponse
+    diffs: List[DrawingDiffResponse] = Field(default_factory=list)
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 
 
 class DrawingBasicSummary(BaseModel):

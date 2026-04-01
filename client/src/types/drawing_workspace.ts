@@ -108,11 +108,42 @@ export type DrawingDiff = {
   diffRegions: DrawingDiffRegion[];
 };
 
+/** Minimal drawing row for overlay/compare responses (URL + type + pages). */
+export type DrawingOverlayDrawingSummary = {
+  id: number;
+  name: string;
+  fileUrl: string;
+  contentType?: string | null;
+  pageCount?: number | null;
+};
+
+export type DrawingAlignmentTransformResponse = {
+  type: "identity" | "affine" | "homography";
+  matrix: number[];
+  confidence?: number | null;
+  meta?: Record<string, unknown> | null;
+};
+
+/** Alignment + structured transform for workspace overlay (POST compare). */
+export type DrawingAlignmentOverlayResponse = {
+  id: number;
+  method: string;
+  status: string;
+  alignmentStatus?: string | null;
+  subDrawing: DrawingBasicSummary;
+  createdAt?: string | null;
+  transform?: DrawingAlignmentTransformResponse | null;
+  errorMessage?: string | null;
+};
+
+/** List/history alignment row or overlay row from compare. */
+export type DrawingAlignmentListItem = DrawingAlignment | DrawingAlignmentOverlayResponse;
+
 /** Response from POST compare — workspace-ready payload */
 export type DrawingComparisonWorkspaceResponse = {
-  masterDrawing: DrawingSummary;
-  subDrawing: DrawingSummary;
-  alignment: DrawingAlignment;
+  masterDrawing: DrawingOverlayDrawingSummary;
+  subDrawing: DrawingOverlayDrawingSummary;
+  alignment: DrawingAlignmentOverlayResponse;
   diffs: DrawingDiff[];
 };
 

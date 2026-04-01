@@ -300,10 +300,10 @@ def test_compare_creates_alignment_and_runs_lifecycle_when_feature_match(
         master_drawing_id=master.id,
         sub_drawing_id=sub.id,
     )
-    assert "master_drawing" in result
-    assert "sub_drawing" in result
-    assert "alignment" in result
-    assert "diffs" in result
+    assert result.master_drawing is not None
+    assert result.sub_drawing is not None
+    assert result.alignment is not None
+    assert result.diffs is not None
     mock_lifecycle.assert_called_once()
     mock_diff.assert_called_once()
 
@@ -331,7 +331,7 @@ def test_compare_reuses_existing_alignment_when_transform_valid(
         )
         mock_lifecycle.assert_not_called()
 
-    assert result["alignment"].id == alignment.id
+    assert result.alignment.id == alignment.id
     mock_diff.assert_called_once()
 
 
