@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import DrawingOverlayLayer from "@/components/drawing-workspace/drawing_overlay_layer";
 import PanZoomContainer from "@/components/drawing-workspace/pan_zoom_container";
 import WorkspaceEmptyState from "@/components/drawing-workspace/workspace_empty_state";
 import AlignedSubOverlay from "@/components/drawings/AlignedSubOverlay";
+import { isAlignmentOverlayUsable } from "@/lib/drawing-alignment/is_alignment_overlay_usable";
+import { computeComparisonRenderBox } from "@/lib/drawing-viewer/comparison-layout";
 import { useResizeObserver } from "@/hooks/use_resize_observer";
 import type {
   DrawingAlignmentTransformResponse,
@@ -30,11 +32,21 @@ export default function DrawingViewer({
   showOverlay,
   overlayOpacity,
 }: Props) {
-  const stageRef = useRef<HTMLDivElement | null>(null);
-  const imageBounds = useResizeObserver(stageRef);
+  /** Shared width probe for comparison layout (max-w-[1200px] row). */
+  const layoutRef = useRef<HTMLDivElement | null>(null);
+  const layoutSize = useResizeObserver(layoutRef);
 
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+  /** Master intrinsic pixels — used with available width to size one shared render box. */
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
+  /** Sub intrinsic pixels — required to map alignment from natural space into the shared render box. */
+  const [subNaturalSize, setSubNaturalSize] = useState<{ w: number; h: number } | null>(null);
+  /** Fixed CSS px box for master + sub + diff overlay (same for all layers). */
+  const [comparisonStackBox, setComparisonStackBox] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
 
   const masterSrc = comparisonWorkspace?.masterDrawing.fileUrl ?? drawing?.fileUrl;
   const masterName = comparisonWorkspace?.masterDrawing.name ?? drawing?.name;
@@ -42,21 +54,88 @@ export default function DrawingViewer({
   useEffect(() => {
     setImageLoaded(false);
     setImageError(null);
-  }, [masterSrc]);
+    setNaturalSize(null);
+    setSubNaturalSize(null);
+    setComparisonStackBox(null);
+  }, [masterSrc, comparisonWorkspace?.subDrawing.fileUrl]);
+
+  /** Recompute the comparison box when the row width changes (resize) or natural size updates. */
+  useEffect(() => {
+    if (!comparisonWorkspace || !naturalSize) return;
+    if (layoutSize.width <= 0) return;
+    const box = computeComparisonRenderBox(
+      naturalSize.w,
+      naturalSize.h,
+      layoutSize.width
+    );
+    if (box.width > 0 && box.height > 0) {
+      setComparisonStackBox(box);
+    }
+  }, [comparisonWorkspace, naturalSize, layoutSize.width]);
 
   const alignmentTransform: DrawingAlignmentTransformResponse | null =
     comparisonWorkspace?.alignment?.transform ?? null;
 
+  const alignmentOverlayUsable = useMemo(
+    () => isAlignmentOverlayUsable(comparisonWorkspace),
+    [comparisonWorkspace]
+  );
+
+  const viewerSize = useMemo(() => {
+    if (comparisonWorkspace && comparisonStackBox) {
+      return {
+        width: comparisonStackBox.width,
+        height: comparisonStackBox.height,
+      };
+    }
+    return {
+      width: layoutSize.width,
+      height: layoutSize.height,
+    };
+  }, [comparisonWorkspace, comparisonStackBox, layoutSize.width, layoutSize.height]);
+
   const canRenderOverlay = useMemo(() => {
-    return imageLoaded && imageBounds.width > 0 && imageBounds.height > 0;
-  }, [imageLoaded, imageBounds.width, imageBounds.height]);
+    if (comparisonWorkspace && !comparisonStackBox) return false;
+    return (
+      imageLoaded && viewerSize.width > 0 && viewerSize.height > 0
+    );
+  }, [
+    comparisonWorkspace,
+    comparisonStackBox,
+    imageLoaded,
+    viewerSize.width,
+    viewerSize.height,
+  ]);
 
   const showSubOverlay = Boolean(
     showOverlay &&
       comparisonWorkspace &&
+      alignmentOverlayUsable &&
       alignmentTransform &&
-      canRenderOverlay
+      canRenderOverlay &&
+      comparisonStackBox
   );
+
+  const onComparisonMasterLoad = useCallback(
+    (e: React.SyntheticEvent<HTMLImageElement>) => {
+      const img = e.currentTarget;
+      setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+      setImageLoaded(true);
+    },
+    []
+  );
+
+  const onComparisonSubLoad = useCallback(
+    (e: React.SyntheticEvent<HTMLImageElement>) => {
+      const img = e.currentTarget;
+      setSubNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+    },
+    []
+  );
+
+  const onLegacyMasterLoad = useCallback(() => {
+    setImageLoaded(true);
+  }, []);
 
   if (!drawing) {
     return (
@@ -140,7 +219,7 @@ export default function DrawingViewer({
 
       <PanZoomContainer>
         <div
-          ref={stageRef}
+          ref={layoutRef}
           className="relative inline-block w-full max-w-[1200px]"
           data-testid="drawing-viewer-stage"
         >
@@ -164,14 +243,32 @@ export default function DrawingViewer({
 
           {!isLoadingComparisonWorkspace && !imageError ? (
             comparisonWorkspace ? (
-              <div className="relative w-full overflow-hidden rounded-lg border bg-black/5">
-                <img
+              <>
+                {!alignmentOverlayUsable ? (
+                  <div className="mb-2 text-sm text-amber-600">
+                    Overlay unavailable for this alignment.
+                  </div>
+                ) : null}
+                <div
+                  className="relative mx-auto overflow-hidden rounded-lg border bg-black/5"
+                  style={
+                    comparisonStackBox
+                      ? {
+                          width: comparisonStackBox.width,
+                          height: comparisonStackBox.height,
+                        }
+                      : { minHeight: 240 }
+                  }
+                >
+                  <img
                   src={masterSrc}
                   alt={masterName ?? "Master drawing"}
-                  className="relative z-0 block h-auto w-full max-h-[80vh] select-none"
-                  onLoad={() => {
-                    setImageLoaded(true);
-                  }}
+                  className={
+                    comparisonStackBox
+                      ? "absolute inset-0 z-0 h-full w-full select-none object-contain"
+                      : "relative z-0 block h-auto w-full max-h-[80vh] select-none"
+                  }
+                  onLoad={onComparisonMasterLoad}
                   onError={() => {
                     setImageError("Failed to load drawing image.");
                   }}
@@ -185,6 +282,17 @@ export default function DrawingViewer({
                     alt={comparisonWorkspace.subDrawing.name}
                     transform={alignmentTransform!}
                     opacity={overlayOpacity}
+                    masterNatural={naturalSize}
+                    subNatural={subNaturalSize}
+                    renderBox={
+                      comparisonStackBox
+                        ? {
+                            w: comparisonStackBox.width,
+                            h: comparisonStackBox.height,
+                          }
+                        : null
+                    }
+                    onLoad={onComparisonSubLoad}
                   />
                 ) : null}
 
@@ -192,21 +300,20 @@ export default function DrawingViewer({
                   <DrawingOverlayLayer
                     diff={selectedDiff}
                     viewerSize={{
-                      width: imageBounds.width,
-                      height: imageBounds.height,
+                      width: viewerSize.width,
+                      height: viewerSize.height,
                     }}
                   />
                 ) : null}
-              </div>
+                </div>
+              </>
             ) : (
               <>
                 <img
                   src={drawing.fileUrl}
                   alt={drawing.name}
                   className="relative z-0 block max-h-[80vh] max-w-[1200px] select-none rounded"
-                  onLoad={() => {
-                    setImageLoaded(true);
-                  }}
+                  onLoad={onLegacyMasterLoad}
                   onError={() => {
                     setImageError("Failed to load drawing image.");
                   }}
@@ -218,8 +325,8 @@ export default function DrawingViewer({
                   <DrawingOverlayLayer
                     diff={selectedDiff}
                     viewerSize={{
-                      width: imageBounds.width,
-                      height: imageBounds.height,
+                      width: layoutSize.width,
+                      height: layoutSize.height,
                     }}
                   />
                 ) : null}

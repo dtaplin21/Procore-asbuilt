@@ -24,3 +24,21 @@ export function affineMatrixToCssMatrix2d(matrix: number[]): string {
   }
   return "matrix(1, 0, 0, 1, 0, 0)";
 }
+
+/**
+ * Row-major 3×3 homography (OpenCV-style) → CSS `matrix3d` for 2D perspective mapping.
+ * See e.g. mapping of H[i] into the 16-element column-major matrix used by CSS.
+ */
+export function homographyRowMajorToMatrix3dCss(h: number[]): string {
+  if (h.length < 9) return "none";
+  const a = h[0],
+    b = h[1],
+    c = h[2];
+  const d = h[3],
+    e = h[4],
+    f = h[5];
+  const g = h[6],
+    h7 = h[7],
+    h8 = h[8];
+  return `matrix3d(${a},${d},0,${g},${b},${e},0,${h7},0,0,0,0,${c},${f},0,${h8})`;
+}

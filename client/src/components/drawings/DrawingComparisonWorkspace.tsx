@@ -5,6 +5,7 @@ import DrawingViewer from "@/components/drawings/DrawingViewer";
 import { compareSubDrawing } from "@/lib/api/drawing_workspace";
 import { drawingComparisonWorkspaceQueryKey } from "@/lib/drawing-comparison-query";
 import { extractAlignmentTransform } from "@/lib/drawing-alignment/extract_transform";
+import { isAlignmentOverlayUsable } from "@/lib/drawing-alignment/is_alignment_overlay_usable";
 import type {
   DrawingAlignmentListItem,
   DrawingDiff,
@@ -50,6 +51,11 @@ export default function DrawingComparisonWorkspace({
   );
 
   const displayTransform = workspace?.alignment?.transform ?? transformFromList;
+
+  const alignmentOverlayUsable = useMemo(
+    () => isAlignmentOverlayUsable(workspace),
+    [workspace]
+  );
 
   const metadata = useMemo(() => {
     if (!selectedAlignment) return null;
@@ -119,7 +125,21 @@ export default function DrawingComparisonWorkspace({
         </div>
       ) : null}
 
-      {selectedAlignment && displayTransform ? (
+      {import.meta.env.DEV && workspace ? (
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Dev: alignment transform
+          </div>
+          <pre
+            className="mt-2 max-h-72 overflow-auto rounded bg-muted p-2 text-xs text-muted-foreground"
+            data-testid="dev-alignment-transform-json"
+          >
+            {JSON.stringify(workspace.alignment.transform ?? null, null, 2)}
+          </pre>
+        </div>
+      ) : null}
+
+      {selectedAlignment && workspace && alignmentOverlayUsable ? (
         <div className="mb-4 flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-800">
             <input
