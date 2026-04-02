@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
@@ -37,12 +38,43 @@ def _drawing_file_api_path(project_id: int, drawing_id: int) -> str:
     return f"/api/projects/{project_id}/drawings/{drawing_id}/file"
 
 
+def build_identity_transform() -> Dict[str, Any]:
+    """
+    Canonical identity transform for persistence and API overlay.
+    Always dict with type, matrix (affine 6), confidence, meta — never None or a bare string.
+    """
+    return {
+        "type": "affine",
+        "matrix": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+        "confidence": 1.0,
+        "meta": {
+            "note": "Identity transform for MVP overlay behavior",
+        },
+    }
+
+
+def _affine6_to_homography9(matrix: List[float]) -> List[float]:
+    """Embed 2D affine [a,b,tx, c,d,ty] as 3x3 row-major for clients that expect 9 floats."""
+    if len(matrix) != 6:
+        return matrix
+    a, b, tx, c, d, ty = matrix
+    return [a, b, tx, c, d, ty, 0.0, 0.0, 1.0]
+
+
 def parse_alignment_transform_for_overlay(raw: Any) -> Optional[DrawingAlignmentTransformResponse]:
     """Normalize DB/JSON alignment.transform into overlay response shape."""
     if raw is None:
         return None
     if isinstance(raw, DrawingAlignmentTransformResponse):
         return raw
+    if isinstance(raw, str):
+        s = raw.strip()
+        if not s:
+            return None
+        try:
+            raw = json.loads(s)
+        except (json.JSONDecodeError, TypeError):
+            return None
     if not isinstance(raw, dict):
         return None
     raw_t = raw.get("type") or "homography"
@@ -59,8 +91,10 @@ def parse_alignment_transform_for_overlay(raw: Any) -> Optional[DrawingAlignment
         matrix = [float(x) for x in m]
     else:
         matrix = []
-    if t == "identity" and not matrix:
-        matrix = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    if not matrix and t in ("identity", "affine"):
+        matrix = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    if len(matrix) == 6:
+        matrix = _affine6_to_homography9(matrix)
     conf = raw.get("confidence")
     if conf is not None:
         try:
@@ -315,13 +349,11 @@ class DrawingComparisonService:
 
     def build_fallback_identity_transform(self, page: int = 1) -> Dict[str, Any]:
         """
-        Fallback only when: master==sub duplicate, user chooses manual identity,
-        or no geometric processing is possible. Not the default production path.
+        Fallback when rendering/features fail or validation cannot run.
+        Same stable shape as build_identity_transform(), plus page for persistence.
         """
         return {
-            "type": "identity",
-            "matrix": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
-            "confidence": 0.0,
+            **build_identity_transform(),
             "residual_error": None,
             "page": page,
         }
@@ -782,16 +814,20 @@ class DrawingComparisonService:
 
 def _to_production_transform(transform: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Return canonical production homography shape:
-    type, matrix [h11..h33], confidence, residual_error, page.
+    Return canonical production transform for storage:
+    type, matrix (9 floats for homography), confidence, residual_error, page, optional meta.
     """
-    return {
+    out: Dict[str, Any] = {
         "type": transform.get("type", "homography"),
         "matrix": transform.get("matrix", [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]),
         "confidence": transform.get("confidence"),
         "residual_error": transform.get("residual_error"),
         "page": transform.get("page", 1),
     }
+    meta = transform.get("meta")
+    if isinstance(meta, dict):
+        out["meta"] = meta
+    return out
 
 
 def _serialize_drawing(

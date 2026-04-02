@@ -88,12 +88,7 @@ export async function compareSubDrawing(
   subDrawingId: number
 ): Promise<DrawingComparisonWorkspaceResponse> {
   return requestJson<DrawingComparisonWorkspaceResponse>(
-    `/api/projects/${projectId}/drawings/${drawingId}/compare`,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        sub_drawing_id: subDrawingId,
-      }),
-    }
+    `/api/projects/${projectId}/drawings/compare/${drawingId}/${subDrawingId}`,
+    { method: "POST" }
   );
 }

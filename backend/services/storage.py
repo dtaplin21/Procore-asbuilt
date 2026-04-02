@@ -385,14 +385,6 @@ class StorageService:
     # Drawing Alignments (Phase 2)
     # ------------------------------------------------------------------
 
-    IDENTITY_TRANSFORM: Dict[str, Any] = {
-        "type": "identity",
-        "matrix": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
-        "confidence": 0.0,
-        "residual_error": None,
-        "page": 1,
-    }
-
     def create_drawing_alignment(
         self,
         master_drawing_id: int,
@@ -408,7 +400,13 @@ class StorageService:
         """
         if method.strip().lower() == "manual":
             status = "complete"
-            transform = self.IDENTITY_TRANSFORM
+            from services.drawing_comparison import build_identity_transform
+
+            transform = {
+                **build_identity_transform(),
+                "page": 1,
+                "residual_error": None,
+            }
         else:
             status = "queued"
             transform = None

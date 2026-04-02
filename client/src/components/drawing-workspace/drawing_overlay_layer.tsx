@@ -23,7 +23,7 @@ export default function DrawingOverlayLayer({ diff, viewerSize }: Props) {
 
   return (
     <svg
-      className="absolute left-0 top-0 pointer-events-none"
+      className="pointer-events-none absolute left-0 top-0 z-[15]"
       width={viewerSize.width}
       height={viewerSize.height}
       viewBox={`0 0 ${viewerSize.width} ${viewerSize.height}`}

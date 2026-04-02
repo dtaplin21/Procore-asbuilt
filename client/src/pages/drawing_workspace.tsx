@@ -5,7 +5,7 @@ import AlignmentsPanel from "@/components/drawing-workspace/alignments_panel";
 import CompareSubDrawingButton from "@/components/drawing-workspace/compare_sub_drawing_button";
 import CompareSubDrawingModal from "@/components/drawing-workspace/compare_sub_drawing_modal";
 import DiffTimelinePanel from "@/components/drawing-workspace/diff_timeline_panel";
-import DrawingViewer from "@/components/drawing-workspace/drawing_viewer";
+import DrawingComparisonWorkspace from "@/components/drawings/DrawingComparisonWorkspace";
 import DrawingWorkspaceLayout from "@/components/drawing-workspace/drawing_workspace_layout";
 import WorkspaceErrorState from "@/components/drawing-workspace/workspace_error_state";
 import WorkspaceLoadingState from "@/components/drawing-workspace/workspace_loading_state";
@@ -55,6 +55,7 @@ function DrawingWorkspaceBody({
     diffsError,
     compareError,
     selectedDiffs,
+    selectedAlignment,
     selectedDiff,
     selectAlignment,
     selectDiff,
@@ -143,8 +144,10 @@ function DrawingWorkspaceBody({
       <DrawingWorkspaceLayout
         header={header}
         viewer={
-          <DrawingViewer
-            drawing={masterDrawing}
+          <DrawingComparisonWorkspace
+            projectId={parsedProjectId}
+            masterDrawing={masterDrawing}
+            selectedAlignment={selectedAlignment}
             selectedDiff={selectedDiff}
           />
         }

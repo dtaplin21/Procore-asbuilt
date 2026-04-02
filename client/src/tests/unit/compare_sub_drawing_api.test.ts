@@ -24,15 +24,14 @@ describe("compareSubDrawing", () => {
     );
   });
 
-  it("POSTs to the compare endpoint with sub_drawing_id in the body", async () => {
+  it("POSTs to the path-based compare endpoint (overlay workspace response)", async () => {
     await compareSubDrawing(1, 10, 201);
 
     expect(fetch).toHaveBeenCalledTimes(1);
     const call = vi.mocked(fetch).mock.calls[0];
-    expect(call[0]).toBe("/api/projects/1/drawings/10/compare");
+    expect(call[0]).toBe("/api/projects/1/drawings/compare/10/201");
     expect(call[1]).toMatchObject({
       method: "POST",
-      body: JSON.stringify({ sub_drawing_id: 201 }),
       credentials: "include",
     });
   });

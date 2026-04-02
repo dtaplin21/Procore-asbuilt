@@ -5,8 +5,11 @@ import {
   fetchMasterDrawing,
   fetchMasterDrawingAlignments,
 } from "@/lib/api/drawing_workspace";
+import { drawingComparisonWorkspaceQueryKey } from "@/lib/drawing-comparison-query";
+import { queryClient } from "@/lib/queryClient";
 import type {
   DrawingAlignmentListItem,
+  DrawingComparisonWorkspaceResponse,
   DrawingDiff,
   DrawingWorkspaceDrawing,
 } from "@/types/drawing_workspace";
@@ -300,6 +303,11 @@ export function useDrawingWorkspace({
 
       try {
         const response = await compareSubDrawing(projectId, drawingId, subDrawingId);
+
+        queryClient.setQueryData<DrawingComparisonWorkspaceResponse>(
+          drawingComparisonWorkspaceQueryKey(projectId, drawingId, subDrawingId),
+          response
+        );
 
         const incomingAlignment = response.alignment;
         const incomingDiffs = response.diffs ?? [];

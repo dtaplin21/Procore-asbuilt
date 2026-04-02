@@ -19,19 +19,17 @@ ALT_BASE = "http://localhost:2000"
 
 
 def test_compare(project_id: int = 1, master_id: int = 10, sub_id: int = 20):
-    url = f"{BASE}/api/projects/{project_id}/drawings/{master_id}/compare"
+    url = f"{BASE}/api/projects/{project_id}/drawings/compare/{master_id}/{sub_id}"
     try:
         r = httpx.post(
             url,
-            json={"subDrawingId": sub_id},
             timeout=30.0,
         )
     except httpx.ConnectError:
-        url = f"{ALT_BASE}/api/projects/{project_id}/drawings/{master_id}/compare"
+        url = f"{ALT_BASE}/api/projects/{project_id}/drawings/compare/{master_id}/{sub_id}"
         try:
             r = httpx.post(
                 url,
-                json={"subDrawingId": sub_id},
                 timeout=30.0,
             )
         except httpx.ConnectError:

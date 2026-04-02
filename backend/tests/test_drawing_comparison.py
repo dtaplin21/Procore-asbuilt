@@ -96,12 +96,39 @@ def sub_drawing(db: Session, project: Project) -> Drawing:
 # ---------------------------------------------------------------------------
 
 
+def test_build_identity_transform_shape() -> None:
+    from services.drawing_comparison import build_identity_transform
+
+    t = build_identity_transform()
+    assert t["type"] == "affine"
+    assert t["matrix"] == [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    assert t["confidence"] == 1.0
+    assert t["meta"]["note"] == "Identity transform for MVP overlay behavior"
+
+
+def test_parse_alignment_transform_overlay_accepts_json_string() -> None:
+    import json
+
+    from services.drawing_comparison import (
+        build_identity_transform,
+        parse_alignment_transform_for_overlay,
+    )
+
+    raw = json.dumps(build_identity_transform())
+    out = parse_alignment_transform_for_overlay(raw)
+    assert out is not None
+    assert out.type == "affine"
+    assert len(out.matrix) == 9
+    assert out.matrix == [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+
+
 def test_build_fallback_identity_transform_shape(db: Session) -> None:
     svc = DrawingComparisonService(db)
     t = svc.build_fallback_identity_transform(page=2)
-    assert t["type"] == "identity"
-    assert t["matrix"] == [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
-    assert t["confidence"] == 0.0
+    assert t["type"] == "affine"
+    assert t["matrix"] == [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    assert t["confidence"] == 1.0
+    assert t["meta"]["note"] == "Identity transform for MVP overlay behavior"
     assert t["residual_error"] is None
     assert t["page"] == 2
 
@@ -174,8 +201,8 @@ def test_estimate_transform_returns_fallback_when_insufficient_matches(
     svc = DrawingComparisonService(db)
     matches = {"source_points": [{"x": 0, "y": 0}], "target_points": [{"x": 0, "y": 0}]}
     result = svc.estimate_transform(matches)
-    assert result["type"] == "identity"
-    assert result["confidence"] == 0.0
+    assert result["type"] == "affine"
+    assert result["confidence"] == 1.0
 
 
 # ---------------------------------------------------------------------------

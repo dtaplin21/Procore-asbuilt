@@ -155,6 +155,53 @@ export interface DrawingAlignmentListResponse {
   offset: number;
 }
 
+// ----------------------------
+// Drawing workspace overlay — POST /compare (snake_case; typed transform matrix)
+// ----------------------------
+
+/** Aligns with backend TransformKind / overlay transform JSON. */
+export type DrawingTransformType = "identity" | "affine" | "homography";
+
+/**
+ * Homography (9) or affine (6) coefficients as flat numbers — never `any`.
+ *
+ * **Affine MVP (6 numbers)** — row-major 2×3 that maps column vectors [x, y, 1]ᵀ (sub → master):
+ * `[a, b, tx, c, d, ty]`  ≡  `[[a, b, tx], [c, d, ty]]`
+ * CSS `matrix(a, b, c, d, e, f)` uses columns `[[a, c, e], [b, d, f]]`, so convert in one place
+ * (see `toCssMatrix` in `AlignedSubOverlay.tsx`): `matrix(a, c, b, d, tx, ty)`.
+ *
+ * **Homography (9)** — row-major 3×3; the affine/CSS path uses the first two rows as above.
+ */
+export interface DrawingTransform {
+  type: DrawingTransformType;
+  matrix: number[];
+  confidence?: number | null;
+  meta?: Record<string, unknown> | null;
+}
+
+export interface DrawingOverlayDrawingSummary {
+  id: number;
+  name: string;
+  file_url: string;
+  content_type?: string | null;
+  page_count?: number | null;
+}
+
+export interface DrawingAlignmentOverlayResponse {
+  id: number;
+  method: string;
+  status: string;
+  transform: DrawingTransform;
+  error_message?: string | null;
+}
+
+export interface DrawingComparisonWorkspaceResponse {
+  master_drawing: DrawingOverlayDrawingSummary;
+  sub_drawing: DrawingOverlayDrawingSummary;
+  alignment: DrawingAlignmentOverlayResponse;
+  diffs: unknown[];
+}
+
 // Submittal (Shop Drawing) interface
 export interface Submittal {
   id: string;

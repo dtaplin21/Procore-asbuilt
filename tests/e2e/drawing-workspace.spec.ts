@@ -337,7 +337,7 @@ test.describe('drawing workspace overlays', () => {
 });
 
 test.describe('compare sub drawing', () => {
-  test('opens modal, posts compare with body, closes on success, updates alignments, diffs, and viewer', async ({
+  test('opens modal, posts compare, closes on success, updates alignments, diffs, and viewer', async ({
     page,
   }) => {
     let comparePosted: unknown;
@@ -382,9 +382,9 @@ test.describe('compare sub drawing', () => {
         })
     );
 
-    await page.route('**/api/projects/1/drawings/10/compare', async (route) => {
+    await page.route('**/api/projects/1/drawings/compare/10/201', async (route) => {
       if (route.request().method() !== 'POST') return route.continue();
-      comparePosted = route.request().postDataJSON();
+      comparePosted = route.request().postData();
       await new Promise((r) => setTimeout(r, 50));
       await route.fulfill({ json: compareResponse });
     });
@@ -423,7 +423,7 @@ test.describe('compare sub drawing', () => {
       page.locator('[data-testid="compare-sub-drawing-modal"]')
     ).toHaveCount(0, { timeout: 8000 });
 
-    expect(comparePosted).toEqual({ sub_drawing_id: 201 });
+    expect(comparePosted).toBeNull();
 
     await expect(page.getByTestId('alignment-3')).toBeVisible();
     await expect(page.getByTestId('alignment-3')).toHaveClass(/bg-slate-100/);
@@ -470,7 +470,7 @@ test.describe('compare sub drawing', () => {
         })
     );
 
-    await page.route('**/api/projects/1/drawings/10/compare', async (route) => {
+    await page.route('**/api/projects/1/drawings/compare/10/201', async (route) => {
       if (route.request().method() !== 'POST') return route.continue();
       compareCalls++;
       if (compareCalls === 1) {
