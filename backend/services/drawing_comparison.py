@@ -32,6 +32,11 @@ from ai.pipelines.drawing_diff import run_drawing_diff
 logger = logging.getLogger(__name__)
 
 
+def _drawing_file_api_path(project_id: int, drawing_id: int) -> str:
+    """Relative URL for GET /api/projects/{project}/drawings/{id}/file (same origin or dev proxy)."""
+    return f"/api/projects/{project_id}/drawings/{drawing_id}/file"
+
+
 def parse_alignment_transform_for_overlay(raw: Any) -> Optional[DrawingAlignmentTransformResponse]:
     """Normalize DB/JSON alignment.transform into overlay response shape."""
     if raw is None:
@@ -78,24 +83,24 @@ def serialize_drawing_for_workspace(db: Session, drawing: Drawing, active_page: 
     storage = StorageService(db)
     rendition = storage.get_drawing_rendition(cast(int, drawing.id), active_page)
 
+    pid = cast(int, drawing.project_id)
+    did = cast(int, drawing.id)
+    source_file_url = _drawing_file_api_path(pid, did)
+
     if rendition:
-        file_url = (
-            f"/api/projects/{drawing.project_id}/drawings/{drawing.id}/pages/{active_page}/image"
-        )
+        file_url = f"/api/projects/{pid}/drawings/{did}/pages/{active_page}/image"
         width_px = rendition.width_px
         height_px = rendition.height_px
     else:
-        file_url = (
-            f"/api/projects/{drawing.project_id}/drawings/{drawing.id}/file"
-        )
+        file_url = source_file_url
         width_px = None
         height_px = None
 
     return {
-        "id": cast(int, drawing.id),
+        "id": did,
         "name": cast(str, drawing.name),
         "fileUrl": file_url,
-        "sourceFileUrl": f"/api/projects/{drawing.project_id}/drawings/{drawing.id}/file",
+        "sourceFileUrl": source_file_url,
         "pageCount": drawing.page_count or 1,
         "activePage": active_page,
         "widthPx": width_px,
@@ -104,7 +109,7 @@ def serialize_drawing_for_workspace(db: Session, drawing: Drawing, active_page: 
         "processingError": getattr(drawing, "processing_error", None),
         "source": getattr(drawing, "source", None),
         "contentType": getattr(drawing, "content_type", None),
-        "projectId": cast(int, drawing.project_id),
+        "projectId": pid,
     }
 
 # Production validation thresholds
@@ -789,13 +794,23 @@ def _to_production_transform(transform: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _serialize_drawing(drawing: Drawing) -> Dict[str, Any]:
+def _serialize_drawing(
+    drawing: Drawing,
+    *,
+    project_id: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    Minimal drawing dict with a resolvable API file URL (Drawing ORM has no file_url column).
+    Prefer serialize_drawing_for_workspace when session/rendition-aware URLs are needed.
+    """
+    pid = project_id if project_id is not None else cast(int, drawing.project_id)
+    did = cast(int, drawing.id)
     return {
-        "id": drawing.id,
-        "project_id": drawing.project_id,
+        "id": did,
+        "project_id": pid,
         "source": drawing.source,
-        "name": drawing.name,
-        "file_url": getattr(drawing, "file_url", None),
+        "name": cast(str, drawing.name),
+        "file_url": _drawing_file_api_path(pid, did),
         "content_type": getattr(drawing, "content_type", None),
         "page_count": getattr(drawing, "page_count", None),
     }

@@ -1,6 +1,7 @@
 from fastapi import HTTPException
 
 from models.schemas import DrawingSummary
+from services.drawing_comparison import _drawing_file_api_path
 from services.storage import StorageService
 
 
@@ -10,9 +11,7 @@ class DrawingService:
         self.storage = StorageService(db)
 
     def _serialize_drawing(self, drawing, project_id: int):
-        file_url = getattr(drawing, "file_url", None)
-        if not file_url:
-            file_url = f"/api/projects/{project_id}/drawings/{drawing.id}/file"
+        file_url = _drawing_file_api_path(project_id, drawing.id)
         return DrawingSummary(
             id=drawing.id,
             project_id=drawing.project_id,
