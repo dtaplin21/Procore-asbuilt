@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import DrawingViewer from "@/components/drawings/DrawingViewer";
 import { compareSubDrawing } from "@/lib/api/drawing_workspace";
 import { drawingComparisonWorkspaceQueryKey } from "@/lib/drawing-comparison-query";
+import { validateTransform } from "@/lib/drawings";
 import { extractAlignmentTransform } from "@/lib/drawing-alignment/extract_transform";
 import { isAlignmentOverlayUsable } from "@/lib/drawing-alignment/is_alignment_overlay_usable";
 import type {
@@ -97,6 +98,7 @@ export default function DrawingComparisonWorkspace({
   }, [selectedAlignment]);
 
   const debugPayload = buildAlignmentDebugPayload(workspace);
+  const transformValidation = validateTransform(workspace?.alignment?.transform);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -199,8 +201,15 @@ export default function DrawingComparisonWorkspace({
       </div>
 
       {isDev && debugPayload ? (
-        <div className="mt-4 rounded-lg border border-dashed p-3">
-          <div className="mb-2 text-sm font-medium">Alignment debug</div>
+        <div className="mt-4 space-y-2 rounded-lg border border-dashed p-3">
+          <div className="text-sm font-medium">Alignment debug</div>
+
+          <div className="text-xs text-muted-foreground">
+            Transform valid: {transformValidation.valid ? "yes" : "no"}
+            {!transformValidation.valid && transformValidation.reason
+              ? ` — ${transformValidation.reason}`
+              : ""}
+          </div>
 
           <pre
             className="overflow-x-auto rounded bg-muted p-2 text-xs"
