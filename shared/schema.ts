@@ -187,14 +187,19 @@ export interface DrawingOverlayDrawingSummary {
   page_count?: number | null;
 }
 
+/**
+ * POST /compare alignment payload. `transform` is null when alignment is queued, failed, or not yet computed.
+ * (Wire JSON may use camelCase aliases depending on client; this is the logical contract.)
+ */
 export interface DrawingAlignmentOverlayResponse {
   id: number;
   method: string;
   status: string;
-  transform: DrawingTransform;
+  transform: DrawingTransform | null;
   error_message?: string | null;
 }
 
+/** Workspace bundle for drawing comparison UI (`master_drawing` / `sub_drawing` match wire snake_case). */
 export interface DrawingComparisonWorkspaceResponse {
   master_drawing: DrawingOverlayDrawingSummary;
   sub_drawing: DrawingOverlayDrawingSummary;

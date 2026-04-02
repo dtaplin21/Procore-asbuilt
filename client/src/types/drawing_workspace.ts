@@ -1,3 +1,5 @@
+import type { DrawingTransform } from "@shared/schema";
+
 export type DrawingSummary = {
   id: number;
   projectId: number;
@@ -117,14 +119,13 @@ export type DrawingOverlayDrawingSummary = {
   pageCount?: number | null;
 };
 
-export type DrawingAlignmentTransformResponse = {
-  type: "identity" | "affine" | "homography";
-  matrix: number[];
-  confidence?: number | null;
-  meta?: Record<string, unknown> | null;
-};
+/** Same as `@shared/schema` `DrawingTransform` — compare/list payloads use this shape. */
+export type DrawingAlignmentTransformResponse = DrawingTransform;
 
-/** Alignment + structured transform for workspace overlay (POST compare). */
+/**
+ * Alignment + structured transform for workspace overlay (POST compare).
+ * `transform` is null when alignment failed or is incomplete (matches backend optional transform).
+ */
 export type DrawingAlignmentOverlayResponse = {
   id: number;
   method: string;
@@ -132,7 +133,7 @@ export type DrawingAlignmentOverlayResponse = {
   alignmentStatus?: string | null;
   subDrawing: DrawingBasicSummary;
   createdAt?: string | null;
-  transform?: DrawingAlignmentTransformResponse | null;
+  transform: DrawingAlignmentTransformResponse | null;
   errorMessage?: string | null;
 };
 

@@ -8,9 +8,35 @@ import { extractAlignmentTransform } from "@/lib/drawing-alignment/extract_trans
 import { isAlignmentOverlayUsable } from "@/lib/drawing-alignment/is_alignment_overlay_usable";
 import type {
   DrawingAlignmentListItem,
+  DrawingComparisonWorkspaceResponse,
   DrawingDiff,
   DrawingWorkspaceDrawing,
 } from "@/types/drawing_workspace";
+
+/** Raw alignment debug UI — never show in production (Vite strips DEV in prod builds). */
+const isDev = import.meta.env.DEV;
+
+/** Safe snapshot for dev JSON — avoids crashes if alignment or transform is missing. */
+function buildAlignmentDebugPayload(
+  workspace: DrawingComparisonWorkspaceResponse | undefined
+): {
+  alignment_id: number | null;
+  status: string | null;
+  method: string | null;
+  error_message: string | null;
+  transform: DrawingComparisonWorkspaceResponse["alignment"]["transform"];
+} | null {
+  if (!workspace) return null;
+
+  const a = workspace.alignment;
+  return {
+    alignment_id: a?.id ?? null,
+    status: a?.status ?? null,
+    method: a?.method ?? null,
+    error_message: a?.errorMessage ?? null,
+    transform: a?.transform ?? null,
+  };
+}
 
 type Props = {
   projectId: number;
@@ -125,16 +151,16 @@ export default function DrawingComparisonWorkspace({
         </div>
       ) : null}
 
-      {import.meta.env.DEV && workspace ? (
+      {isDev && workspace ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Dev: alignment transform
+            Dev: alignment debug
           </div>
           <pre
             className="mt-2 max-h-72 overflow-auto rounded bg-muted p-2 text-xs text-muted-foreground"
             data-testid="dev-alignment-transform-json"
           >
-            {JSON.stringify(workspace.alignment.transform ?? null, null, 2)}
+            {JSON.stringify(buildAlignmentDebugPayload(workspace), null, 2)}
           </pre>
         </div>
       ) : null}
