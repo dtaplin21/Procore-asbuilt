@@ -93,6 +93,8 @@ export default function DrawingComparisonWorkspace({
     return { method, status };
   }, [selectedAlignment]);
 
+  const debugPayload = buildAlignmentDebugPayload(workspace);
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       {selectedAlignment ? (
@@ -151,20 +153,6 @@ export default function DrawingComparisonWorkspace({
         </div>
       ) : null}
 
-      {isDev && workspace ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Dev: alignment debug
-          </div>
-          <pre
-            className="mt-2 max-h-72 overflow-auto rounded bg-muted p-2 text-xs text-muted-foreground"
-            data-testid="dev-alignment-transform-json"
-          >
-            {JSON.stringify(buildAlignmentDebugPayload(workspace), null, 2)}
-          </pre>
-        </div>
-      ) : null}
-
       {selectedAlignment && workspace && alignmentOverlayUsable ? (
         <div className="mb-4 flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-800">
@@ -206,6 +194,19 @@ export default function DrawingComparisonWorkspace({
           overlayOpacity={overlayOpacity}
         />
       </div>
+
+      {isDev && debugPayload ? (
+        <div className="mt-4 rounded-lg border border-dashed p-3">
+          <div className="mb-2 text-sm font-medium">Alignment debug</div>
+
+          <pre
+            className="overflow-x-auto rounded bg-muted p-2 text-xs"
+            data-testid="dev-alignment-transform-json"
+          >
+            {JSON.stringify(debugPayload, null, 2)}
+          </pre>
+        </div>
+      ) : null}
     </div>
   );
 }
