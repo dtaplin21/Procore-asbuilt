@@ -76,7 +76,10 @@ export default function DrawingComparisonWorkspace({
     [selectedAlignment]
   );
 
-  const displayTransform = workspace?.alignment?.transform ?? transformFromList;
+  const transform = workspace?.alignment?.transform ?? null;
+  const displayTransform = transform ?? transformFromList ?? null;
+  const transformType = displayTransform?.type ?? "unknown";
+  const transformMatrix = displayTransform?.matrix ?? [];
 
   const alignmentOverlayUsable = useMemo(
     () => isAlignmentOverlayUsable(workspace),
@@ -123,25 +126,25 @@ export default function DrawingComparisonWorkspace({
               </div>
             ) : null}
 
-            {displayTransform ? (
+            {displayTransform != null ? (
               <>
                 <div>
                   <span className="text-slate-500">Transform: </span>
-                  {displayTransform.type}
+                  {transformType}
                 </div>
                 <div>
                   <span className="text-slate-500">Confidence: </span>
-                  {displayTransform.confidence != null
+                  {displayTransform?.confidence != null
                     ? displayTransform.confidence.toFixed(3)
                     : "—"}
                 </div>
                 <div className="sm:col-span-2 font-mono text-xs text-slate-600">
-                  matrix[{displayTransform.matrix.length}]:{" "}
-                  {displayTransform.matrix
+                  matrix[{transformMatrix.length}]:{" "}
+                  {transformMatrix
                     .slice(0, 12)
                     .map((n) => (Number.isFinite(n) ? n.toFixed(4) : String(n)))
                     .join(", ")}
-                  {displayTransform.matrix.length > 12 ? "…" : ""}
+                  {transformMatrix.length > 12 ? "…" : ""}
                 </div>
               </>
             ) : (

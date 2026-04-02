@@ -276,11 +276,11 @@ export default function DrawingViewer({
                   draggable={false}
                 />
 
-                {showSubOverlay ? (
+                {showSubOverlay && alignmentTransform ? (
                   <AlignedSubOverlay
                     src={comparisonWorkspace.subDrawing.fileUrl}
                     alt={comparisonWorkspace.subDrawing.name}
-                    transform={alignmentTransform!}
+                    transform={alignmentTransform}
                     opacity={overlayOpacity}
                     masterNatural={naturalSize}
                     subNatural={subNaturalSize}
