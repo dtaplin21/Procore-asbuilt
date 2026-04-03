@@ -148,6 +148,12 @@ export type ProjectComparisonProgressMetric = {
   label: string;
 };
 
+/** Project-scoped high/critical unresolved diff count (workspace badge; dashboard may use global). */
+export type DiffRiskMetric = {
+  unresolvedHighSeverityCount: number;
+  label: string;
+};
+
 /** Response from POST compare — workspace-ready payload */
 export type DrawingComparisonWorkspaceResponse = {
   masterDrawing: DrawingOverlayDrawingSummary;
@@ -155,6 +161,7 @@ export type DrawingComparisonWorkspaceResponse = {
   alignment: DrawingAlignmentOverlayResponse;
   diffs: DrawingDiff[];
   comparisonProgress?: ProjectComparisonProgressMetric | null;
+  highSeverityDiffRisk?: DiffRiskMetric | null;
 };
 
 export type DrawingDiffsResponse = {

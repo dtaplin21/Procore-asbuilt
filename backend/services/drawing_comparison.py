@@ -24,11 +24,15 @@ from models.schemas import (
     DrawingDiffHistoryListResponse,
     DrawingDiffRegionResponse,
     DrawingOverlayDrawingSummary,
+    DiffRiskMetric,
     ProjectComparisonProgressMetric,
     TransformKind,
 )
 from services.file_storage import get_file_path
-from services.dashboard import get_project_comparison_progress
+from services.dashboard import (
+    get_project_comparison_progress,
+    get_project_unresolved_high_severity_diff_metric,
+)
 from services.storage import StorageService
 from ai.pipelines.drawing_diff import run_drawing_diff
 
@@ -637,6 +641,11 @@ class DrawingComparisonService:
         """
         Main orchestration: validate, load/create alignment, reuse or compute transform,
         run diff pipeline, return serialized workspace.
+
+        Includes ``comparison_progress`` (project + master scoped via
+        :func:`services.dashboard.get_project_comparison_progress`).
+        Optionally includes project-scoped ``high_severity_diff_risk`` for a workspace
+        badge; global cross-project risk remains on the dashboard summary.
         """
         master_drawing, sub_drawing = self._validate_project_drawings(
             project_id=project_id,
@@ -698,12 +707,19 @@ class DrawingComparisonService:
             label=cp["label"],
         )
 
+        hr = get_project_unresolved_high_severity_diff_metric(self.db, project_id)
+        high_severity_diff_risk = DiffRiskMetric(
+            unresolved_high_severity_count=hr["unresolved_high_severity_count"],
+            label=hr["label"],
+        )
+
         return DrawingComparisonWorkspaceResponse(
             master_drawing=self._serialize_overlay_drawing(master_drawing),
             sub_drawing=self._serialize_overlay_drawing(sub_drawing),
             alignment=self._serialize_alignment_overlay(alignment),
             diffs=[self._serialize_diff(diff) for diff in diffs],
             comparison_progress=comparison_progress,
+            high_severity_diff_risk=high_severity_diff_risk,
         )
 
     def list_alignments(
@@ -928,6 +944,8 @@ def compare_sub_drawing_to_master(
     """
     Compare sub drawing to master. Validates, loads/creates alignment,
     reuses or computes transform, persists, runs diff pipeline.
+
+    Delegates to :meth:`DrawingComparisonService.compare` (includes ``comparisonProgress`` and optional ``highSeverityDiffRisk``).
     """
     svc = DrawingComparisonService(db)
     return svc.compare(

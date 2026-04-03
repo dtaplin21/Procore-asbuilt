@@ -788,6 +788,11 @@ class DrawingComparisonWorkspaceResponse(BaseModel):
         serialization_alias="comparisonProgress",
         description="Master-scoped comparison coverage; same semantics as dashboard KPIs where applicable.",
     )
+    high_severity_diff_risk: Optional[DiffRiskMetric] = Field(
+        default=None,
+        serialization_alias="highSeverityDiffRisk",
+        description="Project-scoped unresolved high/critical diffs (optional sidebar badge).",
+    )
 
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 

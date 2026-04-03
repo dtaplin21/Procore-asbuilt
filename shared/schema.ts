@@ -199,14 +199,26 @@ export interface DrawingAlignmentOverlayResponse {
   error_message?: string | null;
 }
 
+/** Comparison coverage KPI (backend-defined; dashboard and workspace stay aligned). */
+export interface ProjectComparisonProgressMetric {
+  compared_count: number;
+  total_relevant_count: number;
+  label: string;
+}
+
+/** High/critical diff exposure for dashboard storytelling. */
+export interface DiffRiskMetric {
+  unresolved_high_severity_count: number;
+  label: string;
+}
+
 /** Workspace bundle for drawing comparison UI (`master_drawing` / `sub_drawing` match wire snake_case). */
 export interface DrawingComparisonWorkspaceResponse {
   master_drawing: DrawingOverlayDrawingSummary;
   sub_drawing: DrawingOverlayDrawingSummary;
   alignment: DrawingAlignmentOverlayResponse;
   diffs: unknown[];
-  /** camelCase on wire from backend */
-  comparisonProgress?: ProjectComparisonProgressMetric | null;
+  comparison_progress?: ProjectComparisonProgressMetric | null;
 }
 
 // Submittal (Shop Drawing) interface
@@ -497,26 +509,16 @@ export interface SyncHealth {
 
 // Summary for the currently selected drawing, if any.
 // Uses snake_case to match API response.
-export interface CurrentDrawing {
+export interface CurrentDrawingSummary {
   id: number;
   name: string;
   updated_at: string;
 }
 
-/** Comparison coverage KPI (backend-defined; dashboard and workspace stay aligned). Wire uses camelCase inside nested objects. */
-export interface ProjectComparisonProgressMetric {
-  comparedCount: number;
-  totalRelevantCount: number;
-  label: string;
-}
+/** @alias CurrentDrawingSummary */
+export type CurrentDrawing = CurrentDrawingSummary;
 
-/** High/critical diff exposure for dashboard storytelling. */
-export interface DiffRiskMetric {
-  unresolvedHighSeverityCount: number;
-  label: string;
-}
-
-export type ProjectSummaryKpis = {
+export interface ProjectSummaryKpis {
   total_findings: number;
   open_findings: number;
   drawings_count: number;
@@ -524,19 +526,20 @@ export type ProjectSummaryKpis = {
   inspections_count: number;
   comparison_progress?: ProjectComparisonProgressMetric | null;
   high_severity_diff_risk?: DiffRiskMetric | null;
-};
-
-// Top-level dashboard summary response type. This matches the shape of the
-// ``DashboardSummaryResponse`` pydantic model on the backend and is returned by
-// GET /api/projects/{project_id}/dashboard/summary.
-// Uses snake_case to match API response.
-export interface DashboardSummary {
-  project: ProjectSummary;
-  company_context: CompanyContext;
-  sync_health: SyncHealth;
-  current_drawing: CurrentDrawing | null;
-  kpis: ProjectSummaryKpis;
 }
+
+// Top-level dashboard summary response type. Matches ``DashboardSummaryResponse`` on the backend
+// (GET /api/projects/{project_id}/dashboard/summary). Uses snake_case to match API response.
+export interface DashboardSummaryResponse {
+  project: ProjectSummary;
+  company_context?: CompanyContext | null;
+  sync_health?: SyncHealth | null;
+  current_drawing?: CurrentDrawingSummary | null;
+  kpis?: ProjectSummaryKpis | null;
+}
+
+/** @alias DashboardSummaryResponse */
+export type DashboardSummary = DashboardSummaryResponse;
 
 // ----------------------------
 // Inspection runs (Phase 4 pipeline)
