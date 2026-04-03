@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from datetime import datetime
-from sqlalchemy import distinct, func
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 # ---------------------------------------------------------------------------
@@ -74,6 +74,11 @@ from models.models import (
 )
 from services.procore_connection_store import get_active_connection
 from services.evidence_linking import replace_evidence_drawing_links
+from services.dashboard import (
+    get_current_drawing_for_project,
+    get_project_comparison_progress,
+    get_unresolved_high_severity_diff_metric,
+)
 
 
 class StorageService:
@@ -107,6 +112,7 @@ class StorageService:
         self,
         project_id: int,
         procore_user_id: Optional[str] = None,
+        current_drawing_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         project = self.get_project(project_id)
         if project is None:
@@ -121,6 +127,11 @@ class StorageService:
         project_company_id = cast(int, project.company_id)
         matches_active_company = bool(active_company_id == project_company_id) if active_company_id is not None else False
 
+        current_drawing_row = get_current_drawing_for_project(
+            self.db, project_id, current_drawing_id
+        )
+        master_drawing_id = cast(int, current_drawing_row.id) if current_drawing_row else None
+
         # KPIs
         total_findings = self.db.query(Finding).filter(Finding.project_id == project_id).count()
         open_findings = self.db.query(Finding).filter(
@@ -130,6 +141,11 @@ class StorageService:
         drawings_count = self.db.query(Drawing).filter(Drawing.project_id == project_id).count()
         evidence_count = self.db.query(EvidenceRecord).filter(EvidenceRecord.project_id == project_id).count()
         inspections_count = self.db.query(InspectionRun).filter(InspectionRun.project_id == project_id).count()
+
+        comparison_progress = get_project_comparison_progress(
+            self.db, project_id, master_drawing_id=master_drawing_id
+        )
+        high_severity = get_unresolved_high_severity_diff_metric(self.db)
 
         # NOTE: Return datetimes as datetime objects. If the route uses a Pydantic response_model
         # (recommended), FastAPI will serialize these. If returning raw dict without a model,
@@ -153,13 +169,23 @@ class StorageService:
                 "token_expires_at": getattr(conn, "token_expires_at", None) if conn is not None else None,
                 "error_message": None if connected else ("Not connected to Procore" if procore_user_id else None),
             },
-            "current_drawing": None,
+            "current_drawing": (
+                {
+                    "id": cast(int, current_drawing_row.id),
+                    "name": current_drawing_row.name,
+                    "updated_at": current_drawing_row.updated_at,
+                }
+                if current_drawing_row
+                else None
+            ),
             "kpis": {
                 "total_findings": total_findings,
                 "open_findings": open_findings,
                 "drawings_count": drawings_count,
                 "evidence_count": evidence_count,
                 "inspections_count": inspections_count,
+                "comparison_progress": comparison_progress,
+                "high_severity_diff_risk": high_severity,
             },
         }
     
@@ -261,10 +287,10 @@ class StorageService:
         if not drawing:
             raise ValueError(f"Drawing {drawing_id} not found")
 
-        drawing.processing_status = status
-        drawing.processing_error = error
+        setattr(drawing, "processing_status", status)
+        setattr(drawing, "processing_error", error)
         if page_count is not None:
-            drawing.page_count = page_count
+            setattr(drawing, "page_count", page_count)
 
         self.db.add(drawing)
         self.db.commit()
@@ -298,13 +324,13 @@ class StorageService:
                 page_number=page_number,
             )
 
-        rendition.image_storage_key = image_storage_key
-        rendition.mime_type = mime_type
-        rendition.width_px = width_px
-        rendition.height_px = height_px
-        rendition.file_size = file_size
-        rendition.render_status = render_status
-        rendition.error_message = error_message
+        setattr(rendition, "image_storage_key", image_storage_key)
+        setattr(rendition, "mime_type", mime_type)
+        setattr(rendition, "width_px", width_px)
+        setattr(rendition, "height_px", height_px)
+        setattr(rendition, "file_size", file_size)
+        setattr(rendition, "render_status", render_status)
+        setattr(rendition, "error_message", error_message)
 
         self.db.add(rendition)
         self.db.commit()
@@ -421,13 +447,15 @@ class StorageService:
         sub = self.db.query(Drawing).filter(Drawing.id == sub_drawing_id).first()
         if sub is None:
             raise ValueError(f"Sub drawing {sub_drawing_id} not found")
-        if sub.project_id != master.project_id:
+        sub_project_id = cast(int, sub.project_id)
+        master_project_id = cast(int, master.project_id)
+        if sub_project_id != master_project_id:
             raise ValueError(
                 "Master and sub drawings must belong to the same project"
             )
 
         alignment = DrawingAlignment(
-            project_id=master.project_id,
+            project_id=master_project_id,
             master_drawing_id=master_drawing_id,
             sub_drawing_id=sub_drawing_id,
             region_id=region_id,
@@ -723,24 +751,15 @@ class StorageService:
         )
 
     def count_compared_sub_drawings_for_master(self, project_id: int, master_drawing_id: int) -> int:
-        """Distinct sub drawings with an alignment row for this master within the project."""
-        result = (
-            self.db.query(func.count(distinct(DrawingAlignment.sub_drawing_id)))
-            .filter(
-                DrawingAlignment.project_id == project_id,
-                DrawingAlignment.master_drawing_id == master_drawing_id,
-            )
-            .scalar()
+        """Distinct sub drawings with a completed alignment for this master (see dashboard metrics)."""
+        return int(
+            get_project_comparison_progress(
+                self.db, project_id, master_drawing_id=master_drawing_id
+            )["compared_count"]
         )
-        return int(result or 0)
 
     def count_open_high_severity_diffs_for_master(self, project_id: int, master_drawing_id: int) -> int:
-        """
-        High/critical diffs for this master in the project.
-
-        DrawingDiff has no `status` column in this schema; if one is added later, filter by
-        open/active/unresolved statuses here instead of counting all high/critical rows.
-        """
+        """High/critical diffs that are still unresolved on the diff record (resolved=false)."""
         result = (
             self.db.query(func.count(DrawingDiff.id))
             .join(DrawingAlignment, DrawingDiff.alignment_id == DrawingAlignment.id)
@@ -748,6 +767,7 @@ class StorageService:
                 DrawingAlignment.project_id == project_id,
                 DrawingAlignment.master_drawing_id == master_drawing_id,
                 DrawingDiff.severity.in_(["high", "critical"]),
+                DrawingDiff.resolved.is_(False),
             )
             .scalar()
         )

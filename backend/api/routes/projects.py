@@ -52,6 +52,11 @@ async def get_project(project_id: int, db: Session = Depends(get_db)):
 async def get_project_dashboard_summary(
     project_id: int,
     user_id: Optional[str] = Query(None),
+    current_drawing_id: Optional[int] = Query(
+        None,
+        alias="currentDrawingId",
+        description="Optional master drawing id to scope comparison progress KPIs.",
+    ),
     db: Session = Depends(get_db),
 ):
     """Return a high‑level dashboard summary for a given project.
@@ -61,6 +66,9 @@ async def get_project_dashboard_summary(
       :class:`~services.storage.StorageService.get_project_dashboard_summary`
       so that the service can return an active Procore company context if the
       user has an active connection.
+    * ``currentDrawingId`` optionally selects a master drawing; comparison progress
+      is scoped to that master when valid for this project. High-severity diff risk
+      is global across active projects.
 
     The storage method will return an empty dict if the project does not
     exist; we translate that into an HTTP 404 so clients can react
@@ -69,7 +77,9 @@ async def get_project_dashboard_summary(
 
     storage = StorageService(db)
     summary = storage.get_project_dashboard_summary(
-        project_id=project_id, procore_user_id=user_id
+        project_id=project_id,
+        procore_user_id=user_id,
+        current_drawing_id=current_drawing_id,
     )
 
     if not summary:

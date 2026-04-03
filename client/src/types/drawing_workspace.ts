@@ -106,6 +106,7 @@ export type DrawingDiff = {
   alignmentId: number;
   summary?: string | null;
   severity?: string | null;
+  resolved?: boolean;
   createdAt?: string | null;
   diffRegions: DrawingDiffRegion[];
 };
@@ -140,12 +141,20 @@ export type DrawingAlignmentOverlayResponse = {
 /** List/history alignment row or overlay row from compare. */
 export type DrawingAlignmentListItem = DrawingAlignment | DrawingAlignmentOverlayResponse;
 
+/** Backend-owned comparison metric (same semantics as dashboard where applicable). */
+export type ProjectComparisonProgressMetric = {
+  comparedCount: number;
+  totalRelevantCount: number;
+  label: string;
+};
+
 /** Response from POST compare — workspace-ready payload */
 export type DrawingComparisonWorkspaceResponse = {
   masterDrawing: DrawingOverlayDrawingSummary;
   subDrawing: DrawingOverlayDrawingSummary;
   alignment: DrawingAlignmentOverlayResponse;
   diffs: DrawingDiff[];
+  comparisonProgress?: ProjectComparisonProgressMetric | null;
 };
 
 export type DrawingDiffsResponse = {

@@ -205,6 +205,8 @@ export interface DrawingComparisonWorkspaceResponse {
   sub_drawing: DrawingOverlayDrawingSummary;
   alignment: DrawingAlignmentOverlayResponse;
   diffs: unknown[];
+  /** camelCase on wire from backend */
+  comparisonProgress?: ProjectComparisonProgressMetric | null;
 }
 
 // Submittal (Shop Drawing) interface
@@ -370,6 +372,8 @@ export interface DrawingDiff {
   findingId: number | null;
   summary: string;
   severity: DrawingDiffSeverity;
+  /** When false, diff counts toward unresolved high/critical KPIs. */
+  resolved?: boolean;
   diffRegions: DrawingDiffRegion[];
   createdAt: string;
 }
@@ -381,6 +385,7 @@ export interface DrawingDiffResponse {
   finding_id: number | null;
   summary: string;
   severity: DrawingDiffSeverity;
+  resolved?: boolean;
   diff_regions: DrawingDiffRegion[];
   created_at: string;
 }
@@ -498,12 +503,27 @@ export interface CurrentDrawing {
   updated_at: string;
 }
 
+/** Comparison coverage KPI (backend-defined; dashboard and workspace stay aligned). Wire uses camelCase inside nested objects. */
+export interface ProjectComparisonProgressMetric {
+  comparedCount: number;
+  totalRelevantCount: number;
+  label: string;
+}
+
+/** High/critical diff exposure for dashboard storytelling. */
+export interface DiffRiskMetric {
+  unresolvedHighSeverityCount: number;
+  label: string;
+}
+
 export type ProjectSummaryKpis = {
   total_findings: number;
   open_findings: number;
   drawings_count: number;
   evidence_count: number;
   inspections_count: number;
+  comparison_progress?: ProjectComparisonProgressMetric | null;
+  high_severity_diff_risk?: DiffRiskMetric | null;
 };
 
 // Top-level dashboard summary response type. This matches the shape of the

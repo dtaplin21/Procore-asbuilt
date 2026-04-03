@@ -484,6 +484,7 @@ class DrawingDiff(Base):
     summary = Column(String, nullable=False)
     severity = Column(String, nullable=False, index=True)  # low | medium | high | critical
     diff_regions = Column(JSON, nullable=False)  # list of normalized region objects
+    resolved = Column(Boolean, nullable=False, default=False)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 

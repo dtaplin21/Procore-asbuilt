@@ -115,12 +115,36 @@ class CurrentDrawingSummary(BaseModel):
     updated_at: datetime
 
 
+class ProjectComparisonProgressMetric(BaseModel):
+    """Backend-owned comparison coverage (dashboard + workspace stay aligned)."""
+
+    compared_count: int = Field(..., serialization_alias="comparedCount")
+    total_relevant_count: int = Field(..., serialization_alias="totalRelevantCount")
+    label: str
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+class DiffRiskMetric(BaseModel):
+    """High/critical diff exposure for storytelling KPIs."""
+
+    unresolved_high_severity_count: int = Field(
+        ...,
+        serialization_alias="unresolvedHighSeverityCount",
+    )
+    label: str
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
 class ProjectSummaryKpis(BaseModel):
     total_findings: int = 0
     open_findings: int = 0
     drawings_count: int = 0
     evidence_count: int = 0
     inspections_count: int = 0
+    comparison_progress: Optional[ProjectComparisonProgressMetric] = None
+    high_severity_diff_risk: Optional[DiffRiskMetric] = None
 
 
 class DashboardSummaryResponse(BaseModel):
@@ -660,6 +684,7 @@ class DrawingDiffResponse(BaseModel):
     alignment_id: int = Field(..., serialization_alias="alignmentId")
     summary: Optional[str] = None
     status: Optional[str] = Field(default=None, validation_alias="severity")
+    resolved: bool = False
     diff_regions: List[DrawingDiffRegion] = Field(default_factory=list, serialization_alias="diffRegions")
     created_at: Optional[str] = Field(default=None, serialization_alias="createdAt")
 
@@ -758,6 +783,11 @@ class DrawingComparisonWorkspaceResponse(BaseModel):
     sub_drawing: DrawingOverlayDrawingSummary = Field(..., serialization_alias="subDrawing")
     alignment: DrawingAlignmentOverlayResponse
     diffs: List[DrawingDiffResponse] = Field(default_factory=list)
+    comparison_progress: Optional[ProjectComparisonProgressMetric] = Field(
+        default=None,
+        serialization_alias="comparisonProgress",
+        description="Master-scoped comparison coverage; same semantics as dashboard KPIs where applicable.",
+    )
 
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 
@@ -846,6 +876,7 @@ class DrawingDiffHistoryResponse(BaseModel):
     alignment_id: int = Field(..., serialization_alias="alignmentId")
     summary: Optional[str] = None
     severity: Optional[str] = None
+    resolved: bool = False
     created_at: Optional[str] = Field(default=None, serialization_alias="createdAt")
     diff_regions: List[DrawingDiffRegionResponse] = Field(
         default_factory=list,

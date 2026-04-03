@@ -24,9 +24,11 @@ from models.schemas import (
     DrawingDiffHistoryListResponse,
     DrawingDiffRegionResponse,
     DrawingOverlayDrawingSummary,
+    ProjectComparisonProgressMetric,
     TransformKind,
 )
 from services.file_storage import get_file_path
+from services.dashboard import get_project_comparison_progress
 from services.storage import StorageService
 from ai.pipelines.drawing_diff import run_drawing_diff
 
@@ -278,6 +280,7 @@ class DrawingComparisonService:
             alignment_id=cast(int, diff.alignment_id),
             summary=getattr(diff, "summary", None),
             status=getattr(diff, "severity", None),
+            resolved=bool(getattr(diff, "resolved", False)),
             diff_regions=diff_regions,
             created_at=diff.created_at.isoformat() if getattr(diff, "created_at", None) else None,
         )
@@ -291,6 +294,7 @@ class DrawingComparisonService:
             alignment_id=cast(int, diff.alignment_id),
             summary=getattr(diff, "summary", None),
             severity=getattr(diff, "severity", None),
+            resolved=bool(getattr(diff, "resolved", False)),
             created_at=diff.created_at.isoformat() if getattr(diff, "created_at", None) else None,
             diff_regions=[
                 DrawingDiffRegionResponse(
@@ -685,11 +689,21 @@ class DrawingComparisonService:
                     cast(int, alignment.id)
                 )
 
+        cp = get_project_comparison_progress(
+            self.db, project_id, master_drawing_id=master_drawing_id
+        )
+        comparison_progress = ProjectComparisonProgressMetric(
+            compared_count=cp["compared_count"],
+            total_relevant_count=cp["total_relevant_count"],
+            label=cp["label"],
+        )
+
         return DrawingComparisonWorkspaceResponse(
             master_drawing=self._serialize_overlay_drawing(master_drawing),
             sub_drawing=self._serialize_overlay_drawing(sub_drawing),
             alignment=self._serialize_alignment_overlay(alignment),
             diffs=[self._serialize_diff(diff) for diff in diffs],
+            comparison_progress=comparison_progress,
         )
 
     def list_alignments(
