@@ -199,20 +199,20 @@ export interface DrawingAlignmentOverlayResponse {
   error_message?: string | null;
 }
 
-/** Comparison coverage KPI (backend-defined; dashboard and workspace stay aligned). */
+/** Part 6 — comparison coverage KPI (dashboard + workspace). */
 export interface ProjectComparisonProgressMetric {
   compared_count: number;
   total_relevant_count: number;
   label: string;
 }
 
-/** High/critical diff exposure for dashboard storytelling. */
+/** Part 6 — high/critical unresolved diff exposure. */
 export interface DiffRiskMetric {
   unresolved_high_severity_count: number;
   label: string;
 }
 
-/** Workspace bundle for drawing comparison UI (`master_drawing` / `sub_drawing` match wire snake_case). */
+/** Part 6 — workspace bundle for drawing comparison UI. */
 export interface DrawingComparisonWorkspaceResponse {
   master_drawing: DrawingOverlayDrawingSummary;
   sub_drawing: DrawingOverlayDrawingSummary;
@@ -518,18 +518,21 @@ export interface CurrentDrawingSummary {
 /** @alias CurrentDrawingSummary */
 export type CurrentDrawing = CurrentDrawingSummary;
 
+/**
+ * Part 6 — dashboard KPI metrics (`comparison_progress`, `high_severity_diff_risk`).
+ * The same endpoint also returns count fields; keep them required so they match the API.
+ */
 export interface ProjectSummaryKpis {
+  comparison_progress?: ProjectComparisonProgressMetric | null;
+  high_severity_diff_risk?: DiffRiskMetric | null;
   total_findings: number;
   open_findings: number;
   drawings_count: number;
   evidence_count: number;
   inspections_count: number;
-  comparison_progress?: ProjectComparisonProgressMetric | null;
-  high_severity_diff_risk?: DiffRiskMetric | null;
 }
 
-// Top-level dashboard summary response type. Matches ``DashboardSummaryResponse`` on the backend
-// (GET /api/projects/{project_id}/dashboard/summary). Uses snake_case to match API response.
+// Part 6 — top-level dashboard summary (GET /api/projects/{project_id}/dashboard/summary).
 export interface DashboardSummaryResponse {
   project: ProjectSummary;
   company_context?: CompanyContext | null;

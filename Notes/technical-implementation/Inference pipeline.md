@@ -155,11 +155,8 @@ The dashboard should act as an entry point into this workspace; the workspace it
     - Suggest likely master drawings to compare against (based on name, discipline, or Procore metadata).
   - Optionally auto‑populate the “Compare a sub drawing” modal with recommended pairs.
 
-- **5.3 Metrics & storytelling**
-  - Add headline metrics to the dashboard and workspace:
-    - “X of Y relevant sub drawings have been compared for this project.”
-    - “N unresolved high‑severity diffs across your active projects.”
-
+*5.3 Metrics & storytelling** - 
+Add headline metrics to the dashboard and workspace: - “X of Y relevant sub drawings have been compared for this project.” - “N unresolved high‑severity diffs across your active projects.”
 **Done when:** The drawing workspace not only works end‑to‑end, but also clearly tells the story that “our AI continuously compares your drawings, highlights changes, and tracks progress over time” in a way that is obvious to the client.
 
 ## Drawing Workspace & Sub‑vs‑Master Diff Orchestration
