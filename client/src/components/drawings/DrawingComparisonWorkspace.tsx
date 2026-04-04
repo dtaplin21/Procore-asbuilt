@@ -14,6 +14,26 @@ import type {
   DrawingWorkspaceDrawing,
 } from "@/types/drawing_workspace";
 
+/** POST /compare may send `comparison_progress` or `comparisonProgress`; nested counts snake_case or camelCase. */
+function readComparisonProgressFromWorkspace(
+  workspace: DrawingComparisonWorkspaceResponse | undefined | null
+): { compared_count: number; total_relevant_count: number; label: string } | null {
+  if (!workspace) return null;
+  const w = workspace as unknown as Record<string, unknown>;
+  const raw = w.comparison_progress ?? w.comparisonProgress;
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const compared =
+    (typeof o.compared_count === "number" ? o.compared_count : undefined) ??
+    (typeof o.comparedCount === "number" ? o.comparedCount : undefined);
+  const total =
+    (typeof o.total_relevant_count === "number" ? o.total_relevant_count : undefined) ??
+    (typeof o.totalRelevantCount === "number" ? o.totalRelevantCount : undefined);
+  const label = typeof o.label === "string" ? o.label : "";
+  if (compared === undefined || total === undefined) return null;
+  return { compared_count: compared, total_relevant_count: total, label };
+}
+
 /** Raw alignment debug UI — never show in production (Vite strips DEV in prod builds). */
 const isDev = import.meta.env.DEV;
 
@@ -100,8 +120,24 @@ export default function DrawingComparisonWorkspace({
   const debugPayload = buildAlignmentDebugPayload(workspace);
   const transformValidation = validateTransform(workspace?.alignment?.transform);
 
+  const comparisonProgress = readComparisonProgressFromWorkspace(workspace);
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
+      {selectedAlignment ? (
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-sm text-muted-foreground">Project comparison progress</div>
+          <div className="mt-2 text-xl font-semibold tabular-nums">
+            {comparisonProgress
+              ? `${comparisonProgress.compared_count} / ${comparisonProgress.total_relevant_count}`
+              : "—"}
+          </div>
+          <div className="mt-1 text-sm text-muted-foreground">
+            {comparisonProgress?.label ?? "Comparison progress unavailable."}
+          </div>
+        </div>
+      ) : null}
+
       {selectedAlignment ? (
         <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
