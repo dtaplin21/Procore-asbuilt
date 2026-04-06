@@ -1,9 +1,8 @@
-import {
-  useEffect,
-  useMemo,
+import React, {
   useRef,
   useState,
-  type ChangeEvent,
+  useEffect,
+  useMemo,
 } from "react";
 
 import SubDrawingList from "@/components/drawing-workspace/sub_drawing_list";
@@ -110,35 +109,33 @@ export default function CompareSubDrawingModal({
     await onConfirmCompare(selectedDrawingId);
   };
 
-  const handlePickFile = () => {
-    fileInputRef.current?.click();
-  };
+  async function handleUpload(file: File) {
+    setUploading(true);
+    try {
+      const drawing = await uploadProjectDrawing(projectId, file);
+      await reload();
+      setSelectedDrawingId(drawing.id);
+      onSelectSubDrawing?.(drawing.id);
+      setSelectedFile(null);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to upload drawing";
+      setUploadError(message);
+    } finally {
+      setUploading(false);
+    }
+  }
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
     event.target.value = "";
-    if (!file) return;
-
     setSelectedFile(file);
     setUploadError(null);
-    setUploading(true);
 
-    void (async () => {
-      try {
-        const drawing = await uploadProjectDrawing(projectId, file);
-        await reload();
-        setSelectedDrawingId(drawing.id);
-        onSelectSubDrawing?.(drawing.id);
-        setSelectedFile(null);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Failed to upload drawing";
-        setUploadError(message);
-      } finally {
-        setUploading(false);
-      }
-    })();
-  };
+    if (file) {
+      void handleUpload(file);
+    }
+  }
 
   if (!isOpen) {
     return null;
@@ -187,8 +184,8 @@ export default function CompareSubDrawingModal({
         <div className="space-y-4 p-5">
           <Tabs
             value={activeTab}
-            onValueChange={(v) =>
-              setActiveTab(v === "upload" ? "upload" : "choose")
+            onValueChange={(value) =>
+              setActiveTab(value as "choose" | "upload")
             }
             className="w-full"
           >
@@ -217,7 +214,7 @@ export default function CompareSubDrawingModal({
               />
             </TabsContent>
 
-            <TabsContent value="upload" className="mt-4 space-y-3">
+            <TabsContent value="upload" className="mt-4 space-y-4">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -228,27 +225,34 @@ export default function CompareSubDrawingModal({
                 disabled={compareLoading || uploading}
                 onChange={handleFileChange}
               />
-              <button
-                type="button"
-                onClick={handlePickFile}
-                disabled={compareLoading || uploading}
-                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-60"
-              >
-                {uploading ? "Uploading…" : "Choose file…"}
-              </button>
-              <p className="text-xs text-slate-500">
-                PDF or image. The file is added to this project; then use Compare below.
-              </p>
-              {selectedFile && !uploading ? (
-                <p className="text-xs text-slate-600">
-                  Selected: {selectedFile.name}
-                </p>
-              ) : null}
-              {uploadError ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                  {uploadError}
+
+              <div className="space-y-3 rounded-lg border border-dashed p-4">
+                <div className="text-sm font-medium">Upload a new sub drawing</div>
+                <div className="text-sm text-muted-foreground">
+                  Accepted file types: PDF and image files.
                 </div>
-              ) : null}
+
+                <button
+                  type="button"
+                  className="inline-flex items-center rounded-md border px-3 py-2 text-sm disabled:opacity-60"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={compareLoading || uploading}
+                >
+                  {uploading ? "Uploading..." : "Choose file"}
+                </button>
+
+                {selectedFile ? (
+                  <div className="text-sm text-muted-foreground">
+                    Selected: {selectedFile.name}
+                  </div>
+                ) : null}
+
+                {uploadError ? (
+                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {uploadError}
+                  </div>
+                ) : null}
+              </div>
             </TabsContent>
           </Tabs>
 
