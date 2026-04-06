@@ -1,9 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 
-import DrawingUploadField from "@/components/drawings/DrawingUploadField";
 import SubDrawingList from "@/components/drawing-workspace/sub_drawing_list";
 import SubDrawingSearchInput from "@/components/drawing-workspace/sub_drawing_search_input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { uploadProjectDrawing } from "@/lib/api/drawings";
 import { useProjectDrawings } from "@/hooks/use_project_drawings";
 
 type Props = {
@@ -29,7 +35,11 @@ export default function CompareSubDrawingModal({
 }: Props) {
   const [search, setSearch] = useState("");
   const [selectedDrawingId, setSelectedDrawingId] = useState<number | null>(null);
-  const [uploadBusy, setUploadBusy] = useState(false);
+  const [activeTab, setActiveTab] = useState<"choose" | "upload">("choose");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const { drawings, loading, error, reload } = useProjectDrawings({
     projectId,
@@ -37,7 +47,7 @@ export default function CompareSubDrawingModal({
     enabled: isOpen,
   });
 
-  const busy = compareLoading || uploadBusy;
+  const busy = compareLoading || uploading;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -58,7 +68,11 @@ export default function CompareSubDrawingModal({
     if (!isOpen) {
       setSearch("");
       setSelectedDrawingId(null);
-      setUploadBusy(false);
+      setActiveTab("choose");
+      setUploading(false);
+      setUploadError(null);
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }, [isOpen]);
 
@@ -67,6 +81,11 @@ export default function CompareSubDrawingModal({
     if (!isOpen) return;
     setSearch("");
     setSelectedDrawingId(null);
+    setActiveTab("choose");
+    setUploading(false);
+    setUploadError(null);
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }, [isOpen, projectId, masterDrawingId]);
 
   const filteredDrawings = useMemo(() => {
@@ -89,6 +108,36 @@ export default function CompareSubDrawingModal({
   const handleConfirm = async () => {
     if (selectedDrawingId == null || busy) return;
     await onConfirmCompare(selectedDrawingId);
+  };
+
+  const handlePickFile = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setSelectedFile(file);
+    setUploadError(null);
+    setUploading(true);
+
+    void (async () => {
+      try {
+        const drawing = await uploadProjectDrawing(projectId, file);
+        await reload();
+        setSelectedDrawingId(drawing.id);
+        onSelectSubDrawing?.(drawing.id);
+        setSelectedFile(null);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to upload drawing";
+        setUploadError(message);
+      } finally {
+        setUploading(false);
+      }
+    })();
   };
 
   if (!isOpen) {
@@ -136,7 +185,13 @@ export default function CompareSubDrawingModal({
         </div>
 
         <div className="space-y-4 p-5">
-          <Tabs defaultValue="choose" className="w-full">
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) =>
+              setActiveTab(v === "upload" ? "upload" : "choose")
+            }
+            className="w-full"
+          >
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="choose" data-testid="compare-tab-choose">
                 Choose existing
@@ -163,19 +218,37 @@ export default function CompareSubDrawingModal({
             </TabsContent>
 
             <TabsContent value="upload" className="mt-4 space-y-3">
-              <DrawingUploadField
-                projectId={projectId}
-                isActive={isOpen}
-                fileInputTestId="compare-upload-file-input"
-                onUploadingChange={setUploadBusy}
-                disabled={compareLoading}
-                description="PDF or image. The file is added to this project; then use Compare below."
-                onUploaded={async (drawing) => {
-                  await reload();
-                  setSelectedDrawingId(drawing.id);
-                  onSelectSubDrawing?.(drawing.id);
-                }}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf,image/*"
+                className="hidden"
+                data-testid="compare-upload-file-input"
+                aria-label="Upload drawing file"
+                disabled={compareLoading || uploading}
+                onChange={handleFileChange}
               />
+              <button
+                type="button"
+                onClick={handlePickFile}
+                disabled={compareLoading || uploading}
+                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-60"
+              >
+                {uploading ? "Uploading…" : "Choose file…"}
+              </button>
+              <p className="text-xs text-slate-500">
+                PDF or image. The file is added to this project; then use Compare below.
+              </p>
+              {selectedFile && !uploading ? (
+                <p className="text-xs text-slate-600">
+                  Selected: {selectedFile.name}
+                </p>
+              ) : null}
+              {uploadError ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {uploadError}
+                </div>
+              ) : null}
             </TabsContent>
           </Tabs>
 
