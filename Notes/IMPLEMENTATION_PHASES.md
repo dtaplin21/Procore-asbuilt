@@ -120,15 +120,15 @@ Frontend:
 
 ---
 
-## Phase 3 — Drawing workspace stub (so links have a home) ###########################################################################
+## Phase 3 — Drawing workspace (links have a home) ###########################################################################
 
-### Step 7 — Add a new route/page stub
+### Step 7 — Route and full workspace UI
 
 Frontend:
-- Add route like `/projects/:projectId/drawings/:drawingId` (or `/workspace`)
-- Just show: drawing id, project id, “coming soon”
+- **Route:** `/projects/:projectId/drawings/:drawingId/workspace` (see `client/src/App.tsx`, `drawing_workspace.tsx`).
+- **Implemented:** master viewer, alignments + diff timeline, compare-sub modal, deep links (`alignmentId`, `diffId`), dashboard/insight links via `lib/workspace-links.ts`.
 
-**Goal**: dashboard links are real; navigation works.
+**Goal**: dashboard links navigate to a real drawing comparison workspace (not a stub).
 
 ---
 

@@ -8,6 +8,10 @@ Deliver a **drawing workspace** that is the flagship experience of the product, 
 
 The dashboard should act as an entry point into this workspace; the workspace itself is where users spend most of their time.
 
+**Workspace route (canonical):** `/projects/{projectId}/drawings/{drawingId}/workspace` (see `client/src/App.tsx`). Deep links add `?alignmentId=…&diffId=…` (and optionally `findingId`).
+
+**Implementation status (high level):** Phases 1–4 and most of Phase 5 are **implemented** in this repo. Remaining gaps: compare modal does not yet include an **upload-new-sub** path; **smart master suggestions** (Phase 5.2) are not built; **per-alignment “Re‑run comparison”** in the UI is not wired (the `POST …/diffs` run endpoint exists).
+
 ---
 
 ## Implementation Phases
@@ -20,8 +24,8 @@ The dashboard should act as an entry point into this workspace; the workspace it
   - Implement a `drawing_comparison` service (e.g. `backend/services/drawing_comparison.py`) that:
     - Validates `project_id`, `master_drawing_id`, and `sub_drawing_id` all belong together.
     - Reuses or creates a `DrawingAlignment` for `(master_drawing_id, sub_drawing_id)`:
-      - MVP behavior: `method="manual"`, neutral/identity `transform`, `status="complete"`.
-    - Invokes `run_drawing_diff_for_alignment` to produce `DrawingDiff` rows.
+      - May use `feature_match` / alignment lifecycle when files exist, or `manual` when not; transform is computed or reused as appropriate.
+    - Invokes `run_drawing_diff` (`backend/ai/pipelines/drawing_diff.py`) to produce `DrawingDiff` rows.
     - Builds a workspace payload containing:
       - Master drawing summary.
       - Sub drawing summary.
@@ -29,13 +33,10 @@ The dashboard should act as an entry point into this workspace; the workspace it
       - One or more diff summaries (including `diff_regions`).
 
 - **1.2 Compare endpoint**
-  - Add `POST /api/projects/{project_id}/drawings/{master_drawing_id}/compare`:
-    - Request body: `{ "sub_drawing_id": number }` (MVP assumes sub drawing already exists).
-    - Behavior:
-      - Calls the orchestration service’s `compare` method.
-      - Maps the result to a Pydantic response model designed for the workspace.
-    - Response:
-      - `master_drawing`, `sub_drawing`, `alignment`, and `diffs` summaries.
+  - Implemented in `backend/api/routes/drawing_comparison.py`:
+    - `POST /api/projects/{project_id}/drawings/compare/{master_drawing_id}/{sub_drawing_id}` (path-based).
+    - `POST /api/projects/{project_id}/drawings/{master_drawing_id}/compare` with body `{ "sub_drawing_id": number }` (same orchestration).
+    - Response includes workspace summaries plus optional `comparison_progress` (and related KPI fields) per `DrawingComparisonWorkspaceResponse`.
 
 - **1.3 Supporting queries**
   - Ensure existing endpoints support history/progress views:
@@ -52,12 +53,12 @@ The dashboard should act as an entry point into this workspace; the workspace it
 
 ### Phase 2 – Workspace UI (read‑only + history)
 
-**Objective:** Turn `DrawingWorkspacePage` into a real workspace that surfaces existing alignments and diffs for a master drawing.
+**Objective:** `DrawingWorkspacePage` is a real workspace that surfaces existing alignments and diffs for a master drawing (`client/src/pages/drawing_workspace.tsx`).
 
 - **2.1 Layout & state**
-  - Replace the placeholder in `client/src/pages/drawing_workspace.tsx` with:
+  - **Implemented** in `client/src/pages/drawing_workspace.tsx` with `DrawingWorkspaceLayout`:
     - Center: drawing viewer for the **master** drawing.
-    - Right sidebar:
+    - Sidebar:
       - Alignments list (sub drawings + status).
       - Diff timeline for the selected alignment.
   - Manage React state for:
@@ -76,40 +77,27 @@ The dashboard should act as an entry point into this workspace; the workspace it
 - **2.3 Rendering diffs**
   - Render the master drawing image from its `file_url`.
   - For the selected diff:
-    - Render `diff_regions` as simple overlays:
-      - Use normalized coordinates to position rectangles/polygons over the drawing.
-      -add pan to zoom
-      - make sure plan is production ready.
+    - Render `diff_regions` as overlays (normalized coordinates) via `DrawingOverlayLayer` / viewer.
+    - **Pan and zoom** via `PanZoomContainer` in `DrawingViewer`.
 
-**Done when:** Navigating to `/projects/{projectId}/drawings/{drawingId}` shows the master drawing, existing alignments, and diff regions for at least one alignment.
+**Done when:** Navigating to `/projects/{projectId}/drawings/{drawingId}/workspace` shows the master drawing, existing alignments, and diff regions for at least one alignment.
 
 ---
 
 ### Phase 3 – “Compare a sub drawing” flow (end‑to‑end)
 
-**Objective:** Allow a user to start a new comparison from the workspace with a single, prominent action.
+**Objective:** Allow a user to start a new comparison from the workspace with a single, prominent action. **Implemented** via `CompareSubDrawingButton`, `CompareSubDrawingModal`, and `runCompare` in `use_drawing_workspace`.
 
 - **3.1 Primary CTA in workspace**
-  - Add a **“Compare a sub drawing”** button in the workspace sidebar.
-  - Clicking it opens a modal or panel for selecting a sub drawing.
+  - **“Compare a sub drawing”** in the sidebar opens the compare modal.
 
 - **3.2 Sub drawing selection**
-  - Inside the modal:
-    - Show a list of candidate sub drawings (project drawings excluding the current master).
-    - Support search/filter by name.
-  - MVP assumption:
-    - Sub drawing already exists (uploaded via existing flows).
+  - Modal lists candidate subs (excluding master) with search/filter (`CompareSubDrawingModal`, `SubDrawingList`).
+  - Upload-from-modal tab is **not** implemented; subs are expected to exist from other upload flows.
 
 - **3.3 Compare call & state update**
-  - When the user selects a sub drawing:
-    - Call `POST /api/projects/{projectId}/drawings/{drawingId}/compare` with `{ sub_drawing_id }`.
-    - Show a progress indicator while the request is in flight.
-  - On success:
-    - Merge the returned alignment and diffs into workspace state:
-      - Add/refresh the alignment in the list.
-      - Store diffs under that alignment.
-      - Auto‑select the new alignment and latest diff.
-    - Update the canvas overlays to reflect the new diff.
+  - On confirm, calls compare API (path or body style; see Phase 1.2) with loading state.
+  - On success: merges alignment + diffs, refreshes lists, selects the new alignment and latest diff (`use_drawing_workspace`).
 
 **Done when:** A user can choose an existing sub drawing from the workspace and see the comparison result appear immediately in the alignment list, diff timeline, and on the drawing.
 
@@ -119,25 +107,20 @@ The dashboard should act as an entry point into this workspace; the workspace it
 
 **Objective:** Make the workspace the natural destination from dashboard/insights and clearly communicate comparison progress.
 
-- **4.1 URL selection state**
-  - Extend the workspace URL to accept:
-    - `?alignmentId=…&diffId=…`.
-  - On load:
-    - If present, pre‑select the specified alignment and diff.
-  - Optionally:
-    - Keep the URL updated as the user changes selection so views can be shared/bookmarked.
+- **4.1 URL selection state** — **Implemented** (`use_workspace_selection_query_params`, `drawing_workspace.tsx`)
+  - Workspace URL accepts `?alignmentId=…&diffId=…`.
+  - On load, pre‑selects alignment/diff when valid.
+  - Selection changes update the URL for sharing/bookmarks.
 
 - **4.2 Dashboard & insights integration**
   - For dashboard cards or insights tied to drawings/diffs:
-    - Link into the workspace using:
-      - `/projects/{projectId}/drawings/{masterDrawingId}?alignmentId=…&diffId=…`.
+    - Link into the workspace using `buildWorkspaceUrl` / `buildWorkspaceUrlWithFinding` (`client/src/lib/workspace-links.ts`):
+      - `/projects/{projectId}/drawings/{masterDrawingId}/workspace?alignmentId=…&diffId=…` (and optional `findingId`).
   - Ensure underlying records (diffs/findings) store the identifiers needed to construct this link.
 
 - **4.3 Progress surface**
-  - In the workspace sidebar and/or dashboard:
-    - Surface counts like:
-      - “X sub drawings compared to this master.”
-      - “N open high‑severity diffs on this drawing.”
+  - **Dashboard:** headline cards for comparison progress and high‑severity diff risk (`client/src/pages/dashboard.tsx`). Note: high‑severity risk may be **global across active projects** (see `get_unresolved_high_severity_diff_metric` in `backend/services/dashboard.py`), not only “on this drawing,” unless you switch to a project‑scoped helper.
+  - **Workspace:** “Project comparison progress” card (`DrawingComparisonWorkspace.tsx`) using `comparison_progress` from the compare payload.
 
 **Done when:** Users can arrive from dashboard/insights into a specific master/alignment/diff, and the workspace clearly shows comparison coverage and severity at a glance.
 
@@ -147,16 +130,19 @@ The dashboard should act as an entry point into this workspace; the workspace it
 
 **Objective:** Turn a solid workflow into a differentiated AI‑first experience.
 
-- **5.1 Visual sub overlay**
-  - Extend the pipeline and renderer so the warped **sub drawing** itself can be drawn as a semi‑transparent overlay over the master (using `DrawingAlignment.transform`).
+- **5.1 Visual sub overlay** — **Shipped**
+  - Warped **sub** as semi‑transparent overlay over the master using `DrawingAlignment.transform` (`AlignedSubOverlay.tsx`, `DrawingViewer`).
 
-- **5.2 Smart suggestions**
+- **5.2 Smart suggestions** — **Not implemented**
   - When a new drawing is created (upload or sync):
     - Suggest likely master drawings to compare against (based on name, discipline, or Procore metadata).
   - Optionally auto‑populate the “Compare a sub drawing” modal with recommended pairs.
 
-*5.3 Metrics & storytelling** - 
-Add headline metrics to the dashboard and workspace: - “X of Y relevant sub drawings have been compared for this project.” - “N unresolved high‑severity diffs across your active projects.”
+- **5.3 Metrics & storytelling** — **Shipped**
+  - Headline metrics on the **dashboard** and **workspace**:
+    - “X of Y relevant sub drawings have been compared…” (project / master‑scoped comparison progress).
+    - “N unresolved high‑severity diffs…” (dashboard uses global risk; workspace may show project‑scoped risk if enabled).
+
 **Done when:** The drawing workspace not only works end‑to‑end, but also clearly tells the story that “our AI continuously compares your drawings, highlights changes, and tracks progress over time” in a way that is obvious to the client.
 
 ## Drawing Workspace & Sub‑vs‑Master Diff Orchestration
@@ -218,19 +204,22 @@ This document focuses on the **end‑to‑end orchestration** and **UI experienc
 
 - `backend/api/routes/drawing_diffs.py`
   - `GET /api/projects/{project_id}/drawings/{master_drawing_id}/diffs`
-  - `POST /api/projects/{project_id}/drawings/{master_drawing_id}/diffs/run`
+  - `POST /api/projects/{project_id}/drawings/{master_drawing_id}/diffs` (body: `alignment_id` — run diff pipeline for that alignment)
   - `GET /api/projects/{project_id}/drawings/{master_drawing_id}/diffs/{diff_id}`
 
 - `backend/ai/pipelines/drawing_diff.py`
-  - `run_drawing_diff_for_alignment(db, alignment, severity_threshold="high")`
+  - `run_drawing_diff(db, alignment=…, …)` — entry point used by the compare service and diff routes.
   - Handles:
     - Resolving master/sub file paths.
     - Warping sub into master frame using `alignment.transform`.
     - Running vision/AI model.
     - Creating `DrawingDiff` rows (and optionally `Finding` + `DrawingOverlay`).
 
+- `backend/api/routes/drawing_comparison.py`
+  - Orchestrated compare routes (see Phase 1.2).
+
 - `client/src/pages/drawing_workspace.tsx`
-  - Currently a **placeholder** that shows project/drawing IDs but no real viewer.
+  - **Full workspace page:** master viewer, alignments, diff timeline, compare modal, URL selection sync (`use_workspace_selection_query_params`), and comparison workspace overlay.
 
 ---
 
@@ -239,7 +228,7 @@ This document focuses on the **end‑to‑end orchestration** and **UI experienc
 From the user’s perspective, the “headline” flow should look like this:
 
 1. **Open Drawing Workspace**
-   - Route: `/projects/{projectId}/drawings/{drawingId}` (master drawing).
+   - Route: `/projects/{projectId}/drawings/{drawingId}/workspace` (master drawing id in path).
    - UI shows:
      - Large **canvas** for the master drawing.
      - Right/left **panel** with:
@@ -264,12 +253,9 @@ From the user’s perspective, the “headline” flow should look like this:
      - `method="vision"` or `"feature_match"`, alignment pipeline computes transform and updates `DrawingAlignment.transform` + `status`.
 
 4. **Run diff**
-   - UI button in alignment list: “Run comparison”.
-   - Calls `POST /diffs/run` for the chosen `alignment_id`.
-   - Backend:
-     - Runs `run_drawing_diff_for_alignment`.
-     - Creates `DrawingDiff` rows (each with `diff_regions`).
-     - Optionally creates `DrawingOverlay` geometry for rendering.
+   - **Primary path today:** the **Compare** flow (`POST …/compare`) runs alignment lifecycle + `run_drawing_diff` and returns the workspace payload.
+   - **Optional / API-only:** `POST /api/projects/{project_id}/drawings/{master_drawing_id}/diffs` with `alignment_id` runs `run_drawing_diff` (there is not yet a per-row “Re‑run” control in the alignments list UI).
+   - Backend creates `DrawingDiff` rows (each with `diff_regions`); overlays as applicable.
 
 5. **View and revisit results**
    - Canvas overlays:
@@ -287,13 +273,11 @@ This entire experience should be driven from a **single workspace UI**, rather t
 
 ---
 
-### 4. Orchestration Layer: Proposed `evidence_retrieval`‑style Service for Drawings
+### 4. Orchestration Layer: Drawing Comparison Service
 
-We already have a pattern for encapsulating non‑trivial logic in services (e.g., `rfi_ingestion`, `evidence_linking`). For the sub‑vs‑master drawing experience, we should introduce a **drawing comparison orchestration service**, e.g.:
+We already have a pattern for encapsulating non‑trivial logic in services (e.g., `rfi_ingestion`, `evidence_linking`). The sub‑vs‑master orchestration is implemented in **`backend/services/drawing_comparison.py`** (`DrawingComparisonService.compare`, `compare_sub_drawing_to_master`, serialization helpers).
 
-- `backend/services/drawing_comparison.py` (name tbd; avoid editing in this document, this is architectural intent).
-
-**Responsibilities:**
+**Responsibilities (as implemented):**
 
 1. **Sub drawing onboarding**
    - Given `project_id` and either:
@@ -313,7 +297,7 @@ We already have a pattern for encapsulating non‑trivial logic in services (e.g
 
 3. **Diff execution**
    - Given an `alignment_id`, call into the AI pipeline:
-     - `run_drawing_diff_for_alignment(db, alignment, severity_threshold="high")`.
+     - `run_drawing_diff(db, alignment=…)`.
    - Store and/or update:
      - `DrawingDiff` rows.
      - `DrawingOverlay` rows (for fast rendering).
@@ -367,9 +351,9 @@ We should treat the **drawing workspace** as the primary UI surface of the produ
 #### 5.2 Core Interactions
 
 1. **Compare a sub drawing**
-   - Button opens a modal:
-     - Tab 1: “Choose existing sub drawing” → list of `Drawing` records in the project other than the master.
-     - Tab 2: “Upload new sub drawing” → uses existing upload endpoint, then refreshes the list.
+   - Button opens a modal (`CompareSubDrawingModal`):
+     - **Implemented:** list of candidate subs (excluding master) + search.
+     - **Not yet:** second tab / flow to upload a new sub from the modal (upload via other drawing flows first).
    - Once selected:
      - Front‑end POSTs to orchestration endpoint (e.g. `/api/projects/{project_id}/drawings/{master_drawing_id}/compare`).
      - That endpoint:
@@ -385,9 +369,8 @@ We should treat the **drawing workspace** as the primary UI surface of the produ
        - Canvas → new highlights.
 
 2. **Re‑run diff for existing alignment**
-   - Each alignment row has an overflow menu:
-     - “Re‑run comparison”.
-   - Calls `POST /diffs/run` and refreshes diff list for that alignment.
+   - **Planned UX:** each alignment row has an overflow menu → “Re‑run comparison” → `POST …/diffs` with `alignment_id`.
+   - **Current:** API exists; alignments panel does not yet expose this action.
 
 3. **View specific diff**
    - Clicking a diff entry in the timeline:
@@ -396,9 +379,9 @@ We should treat the **drawing workspace** as the primary UI surface of the produ
 
 4. **Navigate from dashboard/insights**
    - Dashboard can link directly into:
-     - `/projects/{projectId}/drawings/{drawingId}` (master).
-     - Optionally include query params for:
-       - `?alignmentId=...&diffId=...` to auto‑select an alignment/diff when opening workspace.
+     - `/projects/{projectId}/drawings/{drawingId}/workspace`
+   - Query params:
+     - `?alignmentId=...&diffId=...` (and optionally `findingId`) to pre‑select context.
 
 ---
 
@@ -419,25 +402,18 @@ High‑level steps:
      - `alignment` + `latest_diff` + overlays + minimal `Drawing` metadata.
 3. **Reuse existing lower‑level pieces**:
    - `Drawing` upload/list endpoints (no duplication).
-   - `create_drawing_alignment` & `run_drawing_diff_for_alignment`.
+   - `create_drawing_alignment` & `run_drawing_diff`.
    - `DrawingOverlay` creation if applicable.
 
 #### Phase 2 – Workspace UI v1 (Read‑only + basic actions)
 
 **Goal**: Make the workspace feel like the center of gravity and expose progress.
 
-1. **Upgrade `DrawingWorkspacePage`**:
-   - Replace placeholder with:
-     - Viewer for master drawing.
-     - Sidebar listing alignments and diffs (using existing endpoints).
-2. **Wire alignment/diff fetching**:
-   - Use:
-     - `GET /drawings/{master_drawing_id}/alignments`
-     - `GET /drawings/{master_drawing_id}/diffs`
-3. **Render basic overlays**:
-   - For each `DrawingDiff`, render `diff_regions` with simple highlight shapes (rectangles/polygons) using normalized geometry.
+1. **`DrawingWorkspacePage`** — viewer, sidebar alignments/diffs, compare flow (`use_drawing_workspace`).
+2. **Alignment/diff fetching** — `GET …/alignments`, `GET …/diffs?alignment_id=…` under `/api/projects/…`.
+3. **Overlays** — `diff_regions` on the master via overlay layer + pan/zoom.
 
-At this point, the workspace shows what’s been run, but might still require separate steps to create alignments/diffs.
+Integrated compare creates alignments/diffs in one step; viewing history no longer requires separate manual steps for the primary flow.
 
 #### Phase 3 – Integrated “Compare Sub Drawing” Flow
 
@@ -454,16 +430,11 @@ At this point, the workspace shows what’s been run, but might still require se
 
 #### Phase 4 – UX Polish and AI‑Forward Experience
 
-**Ideas (post‑MVP, but aligned with headline positioning):**
+**Status:**
 
-- **Automatic suggestions**:
-  - When a new drawing is uploaded, suggest likely master drawings to compare to (based on name similarity or Procore metadata).
-- **Visual sub overlay**:
-  - Render the warped sub drawing itself as a semi‑transparent layer over the master using `alignment.transform`.
-- **Progress metrics**:
-  - In sidebar and dashboard:
-    - “X of Y sub drawings compared”.
-    - “N high‑severity diffs outstanding”.
+- **Automatic suggestions** — not implemented (still a roadmap item).
+- **Visual sub overlay** — implemented (`AlignedSubOverlay` / `DrawingViewer`).
+- **Progress metrics** — dashboard + workspace headline KPIs (see Phase 5.3 and `backend/services/dashboard.py`).
 
 ---
 

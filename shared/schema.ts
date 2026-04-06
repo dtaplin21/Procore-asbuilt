@@ -64,9 +64,10 @@ export interface ProjectListResponse {
 }
 
 // ----------------------------
-// Drawing API types (matches backend DrawingResponse)
+// Drawing API types (matches backend DrawingResponse in models/schemas.py)
 // ----------------------------
 
+/** Upload / generic drawing row — same fields as Pydantic `DrawingResponse` (not `DrawingSummary`). */
 export interface DrawingResponse {
   id: number;
   name: string;
