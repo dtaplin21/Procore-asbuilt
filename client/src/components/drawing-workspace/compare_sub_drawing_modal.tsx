@@ -11,11 +11,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { uploadProjectDrawing } from "@/lib/api/drawings";
 import { useProjectDrawings } from "@/hooks/use_project_drawings";
 
+/** Matches `ALLOWED_CONTENT_TYPES` in `backend/services/file_storage.py` (drawings upload). */
+const ACCEPTED_DRAWING_UPLOAD_TYPES =
+  "application/pdf,image/png,image/jpeg,image/jpg,image/gif";
+
 type Props = {
   isOpen: boolean;
+  /** Numeric project id — parse route params with `Number(...)` / `coerceProjectIdForApi` before passing. */
   projectId: number;
   masterDrawingId: number;
   onClose: () => void;
+  /** Notifies parent when the user picks a row or after a successful upload (`null` only from local resets). */
   onSelectSubDrawing?: (drawingId: number | null) => void;
   onConfirmCompare: (drawingId: number) => Promise<void>;
   compareLoading: boolean;
@@ -120,12 +126,14 @@ export default function CompareSubDrawingModal({
 
       setSelectedDrawingId(response.id);
       onSelectSubDrawing?.(response.id);
+      setSelectedFile(null);
 
       setActiveTab("choose");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to upload drawing";
       setUploadError(message);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } finally {
       setUploading(false);
     }
@@ -223,7 +231,7 @@ export default function CompareSubDrawingModal({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="application/pdf,image/*"
+                accept={ACCEPTED_DRAWING_UPLOAD_TYPES}
                 className="hidden"
                 data-testid="compare-upload-file-input"
                 aria-label="Upload drawing file"
@@ -234,7 +242,7 @@ export default function CompareSubDrawingModal({
               <div className="space-y-3 rounded-lg border border-dashed p-4">
                 <div className="text-sm font-medium">Upload a new sub drawing</div>
                 <div className="text-sm text-muted-foreground">
-                  Accepted file types: PDF and image files.
+                  Accepted: PDF, PNG, JPEG, or GIF (same rules as the server).
                 </div>
 
                 <button
@@ -267,6 +275,12 @@ export default function CompareSubDrawingModal({
                 Compare failed
               </div>
               <div className="mt-1 text-sm text-red-600">{compareError}</div>
+            </div>
+          ) : null}
+
+          {uploadError ? (
+            <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {uploadError}
             </div>
           ) : null}
         </div>
