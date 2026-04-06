@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import DrawingUploadField from "@/components/drawings/DrawingUploadField";
 import SubDrawingList from "@/components/drawing-workspace/sub_drawing_list";
 import SubDrawingSearchInput from "@/components/drawing-workspace/sub_drawing_search_input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useProjectDrawings } from "@/hooks/use_project_drawings";
-import { useUploadProjectDrawing } from "@/hooks/use_upload_project_drawing";
 
 type Props = {
   isOpen: boolean;
@@ -29,7 +29,7 @@ export default function CompareSubDrawingModal({
 }: Props) {
   const [search, setSearch] = useState("");
   const [selectedDrawingId, setSelectedDrawingId] = useState<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadBusy, setUploadBusy] = useState(false);
 
   const { drawings, loading, error, reload } = useProjectDrawings({
     projectId,
@@ -37,14 +37,7 @@ export default function CompareSubDrawingModal({
     enabled: isOpen,
   });
 
-  const {
-    uploading,
-    uploadError,
-    uploadDrawing,
-    reset: resetUpload,
-  } = useUploadProjectDrawing();
-
-  const busy = compareLoading || uploading;
+  const busy = compareLoading || uploadBusy;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -65,9 +58,9 @@ export default function CompareSubDrawingModal({
     if (!isOpen) {
       setSearch("");
       setSelectedDrawingId(null);
-      resetUpload();
+      setUploadBusy(false);
     }
-  }, [isOpen, resetUpload]);
+  }, [isOpen]);
 
   const filteredDrawings = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -89,26 +82,6 @@ export default function CompareSubDrawingModal({
   const handleConfirm = async () => {
     if (selectedDrawingId == null || busy) return;
     await onConfirmCompare(selectedDrawingId);
-  };
-
-  const handlePickFile = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    void (async () => {
-      try {
-        const drawing = await uploadDrawing(projectId, file);
-        await reload();
-        setSelectedDrawingId(drawing.id);
-        onSelectSubDrawing?.(drawing.id);
-      } catch {
-        // uploadError set inside hook
-      }
-    })();
   };
 
   if (!isOpen) {
@@ -183,31 +156,19 @@ export default function CompareSubDrawingModal({
             </TabsContent>
 
             <TabsContent value="upload" className="mt-4 space-y-3">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="application/pdf,image/*"
-                className="hidden"
-                data-testid="compare-upload-file-input"
-                aria-label="Upload drawing file"
-                onChange={handleFileChange}
+              <DrawingUploadField
+                projectId={projectId}
+                isActive={isOpen}
+                fileInputTestId="compare-upload-file-input"
+                onUploadingChange={setUploadBusy}
+                disabled={compareLoading}
+                description="PDF or image. The file is added to this project; then use Compare below."
+                onUploaded={async (drawing) => {
+                  await reload();
+                  setSelectedDrawingId(drawing.id);
+                  onSelectSubDrawing?.(drawing.id);
+                }}
               />
-              <button
-                type="button"
-                onClick={handlePickFile}
-                disabled={uploading}
-                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-60"
-              >
-                {uploading ? "Uploading…" : "Choose file…"}
-              </button>
-              <p className="text-xs text-slate-500">
-                PDF or image. The file is added to this project; then use Compare below.
-              </p>
-              {uploadError ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                  {uploadError}
-                </div>
-              ) : null}
             </TabsContent>
           </Tabs>
 
