@@ -16,12 +16,12 @@ import { useProjectDrawings } from "@/hooks/use_project_drawings";
 const ACCEPTED_DRAWING_UPLOAD_TYPES =
   "application/pdf,image/png,image/jpeg,image/jpg,image/gif";
 
-/** Normalize parent prop: UI only renders plain strings, never raw `Error` instances. */
-function normalizeCompareErrorMessage(
-  value: string | null | undefined
-): string | null {
+/** Normalize parent prop to `string | null` for display (never render raw `Error`). */
+function normalizeCompareErrorMessage(value: unknown): string | null {
   if (value == null || value === "") return null;
-  return typeof value === "string" ? value : null;
+  if (typeof value === "string") return value;
+  if (value instanceof Error) return value.message;
+  return null;
 }
 
 type Props = {
@@ -35,12 +35,15 @@ type Props = {
    * Custom overlay — not Radix `Dialog`; use this instead of `onOpenChange(open: boolean)` (same idea as `onOpenChange(false)`).
    */
   onClose: () => void;
-  /** Notifies parent when the user picks a row or after a successful upload (`null` only from local resets). */
+  /**
+   * Parent selection sync: pass `setSelectedSubDrawingId` so list picks and upload success
+   * (`onSelectSubDrawing?.(response.id)`) update page state. Optional; omit only in tests.
+   */
   onSelectSubDrawing?: (drawingId: number | null) => void;
   onConfirmCompare: (drawingId: number) => Promise<void>;
-  /** Parent `useDrawingWorkspace` compare-in-flight flag; optional (falsy when omitted). */
+  /** Parent `useDrawingWorkspace` compare-in-flight flag; optional (use `Boolean(compareLoading)` with `isBusy`). */
   compareLoading?: boolean;
-  /** Compare failure text from the parent hook — always `string | null`, never an `Error` object. */
+  /** Compare failure: pass `string | null` from the hook; unknown values are normalized for display. */
   compareError?: string | null;
 };
 
@@ -140,6 +143,7 @@ export default function CompareSubDrawingModal({
   };
 
   const handleConfirm = async () => {
+    // Use `== null` so drawing id `0` is still valid; do not use `!selectedDrawingId`.
     if (isBusy || selectedDrawingId == null) return;
     await onConfirmCompare(selectedDrawingId);
   };

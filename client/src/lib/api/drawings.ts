@@ -3,16 +3,36 @@ import type { ProjectDrawingsResponse } from "@/types/drawing_workspace";
 
 import { readApiError, requestJson } from "@/lib/api/http";
 
+/** Positive integer id for URLs and comparisons — works for project id or drawing id route params. */
+function coercePositiveIntId(id: number | string): number {
+  const n = typeof id === "number" ? id : Number(id);
+  if (!Number.isFinite(n) || n <= 0 || !Number.isInteger(n)) {
+    throw new TypeError("Invalid id");
+  }
+  return n;
+}
+
 /**
  * Route params often arrive as strings; the upload URL must use a finite numeric id.
  * Call this so `uploadProjectDrawing` never sends `NaN` or `"12"` in the path by accident.
  */
 function coerceProjectIdForApi(projectId: number | string): number {
-  const n = typeof projectId === "number" ? projectId : Number(projectId);
-  if (!Number.isFinite(n) || n <= 0 || !Number.isInteger(n)) {
+  try {
+    return coercePositiveIntId(projectId);
+  } catch {
     throw new TypeError("Invalid project id");
   }
-  return n;
+}
+
+/**
+ * Same rules as project id: master/sub drawing ids must be numeric and match `drawing.id` comparisons.
+ */
+export function coerceDrawingIdForApi(drawingId: number | string): number {
+  try {
+    return coercePositiveIntId(drawingId);
+  } catch {
+    throw new TypeError("Invalid drawing id");
+  }
 }
 
 /** Minimal shape check so callers never treat `{ drawing: {...} }` as a drawing row. */

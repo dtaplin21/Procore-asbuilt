@@ -39,10 +39,6 @@ function DrawingWorkspaceBody({
     setIsCompareModalOpen(false);
   };
 
-  const handleSelectSubDrawing = (drawingId: number | null) => {
-    setSelectedSubDrawingId(drawingId);
-  };
-
   const {
     masterDrawing,
     alignments,
@@ -97,7 +93,7 @@ function DrawingWorkspaceBody({
       projectId={parsedProjectId}
       masterDrawingId={parsedDrawingId}
       onClose={closeCompareModal}
-      onSelectSubDrawing={handleSelectSubDrawing}
+      onSelectSubDrawing={setSelectedSubDrawingId}
       onConfirmCompare={handleConfirmCompare}
       compareLoading={compareLoading}
       compareError={compareError}

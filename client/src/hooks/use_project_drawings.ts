@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchProjectDrawings } from "@/lib/api/drawings";
+import { coerceDrawingIdForApi, fetchProjectDrawings } from "@/lib/api/drawings";
 import type { ProjectDrawingCandidate } from "@/types/drawing_workspace";
 
 type UseProjectDrawingsArgs = {
@@ -36,12 +36,10 @@ export function useProjectDrawings({
     setError(null);
 
     try {
+      const normalizedMasterDrawingId = coerceDrawingIdForApi(masterDrawingId);
       const response = await fetchProjectDrawings(projectId);
 
       if (requestId !== requestIdRef.current) return;
-
-      // `Number(...)` so we never compare `12 !== "12"` if a loose caller passes a string at runtime.
-      const normalizedMasterDrawingId = Number(masterDrawingId);
 
       const filtered = (response.drawings ?? []).filter(
         (drawing) => drawing.id !== normalizedMasterDrawingId
