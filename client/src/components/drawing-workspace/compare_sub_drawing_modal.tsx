@@ -33,7 +33,8 @@ type Props = {
   /** Notifies parent when the user picks a row or after a successful upload (`null` only from local resets). */
   onSelectSubDrawing?: (drawingId: number | null) => void;
   onConfirmCompare: (drawingId: number) => Promise<void>;
-  compareLoading: boolean;
+  /** Parent `useDrawingWorkspace` compare-in-flight flag; optional (falsy when omitted). */
+  compareLoading?: boolean;
   /** Compare failure text from the parent hook — always `string | null`, never an `Error` object. */
   compareError?: string | null;
 };
@@ -64,13 +65,13 @@ export default function CompareSubDrawingModal({
     enabled: isOpen,
   });
 
-  const busy = compareLoading || uploading;
+  const isBusy = uploading || Boolean(compareLoading);
 
   useEffect(() => {
     if (!isOpen) return;
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) {
+      if (event.key === "Escape" && !isBusy) {
         onClose();
       }
     };
@@ -79,7 +80,7 @@ export default function CompareSubDrawingModal({
     return () => {
       window.removeEventListener("keydown", handleEscape);
     };
-  }, [isOpen, onClose, busy]);
+  }, [isOpen, onClose, isBusy]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -123,7 +124,7 @@ export default function CompareSubDrawingModal({
   };
 
   const handleConfirm = async () => {
-    if (selectedDrawingId == null || busy) return;
+    if (selectedDrawingId == null || isBusy) return;
     await onConfirmCompare(selectedDrawingId);
   };
 
@@ -170,7 +171,7 @@ export default function CompareSubDrawingModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       onClick={() => {
-        if (!busy) onClose();
+        if (!isBusy) onClose();
       }}
       data-testid="compare-sub-drawing-modal-backdrop"
     >
@@ -198,7 +199,7 @@ export default function CompareSubDrawingModal({
           <button
             type="button"
             onClick={onClose}
-            disabled={busy}
+            disabled={isBusy}
             className="rounded-md border px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
             aria-label="Close compare sub drawing modal"
           >
@@ -209,16 +210,25 @@ export default function CompareSubDrawingModal({
         <div className="space-y-4 p-5">
           <Tabs
             value={activeTab}
-            onValueChange={(value) =>
-              setActiveTab(value as "choose" | "upload")
-            }
+            onValueChange={(value) => {
+              if (isBusy) return;
+              setActiveTab(value as "choose" | "upload");
+            }}
             className="w-full"
           >
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="choose" data-testid="compare-tab-choose">
+              <TabsTrigger
+                value="choose"
+                data-testid="compare-tab-choose"
+                disabled={isBusy}
+              >
                 Choose existing
               </TabsTrigger>
-              <TabsTrigger value="upload" data-testid="compare-tab-upload">
+              <TabsTrigger
+                value="upload"
+                data-testid="compare-tab-upload"
+                disabled={isBusy}
+              >
                 Upload new
               </TabsTrigger>
             </TabsList>
@@ -247,7 +257,7 @@ export default function CompareSubDrawingModal({
                 className="hidden"
                 data-testid="compare-upload-file-input"
                 aria-label="Upload drawing file"
-                disabled={compareLoading || uploading}
+                disabled={isBusy}
                 onChange={handleFileChange}
               />
 
@@ -261,7 +271,7 @@ export default function CompareSubDrawingModal({
                   type="button"
                   className="inline-flex items-center rounded-md border px-3 py-2 text-sm disabled:opacity-60"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={compareLoading || uploading}
+                  disabled={isBusy}
                 >
                   {uploading ? "Uploading..." : "Choose file"}
                 </button>
@@ -309,7 +319,7 @@ export default function CompareSubDrawingModal({
             <button
               type="button"
               onClick={onClose}
-              disabled={busy}
+              disabled={isBusy}
               className="rounded-md border px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
             >
               Cancel
@@ -318,7 +328,7 @@ export default function CompareSubDrawingModal({
             <button
               type="button"
               onClick={() => void handleConfirm()}
-              disabled={selectedDrawingId == null || busy}
+              disabled={selectedDrawingId == null || isBusy}
               className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
               data-testid="confirm-compare-sub-drawing-button"
             >
