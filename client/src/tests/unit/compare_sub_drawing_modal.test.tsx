@@ -100,8 +100,10 @@ describe("CompareSubDrawingModal", () => {
       />
     );
 
-    expect(screen.getByText("Compare failed")).toBeInTheDocument();
     expect(screen.getByText("Compare failed on server")).toBeInTheDocument();
+    expect(
+      screen.getByText(/its render may still be processing/i)
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("sub-drawing-item-201"));
     fireEvent.click(screen.getByTestId("confirm-compare-sub-drawing-button"));

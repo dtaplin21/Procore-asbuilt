@@ -34,6 +34,7 @@ type UseDrawingWorkspaceResult = {
 
   workspaceError: string | null;
   diffsError: string | null;
+  /** User-facing message only — set from `error.message` or a fallback string, never a raw `Error`. */
   compareError: string | null;
 
   selectedDiffs: DrawingDiff[];

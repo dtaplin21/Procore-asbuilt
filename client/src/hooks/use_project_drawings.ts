@@ -4,6 +4,7 @@ import type { ProjectDrawingCandidate } from "@/types/drawing_workspace";
 
 type UseProjectDrawingsArgs = {
   projectId: number;
+  /** Master / left drawing to omit from the sub list — must match `drawing.id` numerically (parse route params before passing). */
   masterDrawingId: number;
   enabled?: boolean;
 };
@@ -39,8 +40,11 @@ export function useProjectDrawings({
 
       if (requestId !== requestIdRef.current) return;
 
+      // `Number(...)` so we never compare `12 !== "12"` if a loose caller passes a string at runtime.
+      const normalizedMasterDrawingId = Number(masterDrawingId);
+
       const filtered = (response.drawings ?? []).filter(
-        (drawing) => drawing.id !== masterDrawingId
+        (drawing) => drawing.id !== normalizedMasterDrawingId
       );
 
       setDrawings(filtered);

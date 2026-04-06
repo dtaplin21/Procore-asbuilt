@@ -15,17 +15,27 @@ import { useProjectDrawings } from "@/hooks/use_project_drawings";
 const ACCEPTED_DRAWING_UPLOAD_TYPES =
   "application/pdf,image/png,image/jpeg,image/jpg,image/gif";
 
+/** Normalize parent prop: UI only renders plain strings, never raw `Error` instances. */
+function normalizeCompareErrorMessage(
+  value: string | null | undefined
+): string | null {
+  if (value == null || value === "") return null;
+  return typeof value === "string" ? value : null;
+}
+
 type Props = {
   isOpen: boolean;
   /** Numeric project id — parse route params with `Number(...)` / `coerceProjectIdForApi` before passing. */
   projectId: number;
+  /** Current workspace (master) drawing id — numeric; parse route params before passing. */
   masterDrawingId: number;
   onClose: () => void;
   /** Notifies parent when the user picks a row or after a successful upload (`null` only from local resets). */
   onSelectSubDrawing?: (drawingId: number | null) => void;
   onConfirmCompare: (drawingId: number) => Promise<void>;
   compareLoading: boolean;
-  compareError: string | null;
+  /** Compare failure text from the parent hook — always `string | null`, never an `Error` object. */
+  compareError?: string | null;
 };
 
 export default function CompareSubDrawingModal({
@@ -36,8 +46,10 @@ export default function CompareSubDrawingModal({
   onSelectSubDrawing,
   onConfirmCompare,
   compareLoading,
-  compareError,
+  compareError = null,
 }: Props) {
+  const compareErrorMessage = normalizeCompareErrorMessage(compareError);
+
   const [search, setSearch] = useState("");
   const [selectedDrawingId, setSelectedDrawingId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"choose" | "upload">("choose");
@@ -269,12 +281,13 @@ export default function CompareSubDrawingModal({
             </TabsContent>
           </Tabs>
 
-          {compareError ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-              <div className="text-sm font-medium text-red-700">
-                Compare failed
+          {compareErrorMessage ? (
+            <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div>{compareErrorMessage}</div>
+              <div className="mt-1 text-xs text-red-600">
+                If this drawing was just uploaded, its render may still be processing. Please
+                retry in a moment.
               </div>
-              <div className="mt-1 text-sm text-red-600">{compareError}</div>
             </div>
           ) : null}
 
