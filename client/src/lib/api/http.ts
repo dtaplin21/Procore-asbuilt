@@ -13,23 +13,53 @@ export async function parseJsonSafe(response: Response) {
   return null;
 }
 
+/** FastAPI may send `detail` as a string, object, or validation error array. */
+function messageFromFastApiDetail(detail: unknown): string | null {
+  if (typeof detail === "string" && detail.trim()) {
+    return detail.trim();
+  }
+
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0];
+    if (first && typeof first === "object") {
+      const msg = (first as { msg?: string }).msg;
+      if (typeof msg === "string" && msg.trim()) {
+        return msg.trim();
+      }
+    }
+    try {
+      return JSON.stringify(detail);
+    } catch {
+      return "Validation error";
+    }
+  }
+
+  if (
+    detail &&
+    typeof detail === "object" &&
+    typeof (detail as { message?: string }).message === "string" &&
+    (detail as { message: string }).message.trim()
+  ) {
+    return (detail as { message: string }).message.trim();
+  }
+
+  return null;
+}
+
 export async function readApiError(response: Response): Promise<never> {
   let message = `Request failed with status ${response.status}`;
 
   try {
     const data = (await response.json()) as {
-      detail?: string | { message?: string };
+      detail?: unknown;
+      message?: string;
     };
 
-    if (typeof data?.detail === "string" && data.detail.trim()) {
-      message = data.detail;
-    } else if (
-      data?.detail &&
-      typeof data.detail === "object" &&
-      typeof data.detail.message === "string" &&
-      data.detail.message.trim()
-    ) {
-      message = data.detail.message;
+    const fromDetail = messageFromFastApiDetail(data?.detail);
+    if (fromDetail) {
+      message = fromDetail;
+    } else if (typeof data?.message === "string" && data.message.trim()) {
+      message = data.message.trim();
     }
   } catch {
     if (response.statusText) {

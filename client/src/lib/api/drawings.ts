@@ -3,6 +3,20 @@ import type { ProjectDrawingsResponse } from "@/types/drawing_workspace";
 
 import { readApiError, requestJson } from "@/lib/api/http";
 
+/** Normalize upload response: backend returns a flat `DrawingResponse`; some APIs may wrap `{ drawing }`. */
+function parseDrawingResponsePayload(json: unknown): DrawingResponse {
+  if (
+    json &&
+    typeof json === "object" &&
+    "drawing" in json &&
+    (json as { drawing: unknown }).drawing &&
+    typeof (json as { drawing: unknown }).drawing === "object"
+  ) {
+    return (json as { drawing: DrawingResponse }).drawing;
+  }
+  return json as DrawingResponse;
+}
+
 export async function fetchProjectDrawings(
   projectId: number
 ): Promise<ProjectDrawingsResponse> {
@@ -34,5 +48,5 @@ export async function uploadProjectDrawing(
     await readApiError(response);
   }
 
-  return (await response.json()) as DrawingResponse;
+  return parseDrawingResponsePayload(await response.json());
 }

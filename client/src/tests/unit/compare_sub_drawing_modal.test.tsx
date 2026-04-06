@@ -1,7 +1,21 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import CompareSubDrawingModal from "@/components/drawing-workspace/compare_sub_drawing_modal";
 import { useProjectDrawings } from "@/hooks/use_project_drawings";
+
+function renderWithProviders(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  );
+}
 
 vi.mock("@/hooks/use_project_drawings", () => ({
   useProjectDrawings: vi.fn(),
@@ -35,7 +49,7 @@ describe("CompareSubDrawingModal", () => {
     const onConfirmCompare = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();
 
-    render(
+    renderWithProviders(
       <CompareSubDrawingModal
         isOpen
         projectId={1}
@@ -54,7 +68,7 @@ describe("CompareSubDrawingModal", () => {
   });
 
   it("shows Comparing... on the confirm button while compareLoading is true", () => {
-    render(
+    renderWithProviders(
       <CompareSubDrawingModal
         isOpen
         projectId={1}
@@ -74,7 +88,7 @@ describe("CompareSubDrawingModal", () => {
   it("renders compare error message for retry", () => {
     const onConfirmCompare = vi.fn().mockResolvedValue(undefined);
 
-    render(
+    renderWithProviders(
       <CompareSubDrawingModal
         isOpen
         projectId={1}
@@ -97,7 +111,7 @@ describe("CompareSubDrawingModal", () => {
   it("disables escape and backdrop close while compareLoading", () => {
     const onClose = vi.fn();
 
-    render(
+    renderWithProviders(
       <CompareSubDrawingModal
         isOpen
         projectId={1}

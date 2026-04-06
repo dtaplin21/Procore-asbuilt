@@ -147,7 +147,7 @@ def get_drawing(
     drawing = service.get_drawing(project_id, drawing_id)
     if not drawing:
         raise HTTPException(status_code=404, detail="Drawing not found")
-    return DrawingResponse.from_orm(drawing)
+    return DrawingResponse.model_validate(drawing)
 
 
 @router.get(

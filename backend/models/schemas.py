@@ -309,15 +309,19 @@ class DrawingProgressSummary(BaseModel):
 
 
 class DrawingResponse(BaseModel):
+    """Single drawing row for upload GET/POST and evidence context — matches shared `DrawingResponse`."""
+
     id: int
+    project_id: Optional[int] = None
     name: str
+    source: Optional[str] = None
     file_url: Optional[str] = None
     content_type: Optional[str] = None
     page_count: Optional[int] = None
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DrawingCompareRequest(BaseModel):
