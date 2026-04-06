@@ -29,11 +29,32 @@ export default function DrawingUploadField({
   description = "PDF or image. The file is added to this project.",
 }: DrawingUploadFieldProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevProjectIdRef = useRef<number | null>(null);
   const { uploading, uploadError, uploadDrawing, reset } = useUploadProjectDrawing();
 
+  const clearFileInput = () => {
+    const el = fileInputRef.current;
+    if (el) el.value = "";
+  };
+
   useEffect(() => {
-    if (!isActive) reset();
+    if (!isActive) {
+      reset();
+      clearFileInput();
+    }
   }, [isActive, reset]);
+
+  useEffect(() => {
+    if (prevProjectIdRef.current === null) {
+      prevProjectIdRef.current = projectId;
+      return;
+    }
+    if (prevProjectIdRef.current !== projectId) {
+      prevProjectIdRef.current = projectId;
+      reset();
+      clearFileInput();
+    }
+  }, [projectId, reset]);
 
   useEffect(() => {
     onUploadingChange?.(uploading);
@@ -46,11 +67,15 @@ export default function DrawingUploadField({
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
+    if (!file || !(file instanceof File)) return;
+    // New selection: clear stale error/spinner state before this attempt
+    reset();
     void (async () => {
       try {
         const drawing = await uploadDrawing(projectId, file);
         await Promise.resolve(onUploaded(drawing));
+        reset();
+        clearFileInput();
       } catch {
         // uploadError is set on the hook
       }

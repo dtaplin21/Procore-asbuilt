@@ -62,6 +62,13 @@ export default function CompareSubDrawingModal({
     }
   }, [isOpen]);
 
+  /** While open, reset pick/search when project context changes so nothing stale lingers. */
+  useEffect(() => {
+    if (!isOpen) return;
+    setSearch("");
+    setSelectedDrawingId(null);
+  }, [isOpen, projectId, masterDrawingId]);
+
   const filteredDrawings = useMemo(() => {
     const query = search.trim().toLowerCase();
 
