@@ -111,12 +111,17 @@ export default function CompareSubDrawingModal({
 
   async function handleUpload(file: File) {
     setUploading(true);
+    setUploadError(null);
+
     try {
-      const drawing = await uploadProjectDrawing(projectId, file);
+      const response = await uploadProjectDrawing(projectId, file);
+
       await reload();
-      setSelectedDrawingId(drawing.id);
-      onSelectSubDrawing?.(drawing.id);
-      setSelectedFile(null);
+
+      setSelectedDrawingId(response.id);
+      onSelectSubDrawing?.(response.id);
+
+      setActiveTab("choose");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to upload drawing";
