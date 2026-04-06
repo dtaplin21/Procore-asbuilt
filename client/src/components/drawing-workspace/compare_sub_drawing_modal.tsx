@@ -1,4 +1,5 @@
 import React, {
+  useCallback,
   useRef,
   useState,
   useEffect,
@@ -29,6 +30,10 @@ type Props = {
   projectId: number;
   /** Current workspace (master) drawing id — numeric; parse route params before passing. */
   masterDrawingId: number;
+  /**
+   * Called when the user should dismiss the modal (parent sets `isOpen` to false).
+   * Custom overlay — not Radix `Dialog`; use this instead of `onOpenChange(open: boolean)` (same idea as `onOpenChange(false)`).
+   */
   onClose: () => void;
   /** Notifies parent when the user picks a row or after a successful upload (`null` only from local resets). */
   onSelectSubDrawing?: (drawingId: number | null) => void;
@@ -67,12 +72,29 @@ export default function CompareSubDrawingModal({
 
   const isBusy = uploading || Boolean(compareLoading);
 
+  const resetUploadState = useCallback(() => {
+    setUploading(false);
+    setUploadError(null);
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, []);
+
+  /** Block dismiss while upload or compare is in progress (backdrop, Escape, header/footer close). */
+  const handleRequestClose = useCallback(() => {
+    if (isBusy) return;
+    resetUploadState();
+    setActiveTab("choose");
+    onClose();
+  }, [isBusy, onClose, resetUploadState]);
+
   useEffect(() => {
     if (!isOpen) return;
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !isBusy) {
-        onClose();
+      if (event.key === "Escape") {
+        handleRequestClose();
       }
     };
 
@@ -80,19 +102,16 @@ export default function CompareSubDrawingModal({
     return () => {
       window.removeEventListener("keydown", handleEscape);
     };
-  }, [isOpen, onClose, isBusy]);
+  }, [isOpen, handleRequestClose]);
 
   useEffect(() => {
     if (!isOpen) {
       setSearch("");
       setSelectedDrawingId(null);
       setActiveTab("choose");
-      setUploading(false);
-      setUploadError(null);
-      setSelectedFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      resetUploadState();
     }
-  }, [isOpen]);
+  }, [isOpen, resetUploadState]);
 
   /** While open, reset pick/search when project context changes so nothing stale lingers. */
   useEffect(() => {
@@ -100,11 +119,8 @@ export default function CompareSubDrawingModal({
     setSearch("");
     setSelectedDrawingId(null);
     setActiveTab("choose");
-    setUploading(false);
-    setUploadError(null);
-    setSelectedFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [isOpen, projectId, masterDrawingId]);
+    resetUploadState();
+  }, [isOpen, projectId, masterDrawingId, resetUploadState]);
 
   const filteredDrawings = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -124,7 +140,7 @@ export default function CompareSubDrawingModal({
   };
 
   const handleConfirm = async () => {
-    if (selectedDrawingId == null || isBusy) return;
+    if (isBusy || selectedDrawingId == null) return;
     await onConfirmCompare(selectedDrawingId);
   };
 
@@ -153,6 +169,11 @@ export default function CompareSubDrawingModal({
   }
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (isBusy) {
+      event.target.value = "";
+      return;
+    }
+
     const file = event.target.files?.[0] ?? null;
     event.target.value = "";
     setSelectedFile(file);
@@ -170,9 +191,7 @@ export default function CompareSubDrawingModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={() => {
-        if (!isBusy) onClose();
-      }}
+      onClick={handleRequestClose}
       data-testid="compare-sub-drawing-modal-backdrop"
     >
       <div
@@ -180,6 +199,7 @@ export default function CompareSubDrawingModal({
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        aria-busy={isBusy}
         aria-labelledby="compare-sub-drawing-title"
         data-testid="compare-sub-drawing-modal"
       >
@@ -198,7 +218,7 @@ export default function CompareSubDrawingModal({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleRequestClose}
             disabled={isBusy}
             className="rounded-md border px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
             aria-label="Close compare sub drawing modal"
@@ -270,7 +290,10 @@ export default function CompareSubDrawingModal({
                 <button
                   type="button"
                   className="inline-flex items-center rounded-md border px-3 py-2 text-sm disabled:opacity-60"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => {
+                    if (isBusy) return;
+                    fileInputRef.current?.click();
+                  }}
                   disabled={isBusy}
                 >
                   {uploading ? "Uploading..." : "Choose file"}
@@ -318,7 +341,7 @@ export default function CompareSubDrawingModal({
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleRequestClose}
               disabled={isBusy}
               className="rounded-md border px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
             >
