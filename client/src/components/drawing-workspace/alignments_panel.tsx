@@ -38,7 +38,7 @@ export default function AlignmentsPanel({
   const [rerunningAlignmentId, setRerunningAlignmentId] = useState<number | null>(
     null
   );
-  /** MVP: one visible error below the list. For per-row copy, switch to `Record<number, string>`. */
+  /** MVP: one visible error under the panel header. For per-row copy, use `Record<number, string>`. */
   const [rerunError, setRerunError] = useState<string | null>(null);
 
   const handleRerunComparison = useCallback(
@@ -66,6 +66,14 @@ export default function AlignmentsPanel({
       <div className="border-b px-4 py-3">
         <h3 className="text-sm font-semibold text-slate-900">Alignments</h3>
       </div>
+
+      {rerunError && (
+        <div className="px-4">
+          <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {rerunError}
+          </div>
+        </div>
+      )}
 
       <div className="max-h-[320px] overflow-y-auto">
         {loading ? (
@@ -138,12 +146,6 @@ export default function AlignmentsPanel({
           })
         )}
       </div>
-
-      {rerunError ? (
-        <div className="border-t border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
-          {rerunError}
-        </div>
-      ) : null}
     </section>
   );
 }

@@ -1,5 +1,44 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DrawingDiffsListResponse, RunDrawingDiffRequest } from "@shared/schema";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
+import type { DrawingDiffResponse, DrawingDiffsListResponse } from "@shared/schema";
+
+import { runDrawingDiff } from "@/lib/api/drawing_diffs";
+import { getQueryFn } from "@/lib/queryClient";
+
+/**
+ * Stable React Query key for GET drawing diffs (see `useDrawingDiffs`).
+ * Use `invalidateDrawingDiffsQueries` after POST run-diff so list consumers refetch.
+ *
+ * Note: `useDrawingWorkspace` keeps diffs in React state (fetch), not this key — refresh
+ * that UI via `reloadSelectedDiffs` / `onRerunComplete` on the alignments panel.
+ */
+export function drawingDiffsQueryKey(
+  projectId: string,
+  masterDrawingId: string,
+  alignmentId: number | null
+) {
+  return [
+    "drawing-diffs",
+    projectId,
+    masterDrawingId,
+    alignmentId ?? "all",
+  ] as const;
+}
+
+/** Invalidate every cached GET diffs list for this project + master drawing (all alignment filters). */
+export function invalidateDrawingDiffsQueries(
+  queryClient: QueryClient,
+  projectId: string,
+  masterDrawingId: string
+) {
+  void queryClient.invalidateQueries({
+    queryKey: ["drawing-diffs", projectId, masterDrawingId],
+  });
+}
 
 /**
  * Fetch drawing diffs for a master drawing.
@@ -18,8 +57,14 @@ export function useDrawingDiffs(
       ? `/api/projects/${projectId}/drawings/${masterDrawingId}/diffs${alignmentId != null ? `?alignment_id=${alignmentId}` : ""}`
       : "";
 
+  const queryFn = getQueryFn<DrawingDiffsListResponse>({ on401: "throw" });
+
   return useQuery<DrawingDiffsListResponse>({
-    queryKey: [url],
+    queryKey:
+      projectId && masterDrawingId
+        ? drawingDiffsQueryKey(projectId, masterDrawingId, alignmentId)
+        : ["drawing-diffs", "disabled"],
+    queryFn: (ctx) => queryFn({ ...ctx, queryKey: [url] }),
     enabled: !!projectId && !!masterDrawingId && !!url,
   });
 }
@@ -27,6 +72,7 @@ export function useDrawingDiffs(
 /**
  * Variables for `mutate` / `mutateAsync` only. `projectId` and `masterDrawingId` are **not**
  * passed here — they are fixed when you call `useRunDrawingDiff(projectId, masterDrawingId)`.
+ * Mapping to `alignment_id` happens in {@link runDrawingDiff} (API layer).
  */
 export type RunDrawingDiffMutationVariables = {
   alignmentId: number;
@@ -37,7 +83,8 @@ export type RunDrawingDiffMutationVariables = {
  * POST /api/projects/${projectId}/drawings/${masterDrawingId}/diffs
  * Body: RunDrawingDiffRequest
  *
- * Invalidates all diff queries for this project+drawing on success.
+ * On success, invalidates `drawing-diffs` queries for this project + master drawing so
+ * `useDrawingDiffs` refetches. Broad enough for MVP; narrows to same drawing as the POST.
  *
  * **Usage** (ids are strings to match URL segments / existing callers):
  * ```ts
@@ -52,7 +99,7 @@ export function useRunDrawingDiff(
   const queryClient = useQueryClient();
 
   return useMutation<
-    DrawingDiffsListResponse["items"],
+    DrawingDiffResponse[],
     Error,
     RunDrawingDiffMutationVariables
   >({
@@ -60,31 +107,15 @@ export function useRunDrawingDiff(
       if (!projectId || !masterDrawingId) {
         throw new Error("Project and master drawing required");
       }
-      const url = `/api/projects/${projectId}/drawings/${masterDrawingId}/diffs`;
-      const body: RunDrawingDiffRequest = { alignment_id: alignmentId };
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(body),
+      return runDrawingDiff({
+        projectId: Number(projectId),
+        masterDrawingId: Number(masterDrawingId),
+        alignmentId,
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(typeof err.detail === "string" ? err.detail : "Failed to run diff");
-      }
-      return res.json();
     },
     onSuccess: () => {
       if (projectId && masterDrawingId) {
-        queryClient.invalidateQueries({
-          predicate: (query) => {
-            const key = query.queryKey[0];
-            return (
-              typeof key === "string" &&
-              key.includes(`/api/projects/${projectId}/drawings/${masterDrawingId}/diffs`)
-            );
-          },
-        });
+        invalidateDrawingDiffsQueries(queryClient, projectId, masterDrawingId);
       }
     },
   });
