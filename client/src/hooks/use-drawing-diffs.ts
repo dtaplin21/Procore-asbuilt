@@ -3,6 +3,7 @@ import {
   useQuery,
   useQueryClient,
   type QueryClient,
+  type UseMutationResult,
 } from "@tanstack/react-query";
 import type { DrawingDiffResponse, DrawingDiffsListResponse } from "@shared/schema";
 
@@ -95,7 +96,11 @@ export type RunDrawingDiffMutationVariables = {
 export function useRunDrawingDiff(
   projectId: string | null,
   masterDrawingId: string | null
-) {
+): UseMutationResult<
+  DrawingDiffResponse[],
+  Error,
+  RunDrawingDiffMutationVariables
+> {
   const queryClient = useQueryClient();
 
   return useMutation<

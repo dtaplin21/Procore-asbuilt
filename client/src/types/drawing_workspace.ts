@@ -1,4 +1,4 @@
-import type { DrawingTransform } from "@shared/schema";
+import type { DrawingAlignmentPersisted, DrawingTransform } from "@shared/schema";
 
 export type DrawingSummary = {
   id: number;
@@ -45,9 +45,8 @@ export type ProjectDrawingsResponse = {
   drawings: ProjectDrawingCandidate[];
 };
 
-/** Workspace alignment row from GET alignments — `id` is always set; required for selection + rerun diff. */
-export type DrawingAlignment = {
-  id: number;
+/** Workspace alignment row from GET alignments — `id` required (see {@link DrawingAlignmentPersisted}). */
+export type DrawingAlignment = DrawingAlignmentPersisted & {
   projectId: number;
   masterDrawingId: number;
   subDrawingId: number;
@@ -127,10 +126,9 @@ export type DrawingAlignmentTransformResponse = DrawingTransform;
 /**
  * Alignment + structured transform for workspace overlay (POST compare).
  * `transform` is null when alignment failed or is incomplete (matches backend optional transform).
- * `id` is always present for persisted alignments — use for rerun, same as {@link DrawingAlignment.id}.
+ * `id` is always present for persisted alignments — use for rerun (see {@link DrawingAlignmentPersisted}).
  */
-export type DrawingAlignmentOverlayResponse = {
-  id: number;
+export type DrawingAlignmentOverlayResponse = DrawingAlignmentPersisted & {
   method: string;
   status: string;
   alignmentStatus?: string | null;
@@ -140,7 +138,7 @@ export type DrawingAlignmentOverlayResponse = {
   errorMessage?: string | null;
 };
 
-/** Union of workspace alignment rows; both variants require `id: number` (stable for rerun). */
+/** Union of workspace alignment rows; both extend {@link DrawingAlignmentPersisted} (`id` required). */
 export type DrawingAlignmentListItem = DrawingAlignment | DrawingAlignmentOverlayResponse;
 
 /** Backend-owned comparison metric (same semantics as dashboard where applicable). */

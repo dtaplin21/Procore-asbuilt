@@ -134,11 +134,18 @@ export interface DrawingAlignmentCreate {
 }
 
 /**
+ * Persisted alignment row — `id` is always set (list selection, rerun POST `alignment_id`, deep links).
+ * Extended by {@link DrawingAlignmentResponse} and {@link DrawingAlignmentOverlayResponse}.
+ */
+export interface DrawingAlignmentPersisted {
+  id: number;
+}
+
+/**
  * Persisted alignment from the alignments API. Backend always returns `id` for saved rows.
  * **Rerun diff** (`POST .../diffs` with `alignment_id`) requires this stable numeric `id`.
  */
-export interface DrawingAlignmentResponse {
-  id: number;
+export interface DrawingAlignmentResponse extends DrawingAlignmentPersisted {
   master_drawing_id: number;
   sub_drawing_id: number;
   region_id?: number | null;
@@ -200,8 +207,7 @@ export interface DrawingOverlayDrawingSummary {
  * (Wire JSON may use camelCase aliases depending on client; this is the logical contract.)
  * `id` is required once the alignment is persisted — use it for rerun alongside list/history rows.
  */
-export interface DrawingAlignmentOverlayResponse {
-  id: number;
+export interface DrawingAlignmentOverlayResponse extends DrawingAlignmentPersisted {
   method: string;
   status: string;
   transform: DrawingTransform | null;

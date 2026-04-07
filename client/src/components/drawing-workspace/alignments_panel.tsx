@@ -5,7 +5,9 @@ import { useRunDrawingDiff } from "@/hooks/use-drawing-diffs";
 import type { DrawingAlignmentListItem } from "@/types/drawing_workspace";
 
 export type AlignmentsPanelProps = {
+  /** Finite project id; parent should validate route params before rendering. */
   projectId: number;
+  /** Finite master drawing id (route); parent should validate route params before rendering. */
   masterDrawingId: number;
   alignments: DrawingAlignmentListItem[];
   selectedAlignmentId: number | null;
@@ -18,6 +20,12 @@ export type AlignmentsPanelProps = {
 function formatStatus(status?: string | null) {
   if (!status) return "Unknown";
   return status.replaceAll("_", " ");
+}
+
+function unknownToErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === "string" && error.trim()) return error;
+  return fallback;
 }
 
 export default function AlignmentsPanel({
@@ -51,9 +59,9 @@ export default function AlignmentsPanel({
         await runDrawingDiffMutation.mutateAsync({ alignmentId });
         await onRerunComplete?.();
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Failed to re-run comparison";
-        setRerunError(message);
+        setRerunError(
+          unknownToErrorMessage(error, "Failed to re-run comparison")
+        );
       } finally {
         setRerunningAlignmentId(null);
       }
