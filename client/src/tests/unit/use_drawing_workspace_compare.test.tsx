@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { compareSubDrawingToMaster } from "@/lib/api/drawing_workspace";
 import { useDrawingWorkspace } from "@/hooks/use_drawing_workspace";
 import type {
   DrawingAlignment,
@@ -10,20 +11,20 @@ const mocks = vi.hoisted(() => ({
   fetchMasterDrawing: vi.fn(),
   fetchMasterDrawingAlignments: vi.fn(),
   fetchAlignmentDiffs: vi.fn(),
-  compareSubDrawing: vi.fn(),
+  compareSubDrawingToMaster: vi.fn(),
 }));
 
 vi.mock("@/lib/api/drawing_workspace", () => ({
   fetchMasterDrawing: mocks.fetchMasterDrawing,
   fetchMasterDrawingAlignments: mocks.fetchMasterDrawingAlignments,
   fetchAlignmentDiffs: mocks.fetchAlignmentDiffs,
-  compareSubDrawing: mocks.compareSubDrawing,
+  compareSubDrawingToMaster: mocks.compareSubDrawingToMaster,
 }));
 
 const fetchMasterDrawing = mocks.fetchMasterDrawing;
 const fetchMasterDrawingAlignments = mocks.fetchMasterDrawingAlignments;
 const fetchAlignmentDiffs = mocks.fetchAlignmentDiffs;
-const compareSubDrawing = mocks.compareSubDrawing;
+const compareSubDrawingToMasterMock = mocks.compareSubDrawingToMaster;
 
 const baseDrawing: DrawingWorkspaceDrawing = {
   id: 10,
@@ -61,14 +62,27 @@ function setupDefaultWorkspace() {
   });
 }
 
-describe("useDrawingWorkspace — runCompare", () => {
+async function runCompareFlow(
+  result: { current: ReturnType<typeof useDrawingWorkspace> },
+  subDrawingId: number
+) {
+  const requestId = result.current.beginCompareOperation();
+  const response = await compareSubDrawingToMaster({
+    projectId: 1,
+    masterDrawingId: 10,
+    subDrawingId,
+  });
+  return result.current.mergeCompareResponse(response, requestId);
+}
+
+describe("useDrawingWorkspace — compare (API + merge)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupDefaultWorkspace();
   });
 
-  it("calls compareSubDrawing with project, master drawing, and sub drawing ids", async () => {
-    compareSubDrawing.mockResolvedValue({
+  it("calls compareSubDrawingToMaster with project, master drawing, and sub drawing ids", async () => {
+    compareSubDrawingToMasterMock.mockResolvedValue({
       masterDrawing: null,
       subDrawing: { id: 201, projectId: 1, name: "Sub" },
       alignment: {
@@ -97,14 +111,18 @@ describe("useDrawingWorkspace — runCompare", () => {
     await waitFor(() => expect(result.current.workspaceLoading).toBe(false));
 
     await act(async () => {
-      await result.current.runCompare(201);
+      await runCompareFlow(result, 201);
     });
 
-    expect(compareSubDrawing).toHaveBeenCalledWith(1, 10, 201);
+    expect(compareSubDrawingToMasterMock).toHaveBeenCalledWith({
+      projectId: 1,
+      masterDrawingId: 10,
+      subDrawingId: 201,
+    });
   });
 
   it("stores returned diffs under the alignment id and selects the newest diff", async () => {
-    compareSubDrawing.mockResolvedValue({
+    compareSubDrawingToMasterMock.mockResolvedValue({
       masterDrawing: null,
       subDrawing: { id: 201, projectId: 1, name: "Sub" },
       alignment: {
@@ -140,7 +158,7 @@ describe("useDrawingWorkspace — runCompare", () => {
     await waitFor(() => expect(result.current.workspaceLoading).toBe(false));
 
     await act(async () => {
-      await result.current.runCompare(201);
+      await runCompareFlow(result, 201);
     });
 
     expect(result.current.diffsByAlignmentId[2]?.map((d) => d.id)).toEqual([21, 22]);
@@ -150,7 +168,7 @@ describe("useDrawingWorkspace — runCompare", () => {
   });
 
   it("merges an existing alignment id in place without duplicating", async () => {
-    compareSubDrawing.mockResolvedValue({
+    compareSubDrawingToMasterMock.mockResolvedValue({
       masterDrawing: null,
       subDrawing: { id: 101, projectId: 1, name: "Sub A" },
       alignment: {
@@ -178,7 +196,7 @@ describe("useDrawingWorkspace — runCompare", () => {
     expect(countBefore).toBe(1);
 
     await act(async () => {
-      await result.current.runCompare(101);
+      await runCompareFlow(result, 101);
     });
 
     expect(result.current.alignments.filter((a) => a.id === 1)).toHaveLength(1);
@@ -188,8 +206,20 @@ describe("useDrawingWorkspace — runCompare", () => {
     expect(result.current.selectedAlignmentId).toBe(1);
   });
 
-  it("sets compareError and rethrows on failure", async () => {
-    compareSubDrawing.mockRejectedValue(new Error("Compare failed"));
+  it("ignores a stale merge when a newer compare operation has started", async () => {
+    compareSubDrawingToMasterMock.mockResolvedValue({
+      masterDrawing: null,
+      subDrawing: { id: 201, projectId: 1, name: "Sub" },
+      alignment: {
+        id: 2,
+        projectId: 1,
+        masterDrawingId: 10,
+        subDrawingId: 201,
+        createdAt: "2025-02-15T12:00:00Z",
+        subDrawing: { id: 201, name: "Sub B" },
+      },
+      diffs: [],
+    });
 
     const { result } = renderHook(() =>
       useDrawingWorkspace({ projectId: 1, drawingId: 10 })
@@ -197,17 +227,25 @@ describe("useDrawingWorkspace — runCompare", () => {
 
     await waitFor(() => expect(result.current.workspaceLoading).toBe(false));
 
-    let caught: Error | undefined;
-    await act(async () => {
-      try {
-        await result.current.runCompare(201);
-      } catch (e) {
-        caught = e as Error;
-      }
+    const staleRequestId = result.current.beginCompareOperation();
+    const freshRequestId = result.current.beginCompareOperation();
+
+    const response = await compareSubDrawingToMaster({
+      projectId: 1,
+      masterDrawingId: 10,
+      subDrawingId: 201,
     });
 
-    expect(caught?.message).toBe("Compare failed");
-    expect(result.current.compareError).toBe("Compare failed");
-    expect(result.current.compareLoading).toBe(false);
+    await act(async () => {
+      await result.current.mergeCompareResponse(response, staleRequestId);
+    });
+
+    expect(result.current.selectedAlignmentId).toBe(1);
+
+    await act(async () => {
+      await result.current.mergeCompareResponse(response, freshRequestId);
+    });
+
+    expect(result.current.selectedAlignmentId).toBe(2);
   });
 });

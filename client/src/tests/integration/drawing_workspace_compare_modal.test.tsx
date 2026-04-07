@@ -1,7 +1,7 @@
 /**
  * Test file 1 — parent / page integration (drawing workspace + compare modal wiring).
  *
- * Covers: modal rendered from parent, parent selection state, compare callback → runCompare.
+ * Covers: modal from parent, `compareSubDrawingToMaster({ projectId, masterDrawingId, subDrawingId })`, merge hook.
  *
  * Modal-only behavior (tabs, upload, busy locks, error copy) lives in:
  * `client/src/tests/unit/compare_sub_drawing_modal.test.tsx` (test file 2).
@@ -16,6 +16,18 @@ import { useDrawingWorkspace } from "@/hooks/use_drawing_workspace";
 import { useProjectDrawings } from "@/hooks/use_project_drawings";
 import { useWorkspaceSelectionQueryParams } from "@/hooks/use_workspace_selection_query_params";
 import type { DrawingWorkspaceDrawing } from "@/types/drawing_workspace";
+
+const apiMocks = vi.hoisted(() => ({
+  compareSubDrawingToMaster: vi.fn(),
+}));
+
+vi.mock("@/lib/api/drawing_workspace", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/drawing_workspace")>();
+  return {
+    ...actual,
+    compareSubDrawingToMaster: apiMocks.compareSubDrawingToMaster,
+  };
+});
 
 vi.mock("@/hooks/use_drawing_workspace", () => ({
   useDrawingWorkspace: vi.fn(),
@@ -46,6 +58,20 @@ const masterDrawing: DrawingWorkspaceDrawing = {
   processingStatus: "ready",
 };
 
+const compareResponse = {
+  masterDrawing: null,
+  subDrawing: { id: 201, projectId: 1, name: "Sub", fileUrl: "/x" },
+  alignment: {
+    id: 2,
+    method: "auto",
+    status: "ready",
+    subDrawing: { id: 201, name: "Sub", fileUrl: "/x" },
+    transform: null,
+    createdAt: "2025-02-15T12:00:00Z",
+  },
+  diffs: [],
+};
+
 function renderWorkspace() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -61,7 +87,8 @@ function renderWorkspace() {
 }
 
 describe("Drawing workspace — compare modal parent integration", () => {
-  let runCompare: ReturnType<typeof vi.fn>;
+  let beginCompareOperation: ReturnType<typeof vi.fn>;
+  let mergeCompareResponse: ReturnType<typeof vi.fn>;
 
   beforeAll(() => {
     class ResizeObserverMock {
@@ -74,17 +101,13 @@ describe("Drawing workspace — compare modal parent integration", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    runCompare = vi.fn().mockResolvedValue({
-      alignment: {
-        id: 2,
-        projectId: 1,
-        masterDrawingId: 10,
-        subDrawingId: 201,
-        createdAt: "2025-02-15T12:00:00Z",
-        subDrawing: { id: 201, name: "Sub" },
-      },
+    beginCompareOperation = vi.fn(() => 1);
+    mergeCompareResponse = vi.fn().mockResolvedValue({
+      alignment: compareResponse.alignment,
       diffs: [],
     });
+
+    apiMocks.compareSubDrawingToMaster.mockResolvedValue(compareResponse);
 
     mockUseWorkspaceSelectionQueryParams.mockReturnValue({
       alignmentIdFromUrl: null,
@@ -107,10 +130,8 @@ describe("Drawing workspace — compare modal parent integration", () => {
       diffsByAlignmentId: {},
       workspaceLoading: false,
       diffsLoading: false,
-      compareLoading: false,
       workspaceError: null,
       diffsError: null,
-      compareError: null,
       selectedDiffs: [],
       selectedAlignment: null,
       selectedDiff: null,
@@ -118,47 +139,64 @@ describe("Drawing workspace — compare modal parent integration", () => {
       selectDiff: vi.fn(),
       reloadWorkspace: vi.fn().mockResolvedValue(undefined),
       reloadSelectedDiffs: vi.fn().mockResolvedValue(undefined),
-      runCompare,
+      beginCompareOperation,
+      mergeCompareResponse,
     });
   });
 
-  it("renders CompareSubDrawingModal from the page and passes compareLoading and compareError from the workspace hook", () => {
-    mockUseDrawingWorkspace.mockReturnValue({
-      masterDrawing,
-      alignments: [],
-      selectedAlignmentId: null,
-      selectedDiffId: null,
-      diffsByAlignmentId: {},
-      workspaceLoading: false,
-      diffsLoading: false,
-      compareLoading: true,
-      workspaceError: null,
-      diffsError: null,
-      compareError: "Compare failed on server",
-      selectedDiffs: [],
-      selectedAlignment: null,
-      selectedDiff: null,
-      selectAlignment: vi.fn(),
-      selectDiff: vi.fn(),
-      reloadWorkspace: vi.fn().mockResolvedValue(undefined),
-      reloadSelectedDiffs: vi.fn().mockResolvedValue(undefined),
-      runCompare,
-    });
+  it("shows compare error and loading state from the page compare handler", async () => {
+    apiMocks.compareSubDrawingToMaster.mockRejectedValue(
+      new Error("Compare failed on server")
+    );
 
     renderWorkspace();
-
-    expect(screen.queryByTestId("compare-sub-drawing-modal")).toBeNull();
 
     fireEvent.click(screen.getByTestId("compare-sub-drawing-button"));
 
     expect(screen.getByTestId("compare-sub-drawing-modal")).toBeInTheDocument();
-    expect(screen.getByText("Compare failed on server")).toBeInTheDocument();
 
-    const compareBtn = screen.getByTestId("confirm-compare-sub-drawing-button");
-    expect(compareBtn).toHaveTextContent("Comparing...");
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("sub-drawing-item-201"));
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-compare-sub-drawing-button"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Compare failed on server")).toBeInTheDocument();
+    });
   });
 
-  it("wires compare confirm to runCompare with the selected sub drawing id", async () => {
+  it("shows Comparing… while compareSubDrawingToMaster is in flight", async () => {
+    let resolveCompare!: (value: typeof compareResponse) => void;
+    const pending = new Promise<typeof compareResponse>((resolve) => {
+      resolveCompare = resolve;
+    });
+    apiMocks.compareSubDrawingToMaster.mockReturnValue(pending);
+
+    renderWorkspace();
+
+    fireEvent.click(screen.getByTestId("compare-sub-drawing-button"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("sub-drawing-item-201"));
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-compare-sub-drawing-button"));
+    });
+
+    expect(screen.getByTestId("confirm-compare-sub-drawing-button")).toHaveTextContent(
+      "Comparing..."
+    );
+
+    await act(async () => {
+      resolveCompare(compareResponse);
+    });
+  });
+
+  it("calls compareSubDrawingToMaster with route master + selected sub, then mergeCompareResponse", async () => {
     renderWorkspace();
 
     fireEvent.click(screen.getByTestId("compare-sub-drawing-button"));
@@ -172,7 +210,15 @@ describe("Drawing workspace — compare modal parent integration", () => {
     });
 
     await waitFor(() => {
-      expect(runCompare).toHaveBeenCalledWith(201);
+      expect(apiMocks.compareSubDrawingToMaster).toHaveBeenCalledWith({
+        projectId: 1,
+        masterDrawingId: 10,
+        subDrawingId: 201,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mergeCompareResponse).toHaveBeenCalledWith(compareResponse, 1);
     });
   });
 });

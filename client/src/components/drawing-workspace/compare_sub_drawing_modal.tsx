@@ -42,9 +42,9 @@ type Props = {
    */
   onSelectSubDrawing?: (drawingId: number | null) => void;
   onConfirmCompare: (drawingId: number) => Promise<void>;
-  /** Parent `useDrawingWorkspace` compare-in-flight flag; optional (use `Boolean(compareLoading)` with `isBusy`). */
+  /** Compare-in-flight flag from the parent page handler; optional (use `Boolean(compareLoading)` with `isBusy`). */
   compareLoading?: boolean;
-  /** Compare failure: pass `string | null` from the hook; unknown values are normalized for display. */
+  /** Compare failure message from the parent; unknown values are normalized for display. */
   compareError?: string | null;
 };
 

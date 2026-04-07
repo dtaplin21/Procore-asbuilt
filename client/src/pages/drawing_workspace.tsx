@@ -12,6 +12,7 @@ import WorkspaceErrorState from "@/components/drawing-workspace/workspace_error_
 import WorkspaceLoadingState from "@/components/drawing-workspace/workspace_loading_state";
 import { useDrawingWorkspace } from "@/hooks/use_drawing_workspace";
 import { useWorkspaceSelectionQueryParams } from "@/hooks/use_workspace_selection_query_params";
+import { compareSubDrawingToMaster } from "@/lib/api/drawing_workspace";
 import { fetchProjectDashboardSummary } from "@/lib/api/projects";
 import type { WorkspaceRouteParams } from "@/types/drawing_workspace";
 
@@ -26,6 +27,11 @@ export function DrawingWorkspaceBody({
 }: DrawingWorkspaceBodyProps) {
   const [compareModalOpen, setCompareModalOpen] = useState(false);
   const [selectedSubDrawingId, setSelectedSubDrawingId] = useState<number | null>(null);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
+
+  const projectId = parsedProjectId;
+  const masterDrawingId = parsedDrawingId;
 
   const {
     alignmentIdFromUrl,
@@ -57,10 +63,8 @@ export function DrawingWorkspaceBody({
     selectedDiffId,
     workspaceLoading,
     diffsLoading,
-    compareLoading,
     workspaceError,
     diffsError,
-    compareError,
     selectedDiffs,
     selectedAlignment,
     selectedDiff,
@@ -68,7 +72,8 @@ export function DrawingWorkspaceBody({
     selectDiff,
     reloadWorkspace,
     reloadSelectedDiffs,
-    runCompare,
+    beginCompareOperation,
+    mergeCompareResponse,
   } = useDrawingWorkspace({
     projectId: parsedProjectId,
     drawingId: parsedDrawingId,
@@ -84,9 +89,26 @@ export function DrawingWorkspaceBody({
   }, [selectedAlignmentId, selectedDiffId, setSelectionQueryParams]);
 
   const handleConfirmCompare = async (subDrawingId: number) => {
-    await runCompare(subDrawingId);
-    setSelectedSubDrawingId(subDrawingId);
-    setCompareModalOpen(false);
+    const requestId = beginCompareOperation();
+    setCompareLoading(true);
+    setCompareError(null);
+
+    try {
+      const response = await compareSubDrawingToMaster({
+        projectId,
+        masterDrawingId,
+        subDrawingId,
+      });
+      await mergeCompareResponse(response, requestId);
+      setSelectedSubDrawingId(subDrawingId);
+      setCompareModalOpen(false);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to compare drawings";
+      setCompareError(message);
+    } finally {
+      setCompareLoading(false);
+    }
   };
 
   const header = (

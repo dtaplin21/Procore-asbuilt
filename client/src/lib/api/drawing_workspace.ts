@@ -56,3 +56,16 @@ export async function compareSubDrawing(
     { method: "POST" }
   );
 }
+
+/** POST compare — route master + chosen sub, aligned with backend naming. */
+export async function compareSubDrawingToMaster(params: {
+  projectId: number;
+  masterDrawingId: number;
+  subDrawingId: number;
+}): Promise<DrawingComparisonWorkspaceResponse> {
+  return compareSubDrawing(
+    params.projectId,
+    params.masterDrawingId,
+    params.subDrawingId
+  );
+}

@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { compareSubDrawing } from "@/lib/api/drawing_workspace";
+import {
+  compareSubDrawing,
+  compareSubDrawingToMaster,
+} from "@/lib/api/drawing_workspace";
 
 describe("compareSubDrawing", () => {
   beforeEach(() => {
@@ -34,5 +37,17 @@ describe("compareSubDrawing", () => {
       method: "POST",
       credentials: "include",
     });
+  });
+
+  it("compareSubDrawingToMaster delegates to the same compare endpoint", async () => {
+    await compareSubDrawingToMaster({
+      projectId: 1,
+      masterDrawingId: 10,
+      subDrawingId: 201,
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const call = vi.mocked(fetch).mock.calls[0];
+    expect(call[0]).toBe("/api/projects/1/drawings/compare/10/201");
   });
 });

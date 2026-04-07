@@ -1,7 +1,7 @@
 /**
  * Test file 2 — CompareSubDrawingModal unit / integration (tabs, busy locks, errors, selection, upload).
  *
- * Parent / page wiring for `DrawingWorkspaceBody` + `runCompare` is in:
+ * Parent / page wiring for `DrawingWorkspaceBody` + `compareSubDrawingToMaster` is in:
  * `client/src/tests/integration/drawing_workspace_compare_modal.test.tsx` (test file 1).
  */
 
