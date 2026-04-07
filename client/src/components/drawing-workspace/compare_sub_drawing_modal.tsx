@@ -24,28 +24,18 @@ function normalizeCompareErrorMessage(value: unknown): string | null {
   return null;
 }
 
-type Props = {
+export type CompareSubDrawingModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Numeric project id — parse route params with `Number(...)` / `coerceProjectIdForApi` before passing. */
   projectId: number;
-  /** Workspace route master (left) drawing — same id as the URL segment; no separate project-master lookup. */
   masterDrawingId: number;
-  /**
-   * Parent-owned sub selection. When provided, list/upload updates go through `onSelectSubDrawing`.
-   * Omit in tests for fully uncontrolled selection.
-   */
-  selectedDrawingId?: number | null;
-  /**
-   * Parent selection sync: pass `setSelectedSubDrawingId` so list picks and upload success
-   * (`onSelectSubDrawing?.(response.id)`) update page state. Optional; omit only in tests.
-   */
+  /** UX-only label (e.g. from dashboard summary `current_drawing.name`). */
+  currentDrawingName?: string | null;
+  selectedDrawingId: number | null;
   onSelectSubDrawing?: (drawingId: number | null) => void;
-  onConfirmCompare: (drawingId: number) => Promise<void>;
-  /** Compare-in-flight flag from the parent page handler; optional (use `Boolean(compareLoading)` with `isBusy`). */
   compareLoading?: boolean;
-  /** Compare failure message from the parent; unknown values are normalized for display. */
   compareError?: string | null;
+  onConfirmCompare: (subDrawingId: number) => Promise<void> | void;
 };
 
 export default function CompareSubDrawingModal({
@@ -53,21 +43,22 @@ export default function CompareSubDrawingModal({
   onOpenChange,
   projectId,
   masterDrawingId,
-  selectedDrawingId: selectedDrawingIdProp,
+  currentDrawingName = null,
+  selectedDrawingId,
   onSelectSubDrawing,
-  onConfirmCompare,
   compareLoading,
   compareError = null,
-}: Props) {
+  onConfirmCompare,
+}: CompareSubDrawingModalProps) {
   const compareErrorMessage = normalizeCompareErrorMessage(compareError);
 
   const [search, setSearch] = useState("");
-  const [uncontrolledSelected, setUncontrolledSelected] = useState<number | null>(null);
-  const selectedDrawingId =
-    selectedDrawingIdProp !== undefined ? selectedDrawingIdProp : uncontrolledSelected;
   const [activeTab, setActiveTab] = useState<"choose" | "upload">("choose");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(
+    null
+  );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -81,17 +72,15 @@ export default function CompareSubDrawingModal({
 
   const updateSelection = useCallback(
     (drawingId: number | null) => {
-      if (selectedDrawingIdProp === undefined) {
-        setUncontrolledSelected(drawingId);
-      }
       onSelectSubDrawing?.(drawingId);
     },
-    [selectedDrawingIdProp, onSelectSubDrawing]
+    [onSelectSubDrawing]
   );
 
   const resetUploadState = useCallback(() => {
     setUploading(false);
     setUploadError(null);
+    setUploadSuccessMessage(null);
     setSelectedFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -126,11 +115,8 @@ export default function CompareSubDrawingModal({
       setSearch("");
       setActiveTab("choose");
       resetUploadState();
-      if (selectedDrawingIdProp === undefined) {
-        setUncontrolledSelected(null);
-      }
     }
-  }, [open, resetUploadState, selectedDrawingIdProp]);
+  }, [open, resetUploadState]);
 
   const prevWorkspaceRef = useRef<{
     projectId: number;
@@ -154,18 +140,8 @@ export default function CompareSubDrawingModal({
     setSearch("");
     setActiveTab("choose");
     resetUploadState();
-    if (selectedDrawingIdProp === undefined) {
-      setUncontrolledSelected(null);
-    } else {
-      onSelectSubDrawing?.(null);
-    }
-  }, [
-    projectId,
-    masterDrawingId,
-    resetUploadState,
-    selectedDrawingIdProp,
-    onSelectSubDrawing,
-  ]);
+    onSelectSubDrawing?.(null);
+  }, [projectId, masterDrawingId, resetUploadState, onSelectSubDrawing]);
 
   const filteredDrawings = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -186,7 +162,7 @@ export default function CompareSubDrawingModal({
   const handleConfirm = async () => {
     // Use `== null` so drawing id `0` is still valid; do not use `!selectedDrawingId`.
     if (isBusy || selectedDrawingId == null) return;
-    await onConfirmCompare(selectedDrawingId);
+    await Promise.resolve(onConfirmCompare(selectedDrawingId));
   };
 
   async function handleUpload(file: File) {
@@ -198,10 +174,14 @@ export default function CompareSubDrawingModal({
 
       await reload();
 
-      updateSelection(response.id);
-      setSelectedFile(null);
-
+      onSelectSubDrawing?.(response.id);
       setActiveTab("choose");
+      setUploadSuccessMessage(
+        currentDrawingName
+          ? `Upload complete. Ready to compare against ${currentDrawingName}.`
+          : "Upload complete. Ready to compare against the current workspace drawing."
+      );
+      setSelectedFile(null);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to upload drawing";
@@ -256,7 +236,8 @@ export default function CompareSubDrawingModal({
               Compare a sub drawing
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Choose an existing project drawing or upload a new file, then compare.
+              Choose another drawing in this project or upload a new file. Comparison will use
+              the active workspace drawing as the master.
             </p>
           </div>
 
@@ -326,7 +307,10 @@ export default function CompareSubDrawingModal({
               />
 
               <div className="space-y-3 rounded-lg border border-dashed p-4">
-                <div className="text-sm font-medium">Upload a new sub drawing</div>
+                <div className="text-sm font-medium">Upload a new drawing</div>
+                <div className="text-sm text-muted-foreground">
+                  This upload can be compared against the drawing open in this workspace.
+                </div>
                 <div className="text-sm text-muted-foreground">
                   Accepted: PDF, PNG, JPEG, or GIF (same rules as the server).
                 </div>
@@ -357,6 +341,12 @@ export default function CompareSubDrawingModal({
               </div>
             </TabsContent>
           </Tabs>
+
+          {uploadSuccessMessage ? (
+            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+              {uploadSuccessMessage}
+            </div>
+          ) : null}
 
           {compareErrorMessage ? (
             <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

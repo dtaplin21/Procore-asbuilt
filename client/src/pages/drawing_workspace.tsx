@@ -39,8 +39,8 @@ export function DrawingWorkspaceBody({
     setSelectionQueryParams,
   } = useWorkspaceSelectionQueryParams();
 
-  /** Scopes dashboard KPIs (`currentDrawingId`) to the workspace master drawing. */
-  useQuery({
+  /** Dashboard summary — UX-only `current_drawing.name` for the compare modal (same scope as workspace route). */
+  const summaryQuery = useQuery({
     queryKey: [
       "project-dashboard-summary",
       parsedProjectId,
@@ -51,6 +51,9 @@ export function DrawingWorkspaceBody({
         currentDrawingId: parsedDrawingId,
       }),
   });
+
+  const currentDrawingName =
+    summaryQuery.data?.current_drawing?.name ?? null;
 
   const openCompareModal = () => {
     setCompareModalOpen(true);
@@ -124,13 +127,14 @@ export function DrawingWorkspaceBody({
     <CompareSubDrawingModal
       open={compareModalOpen}
       onOpenChange={setCompareModalOpen}
-      projectId={parsedProjectId}
-      masterDrawingId={parsedDrawingId}
+      projectId={projectId}
+      masterDrawingId={masterDrawingId}
+      currentDrawingName={currentDrawingName}
       selectedDrawingId={selectedSubDrawingId}
       onSelectSubDrawing={setSelectedSubDrawingId}
-      onConfirmCompare={handleConfirmCompare}
       compareLoading={compareLoading}
       compareError={compareError}
+      onConfirmCompare={handleConfirmCompare}
     />
   );
 

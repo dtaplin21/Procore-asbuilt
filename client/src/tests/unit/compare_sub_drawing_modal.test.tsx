@@ -7,6 +7,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
+import { useState } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import CompareSubDrawingModal from "@/components/drawing-workspace/compare_sub_drawing_modal";
@@ -56,17 +57,26 @@ describe("CompareSubDrawingModal", () => {
     const onConfirmCompare = vi.fn().mockResolvedValue(undefined);
     const onOpenChange = vi.fn();
 
-    renderWithProviders(
-      <CompareSubDrawingModal
-        open
-        onOpenChange={onOpenChange}
-        projectId={1}
-        masterDrawingId={10}
-        onConfirmCompare={onConfirmCompare}
-        compareLoading={false}
-        compareError={null}
-      />
-    );
+    function Harness() {
+      const [selectedDrawingId, setSelectedDrawingId] = useState<number | null>(
+        null
+      );
+      return (
+        <CompareSubDrawingModal
+          open
+          onOpenChange={onOpenChange}
+          projectId={1}
+          masterDrawingId={10}
+          selectedDrawingId={selectedDrawingId}
+          onSelectSubDrawing={setSelectedDrawingId}
+          onConfirmCompare={onConfirmCompare}
+          compareLoading={false}
+          compareError={null}
+        />
+      );
+    }
+
+    renderWithProviders(<Harness />);
 
     fireEvent.click(screen.getByTestId("sub-drawing-item-201"));
     fireEvent.click(screen.getByTestId("confirm-compare-sub-drawing-button"));
@@ -81,6 +91,7 @@ describe("CompareSubDrawingModal", () => {
         onOpenChange={vi.fn()}
         projectId={1}
         masterDrawingId={10}
+        selectedDrawingId={null}
         onConfirmCompare={vi.fn()}
         compareLoading
         compareError={null}
@@ -95,17 +106,26 @@ describe("CompareSubDrawingModal", () => {
   it("renders compare error message for retry", () => {
     const onConfirmCompare = vi.fn().mockResolvedValue(undefined);
 
-    renderWithProviders(
-      <CompareSubDrawingModal
-        open
-        onOpenChange={vi.fn()}
-        projectId={1}
-        masterDrawingId={10}
-        onConfirmCompare={onConfirmCompare}
-        compareLoading={false}
-        compareError="Compare failed on server"
-      />
-    );
+    function Harness() {
+      const [selectedDrawingId, setSelectedDrawingId] = useState<number | null>(
+        null
+      );
+      return (
+        <CompareSubDrawingModal
+          open
+          onOpenChange={vi.fn()}
+          projectId={1}
+          masterDrawingId={10}
+          selectedDrawingId={selectedDrawingId}
+          onSelectSubDrawing={setSelectedDrawingId}
+          onConfirmCompare={onConfirmCompare}
+          compareLoading={false}
+          compareError="Compare failed on server"
+        />
+      );
+    }
+
+    renderWithProviders(<Harness />);
 
     expect(screen.getByText("Compare failed on server")).toBeInTheDocument();
     expect(
@@ -126,6 +146,7 @@ describe("CompareSubDrawingModal", () => {
         onOpenChange={onOpenChange}
         projectId={1}
         masterDrawingId={10}
+        selectedDrawingId={null}
         onConfirmCompare={vi.fn()}
         compareLoading
         compareError={null}
