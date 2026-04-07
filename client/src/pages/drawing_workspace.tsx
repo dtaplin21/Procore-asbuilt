@@ -18,7 +18,7 @@ type DrawingWorkspaceBodyProps = {
   parsedDrawingId: number;
 };
 
-function DrawingWorkspaceBody({
+export function DrawingWorkspaceBody({
   parsedProjectId,
   parsedDrawingId,
 }: DrawingWorkspaceBodyProps) {

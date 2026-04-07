@@ -1,3 +1,10 @@
+/**
+ * Test file 2 — CompareSubDrawingModal unit / integration (tabs, busy locks, errors, selection, upload).
+ *
+ * Parent / page wiring for `DrawingWorkspaceBody` + `runCompare` is in:
+ * `client/src/tests/integration/drawing_workspace_compare_modal.test.tsx` (test file 1).
+ */
+
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
