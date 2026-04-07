@@ -133,6 +133,10 @@ export interface DrawingAlignmentCreate {
   method: string; // "manual" | "feature_match" | "vision"
 }
 
+/**
+ * Persisted alignment from the alignments API. Backend always returns `id` for saved rows.
+ * **Rerun diff** (`POST .../diffs` with `alignment_id`) requires this stable numeric `id`.
+ */
 export interface DrawingAlignmentResponse {
   id: number;
   master_drawing_id: number;
@@ -194,6 +198,7 @@ export interface DrawingOverlayDrawingSummary {
 /**
  * POST /compare alignment payload. `transform` is null when alignment is queued, failed, or not yet computed.
  * (Wire JSON may use camelCase aliases depending on client; this is the logical contract.)
+ * `id` is required once the alignment is persisted — use it for rerun alongside list/history rows.
  */
 export interface DrawingAlignmentOverlayResponse {
   id: number;
@@ -511,11 +516,11 @@ export interface SyncHealth {
   error_message?: string | null;
 }
 
-// Summary for the currently selected drawing, if any.
-// Uses snake_case to match API response.
+/** Mirrors backend `CurrentDrawingSummary`; JSON uses string timestamps, not `Date`. */
 export interface CurrentDrawingSummary {
   id: number;
   name: string;
+  /** Backend `datetime` → ISO string in JSON; parse in UI if you need `Date`. */
   updated_at: string;
 }
 
@@ -537,12 +542,14 @@ export interface ProjectSummaryKpis {
 }
 
 // Part 6 — top-level dashboard summary (GET /api/projects/{project_id}/dashboard/summary).
+// Mirrors `DashboardSummaryResponse` in backend; optional fields only where the API omits them.
 export interface DashboardSummaryResponse {
   project: ProjectSummary;
-  company_context?: CompanyContext | null;
-  sync_health?: SyncHealth | null;
+  company_context: CompanyContext;
+  sync_health: SyncHealth;
+  /** `None` / omitted when no current drawing; never use as the workspace route id source. */
   current_drawing?: CurrentDrawingSummary | null;
-  kpis?: ProjectSummaryKpis | null;
+  kpis: ProjectSummaryKpis;
 }
 
 /** @alias DashboardSummaryResponse */

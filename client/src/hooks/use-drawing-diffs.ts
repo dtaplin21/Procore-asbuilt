@@ -25,11 +25,25 @@ export function useDrawingDiffs(
 }
 
 /**
+ * Variables for `mutate` / `mutateAsync` only. `projectId` and `masterDrawingId` are **not**
+ * passed here — they are fixed when you call `useRunDrawingDiff(projectId, masterDrawingId)`.
+ */
+export type RunDrawingDiffMutationVariables = {
+  alignmentId: number;
+};
+
+/**
  * Run the diff pipeline for an alignment.
  * POST /api/projects/${projectId}/drawings/${masterDrawingId}/diffs
  * Body: RunDrawingDiffRequest
  *
  * Invalidates all diff queries for this project+drawing on success.
+ *
+ * **Usage** (ids are strings to match URL segments / existing callers):
+ * ```ts
+ * const { mutateAsync } = useRunDrawingDiff(String(projectId), String(masterDrawingId));
+ * await mutateAsync({ alignmentId });
+ * ```
  */
 export function useRunDrawingDiff(
   projectId: string | null,
@@ -40,7 +54,7 @@ export function useRunDrawingDiff(
   return useMutation<
     DrawingDiffsListResponse["items"],
     Error,
-    { alignmentId: number }
+    RunDrawingDiffMutationVariables
   >({
     mutationFn: async ({ alignmentId }) => {
       if (!projectId || !masterDrawingId) {

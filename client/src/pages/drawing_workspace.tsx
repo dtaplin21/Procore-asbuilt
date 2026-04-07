@@ -31,7 +31,12 @@ export function DrawingWorkspaceBody({
   const [compareError, setCompareError] = useState<string | null>(null);
 
   const projectId = parsedProjectId;
+  /** Workspace “master” side of compare — always from route `drawingId`, not from dashboard summary. */
   const masterDrawingId = parsedDrawingId;
+
+  useEffect(() => {
+    setSelectedSubDrawingId(null);
+  }, [parsedProjectId, parsedDrawingId]);
 
   const {
     alignmentIdFromUrl,
@@ -39,7 +44,7 @@ export function DrawingWorkspaceBody({
     setSelectionQueryParams,
   } = useWorkspaceSelectionQueryParams();
 
-  /** Dashboard summary — UX-only `current_drawing.name` for the compare modal (same scope as workspace route). */
+  /** UX-only label (`current_drawing.name`); optional. Do not use summary ids for `masterDrawingId` (avoid circularity). */
   const summaryQuery = useQuery({
     queryKey: [
       "project-dashboard-summary",
@@ -131,7 +136,7 @@ export function DrawingWorkspaceBody({
       masterDrawingId={masterDrawingId}
       currentDrawingName={currentDrawingName}
       selectedDrawingId={selectedSubDrawingId}
-      onSelectSubDrawing={setSelectedSubDrawingId}
+      onSelectSubDrawing={(drawingId) => setSelectedSubDrawingId(drawingId)}
       compareLoading={compareLoading}
       compareError={compareError}
       onConfirmCompare={handleConfirmCompare}
@@ -190,10 +195,13 @@ export function DrawingWorkspaceBody({
             <CompareSubDrawingButton onClick={openCompareModal} />
 
             <AlignmentsPanel
+              projectId={projectId}
+              masterDrawingId={masterDrawingId}
               alignments={alignments}
               selectedAlignmentId={selectedAlignmentId}
               loading={workspaceLoading}
               onSelectAlignment={selectAlignment}
+              onRerunComplete={() => void reloadSelectedDiffs()}
             />
 
             <DiffTimelinePanel

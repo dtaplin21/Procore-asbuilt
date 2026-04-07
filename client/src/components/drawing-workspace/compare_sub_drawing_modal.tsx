@@ -32,7 +32,8 @@ export type CompareSubDrawingModalProps = {
   /** UX-only label (e.g. from dashboard summary `current_drawing.name`). */
   currentDrawingName?: string | null;
   selectedDrawingId: number | null;
-  onSelectSubDrawing?: (drawingId: number | null) => void;
+  /** Called when the user picks or uploads a sub drawing (numeric id only). Clear selection on route change in the parent. */
+  onSelectSubDrawing?: (drawingId: number) => void;
   compareLoading?: boolean;
   compareError?: string | null;
   onConfirmCompare: (subDrawingId: number) => Promise<void> | void;
@@ -71,7 +72,7 @@ export default function CompareSubDrawingModal({
   const isBusy = uploading || Boolean(compareLoading);
 
   const updateSelection = useCallback(
-    (drawingId: number | null) => {
+    (drawingId: number) => {
       onSelectSubDrawing?.(drawingId);
     },
     [onSelectSubDrawing]
@@ -140,8 +141,7 @@ export default function CompareSubDrawingModal({
     setSearch("");
     setActiveTab("choose");
     resetUploadState();
-    onSelectSubDrawing?.(null);
-  }, [projectId, masterDrawingId, resetUploadState, onSelectSubDrawing]);
+  }, [projectId, masterDrawingId, resetUploadState]);
 
   const filteredDrawings = useMemo(() => {
     const query = search.trim().toLowerCase();

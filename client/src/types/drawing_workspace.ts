@@ -45,6 +45,7 @@ export type ProjectDrawingsResponse = {
   drawings: ProjectDrawingCandidate[];
 };
 
+/** Workspace alignment row from GET alignments — `id` is always set; required for selection + rerun diff. */
 export type DrawingAlignment = {
   id: number;
   projectId: number;
@@ -126,6 +127,7 @@ export type DrawingAlignmentTransformResponse = DrawingTransform;
 /**
  * Alignment + structured transform for workspace overlay (POST compare).
  * `transform` is null when alignment failed or is incomplete (matches backend optional transform).
+ * `id` is always present for persisted alignments — use for rerun, same as {@link DrawingAlignment.id}.
  */
 export type DrawingAlignmentOverlayResponse = {
   id: number;
@@ -138,7 +140,7 @@ export type DrawingAlignmentOverlayResponse = {
   errorMessage?: string | null;
 };
 
-/** List/history alignment row or overlay row from compare. */
+/** Union of workspace alignment rows; both variants require `id: number` (stable for rerun). */
 export type DrawingAlignmentListItem = DrawingAlignment | DrawingAlignmentOverlayResponse;
 
 /** Backend-owned comparison metric (same semantics as dashboard where applicable). */

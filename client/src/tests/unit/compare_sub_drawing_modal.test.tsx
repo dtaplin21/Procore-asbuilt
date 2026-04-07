@@ -68,7 +68,7 @@ describe("CompareSubDrawingModal", () => {
           projectId={1}
           masterDrawingId={10}
           selectedDrawingId={selectedDrawingId}
-          onSelectSubDrawing={setSelectedDrawingId}
+          onSelectSubDrawing={(id) => setSelectedDrawingId(id)}
           onConfirmCompare={onConfirmCompare}
           compareLoading={false}
           compareError={null}
@@ -117,7 +117,7 @@ describe("CompareSubDrawingModal", () => {
           projectId={1}
           masterDrawingId={10}
           selectedDrawingId={selectedDrawingId}
-          onSelectSubDrawing={setSelectedDrawingId}
+          onSelectSubDrawing={(id) => setSelectedDrawingId(id)}
           onConfirmCompare={onConfirmCompare}
           compareLoading={false}
           compareError="Compare failed on server"
