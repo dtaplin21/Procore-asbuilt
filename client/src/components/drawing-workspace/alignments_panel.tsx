@@ -29,22 +29,24 @@ export default function AlignmentsPanel({
   onSelectAlignment,
   onRerunComplete,
 }: AlignmentsPanelProps) {
-  const runDrawingDiff = useRunDrawingDiff(
+  const runDrawingDiffMutation = useRunDrawingDiff(
     String(projectId),
     String(masterDrawingId)
   );
 
-  const [rerunError, setRerunError] = useState<string | null>(null);
+  /** Which alignment row is currently re-running (only that row shows loading / disabled). */
   const [rerunningAlignmentId, setRerunningAlignmentId] = useState<number | null>(
     null
   );
+  /** MVP: one visible error below the list. For per-row copy, switch to `Record<number, string>`. */
+  const [rerunError, setRerunError] = useState<string | null>(null);
 
   const handleRerun = useCallback(
     async (alignmentId: number) => {
       setRerunError(null);
       setRerunningAlignmentId(alignmentId);
       try {
-        await runDrawingDiff.mutateAsync({ alignmentId });
+        await runDrawingDiffMutation.mutateAsync({ alignmentId });
         await onRerunComplete?.();
       } catch (error) {
         const message =
@@ -54,10 +56,8 @@ export default function AlignmentsPanel({
         setRerunningAlignmentId(null);
       }
     },
-    [onRerunComplete, runDrawingDiff]
+    [onRerunComplete, runDrawingDiffMutation]
   );
-
-  const busy = runDrawingDiff.isPending || rerunningAlignmentId != null;
 
   return (
     <section className="overflow-hidden rounded-xl border bg-white">
@@ -119,7 +119,8 @@ export default function AlignmentsPanel({
                   <button
                     type="button"
                     onClick={() => void handleRerun(alignment.id)}
-                    disabled={busy}
+                    disabled={rowRerunning}
+                    aria-busy={rowRerunning}
                     data-testid={`alignment-rerun-${alignment.id}`}
                     className="whitespace-nowrap rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
