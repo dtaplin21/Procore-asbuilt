@@ -28,6 +28,7 @@ import {
   buildDrawingPickerUrl,
   buildWorkspaceUrlWithFinding,
 } from "@/lib/workspace-links";
+import { fetchProjectDashboardSummary } from "@/lib/api/projects";
 
 function getProjectIdFromUrl(): string | null {
   const sp = new URLSearchParams(window.location.search);
@@ -181,12 +182,12 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
 
   // Project-specific summary (Phase 0 change)
   const { data: projectSummary, isLoading: projectSummaryLoading } = useQuery<DashboardSummary>({
-    queryKey: [
-      selectedProjectId
-        ? `/api/projects/${selectedProjectId}/dashboard/summary?user_id=${procoreUserId || ""}`
-        : "/api/projects/" // unused but keeps key consistent
-    ],
-    enabled: !!selectedProjectId,
+    queryKey: ["project-dashboard-summary", selectedProjectId, null, procoreUserId ?? null],
+    queryFn: () =>
+      fetchProjectDashboardSummary(Number(selectedProjectId), {
+        userId: procoreUserId ?? undefined,
+      }),
+    enabled: !!selectedProjectId && Number.isFinite(Number(selectedProjectId)),
   });
 
   // If URL has no projectId, pick a default once projects load

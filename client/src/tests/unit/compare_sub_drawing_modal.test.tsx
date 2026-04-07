@@ -54,14 +54,14 @@ describe("CompareSubDrawingModal", () => {
 
   it("shows sub drawings, selects one, and calls onConfirmCompare with Compare", () => {
     const onConfirmCompare = vi.fn().mockResolvedValue(undefined);
-    const onClose = vi.fn();
+    const onOpenChange = vi.fn();
 
     renderWithProviders(
       <CompareSubDrawingModal
-        isOpen
+        open
+        onOpenChange={onOpenChange}
         projectId={1}
         masterDrawingId={10}
-        onClose={onClose}
         onConfirmCompare={onConfirmCompare}
         compareLoading={false}
         compareError={null}
@@ -77,10 +77,10 @@ describe("CompareSubDrawingModal", () => {
   it("shows Comparing... on the confirm button while compareLoading is true", () => {
     renderWithProviders(
       <CompareSubDrawingModal
-        isOpen
+        open
+        onOpenChange={vi.fn()}
         projectId={1}
         masterDrawingId={10}
-        onClose={vi.fn()}
         onConfirmCompare={vi.fn()}
         compareLoading
         compareError={null}
@@ -97,10 +97,10 @@ describe("CompareSubDrawingModal", () => {
 
     renderWithProviders(
       <CompareSubDrawingModal
-        isOpen
+        open
+        onOpenChange={vi.fn()}
         projectId={1}
         masterDrawingId={10}
-        onClose={vi.fn()}
         onConfirmCompare={onConfirmCompare}
         compareLoading={false}
         compareError="Compare failed on server"
@@ -118,14 +118,14 @@ describe("CompareSubDrawingModal", () => {
   });
 
   it("disables escape and backdrop close while compareLoading", () => {
-    const onClose = vi.fn();
+    const onOpenChange = vi.fn();
 
     renderWithProviders(
       <CompareSubDrawingModal
-        isOpen
+        open
+        onOpenChange={onOpenChange}
         projectId={1}
         masterDrawingId={10}
-        onClose={onClose}
         onConfirmCompare={vi.fn()}
         compareLoading
         compareError={null}
@@ -133,9 +133,9 @@ describe("CompareSubDrawingModal", () => {
     );
 
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(onClose).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId("compare-sub-drawing-modal-backdrop"));
-    expect(onClose).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
   });
 });

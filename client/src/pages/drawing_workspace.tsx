@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useParams } from "wouter";
 
 import AlignmentsPanel from "@/components/drawing-workspace/alignments_panel";
@@ -11,6 +12,7 @@ import WorkspaceErrorState from "@/components/drawing-workspace/workspace_error_
 import WorkspaceLoadingState from "@/components/drawing-workspace/workspace_loading_state";
 import { useDrawingWorkspace } from "@/hooks/use_drawing_workspace";
 import { useWorkspaceSelectionQueryParams } from "@/hooks/use_workspace_selection_query_params";
+import { fetchProjectDashboardSummary } from "@/lib/api/projects";
 import type { WorkspaceRouteParams } from "@/types/drawing_workspace";
 
 type DrawingWorkspaceBodyProps = {
@@ -22,7 +24,7 @@ export function DrawingWorkspaceBody({
   parsedProjectId,
   parsedDrawingId,
 }: DrawingWorkspaceBodyProps) {
-  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+  const [compareModalOpen, setCompareModalOpen] = useState(false);
   const [selectedSubDrawingId, setSelectedSubDrawingId] = useState<number | null>(null);
 
   const {
@@ -31,12 +33,21 @@ export function DrawingWorkspaceBody({
     setSelectionQueryParams,
   } = useWorkspaceSelectionQueryParams();
 
-  const openCompareModal = () => {
-    setIsCompareModalOpen(true);
-  };
+  /** Scopes dashboard KPIs (`currentDrawingId`) to the workspace master drawing. */
+  useQuery({
+    queryKey: [
+      "project-dashboard-summary",
+      parsedProjectId,
+      parsedDrawingId,
+    ],
+    queryFn: () =>
+      fetchProjectDashboardSummary(parsedProjectId, {
+        currentDrawingId: parsedDrawingId,
+      }),
+  });
 
-  const closeCompareModal = () => {
-    setIsCompareModalOpen(false);
+  const openCompareModal = () => {
+    setCompareModalOpen(true);
   };
 
   const {
@@ -75,7 +86,7 @@ export function DrawingWorkspaceBody({
   const handleConfirmCompare = async (subDrawingId: number) => {
     await runCompare(subDrawingId);
     setSelectedSubDrawingId(subDrawingId);
-    closeCompareModal();
+    setCompareModalOpen(false);
   };
 
   const header = (
@@ -89,10 +100,11 @@ export function DrawingWorkspaceBody({
 
   const compareModal = (
     <CompareSubDrawingModal
-      isOpen={isCompareModalOpen}
+      open={compareModalOpen}
+      onOpenChange={setCompareModalOpen}
       projectId={parsedProjectId}
       masterDrawingId={parsedDrawingId}
-      onClose={closeCompareModal}
+      selectedDrawingId={selectedSubDrawingId}
       onSelectSubDrawing={setSelectedSubDrawingId}
       onConfirmCompare={handleConfirmCompare}
       compareLoading={compareLoading}

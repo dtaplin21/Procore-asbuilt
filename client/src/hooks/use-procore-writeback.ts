@@ -50,7 +50,9 @@ function invalidateAfterWriteback(queryClient: ReturnType<typeof useQueryClient>
         typeof key === "string" &&
         (key.includes(`/api/projects/${projectId}/inspections/runs`) ||
           (key.includes(`/api/projects/${projectId}/drawings/`) && key.includes("/overlays")) ||
-          key.includes(`/api/projects/${projectId}/dashboard/summary`))
+          key.includes(`/api/projects/${projectId}/dashboard/summary`) ||
+          (key === "project-dashboard-summary" &&
+            String(query.queryKey[1]) === String(projectId)))
       );
     },
   });

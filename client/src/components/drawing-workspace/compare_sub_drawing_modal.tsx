@@ -25,16 +25,17 @@ function normalizeCompareErrorMessage(value: unknown): string | null {
 }
 
 type Props = {
-  isOpen: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   /** Numeric project id — parse route params with `Number(...)` / `coerceProjectIdForApi` before passing. */
   projectId: number;
-  /** Current workspace (master) drawing id — numeric; parse route params before passing. */
+  /** Workspace route master (left) drawing — same id as the URL segment; no separate project-master lookup. */
   masterDrawingId: number;
   /**
-   * Called when the user should dismiss the modal (parent sets `isOpen` to false).
-   * Custom overlay — not Radix `Dialog`; use this instead of `onOpenChange(open: boolean)` (same idea as `onOpenChange(false)`).
+   * Parent-owned sub selection. When provided, list/upload updates go through `onSelectSubDrawing`.
+   * Omit in tests for fully uncontrolled selection.
    */
-  onClose: () => void;
+  selectedDrawingId?: number | null;
   /**
    * Parent selection sync: pass `setSelectedSubDrawingId` so list picks and upload success
    * (`onSelectSubDrawing?.(response.id)`) update page state. Optional; omit only in tests.
@@ -48,10 +49,11 @@ type Props = {
 };
 
 export default function CompareSubDrawingModal({
-  isOpen,
+  open,
+  onOpenChange,
   projectId,
   masterDrawingId,
-  onClose,
+  selectedDrawingId: selectedDrawingIdProp,
   onSelectSubDrawing,
   onConfirmCompare,
   compareLoading,
@@ -60,7 +62,9 @@ export default function CompareSubDrawingModal({
   const compareErrorMessage = normalizeCompareErrorMessage(compareError);
 
   const [search, setSearch] = useState("");
-  const [selectedDrawingId, setSelectedDrawingId] = useState<number | null>(null);
+  const [uncontrolledSelected, setUncontrolledSelected] = useState<number | null>(null);
+  const selectedDrawingId =
+    selectedDrawingIdProp !== undefined ? selectedDrawingIdProp : uncontrolledSelected;
   const [activeTab, setActiveTab] = useState<"choose" | "upload">("choose");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -70,10 +74,20 @@ export default function CompareSubDrawingModal({
   const { drawings, loading, error, reload } = useProjectDrawings({
     projectId,
     masterDrawingId,
-    enabled: isOpen,
+    enabled: open,
   });
 
   const isBusy = uploading || Boolean(compareLoading);
+
+  const updateSelection = useCallback(
+    (drawingId: number | null) => {
+      if (selectedDrawingIdProp === undefined) {
+        setUncontrolledSelected(drawingId);
+      }
+      onSelectSubDrawing?.(drawingId);
+    },
+    [selectedDrawingIdProp, onSelectSubDrawing]
+  );
 
   const resetUploadState = useCallback(() => {
     setUploading(false);
@@ -89,11 +103,11 @@ export default function CompareSubDrawingModal({
     if (isBusy) return;
     resetUploadState();
     setActiveTab("choose");
-    onClose();
-  }, [isBusy, onClose, resetUploadState]);
+    onOpenChange(false);
+  }, [isBusy, onOpenChange, resetUploadState]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!open) return;
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -105,25 +119,53 @@ export default function CompareSubDrawingModal({
     return () => {
       window.removeEventListener("keydown", handleEscape);
     };
-  }, [isOpen, handleRequestClose]);
+  }, [open, handleRequestClose]);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!open) {
       setSearch("");
-      setSelectedDrawingId(null);
       setActiveTab("choose");
       resetUploadState();
+      if (selectedDrawingIdProp === undefined) {
+        setUncontrolledSelected(null);
+      }
     }
-  }, [isOpen, resetUploadState]);
+  }, [open, resetUploadState, selectedDrawingIdProp]);
 
-  /** While open, reset pick/search when project context changes so nothing stale lingers. */
+  const prevWorkspaceRef = useRef<{
+    projectId: number;
+    masterDrawingId: number;
+  } | null>(null);
+
+  /** When the route workspace (project + master) changes, reset search/upload and sub pick — not on every `open` toggle. */
   useEffect(() => {
-    if (!isOpen) return;
+    const prev = prevWorkspaceRef.current;
+    const next = { projectId, masterDrawingId };
+    if (
+      prev &&
+      prev.projectId === next.projectId &&
+      prev.masterDrawingId === next.masterDrawingId
+    ) {
+      return;
+    }
+    prevWorkspaceRef.current = next;
+    if (!prev) return;
+
     setSearch("");
-    setSelectedDrawingId(null);
     setActiveTab("choose");
     resetUploadState();
-  }, [isOpen, projectId, masterDrawingId, resetUploadState]);
+    if (selectedDrawingIdProp === undefined) {
+      setUncontrolledSelected(null);
+    } else {
+      onSelectSubDrawing?.(null);
+    }
+  }, [
+    projectId,
+    masterDrawingId,
+    resetUploadState,
+    selectedDrawingIdProp,
+    onSelectSubDrawing,
+  ]);
 
   const filteredDrawings = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -138,8 +180,7 @@ export default function CompareSubDrawingModal({
   }, [drawings, search]);
 
   const handleSelectDrawing = (drawingId: number) => {
-    setSelectedDrawingId(drawingId);
-    onSelectSubDrawing?.(drawingId);
+    updateSelection(drawingId);
   };
 
   const handleConfirm = async () => {
@@ -157,8 +198,7 @@ export default function CompareSubDrawingModal({
 
       await reload();
 
-      setSelectedDrawingId(response.id);
-      onSelectSubDrawing?.(response.id);
+      updateSelection(response.id);
       setSelectedFile(null);
 
       setActiveTab("choose");
@@ -188,7 +228,7 @@ export default function CompareSubDrawingModal({
     }
   }
 
-  if (!isOpen) {
+  if (!open) {
     return null;
   }
 
