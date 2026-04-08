@@ -66,3 +66,8 @@ Material Design 3 inspired with Linear-style B2B SaaS patterns. Mobile-first app
 - **recharts**: Data visualization charts
 - **vaul**: Drawer component
 - **wouter**: Lightweight routing
+
+## Documentation
+
+- Engineering and product notes live under `Notes/`. Start at `Notes/README.md`.
+- How to keep docs up to date: `Notes/DOC_MAINTENANCE.md`.

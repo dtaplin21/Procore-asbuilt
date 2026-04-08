@@ -82,5 +82,13 @@ test.describe('My Feature', () => {
 });
 ```
 
+## Unit tests (Vitest)
 
+Client unit tests live under `client/src/**/*.test.ts(x)` and run with:
+
+```bash
+npm run test:unit
+```
+
+When you change how tests are organized or which runner applies, update this README and see `Notes/DOC_MAINTENANCE.md`.
 

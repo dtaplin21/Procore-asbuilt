@@ -5,4 +5,10 @@ Put product-facing documentation here:
 - Personas and workflows
 - UX/UI notes and screenshots (if needed)
 
-Use `Notes/TEMPLATE_FEATURE_DOC.md` as a starting point and keep this folder focused on *product intent*.
+Use [`Notes/TEMPLATE_FEATURE_DOC.md`](../TEMPLATE_FEATURE_DOC.md) as a starting point and keep this folder focused on *product intent*.
+
+**Maintenance:** When you add a doc here, list it in this README. See [`Notes/DOC_MAINTENANCE.md`](../DOC_MAINTENANCE.md).
+
+### Current docs
+
+*(None yet — pillar is ready for product-level feature write-ups.)*
