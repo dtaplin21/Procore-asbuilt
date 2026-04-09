@@ -13,6 +13,7 @@ from typing import Optional, cast
 from sqlalchemy.orm import Session
 
 from models.models import JobQueue, Project, User, UserCompany
+from observability.workflow_logging import log_job_status_transition
 from services.drawing_rendering import run_render_drawing_job
 
 DRAWING_RENDER_JOB_TYPE = "drawing_render"
@@ -63,6 +64,12 @@ def enqueue_drawing_render_job(
     db.add(job)
     db.commit()
     db.refresh(job)
+    log_job_status_transition(
+        project_id=project_id,
+        job_id=job.id,
+        status="pending",
+        previous_status=None,
+    )
     return job
 
 

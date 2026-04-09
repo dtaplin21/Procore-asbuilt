@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from database import SessionLocal
 from models.models import JobQueue
+from observability.workflow_logging import log_job_status_transition
 from services.drawing_render_jobs import (
     DRAWING_RENDER_JOB_TYPE,
     process_drawing_render_job,
@@ -49,10 +50,17 @@ def _claim_pending_job(db: Session) -> JobQueue | None:
     if not job:
         return None
 
+    previous_status = job.status
     job.status = "processing"
     job.started_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(job)
+    log_job_status_transition(
+        project_id=job.project_id,
+        job_id=job.id,
+        status=job.status,
+        previous_status=previous_status,
+    )
     return job
 
 
@@ -89,9 +97,21 @@ async def process_one_job() -> bool:
         try:
             await handle_job(job)
             _mark_job_completed(db, job_id)
+            log_job_status_transition(
+                project_id=job.project_id,
+                job_id=job.id,
+                status="completed",
+                previous_status="processing",
+            )
             logger.info("Job %s completed", job_id)
         except Exception as exc:
             _mark_job_failed(db, job_id, str(exc))
+            log_job_status_transition(
+                project_id=job.project_id,
+                job_id=job.id,
+                status="failed",
+                previous_status="processing",
+            )
             logger.exception("Job %s failed: %s", job_id, exc)
 
         return True
