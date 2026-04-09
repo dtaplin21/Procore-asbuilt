@@ -35,8 +35,28 @@ class JsonFormatter(logging.Formatter):
             "request_id": getattr(record, "request_id", None),
         }
 
-        # Include common extras if present
-        for key in ("method", "path", "status_code", "duration_ms", "endpoint", "upstream_status", "app_env", "log_level", "error_class", "retry_after"):
+        # Include common extras if present (must match keys passed via logger.info(..., extra={...}))
+        for key in (
+            "method",
+            "path",
+            "status_code",
+            "duration_ms",
+            "endpoint",
+            "upstream_status",
+            "app_env",
+            "log_level",
+            "error_class",
+            "retry_after",
+            # workflow_logging.py
+            "project_id",
+            "job_id",
+            "status",
+            "previous_status",
+            "finding_id",
+            "evidence_ids",
+            "finding_type",
+            "severity",
+        ):
             if hasattr(record, key):
                 payload[key] = getattr(record, key)
 
