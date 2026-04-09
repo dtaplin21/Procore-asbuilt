@@ -72,6 +72,7 @@ from models.models import (
     DrawingOverlay,
     ProcoreWriteback,
 )
+from observability.workflow_logging import log_finding_created
 from services.procore_connection_store import get_active_connection
 from services.evidence_linking import replace_evidence_drawing_links
 from services.dashboard import (
@@ -835,6 +836,13 @@ class StorageService:
             raise
         self.db.refresh(finding)
         self.db.refresh(diff)
+        log_finding_created(
+            project_id=cast(int, finding.project_id),
+            finding_id=cast(int, finding.id),
+            evidence_ids=None,
+            finding_type=cast(str, finding.type),
+            severity=cast(str, finding.severity),
+        )
         return finding
 
     def create_finding(
@@ -866,6 +874,13 @@ class StorageService:
             self.db.rollback()
             raise
         self.db.refresh(finding)
+        log_finding_created(
+            project_id=cast(int, finding.project_id),
+            finding_id=cast(int, finding.id),
+            evidence_ids=None,
+            finding_type=cast(str, finding.type),
+            severity=cast(str, finding.severity),
+        )
         return finding
 
     # ------------------------------------------------------------------

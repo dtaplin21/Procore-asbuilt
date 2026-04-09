@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
+from typing import Any, cast
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -27,14 +28,17 @@ logger = logging.getLogger(__name__)
 
 async def handle_job(job: JobQueue) -> None:
     """Dispatch job to the appropriate handler based on job_type."""
-    if job.job_type == DRAWING_RENDER_JOB_TYPE:
-        drawing_id = job.input_data.get("drawing_id")
+    # Compare Python str values — `job.job_type == ...` is typed as ColumnElement[bool] for ORM descriptors.
+    job_type = cast(str, job.job_type)
+    if job_type == DRAWING_RENDER_JOB_TYPE:
+        input_data = cast(dict[str, Any] | None, job.input_data)
+        drawing_id = input_data.get("drawing_id") if input_data else None
         if drawing_id is None:
             raise ValueError("drawing_render job missing input_data.drawing_id")
         await process_drawing_render_job(int(drawing_id))
         return
 
-    raise ValueError(f"Unknown job_type: {job.job_type}")
+    raise ValueError(f"Unknown job_type: {job_type}")
 
 
 def _claim_pending_job(db: Session) -> JobQueue | None:
@@ -50,16 +54,16 @@ def _claim_pending_job(db: Session) -> JobQueue | None:
     if not job:
         return None
 
-    previous_status = job.status
-    job.status = "processing"
-    job.started_at = datetime.now(timezone.utc)
+    previous_status = cast(str | None, job.status)
+    job.status = "processing"  # type: ignore[assignment]
+    job.started_at = datetime.now(timezone.utc)  # type: ignore[assignment]
     db.commit()
     db.refresh(job)
     log_job_status_transition(
-        project_id=job.project_id,
-        job_id=job.id,
-        status=job.status,
-        previous_status=previous_status,
+        project_id=cast(int, job.project_id),
+        job_id=cast(int, job.id),
+        status=cast(str | None, job.status),
+        previous_status=cast(str | None, previous_status),
     )
     return job
 
@@ -90,29 +94,42 @@ async def process_one_job() -> bool:
         if not job:
             return False
 
-        job_id = job.id
+        job_id = cast(int, job.id)
         job_type = job.job_type
         logger.info("Processing job %s (type=%s)", job_id, job_type)
 
         try:
             await handle_job(job)
+            previous_status = cast(str | None, job.status)
             _mark_job_completed(db, job_id)
             log_job_status_transition(
-                project_id=job.project_id,
-                job_id=job.id,
+                project_id=cast(int, job.project_id),
+                job_id=job_id,
                 status="completed",
-                previous_status="processing",
+                previous_status=previous_status,
             )
             logger.info("Job %s completed", job_id)
         except Exception as exc:
+            previous_status = cast(str | None, job.status)
             _mark_job_failed(db, job_id, str(exc))
             log_job_status_transition(
-                project_id=job.project_id,
-                job_id=job.id,
+                project_id=cast(int, job.project_id),
+                job_id=job_id,
                 status="failed",
-                previous_status="processing",
+                previous_status=previous_status,
             )
-            logger.exception("Job %s failed: %s", job_id, exc)
+            logger.exception(
+                "Job %s failed: %s",
+                job_id,
+                exc,
+                extra={
+                    "project_id": cast(int, job.project_id),
+                    "job_id": job_id,
+                    # Persisted status is failed (ORM instance may not be refreshed after bulk update)
+                    "status": "failed",
+                    "error_class": exc.__class__.__name__,
+                },
+            )
 
         return True
     finally:

@@ -53,6 +53,7 @@ def enqueue_drawing_render_job(
     if not project:
         raise ValueError(f"Project {project_id} not found")
 
+    previous_status = None
     job = JobQueue(
         user_id=user_id,
         company_id=project.company_id,
@@ -66,9 +67,9 @@ def enqueue_drawing_render_job(
     db.refresh(job)
     log_job_status_transition(
         project_id=project_id,
-        job_id=job.id,
-        status="pending",
-        previous_status=None,
+        job_id=cast(int, job.id),
+        status=cast(str | None, job.status),
+        previous_status=previous_status,
     )
     return job
 
