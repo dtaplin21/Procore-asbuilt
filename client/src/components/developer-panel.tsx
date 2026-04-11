@@ -42,6 +42,14 @@ function resolveDrawingName(drawings: ProjectDrawingCandidate[], id: number): st
   return d?.name || `Drawing ${id}`;
 }
 
+/** Backend `get_idempotency_key` requires this header on mutating routes. */
+function jsonPostHeaders(): HeadersInit {
+  return {
+    "Content-Type": "application/json",
+    "Idempotency-Key": crypto.randomUUID(),
+  };
+}
+
 async function createRegion(
   projectId: string,
   masterDrawingId: string,
@@ -51,7 +59,7 @@ async function createRegion(
     `/api/projects/${projectId}/drawings/${masterDrawingId}/regions`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: jsonPostHeaders(),
       credentials: "include",
       body: JSON.stringify(body),
     }
@@ -70,7 +78,7 @@ async function createAlignment(
     `/api/projects/${projectId}/drawings/${masterDrawingId}/alignments`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: jsonPostHeaders(),
       credentials: "include",
       body: JSON.stringify(body),
     }
