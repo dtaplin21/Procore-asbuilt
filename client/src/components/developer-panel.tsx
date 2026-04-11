@@ -19,13 +19,13 @@ import { useToast } from "@/hooks/use-toast";
 import type {
   ProjectListResponse,
   ProjectResponse,
-  DrawingResponse,
   DrawingRegionResponse,
   DrawingAlignmentCreate,
   DrawingAlignmentResponse,
   DrawingAlignmentListResponse,
   DrawingDiffResponse,
 } from "@shared/schema";
+import type { ProjectDrawingCandidate } from "@/types/drawing_workspace";
 
 const ALIGNMENT_STATUS_CONFIG: Record<
   "queued" | "processing" | "complete" | "failed",
@@ -37,7 +37,7 @@ const ALIGNMENT_STATUS_CONFIG: Record<
   failed: { label: "Failed", variant: "destructive" },
 };
 
-function resolveDrawingName(drawings: DrawingResponse[], id: number): string {
+function resolveDrawingName(drawings: ProjectDrawingCandidate[], id: number): string {
   const d = drawings.find((x) => x.id === id);
   return d?.name || `Drawing ${id}`;
 }
@@ -98,7 +98,7 @@ interface DeveloperPanelProps {
   selectedAlignmentId: number | null;
   onAlignmentChange: (id: number | null) => void;
   projects: ProjectResponse[];
-  drawings: DrawingResponse[];
+  drawings: ProjectDrawingCandidate[];
   diffs?: DrawingDiffResponse[];
   diffsLoading?: boolean;
   onDiffRunningChange?: (running: boolean) => void;

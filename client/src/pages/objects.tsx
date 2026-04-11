@@ -40,8 +40,8 @@ import type {
   DrawingObject,
   ObjectStatus,
   ProjectListResponse,
-  DrawingResponse,
 } from "@shared/schema";
+import type { ProjectDrawingsResponse } from "@/types/drawing_workspace";
 import { useDrawingDiffs } from "@/hooks/use-drawing-diffs";
 
 const statusConfig: Record<ObjectStatus, { label: string; color: string }> = {
@@ -68,13 +68,13 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     queryKey: ["/api/projects"],
   });
 
-  const { data: drawingsData, isLoading: drawingsLoading } = useQuery<DrawingResponse[]>({
+  const { data: drawingsData, isLoading: drawingsLoading } = useQuery<ProjectDrawingsResponse>({
     queryKey: [`/api/projects/${selectedProjectId}/drawings`],
     enabled: !!selectedProjectId,
   });
 
   const projects = projectsData?.items ?? [];
-  const drawings = drawingsData ?? [];
+  const drawings = drawingsData?.drawings ?? [];
 
   const { data: objects, isLoading } = useQuery<DrawingObject[]>({
     queryKey: ["/api/objects"],
