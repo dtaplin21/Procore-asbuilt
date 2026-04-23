@@ -53,7 +53,7 @@ def get_storage_file_size(storage_key: str) -> int | None:
 def open_storage_path(storage_key: str) -> Path:
     return storage_key_to_abs_path(storage_key)
 from sqlalchemy.exc import SQLAlchemyError
-from typing import Any, Dict, List, Optional, Sequence, Set, cast
+from typing import Any, Dict, List, Literal, Optional, Sequence, Set, cast
 
 from models.models import (
     Project,
@@ -218,6 +218,7 @@ class StorageService:
         storage_key: str,
         content_type: str,
         page_count: Optional[int] = None,
+        upload_intent: Literal["master", "sub"] | None = None,
     ) -> Drawing:
         drawing = Drawing(
             project_id=project_id,
@@ -226,6 +227,7 @@ class StorageService:
             storage_key=storage_key,
             content_type=content_type,
             page_count=page_count,
+            upload_intent=upload_intent,
         )
         self.db.add(drawing)
         try:

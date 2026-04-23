@@ -320,6 +320,7 @@ class Drawing(Base):
     file_url = Column(String, nullable=True)  # API endpoint for download
     content_type = Column(String, nullable=True)  # 'application/pdf', 'image/png', etc.
     page_count = Column(Integer, nullable=True)  # for PDFs
+    upload_intent = Column(String(16), nullable=True)  # 'master' | 'sub' (upload UX / AI context)
 
     # Rendition processing metadata
     original_filename = Column(String, nullable=True)
