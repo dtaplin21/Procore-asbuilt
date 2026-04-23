@@ -7,7 +7,11 @@ export type UseUploadProjectDrawingResult = {
   uploading: boolean;
   uploadError: string | null;
   /** `projectId` should be a number; `uploadProjectDrawing` also coerces a numeric string defensively. */
-  uploadDrawing: (projectId: number, file: File) => Promise<DrawingResponse>;
+  uploadDrawing: (
+    projectId: number,
+    file: File,
+    uploadIntent?: "master" | "sub"
+  ) => Promise<DrawingResponse>;
   /** Clears `uploadError` and `uploading`. Avoid calling mid-flight unless you intend to cancel UI state (see reset race note in hook). */
   reset: () => void;
 };
@@ -22,7 +26,11 @@ export function useUploadProjectDrawing(): UseUploadProjectDrawingResult {
   }, []);
 
   const uploadDrawing = useCallback(
-    async (projectId: number, file: File): Promise<DrawingResponse> => {
+    async (
+      projectId: number,
+      file: File,
+      uploadIntent?: "master" | "sub"
+    ): Promise<DrawingResponse> => {
       if (!(file instanceof File)) {
         const msg = "No file selected for upload";
         setUploadError(msg);
@@ -32,7 +40,7 @@ export function useUploadProjectDrawing(): UseUploadProjectDrawingResult {
       setUploadError(null);
 
       try {
-        return await uploadProjectDrawing(projectId, file);
+        return await uploadProjectDrawing(projectId, file, uploadIntent);
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Failed to upload drawing";

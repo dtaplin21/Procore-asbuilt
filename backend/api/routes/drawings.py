@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db, get_idempotency_key
+from api.upload_intent_form import coalesce_upload_intent_form
 from models.models import Drawing
 from models.schemas import (
     DrawingOverlayResponse,
@@ -49,11 +50,9 @@ async def upload_drawing(
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
 
-    normalized_upload_intent = (
-        upload_intent if upload_intent is not None else uploadIntent
+    normalized_upload_intent = coalesce_upload_intent_form(
+        upload_intent, uploadIntent
     )
-    if normalized_upload_intent == "":
-        normalized_upload_intent = None
     if normalized_upload_intent not in (None, "master", "sub"):
         raise HTTPException(
             status_code=400,

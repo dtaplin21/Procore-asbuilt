@@ -170,7 +170,7 @@ export default function CompareSubDrawingModal({
     setUploadError(null);
 
     try {
-      const response = await uploadProjectDrawing(projectId, file);
+      const response = await uploadProjectDrawing(projectId, file, "sub");
 
       await reload();
 

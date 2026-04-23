@@ -74,6 +74,7 @@ export async function fetchProjectDrawings(
 /**
  * POST /api/projects/{project_id}/drawings — multipart upload.
  * Form field name `file` matches FastAPI `File(...)`.
+ * Optional `uploadIntent` is sent as form field `upload_intent` (`master` | `sub`).
  * Only `Idempotency-Key` in headers — do not set `Content-Type` (browser sets multipart boundary).
  *
  * Always resolves to a **plain** {@link DrawingResponse} (never `{ drawing: ... }` at the type level).
@@ -81,7 +82,8 @@ export async function fetchProjectDrawings(
  */
 export async function uploadProjectDrawing(
   projectId: number | string,
-  file: File
+  file: File,
+  uploadIntent?: "master" | "sub"
 ): Promise<DrawingResponse> {
   if (!(file instanceof File)) {
     throw new TypeError("uploadProjectDrawing requires a File instance");
@@ -90,6 +92,9 @@ export async function uploadProjectDrawing(
   const pid = coerceProjectIdForApi(projectId);
   const formData = new FormData();
   formData.append("file", file);
+  if (uploadIntent != null) {
+    formData.append("upload_intent", uploadIntent);
+  }
 
   const response = await fetch(`/api/projects/${pid}/drawings`, {
     method: "POST",

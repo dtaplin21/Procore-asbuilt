@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from typing import List, Optional, cast
+from typing import List, Literal, Optional, cast
 
 from api.dependencies import get_db
+from api.upload_intent_form import coalesce_upload_intent_form
 from services.drawing_comparison import serialize_drawing_for_workspace
 from services.drawing_render_jobs import enqueue_drawing_render_job
 from services.storage import StorageService
@@ -108,6 +109,8 @@ def get_project_jobs(
 async def upload_project_drawing(
     project_id: int,
     file: UploadFile = File(...),
+    upload_intent: str | None = Form(default=None),
+    uploadIntent: str | None = Form(default=None),
     db: Session = Depends(get_db),
 ):
     """Upload a drawing file for a project.
@@ -121,6 +124,22 @@ async def upload_project_drawing(
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    normalized_upload_intent = coalesce_upload_intent_form(
+        upload_intent, uploadIntent
+    )
+    if normalized_upload_intent not in (None, "master", "sub"):
+        raise HTTPException(
+            status_code=400,
+            detail="upload_intent must be one of: master, sub",
+        )
+    upload_intent_for_create: Literal["master", "sub"] | None
+    if normalized_upload_intent == "master":
+        upload_intent_for_create = "master"
+    elif normalized_upload_intent == "sub":
+        upload_intent_for_create = "sub"
+    else:
+        upload_intent_for_create = None
+
     # Persist file via helper (validates size/type and writes to disk)
     storage_key, content_type, original_name = save_upload(file, project_id, category="drawings")
 
@@ -133,6 +152,7 @@ async def upload_project_drawing(
         storage_key=storage_key,
         content_type=content_type,
         page_count=None,
+        upload_intent=upload_intent_for_create,
     )
     
     # Set file_url to point to the /file route (will be implemented in next step)
