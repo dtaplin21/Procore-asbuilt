@@ -143,7 +143,7 @@ async def upload_project_drawing(
     # Enqueue async render job for PDF/image rendition generation
     enqueue_drawing_render_job(db, project_id, cast(int, drawing.id))
 
-    return drawing
+    return DrawingResponse.model_validate(drawing)
 
 
 @router.get("/{project_id}/drawings", response_model=ProjectDrawingsResponse)

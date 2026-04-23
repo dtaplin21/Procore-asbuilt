@@ -120,6 +120,8 @@ async def upload_drawing(
     response = DrawingResponse.model_validate(drawing)
     response_data = response.model_dump(mode="json")
     response_data["file_url"] = f"/api/projects/{project_id}/drawings/{cast(int, drawing.id)}/file"
+    # Explicit for idempotency cache + clarity (also present on model_dump from ORM).
+    response_data["upload_intent"] = drawing.upload_intent
 
     # Enqueue async render job for PDF/image rendition generation
     enqueue_drawing_render_job(db, project_id, cast(int, drawing.id))
