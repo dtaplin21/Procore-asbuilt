@@ -1,6 +1,6 @@
-from typing import List, Optional, cast
+from typing import List, Literal, Optional, cast
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db, get_idempotency_key
@@ -37,6 +37,8 @@ router = APIRouter(tags=["drawings"])
 async def upload_drawing(
     project_id: int,
     file: UploadFile = File(...),
+    upload_intent: str | None = Form(default=None),
+    uploadIntent: str | None = Form(default=None),
     idempotency_key: str = Depends(get_idempotency_key),
     db: Session = Depends(get_db),
 ) -> DrawingResponse:
@@ -47,14 +49,35 @@ async def upload_drawing(
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
 
+    normalized_upload_intent = (
+        upload_intent if upload_intent is not None else uploadIntent
+    )
+    if normalized_upload_intent == "":
+        normalized_upload_intent = None
+    if normalized_upload_intent not in (None, "master", "sub"):
+        raise HTTPException(
+            status_code=400,
+            detail="upload_intent must be one of: master, sub",
+        )
+    upload_intent_for_create: Literal["master", "sub"] | None
+    if normalized_upload_intent == "master":
+        upload_intent_for_create = "master"
+    elif normalized_upload_intent == "sub":
+        upload_intent_for_create = "sub"
+    else:
+        upload_intent_for_create = None
+
     file_bytes, content_type, original_name = read_and_validate_upload(file, category="drawings")
     checksum = sha256_bytes(file_bytes)
     source = "upload"
 
+    # Must include normalized_upload_intent: same bytes + same Idempotency-Key would otherwise
+    # hash identically for master vs sub and return the wrong cached DrawingResponse.
     request_fingerprint = {
         "project_id": project_id,
         "checksum": checksum,
         "source": source,
+        "upload_intent": normalized_upload_intent,
     }
     scope = f"drawing_upload:{project_id}:{checksum}:{source}"
 
@@ -91,6 +114,7 @@ async def upload_drawing(
         storage_key=storage_key,
         content_type=content_type,
         page_count=None,
+        upload_intent=upload_intent_for_create,
     )
 
     response = DrawingResponse.model_validate(drawing)

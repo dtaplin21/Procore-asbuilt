@@ -318,6 +318,7 @@ class DrawingResponse(BaseModel):
     file_url: Optional[str] = None
     content_type: Optional[str] = None
     page_count: Optional[int] = None
+    upload_intent: Literal["master", "sub"] | None = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
