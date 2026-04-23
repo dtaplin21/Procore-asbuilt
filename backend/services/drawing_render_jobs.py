@@ -12,7 +12,7 @@ from typing import Optional, cast
 
 from sqlalchemy.orm import Session
 
-from models.models import JobQueue, Project, User, UserCompany
+from models.models import Drawing, JobQueue, Project, User, UserCompany
 from observability.workflow_logging import log_job_status_transition
 from services.drawing_rendering import run_render_drawing_job
 
@@ -53,6 +53,16 @@ def enqueue_drawing_render_job(
     if not project:
         raise ValueError(f"Project {project_id} not found")
 
+    drawing = (
+        db.query(Drawing)
+        .filter(Drawing.id == drawing_id, Drawing.project_id == project_id)
+        .first()
+    )
+    if not drawing:
+        raise ValueError(
+            f"Drawing {drawing_id} not found for project {project_id}; cannot enqueue render job"
+        )
+
     previous_status = None
     job = JobQueue(
         user_id=user_id,
@@ -60,7 +70,11 @@ def enqueue_drawing_render_job(
         project_id=project_id,
         job_type=DRAWING_RENDER_JOB_TYPE,
         status="pending",
-        input_data={"drawing_id": drawing_id},
+        input_data={
+            "drawing_id": drawing_id,
+            "storage_key": drawing.storage_key,
+            "upload_intent": drawing.upload_intent,
+        },
     )
     db.add(job)
     db.commit()
