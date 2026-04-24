@@ -74,14 +74,14 @@ export async function fetchProjectDrawings(
 /**
  * POST /api/projects/{project_id}/drawings — multipart upload.
  * Form field name `file` matches FastAPI `File(...)`.
- * Optional `uploadIntent` is sent as form field `upload_intent` (`master` | `sub`).
+ * Optional `uploadIntent` is sent as multipart field `upload_intent` only (snake_case — not `uploadIntent`).
  * Only `Idempotency-Key` in headers — do not set `Content-Type` (browser sets multipart boundary).
  *
  * Always resolves to a **plain** {@link DrawingResponse} (never `{ drawing: ... }` at the type level).
  * Imports: use `@shared/schema` and `@/lib/api/drawings` (see root `tsconfig.json` paths).
  */
 export async function uploadProjectDrawing(
-  projectId: number | string,
+  projectId: number,
   file: File,
   uploadIntent?: "master" | "sub"
 ): Promise<DrawingResponse> {
@@ -92,7 +92,7 @@ export async function uploadProjectDrawing(
   const pid = coerceProjectIdForApi(projectId);
   const formData = new FormData();
   formData.append("file", file);
-  if (uploadIntent != null) {
+  if (uploadIntent) {
     formData.append("upload_intent", uploadIntent);
   }
 

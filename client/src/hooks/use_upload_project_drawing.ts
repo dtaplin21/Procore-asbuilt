@@ -6,7 +6,6 @@ import { uploadProjectDrawing } from "@/lib/api/drawings";
 export type UseUploadProjectDrawingResult = {
   uploading: boolean;
   uploadError: string | null;
-  /** `projectId` should be a number; `uploadProjectDrawing` also coerces a numeric string defensively. */
   uploadDrawing: (
     projectId: number,
     file: File,
@@ -21,8 +20,8 @@ export function useUploadProjectDrawing(): UseUploadProjectDrawingResult {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const reset = useCallback(() => {
-    setUploadError(null);
     setUploading(false);
+    setUploadError(null);
   }, []);
 
   const uploadDrawing = useCallback(
@@ -40,7 +39,12 @@ export function useUploadProjectDrawing(): UseUploadProjectDrawingResult {
       setUploadError(null);
 
       try {
-        return await uploadProjectDrawing(projectId, file, uploadIntent);
+        const drawing = await uploadProjectDrawing(
+          projectId,
+          file,
+          uploadIntent
+        );
+        return drawing;
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Failed to upload drawing";
