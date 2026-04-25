@@ -21,6 +21,23 @@ function splitPathAndSearch(location: string): { pathname: string; search: strin
   return { pathname: location.slice(0, q), search: location.slice(q + 1) };
 }
 
+/**
+ * Drop workspace selection params that are invalid after switching master drawing.
+ * Keeps any other query keys (e.g. `projectId`, `findingId` if present).
+ *
+ * @param search - Query string **with or without** a leading `?`, or empty.
+ * @returns `?a=b&c=d` or `""` if nothing remains.
+ */
+export function stripWorkspaceSelectionFromSearch(search: string): string {
+  const raw = search.startsWith("?") ? search.slice(1) : search;
+  if (!raw) return "";
+  const params = new URLSearchParams(raw);
+  params.delete("alignmentId");
+  params.delete("diffId");
+  const next = params.toString();
+  return next ? `?${next}` : "";
+}
+
 export function useWorkspaceSelectionQueryParams() {
   const [location, setLocation] = useLocation();
 

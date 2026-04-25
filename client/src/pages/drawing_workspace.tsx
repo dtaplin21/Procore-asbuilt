@@ -13,20 +13,14 @@ import DrawingWorkspaceLayout from "@/components/drawing-workspace/drawing_works
 import WorkspaceErrorState from "@/components/drawing-workspace/workspace_error_state";
 import WorkspaceLoadingState from "@/components/drawing-workspace/workspace_loading_state";
 import { useDrawingWorkspace } from "@/hooks/use_drawing_workspace";
-import { useWorkspaceSelectionQueryParams } from "@/hooks/use_workspace_selection_query_params";
+import {
+  stripWorkspaceSelectionFromSearch,
+  useWorkspaceSelectionQueryParams,
+} from "@/hooks/use_workspace_selection_query_params";
 import { compareSubDrawingToMaster } from "@/lib/api/drawing_workspace";
 import { fetchProjectDashboardSummary } from "@/lib/api/projects";
 import type { DrawingUploadIntent } from "@/components/drawings/DrawingUploadWithIntent";
 import type { WorkspaceRouteParams } from "@/types/drawing_workspace";
-
-/** Preserves other query params but drops selection ids when switching master drawing. */
-function buildWorkspaceQueryWithoutStaleSelection(search: string): string {
-  const params = new URLSearchParams(search);
-  params.delete("alignmentId");
-  params.delete("diffId");
-  const next = params.toString();
-  return next ? `?${next}` : "";
-}
 
 type DrawingWorkspaceBodyProps = {
   parsedProjectId: number;
@@ -156,8 +150,8 @@ export function DrawingWorkspaceBody({
     async (drawing: DrawingResponse, intent: DrawingUploadIntent) => {
       if (intent === "master") {
         const q = location.indexOf("?");
-        const search = q === -1 ? "" : location.slice(q + 1);
-        const nextQuery = buildWorkspaceQueryWithoutStaleSelection(search);
+        const search = q === -1 ? "" : location.slice(q);
+        const nextQuery = stripWorkspaceSelectionFromSearch(search);
         setLocation(
           `/projects/${projectId}/drawings/${drawing.id}/workspace${nextQuery}`
         );
