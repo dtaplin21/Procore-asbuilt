@@ -10,7 +10,12 @@ export type DrawingUploadWithIntentProps = {
   workspaceMasterDrawingId?: number | null;
   allowMaster?: boolean;
   allowSub?: boolean;
-  onComplete?: (drawing: DrawingResponse, intent: DrawingUploadIntent) => void;
+  onComplete?: (
+    drawing: DrawingResponse,
+    intent: DrawingUploadIntent
+  ) => void | Promise<void>;
+  /** Fires when the internal upload hook busy state changes (e.g. modals use this to block dismiss). */
+  onUploadingChange?: (uploading: boolean) => void;
   /** Overrides default copy when Master is selected. */
   masterWarningText?: string;
   /** Overrides default helper when Sub is selected but no master is available. */
@@ -33,6 +38,7 @@ export function DrawingUploadWithIntent({
   allowMaster = true,
   allowSub = true,
   onComplete,
+  onUploadingChange,
   masterWarningText,
   subDisabledReason,
 }: DrawingUploadWithIntentProps) {
@@ -44,6 +50,10 @@ export function DrawingUploadWithIntent({
 
   const { uploading, uploadError, uploadDrawing, reset } =
     useUploadProjectDrawing();
+
+  useEffect(() => {
+    onUploadingChange?.(uploading);
+  }, [uploading, onUploadingChange]);
 
   useEffect(() => {
     setIntent((prev) => {
@@ -64,7 +74,7 @@ export function DrawingUploadWithIntent({
 
   async function handleUpload(file: File) {
     const response = await uploadDrawing(projectId, file, intent);
-    onComplete?.(response, intent);
+    await Promise.resolve(onComplete?.(response, intent));
   }
 
   async function handleFileSelected(event: ChangeEvent<HTMLInputElement>) {
@@ -82,7 +92,7 @@ export function DrawingUploadWithIntent({
         fileInputRef.current.value = "";
       }
     } catch {
-      // uploadError handled in hook
+      // uploadError (hook) or onComplete rejection (e.g. compare)
     }
   }
 
