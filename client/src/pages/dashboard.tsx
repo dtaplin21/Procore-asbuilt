@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import type { InsightListResponse } from "@shared/schema";
+import type { DrawingResponse, InsightListResponse } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { 
   AlertTriangle,
@@ -26,9 +26,11 @@ import type {
 import JobQueueList from "@/components/JobQueueList";
 import {
   buildDrawingPickerUrl,
+  buildWorkspaceUrl,
   buildWorkspaceUrlWithFinding,
 } from "@/lib/workspace-links";
 import { fetchProjectDashboardSummary } from "@/lib/api/projects";
+import { UploadDrawingModal } from "@/components/drawing-workspace/UploadDrawingModal";
 
 function getProjectIdFromUrl(): string | null {
   const sp = new URLSearchParams(window.location.search);
@@ -95,8 +97,9 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ procoreConnection, procoreUserId, onProcoreSync }: DashboardProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const isInsightsView = location === "/insights";
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
   // Selected project context (scopes the dashboard structurally)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() =>
@@ -216,6 +219,15 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
   const comparisonProgress = readComparisonProgressFromKpis(summary?.kpis);
   const highSeverityRisk = readHighSeverityRiskFromKpis(summary?.kpis);
 
+  const handleDashboardUploadSuccess = (drawing: DrawingResponse) => {
+    if (!selectedProjectId) return;
+    const pid = Number(selectedProjectId);
+    if (!Number.isFinite(pid)) return;
+    setLocation(
+      buildWorkspaceUrl({ projectId: pid, masterDrawingId: drawing.id })
+    );
+  };
+
   // NOTE (future): when backend supports project-scoped stats/insights, use query params:
   // queryKey: [`/api/dashboard/stats?project_id=${selectedProjectId}`]
   // queryKey: [`/api/insights?limit=4&project_id=${selectedProjectId}`]
@@ -262,6 +274,17 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
               )}
             </select>
           </div>
+
+          {selectedProjectId ? (
+            <button
+              type="button"
+              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 h-9 self-end"
+              onClick={() => setUploadModalOpen(true)}
+              data-testid="dashboard-upload-drawing"
+            >
+              Upload drawing
+            </button>
+          ) : null}
 
           {/* Existing Procore status */}
           <ProcoreStatus connection={procoreConnection} onSync={onProcoreSync} />
@@ -520,6 +543,17 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
           </CardContent>
         </Card>
       )}
+
+      {selectedProjectId && Number.isFinite(Number(selectedProjectId)) ? (
+        <UploadDrawingModal
+          open={uploadModalOpen}
+          onOpenChange={setUploadModalOpen}
+          projectId={Number(selectedProjectId)}
+          allowMaster
+          allowSub={false}
+          onUploadSuccess={handleDashboardUploadSuccess}
+        />
+      ) : null}
     </div>
   );
 }
