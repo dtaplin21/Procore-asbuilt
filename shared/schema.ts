@@ -72,11 +72,10 @@ export interface DrawingResponse {
   id: number;
   project_id: number;
   name: string;
-  source?: string | null;
+  source: string;
   file_url?: string | null;
   content_type?: string | null;
   page_count?: number | null;
-  /** Exact strings only; JSON key is `upload_intent`. */
   upload_intent?: "master" | "sub" | null;
   created_at: string;
   updated_at: string;

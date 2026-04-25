@@ -13,6 +13,8 @@ export type DrawingUploadFieldProps = {
   fileInputTestId?: string;
   /** Helper text under the button. */
   description?: string;
+  /** When set, sent as multipart `upload_intent` on the upload request. */
+  uploadIntent?: "master" | "sub";
 };
 
 /**
@@ -27,6 +29,7 @@ export default function DrawingUploadField({
   disabled = false,
   fileInputTestId = "drawing-upload-file-input",
   description = "PDF or image. The file is added to this project.",
+  uploadIntent,
 }: DrawingUploadFieldProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevProjectIdRef = useRef<number | null>(null);
@@ -72,7 +75,7 @@ export default function DrawingUploadField({
     reset();
     void (async () => {
       try {
-        const drawing = await uploadDrawing(projectId, file);
+        const drawing = await uploadDrawing(projectId, file, uploadIntent);
         await Promise.resolve(onUploaded(drawing));
         reset();
         clearFileInput();
