@@ -20,7 +20,7 @@ export default function SubDrawingList({
 }: Props) {
   if (loading) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+      <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
         Loading sub drawings...
       </div>
     );
@@ -49,7 +49,7 @@ export default function SubDrawingList({
 
   if (drawings.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed p-4 text-sm text-slate-500">
+      <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
         No candidate sub drawings were found for this project.
       </div>
     );

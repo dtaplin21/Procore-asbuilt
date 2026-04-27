@@ -164,8 +164,8 @@ export function DrawingWorkspaceBody({
 
   const header = (
     <div>
-      <h1 className="text-xl font-semibold text-slate-900">Drawing Workspace</h1>
-      <p className="text-sm text-slate-500">
+      <h1 className="text-xl font-semibold text-foreground">Drawing Workspace</h1>
+      <p className="text-sm text-muted-foreground">
         Project {parsedProjectId} • Drawing {parsedDrawingId}
       </p>
     </div>
@@ -202,7 +202,7 @@ export function DrawingWorkspaceBody({
       <CompareSubDrawingButton onClick={openCompareModal} disabled={uploadDisabled} />
       <button
         type="button"
-        className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+        className="inline-flex w-full items-center justify-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-60"
         onClick={() => setUploadModalOpen(true)}
         disabled={uploadDisabled}
         data-testid="upload-drawing-open"

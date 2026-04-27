@@ -70,9 +70,9 @@ export default function AlignmentsPanel({
   );
 
   return (
-    <section className="overflow-hidden rounded-xl border bg-white">
-      <div className="border-b px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-900">Alignments</h3>
+    <section className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="border-b border-border px-4 py-3">
+        <h3 className="text-sm font-semibold text-foreground">Alignments</h3>
       </div>
 
       {rerunError && (
@@ -85,7 +85,7 @@ export default function AlignmentsPanel({
 
       <div className="max-h-[320px] overflow-y-auto">
         {loading ? (
-          <div className="px-4 py-4 text-sm text-slate-500">Loading alignments...</div>
+          <div className="px-4 py-4 text-sm text-muted-foreground">Loading alignments...</div>
         ) : alignments.length === 0 ? (
           <div className="p-4">
             <WorkspaceEmptyState
@@ -100,39 +100,41 @@ export default function AlignmentsPanel({
             return (
               <div
                 key={alignment.id}
-                className={`flex border-b last:border-b-0 ${
-                  selected ? "bg-slate-100" : "bg-white"
+                className={`flex border-b border-border last:border-b-0 ${
+                  selected
+                    ? "border-l-4 border-l-primary bg-primary-soft"
+                    : "border-l-4 border-l-transparent bg-card"
                 }`}
               >
                 <button
                   type="button"
                   onClick={() => onSelectAlignment(alignment.id)}
                   data-testid={`alignment-${alignment.id}`}
-                  className="min-w-0 flex-1 px-4 py-3 text-left transition hover:bg-slate-50"
+                  className="min-w-0 flex-1 px-4 py-3 text-left transition hover:bg-muted/60"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-slate-900">
+                      <div className="truncate text-sm font-medium text-foreground">
                         {alignment.subDrawing.name}
                       </div>
-                      <div className="mt-1 text-xs text-slate-500">
+                      <div className="mt-1 text-xs text-muted-foreground">
                         Sub drawing #{alignment.subDrawing.id}
                       </div>
                     </div>
 
-                    <span className="shrink-0 rounded-md border px-2 py-1 text-xs text-slate-600">
+                    <span className="shrink-0 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
                       {formatStatus(alignment.alignmentStatus)}
                     </span>
                   </div>
 
                   {alignment.createdAt ? (
-                    <div className="mt-2 text-xs text-slate-400">
+                    <div className="mt-2 text-xs text-muted-foreground/80">
                       {new Date(alignment.createdAt).toLocaleString()}
                     </div>
                   ) : null}
                 </button>
 
-                <div className="flex shrink-0 flex-col justify-center border-l border-slate-200 px-2 py-2">
+                <div className="flex shrink-0 flex-col justify-center border-l border-border px-2 py-2">
                   <button
                     type="button"
                     onClick={(event) => {
@@ -142,7 +144,7 @@ export default function AlignmentsPanel({
                     disabled={rerunningAlignmentId === alignment.id}
                     aria-busy={rerunningAlignmentId === alignment.id}
                     data-testid={`alignment-rerun-${alignment.id}`}
-                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {rerunningAlignmentId === alignment.id
                       ? "Re-running..."

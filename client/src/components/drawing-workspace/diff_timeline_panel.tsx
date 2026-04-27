@@ -23,14 +23,14 @@ export default function DiffTimelinePanel({
   onRetry,
 }: Props) {
   return (
-    <section className="overflow-hidden rounded-xl border bg-white">
-      <div className="border-b px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-900">Diff Timeline</h3>
+    <section className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="border-b border-border px-4 py-3">
+        <h3 className="text-sm font-semibold text-foreground">Diff Timeline</h3>
       </div>
 
       <div className="max-h-[420px] overflow-y-auto">
         {loading ? (
-          <div className="px-4 py-4 text-sm text-slate-500">Loading diffs...</div>
+          <div className="px-4 py-4 text-sm text-muted-foreground">Loading diffs...</div>
         ) : error ? (
           <div className="p-4">
             <div className="rounded-lg border border-red-200 bg-red-50 p-4">
@@ -65,28 +65,30 @@ export default function DiffTimelinePanel({
                 type="button"
                 onClick={() => onSelectDiff(diff.id)}
                 data-testid={`diff-${diff.id}`}
-                className={`w-full border-b px-4 py-3 text-left transition hover:bg-slate-50 ${
-                  selected ? "bg-slate-100" : "bg-white"
+                className={`w-full border-b border-border px-4 py-3 text-left transition hover:bg-muted/60 ${
+                  selected
+                    ? "border-l-4 border-l-primary bg-primary-soft"
+                    : "border-l-4 border-l-transparent bg-card"
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-slate-900">
+                    <div className="truncate text-sm font-medium text-foreground">
                       {diff.summary || `Diff #${diff.id}`}
                     </div>
                     {diff.createdAt ? (
-                      <div className="mt-1 text-xs text-slate-500">
+                      <div className="mt-1 text-xs text-muted-foreground">
                         {new Date(diff.createdAt).toLocaleString()}
                       </div>
                     ) : null}
                   </div>
 
-                  <span className="rounded-md border px-2 py-1 text-xs text-slate-600">
+                  <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
                     {formatSeverity(diff.severity)}
                   </span>
                 </div>
 
-                <div className="mt-2 text-xs text-slate-400">
+                <div className="mt-2 text-xs text-muted-foreground/80">
                   Regions: {diff.diffRegions?.length ?? 0}
                 </div>
               </button>

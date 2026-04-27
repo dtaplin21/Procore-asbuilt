@@ -19,25 +19,25 @@ export default function MasterDrawingViewer({ drawing, selectedDiff }: Props) {
   const isPdf = drawing.contentType === "application/pdf";
 
   return (
-    <div className="flex h-full min-h-[70vh] flex-col overflow-hidden rounded-xl border bg-white">
-      <div className="border-b px-5 py-4">
+    <div className="flex h-full min-h-[70vh] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="border-b border-border px-5 py-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">{drawing.name}</h2>
-            <p className="text-sm text-slate-500">
+            <h2 className="text-lg font-semibold text-foreground">{drawing.name}</h2>
+            <p className="text-sm text-muted-foreground">
               Drawing #{drawing.id}
               {drawing.pageCount != null ? ` • ${drawing.pageCount} page(s)` : ""}
             </p>
           </div>
 
-          <div className="text-right text-xs text-slate-500">
+          <div className="text-right text-xs text-muted-foreground">
             <div>Source: {drawing.source || "unspecified"}</div>
             {selectedDiff ? <div>Selected diff: #{selectedDiff.id}</div> : <div>No diff selected</div>}
           </div>
         </div>
       </div>
 
-      <div className="flex-1 bg-slate-50 p-4">
+      <div className="flex-1 bg-muted/30 p-4">
         {!drawing.fileUrl ? (
           <WorkspaceEmptyState
             title="Drawing file unavailable"
@@ -47,13 +47,13 @@ export default function MasterDrawingViewer({ drawing, selectedDiff }: Props) {
           <iframe
             title={drawing.name}
             src={drawing.fileUrl}
-            className="h-full w-full rounded-lg border bg-white"
+            className="h-full w-full rounded-lg border border-border bg-card"
           />
         ) : (
           <img
             src={drawing.fileUrl}
             alt={drawing.name}
-            className="h-full w-full rounded-lg border bg-white object-contain"
+            className="h-full w-full rounded-lg border border-border bg-card object-contain"
           />
         )}
       </div>

@@ -12,7 +12,7 @@ export default function CompareSubDrawingButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
+      className="w-full rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
       data-testid="compare-sub-drawing-button"
     >
       Compare a sub drawing

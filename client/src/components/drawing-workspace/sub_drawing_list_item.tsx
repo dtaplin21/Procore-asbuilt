@@ -17,23 +17,23 @@ export default function SubDrawingListItem({
       onClick={() => onSelect(drawing.id)}
       className={`w-full rounded-lg border px-4 py-3 text-left transition ${
         selected
-          ? "border-slate-900 bg-slate-100"
-          : "border-slate-200 bg-white hover:bg-slate-50"
+          ? "border-primary bg-primary-soft"
+          : "border-border bg-card hover:bg-muted/60"
       }`}
       data-testid={`sub-drawing-item-${drawing.id}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate text-sm font-medium text-slate-900">
+          <div className="truncate text-sm font-medium text-foreground">
             {drawing.name}
           </div>
-          <div className="mt-1 text-xs text-slate-500">
+          <div className="mt-1 text-xs text-muted-foreground">
             Drawing #{drawing.id}
           </div>
         </div>
 
         {drawing.source ? (
-          <span className="rounded-md border px-2 py-1 text-xs text-slate-600">
+          <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
             {drawing.source}
           </span>
         ) : null}

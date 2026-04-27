@@ -90,7 +90,7 @@ export function UploadDrawingModal({
       data-testid="upload-drawing-modal-backdrop"
     >
       <div
-        className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950"
+        className="w-full max-w-lg rounded-xl border border-border bg-card shadow-xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -98,15 +98,15 @@ export function UploadDrawingModal({
         aria-labelledby="upload-drawing-modal-title"
         data-testid="upload-drawing-modal"
       >
-        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+        <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div>
             <h2
               id="upload-drawing-modal-title"
-              className="text-lg font-semibold text-slate-900 dark:text-slate-100"
+              className="text-lg font-semibold text-foreground"
             >
               {title}
             </h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-sm text-muted-foreground">
               {description}
             </p>
           </div>
@@ -114,7 +114,7 @@ export function UploadDrawingModal({
             type="button"
             onClick={handleRequestClose}
             disabled={isBusy}
-            className="shrink-0 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="shrink-0 rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted disabled:opacity-60"
             aria-label="Close upload drawing modal"
             data-testid="upload-drawing-modal-close"
           >

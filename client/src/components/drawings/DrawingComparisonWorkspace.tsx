@@ -125,7 +125,7 @@ export default function DrawingComparisonWorkspace({
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       {selectedAlignment ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
           <div className="text-sm text-muted-foreground">Project comparison progress</div>
           <div className="mt-2 text-xl font-semibold tabular-nums">
             {comparisonProgress
@@ -139,22 +139,22 @@ export default function DrawingComparisonWorkspace({
       ) : null}
 
       {selectedAlignment ? (
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <div className="rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Alignment
           </div>
-          <div className="mt-2 grid gap-2 text-sm text-slate-800 sm:grid-cols-2">
+          <div className="mt-2 grid gap-2 text-sm text-foreground sm:grid-cols-2">
             <div>
-              <span className="text-slate-500">Sub drawing: </span>
+              <span className="text-muted-foreground">Sub drawing: </span>
               {selectedAlignment.subDrawing.name} (#{selectedAlignment.subDrawing.id})
             </div>
             <div>
-              <span className="text-slate-500">Status: </span>
+              <span className="text-muted-foreground">Status: </span>
               {metadata?.status ?? "—"}
             </div>
             {metadata?.method ? (
               <div>
-                <span className="text-slate-500">Method: </span>
+                <span className="text-muted-foreground">Method: </span>
                 {metadata.method}
               </div>
             ) : null}
@@ -167,16 +167,16 @@ export default function DrawingComparisonWorkspace({
             {displayTransform != null ? (
               <>
                 <div>
-                  <span className="text-slate-500">Transform: </span>
+                  <span className="text-muted-foreground">Transform: </span>
                   {transformType}
                 </div>
                 <div>
-                  <span className="text-slate-500">Confidence: </span>
+                  <span className="text-muted-foreground">Confidence: </span>
                   {displayTransform?.confidence != null
                     ? displayTransform.confidence.toFixed(3)
                     : "—"}
                 </div>
-                <div className="sm:col-span-2 font-mono text-xs text-slate-600">
+                <div className="sm:col-span-2 font-mono text-xs text-muted-foreground">
                   matrix[{transformMatrix.length}]:{" "}
                   {transformMatrix
                     .slice(0, 12)
@@ -195,19 +195,19 @@ export default function DrawingComparisonWorkspace({
       ) : null}
 
       {selectedAlignment && workspace && alignmentOverlayUsable ? (
-        <div className="mb-4 flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-800">
+        <div className="mb-4 flex flex-wrap items-center gap-4 rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
             <input
               type="checkbox"
               checked={showOverlay}
               onChange={(e) => setShowOverlay(e.target.checked)}
-              className="rounded border-slate-300"
+              className="rounded border-border text-primary focus:ring-primary"
             />
             Show sub overlay
           </label>
 
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-800">
-            <span className="text-slate-600">Opacity</span>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+            <span className="text-muted-foreground">Opacity</span>
             <input
               type="range"
               min={0}
@@ -215,11 +215,11 @@ export default function DrawingComparisonWorkspace({
               step={0.05}
               value={overlayOpacity}
               onChange={(e) => setOverlayOpacity(Number(e.target.value))}
-              className="h-2 w-48 min-w-[8rem] accent-slate-700"
+              className="h-2 w-48 min-w-[8rem] accent-primary"
             />
           </label>
 
-          <span className="text-sm text-slate-500 tabular-nums">
+          <span className="text-sm text-muted-foreground tabular-nums">
             {Math.round(overlayOpacity * 100)}%
           </span>
         </div>

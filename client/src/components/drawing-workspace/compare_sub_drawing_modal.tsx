@@ -219,7 +219,7 @@ export default function CompareSubDrawingModal({
       data-testid="compare-sub-drawing-modal-backdrop"
     >
       <div
-        className="w-full max-w-2xl rounded-xl bg-white shadow-xl"
+        className="w-full max-w-2xl rounded-xl border border-border bg-card shadow-xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -227,15 +227,15 @@ export default function CompareSubDrawingModal({
         aria-labelledby="compare-sub-drawing-title"
         data-testid="compare-sub-drawing-modal"
       >
-        <div className="flex items-center justify-between border-b px-5 py-4">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div>
             <h2
               id="compare-sub-drawing-title"
-              className="text-lg font-semibold text-slate-900"
+              className="text-lg font-semibold text-foreground"
             >
               Compare a sub drawing
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-muted-foreground">
               Choose another drawing in this project or upload a new file. Comparison will use
               the active workspace drawing as the master.
             </p>
@@ -245,7 +245,7 @@ export default function CompareSubDrawingModal({
             type="button"
             onClick={handleRequestClose}
             disabled={isBusy}
-            className="rounded-md border px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted disabled:opacity-60"
             aria-label="Close compare sub drawing modal"
           >
             Close
@@ -266,6 +266,7 @@ export default function CompareSubDrawingModal({
                 value="choose"
                 data-testid="compare-tab-choose"
                 disabled={isBusy}
+                className="data-[state=active]:bg-primary-soft data-[state=active]:text-primary data-[state=active]:shadow-sm"
               >
                 Choose existing
               </TabsTrigger>
@@ -273,6 +274,7 @@ export default function CompareSubDrawingModal({
                 value="upload"
                 data-testid="compare-tab-upload"
                 disabled={isBusy}
+                className="data-[state=active]:bg-primary-soft data-[state=active]:text-primary data-[state=active]:shadow-sm"
               >
                 Upload new
               </TabsTrigger>
@@ -306,7 +308,7 @@ export default function CompareSubDrawingModal({
                 onChange={handleFileChange}
               />
 
-              <div className="space-y-3 rounded-lg border border-dashed p-4">
+              <div className="space-y-3 rounded-lg border border-dashed border-border p-4">
                 <div className="text-sm font-medium">Upload a new drawing</div>
                 <div className="text-sm text-muted-foreground">
                   This upload can be compared against the drawing open in this workspace.
@@ -317,7 +319,7 @@ export default function CompareSubDrawingModal({
 
                 <button
                   type="button"
-                  className="inline-flex items-center rounded-md border px-3 py-2 text-sm disabled:opacity-60"
+                  className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground hover:bg-muted disabled:opacity-60"
                   onClick={() => {
                     if (isBusy) return;
                     fileInputRef.current?.click();
@@ -365,8 +367,8 @@ export default function CompareSubDrawingModal({
           ) : null}
         </div>
 
-        <div className="flex items-center justify-between border-t px-5 py-4">
-          <div className="text-sm text-slate-500">
+        <div className="flex items-center justify-between border-t border-border px-5 py-4">
+          <div className="text-sm text-muted-foreground">
             {selectedDrawingId
               ? `Selected drawing #${selectedDrawingId}`
               : "No sub drawing selected"}
@@ -377,7 +379,7 @@ export default function CompareSubDrawingModal({
               type="button"
               onClick={handleRequestClose}
               disabled={isBusy}
-              className="rounded-md border px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted disabled:opacity-60"
             >
               Cancel
             </button>
@@ -386,7 +388,7 @@ export default function CompareSubDrawingModal({
               type="button"
               onClick={() => void handleConfirm()}
               disabled={selectedDrawingId == null || isBusy}
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
               data-testid="confirm-compare-sub-drawing-button"
             >
               {compareLoading ? "Comparing..." : "Compare"}

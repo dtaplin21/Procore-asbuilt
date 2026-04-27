@@ -11,6 +11,23 @@ export default {
         sm: ".1875rem", /* 3px */
       },
       colors: {
+        /**
+         * Semantic UI (shadcn) — values come from client/src/index.css (:root / .dark).
+         * Procore-inspired primary: hsl(19, 100%, 50%). Use bg-primary, bg-primary-hover, bg-primary-soft.
+         *
+         * Literal fallbacks (no CSS vars): bg-procore-primary, text-procore-secondary, etc.
+         */
+        surface: "hsl(var(--card) / <alpha-value>)",
+        procore: {
+          primary: "hsl(19 100% 50%)",
+          "primary-hover": "hsl(19 100% 40%)",
+          "primary-soft": "hsl(19 100% 94%)",
+          secondary: "#1f2937",
+          background: "#f8fafc",
+          surface: "#ffffff",
+          border: "#e5e7eb",
+          muted: "#6b7280",
+        },
         // Flat / base colors (regular buttons)
         background: "hsl(var(--background) / <alpha-value>)",
         foreground: "hsl(var(--foreground) / <alpha-value>)",
@@ -87,7 +104,7 @@ export default {
           approved: "rgb(34 197 94)",
           pending: "rgb(245 158 11)",
           rejected: "rgb(239 68 68)",
-          "in-review": "rgb(59 130 246)",
+          "in-review": "hsl(19 90% 48%)",
           "not-started": "rgb(156 163 175)",
         },
       },
