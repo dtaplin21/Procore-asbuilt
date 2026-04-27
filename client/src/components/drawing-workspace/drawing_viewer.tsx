@@ -48,7 +48,7 @@ export default function DrawingViewer({ drawing, selectedDiff }: Props) {
           <p className="text-sm text-muted-foreground">Drawing #{drawing.id}</p>
         </div>
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-          <div className="rounded border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+          <div className="rounded border border-red-200 bg-red-50 p-6 text-sm text-red-800">
             <div className="font-medium">Rendering failed</div>
             <div className="mt-2 text-muted-foreground">
               {drawing.processingError || "The drawing could not be rendered."}
@@ -122,7 +122,7 @@ export default function DrawingViewer({ drawing, selectedDiff }: Props) {
           ) : null}
 
           {imageError ? (
-            <div className="flex min-h-[400px] min-w-[600px] items-center justify-center rounded border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+            <div className="flex min-h-[400px] min-w-[600px] items-center justify-center rounded border border-red-200 bg-red-50 p-6 text-sm text-red-800">
               {imageError}
             </div>
           ) : (

@@ -186,7 +186,7 @@ export default function DrawingComparisonWorkspace({
                 </div>
               </>
             ) : (
-              <div className="sm:col-span-2 text-amber-700">
+              <div className="sm:col-span-2 rounded-md border border-primary/30 bg-primary-soft px-3 py-2 text-sm text-foreground">
                 No transform on this alignment — showing master only.
               </div>
             )}

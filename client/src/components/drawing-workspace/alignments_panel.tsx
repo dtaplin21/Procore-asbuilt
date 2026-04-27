@@ -73,11 +73,17 @@ export default function AlignmentsPanel({
     <section className="overflow-hidden rounded-xl border border-border bg-card">
       <div className="border-b border-border px-4 py-3">
         <h3 className="text-sm font-semibold text-foreground">Alignments</h3>
+        {alignments.length > 0 && !loading ? (
+          <p className="mt-2 rounded-md border border-primary bg-primary-soft px-3 py-2 text-xs text-foreground">
+            Re-run comparison is available per alignment when you need to refresh diffs after
+            changes.
+          </p>
+        ) : null}
       </div>
 
       {rerunError && (
         <div className="px-4">
-          <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
             {rerunError}
           </div>
         </div>

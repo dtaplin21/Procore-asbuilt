@@ -139,7 +139,7 @@ export function DrawingUploadWithIntent({
 
       {intent === "master" && allowMaster ? (
         <div
-          className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100"
+          className="rounded-md border border-primary bg-primary-soft px-3 py-2 text-sm text-foreground"
           role="status"
           data-testid="upload-master-warning"
         >
@@ -149,7 +149,7 @@ export function DrawingUploadWithIntent({
 
       {intent === "sub" && subRequiresMaster && allowSub ? (
         <div
-          className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100"
+          className="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-foreground"
           role="status"
           data-testid="upload-sub-needs-master"
         >
@@ -170,7 +170,7 @@ export function DrawingUploadWithIntent({
 
       <button
         type="button"
-        className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-60"
         onClick={() => fileInputRef.current?.click()}
         disabled={chooseDisabled}
         data-testid="drawing-upload-with-intent-choose-file"
@@ -186,7 +186,7 @@ export function DrawingUploadWithIntent({
 
       {uploadError ? (
         <div
-          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200"
+          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
           data-testid="upload-error"
         >
           {uploadError}

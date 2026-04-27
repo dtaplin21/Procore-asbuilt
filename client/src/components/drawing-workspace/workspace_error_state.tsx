@@ -12,7 +12,7 @@ export default function WorkspaceErrorState({ message, onRetry }: Props) {
         <button
           type="button"
           onClick={onRetry}
-          className="mt-3 rounded-md border border-red-300 bg-white px-3 py-2 text-sm text-red-700 hover:bg-red-50"
+          className="mt-3 rounded-md border border-red-300 bg-card px-3 py-2 text-sm text-red-800 hover:bg-red-50"
           data-testid="retry-workspace"
         >
           Retry

@@ -103,13 +103,13 @@ export default function DrawingUploadField({
         type="button"
         onClick={handlePickFile}
         disabled={controlsDisabled}
-        className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-60"
+        className="rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-60"
       >
         {uploading ? "Uploading…" : "Choose file…"}
       </button>
-      <p className="text-xs text-slate-500">{description}</p>
+      <p className="text-xs text-muted-foreground">{description}</p>
       {uploadError ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
           {uploadError}
         </div>
       ) : null}

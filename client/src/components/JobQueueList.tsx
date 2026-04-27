@@ -46,25 +46,25 @@ export default function JobQueueList({
       {jobs.map((job) => (
         <div
           key={job.id}
-          className="rounded-lg border p-4 shadow-sm bg-white"
+          className="rounded-lg border border-border bg-card p-4 shadow-sm"
         >
           <div className="flex items-center justify-between">
             <div className="font-medium">{job.job_type}</div>
             <div className="text-sm">{getStatusLabel(job.status)}</div>
           </div>
 
-          <div className="mt-2 text-sm text-gray-600">
+          <div className="mt-2 text-sm text-muted-foreground">
             Job ID: {job.id}
           </div>
 
           {job.started_at && (
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-muted-foreground">
               Started: {new Date(job.started_at).toLocaleString()}
             </div>
           )}
 
           {job.completed_at && (
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-muted-foreground">
               Completed: {new Date(job.completed_at).toLocaleString()}
             </div>
           )}

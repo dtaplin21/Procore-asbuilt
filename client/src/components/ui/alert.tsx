@@ -8,7 +8,12 @@ const alertVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-background text-foreground",
+        default: "border-border bg-card text-foreground",
+        /** Workflow / brand emphasis — use sparingly (CTAs, compare/upload context). */
+        workflow: "border-primary bg-primary-soft text-foreground [&>svg]:text-primary",
+        /** Non-error confirmations — keep semantic green. */
+        success:
+          "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/35 dark:text-emerald-100 [&>svg]:text-emerald-700",
         destructive:
           "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
       },

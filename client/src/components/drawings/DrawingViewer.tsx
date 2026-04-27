@@ -156,9 +156,9 @@ export default function DrawingViewer({
           <p className="text-sm text-slate-500">Drawing #{drawing.id}</p>
         </div>
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-          <div className="rounded border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+          <div className="rounded-md border border-red-200 bg-red-50 p-6 text-sm text-red-800">
             <div className="font-medium">Rendering failed</div>
-            <div className="mt-2 text-slate-600">
+            <div className="mt-2 text-red-700/90">
               {drawing.processingError || "The drawing could not be rendered."}
             </div>
           </div>
@@ -178,7 +178,7 @@ export default function DrawingViewer({
           </p>
         </div>
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
           <p className="text-sm text-slate-500">
             {status === "processing"
               ? "Rendering drawing pages…"
@@ -224,19 +224,19 @@ export default function DrawingViewer({
           data-testid="drawing-viewer-stage"
         >
           {isLoadingComparisonWorkspace ? (
-            <div className="flex min-h-[240px] min-w-[320px] items-center justify-center rounded border border-slate-200 bg-slate-50 text-sm text-slate-500">
+            <div className="flex min-h-[240px] min-w-[320px] items-center justify-center rounded-md border border-border bg-muted/40 text-sm text-muted-foreground">
               Loading comparison workspace…
             </div>
           ) : null}
 
           {!isLoadingComparisonWorkspace && !imageLoaded && !imageError ? (
-            <div className="absolute inset-0 z-10 flex min-h-[240px] min-w-[320px] items-center justify-center rounded bg-white/80 text-sm text-slate-500">
+            <div className="absolute inset-0 z-10 flex min-h-[240px] min-w-[320px] items-center justify-center rounded bg-card/80 text-sm text-muted-foreground">
               Loading drawing image...
             </div>
           ) : null}
 
           {!isLoadingComparisonWorkspace && imageError ? (
-            <div className="flex min-h-[400px] min-w-[600px] items-center justify-center rounded border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+            <div className="flex min-h-[400px] min-w-[600px] items-center justify-center rounded-md border border-red-200 bg-red-50 p-6 text-sm text-red-800">
               {imageError}
             </div>
           ) : null}
@@ -245,7 +245,7 @@ export default function DrawingViewer({
             comparisonWorkspace ? (
               <>
                 {!alignmentOverlayUsable ? (
-                  <div className="mb-2 text-sm text-amber-600">
+                  <div className="mb-2 rounded-md border border-primary/30 bg-primary-soft px-3 py-2 text-sm text-foreground">
                     Overlay unavailable for this alignment.
                   </div>
                 ) : null}
