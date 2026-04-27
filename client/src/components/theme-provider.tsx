@@ -10,8 +10,8 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   useEffect(() => {
     const root = window.document.documentElement;
-    root.classList.remove("light");
-    root.classList.add("dark");
+    /* Light default — Procore-inspired palette in :root. Add "dark" for dark variant. */
+    root.classList.remove("dark");
   }, []);
 
   return <>{children}</>;
