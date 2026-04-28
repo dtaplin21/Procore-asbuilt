@@ -1,0 +1,11 @@
+├─ MIT: 295
+├─ ISC: 32
+├─ Apache-2.0: 5
+├─ BSD-3-Clause: 4
+├─ BlueOak-1.0.0: 3
+├─ MIT*: 2
+├─ UNKNOWN: 1
+├─ 0BSD: 1
+├─ MIT AND ISC: 1
+└─ Unlicense: 1
+

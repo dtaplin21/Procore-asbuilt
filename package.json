@@ -2,7 +2,8 @@
   "name": "rest-express",
   "version": "1.0.0",
   "type": "module",
-  "license": "MIT",
+  "author": "Grand Gaia LLC",
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "concurrently -k -n backend,frontend -c magenta,cyan \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && ./venv/bin/uvicorn main:app --reload --host 0.0.0.0 --port 2000",
@@ -21,7 +22,9 @@
     "test:ui": "playwright test --ui",
     "test:regression": "playwright test --grep @regression",
     "test:e2e": "playwright test",
-    "test:headed": "playwright test --headed"
+    "test:headed": "playwright test --headed",
+    "sbom:frontend": "mkdir -p legal/sbom && npx --yes @cyclonedx/cyclonedx-npm --output-file legal/sbom/frontend-cyclonedx.json",
+    "sbom:backend": "cd backend && ./venv/bin/cyclonedx-py requirements requirements.txt -o ../legal/sbom/backend-cyclonedx.json"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

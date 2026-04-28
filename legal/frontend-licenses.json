@@ -1,0 +1,2569 @@
+{
+  "@alloc/quick-lru@5.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/quick-lru",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "https://sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@alloc/quick-lru",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@alloc/quick-lru/license"
+  },
+  "@babel/runtime@7.27.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel/babel",
+    "publisher": "The Babel Team",
+    "url": "https://babel.dev/team",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@babel/runtime",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@babel/runtime/LICENSE"
+  },
+  "@floating-ui/core@1.6.9": {
+    "licenses": "MIT",
+    "repository": "https://github.com/floating-ui/floating-ui",
+    "publisher": "atomiks",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@floating-ui/core",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@floating-ui/core/LICENSE"
+  },
+  "@floating-ui/dom@1.6.13": {
+    "licenses": "MIT",
+    "repository": "https://github.com/floating-ui/floating-ui",
+    "publisher": "atomiks",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@floating-ui/dom",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@floating-ui/dom/LICENSE"
+  },
+  "@floating-ui/react-dom@2.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/floating-ui/floating-ui",
+    "publisher": "atomiks",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@floating-ui/react-dom",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@floating-ui/react-dom/LICENSE"
+  },
+  "@floating-ui/utils@0.2.9": {
+    "licenses": "MIT",
+    "repository": "https://github.com/floating-ui/floating-ui",
+    "publisher": "atomiks",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@floating-ui/utils",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@floating-ui/utils/LICENSE"
+  },
+  "@hookform/resolvers@3.10.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/react-hook-form/resolvers",
+    "publisher": "bluebill1049",
+    "email": "bluebill1049@hotmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@hookform/resolvers",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@hookform/resolvers/LICENSE"
+  },
+  "@isaacs/cliui@8.0.2": {
+    "licenses": "ISC",
+    "repository": "https://github.com/yargs/cliui",
+    "publisher": "Ben Coe",
+    "email": "ben@npmjs.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@isaacs/cliui",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@isaacs/cliui/LICENSE.txt"
+  },
+  "@jridgewell/gen-mapping@0.3.13": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jridgewell/sourcemaps",
+    "publisher": "Justin Ridgewell",
+    "email": "justin@ridgewell.name",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@jridgewell/gen-mapping",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@jridgewell/gen-mapping/LICENSE"
+  },
+  "@jridgewell/resolve-uri@3.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jridgewell/resolve-uri",
+    "publisher": "Justin Ridgewell",
+    "email": "justin@ridgewell.name",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@jridgewell/resolve-uri",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@jridgewell/resolve-uri/LICENSE"
+  },
+  "@jridgewell/sourcemap-codec@1.5.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jridgewell/sourcemaps",
+    "publisher": "Justin Ridgewell",
+    "email": "justin@ridgewell.name",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@jridgewell/sourcemap-codec",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@jridgewell/sourcemap-codec/LICENSE"
+  },
+  "@jridgewell/trace-mapping@0.3.31": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jridgewell/sourcemaps",
+    "publisher": "Justin Ridgewell",
+    "email": "justin@ridgewell.name",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@jridgewell/trace-mapping",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@jridgewell/trace-mapping/LICENSE"
+  },
+  "@nodelib/fs.scandir@2.1.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/nodelib/nodelib/tree/master/packages/fs/fs.scandir",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@nodelib/fs.scandir",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@nodelib/fs.scandir/LICENSE"
+  },
+  "@nodelib/fs.stat@2.0.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/nodelib/nodelib/tree/master/packages/fs/fs.stat",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@nodelib/fs.stat",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@nodelib/fs.stat/LICENSE"
+  },
+  "@nodelib/fs.walk@1.2.8": {
+    "licenses": "MIT",
+    "repository": "https://github.com/nodelib/nodelib/tree/master/packages/fs/fs.walk",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@nodelib/fs.walk",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@nodelib/fs.walk/LICENSE"
+  },
+  "@pkgjs/parseargs@0.11.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/pkgjs/parseargs",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@pkgjs/parseargs",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@pkgjs/parseargs/LICENSE"
+  },
+  "@radix-ui/number@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/number",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/number/README.md"
+  },
+  "@radix-ui/primitive@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/primitive",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/primitive/README.md"
+  },
+  "@radix-ui/react-accordion@1.2.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-accordion",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-accordion/README.md"
+  },
+  "@radix-ui/react-alert-dialog@1.1.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-alert-dialog",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-alert-dialog/README.md"
+  },
+  "@radix-ui/react-arrow@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-arrow",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-arrow/README.md"
+  },
+  "@radix-ui/react-aspect-ratio@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-aspect-ratio",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-aspect-ratio/README.md"
+  },
+  "@radix-ui/react-avatar@1.1.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-avatar",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-avatar/README.md"
+  },
+  "@radix-ui/react-checkbox@1.1.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-checkbox",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-checkbox/README.md"
+  },
+  "@radix-ui/react-collapsible@1.1.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-collapsible",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-collapsible/README.md"
+  },
+  "@radix-ui/react-collection@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-collection",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-collection/README.md"
+  },
+  "@radix-ui/react-compose-refs@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-compose-refs",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-compose-refs/README.md"
+  },
+  "@radix-ui/react-context-menu@2.2.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-context-menu",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-context-menu/README.md"
+  },
+  "@radix-ui/react-context@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-context",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-context/README.md"
+  },
+  "@radix-ui/react-dialog@1.1.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-dialog",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-dialog/README.md"
+  },
+  "@radix-ui/react-direction@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-direction",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-direction/README.md"
+  },
+  "@radix-ui/react-dismissable-layer@1.1.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-dismissable-layer",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-dismissable-layer/README.md"
+  },
+  "@radix-ui/react-dropdown-menu@2.1.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-dropdown-menu",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-dropdown-menu/README.md"
+  },
+  "@radix-ui/react-focus-guards@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-focus-guards",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-focus-guards/README.md"
+  },
+  "@radix-ui/react-focus-scope@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-focus-scope",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-focus-scope/README.md"
+  },
+  "@radix-ui/react-hover-card@1.1.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-hover-card",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-hover-card/README.md"
+  },
+  "@radix-ui/react-id@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-id",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-id/README.md"
+  },
+  "@radix-ui/react-label@2.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-label",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-label/README.md"
+  },
+  "@radix-ui/react-menu@2.1.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-menu",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-menu/README.md"
+  },
+  "@radix-ui/react-menubar@1.1.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-menubar",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-menubar/README.md"
+  },
+  "@radix-ui/react-navigation-menu@1.2.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-navigation-menu",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-navigation-menu/README.md"
+  },
+  "@radix-ui/react-popover@1.1.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-popover",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-popover/README.md"
+  },
+  "@radix-ui/react-popper@1.2.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-popper",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-popper/README.md"
+  },
+  "@radix-ui/react-portal@1.1.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-portal",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-portal/README.md"
+  },
+  "@radix-ui/react-presence@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-presence",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-presence/README.md"
+  },
+  "@radix-ui/react-primitive@2.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-primitive",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-primitive/README.md"
+  },
+  "@radix-ui/react-progress@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-progress",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-progress/README.md"
+  },
+  "@radix-ui/react-radio-group@1.2.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-radio-group",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-radio-group/README.md"
+  },
+  "@radix-ui/react-roving-focus@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-roving-focus",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-roving-focus/README.md"
+  },
+  "@radix-ui/react-scroll-area@1.2.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-scroll-area",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-scroll-area/README.md"
+  },
+  "@radix-ui/react-select@2.1.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-select",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-select/README.md"
+  },
+  "@radix-ui/react-separator@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-separator",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-separator/README.md"
+  },
+  "@radix-ui/react-slider@1.2.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-slider",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-slider/README.md"
+  },
+  "@radix-ui/react-slot@1.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-slot",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-slot/README.md"
+  },
+  "@radix-ui/react-switch@1.1.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-switch",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-switch/README.md"
+  },
+  "@radix-ui/react-tabs@1.1.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-tabs",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-tabs/README.md"
+  },
+  "@radix-ui/react-toast@1.2.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-toast",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-toast/README.md"
+  },
+  "@radix-ui/react-toggle-group@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-toggle-group",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-toggle-group/README.md"
+  },
+  "@radix-ui/react-toggle@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-toggle",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-toggle/README.md"
+  },
+  "@radix-ui/react-tooltip@1.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-tooltip",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-tooltip/README.md"
+  },
+  "@radix-ui/react-use-callback-ref@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-use-callback-ref",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-use-callback-ref/README.md"
+  },
+  "@radix-ui/react-use-controllable-state@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-use-controllable-state",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-use-controllable-state/README.md"
+  },
+  "@radix-ui/react-use-escape-keydown@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-use-escape-keydown",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-use-escape-keydown/README.md"
+  },
+  "@radix-ui/react-use-layout-effect@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-use-layout-effect",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-use-layout-effect/README.md"
+  },
+  "@radix-ui/react-use-previous@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-use-previous",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-use-previous/README.md"
+  },
+  "@radix-ui/react-use-rect@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-use-rect",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-use-rect/README.md"
+  },
+  "@radix-ui/react-use-size@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-use-size",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-use-size/README.md"
+  },
+  "@radix-ui/react-visually-hidden@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-visually-hidden",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/react-visually-hidden/README.md"
+  },
+  "@radix-ui/rect@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/rect",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@radix-ui/rect/README.md"
+  },
+  "@tanstack/query-core@5.60.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/TanStack/query",
+    "publisher": "tannerlinsley",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@tanstack/query-core",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@tanstack/query-core/LICENSE"
+  },
+  "@tanstack/react-query@5.60.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/TanStack/query",
+    "publisher": "tannerlinsley",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@tanstack/react-query",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@tanstack/react-query/LICENSE"
+  },
+  "@types/d3-array@3.2.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-array",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-array/LICENSE"
+  },
+  "@types/d3-color@3.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-color",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-color/LICENSE"
+  },
+  "@types/d3-ease@3.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-ease",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-ease/LICENSE"
+  },
+  "@types/d3-interpolate@3.0.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-interpolate",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-interpolate/LICENSE"
+  },
+  "@types/d3-path@3.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-path",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-path/LICENSE"
+  },
+  "@types/d3-scale@4.0.8": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-scale",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-scale/LICENSE"
+  },
+  "@types/d3-shape@3.1.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-shape",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-shape/LICENSE"
+  },
+  "@types/d3-time@3.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-time",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-time/LICENSE"
+  },
+  "@types/d3-timer@3.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-timer",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/d3-timer/LICENSE"
+  },
+  "@types/node@20.19.27": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/node",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/node/LICENSE"
+  },
+  "@types/pg@8.11.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/pg",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/pg/LICENSE"
+  },
+  "@types/prop-types@15.7.13": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/prop-types",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/prop-types/LICENSE"
+  },
+  "@types/react-dom@18.3.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/react-dom",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/react-dom/LICENSE"
+  },
+  "@types/react@18.3.12": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/react",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/@types/react/LICENSE"
+  },
+  "accepts@1.3.8": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/accepts",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/accepts",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/accepts/LICENSE"
+  },
+  "ansi-regex@5.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/chalk/ansi-regex",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/string-width-cjs/node_modules/ansi-regex",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/string-width-cjs/node_modules/ansi-regex/license"
+  },
+  "ansi-regex@6.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/chalk/ansi-regex",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "https://sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/ansi-regex",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/ansi-regex/license"
+  },
+  "ansi-styles@4.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/chalk/ansi-styles",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/wrap-ansi-cjs/node_modules/ansi-styles",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/wrap-ansi-cjs/node_modules/ansi-styles/license"
+  },
+  "ansi-styles@6.2.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/chalk/ansi-styles",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "https://sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/ansi-styles",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/ansi-styles/license"
+  },
+  "any-promise@1.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/kevinbeaty/any-promise",
+    "publisher": "Kevin Beaty",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/any-promise",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/any-promise/LICENSE"
+  },
+  "anymatch@3.1.3": {
+    "licenses": "ISC",
+    "repository": "https://github.com/micromatch/anymatch",
+    "publisher": "Elan Shanker",
+    "url": "https://github.com/es128",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/anymatch",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/anymatch/LICENSE"
+  },
+  "arg@5.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/vercel/arg",
+    "publisher": "Josh Junon",
+    "email": "junon@wavetilt.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/arg",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/arg/LICENSE.md"
+  },
+  "aria-hidden@1.2.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/theKashey/aria-hidden",
+    "publisher": "Anton Korzunov",
+    "email": "thekashey@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/aria-hidden",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/aria-hidden/LICENSE"
+  },
+  "array-flatten@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/blakeembrey/array-flatten",
+    "publisher": "Blake Embrey",
+    "email": "hello@blakeembrey.com",
+    "url": "http://blakeembrey.me",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/array-flatten",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/array-flatten/LICENSE"
+  },
+  "balanced-match@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/juliangruber/balanced-match",
+    "publisher": "Julian Gruber",
+    "email": "mail@juliangruber.com",
+    "url": "http://juliangruber.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/balanced-match",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/balanced-match/LICENSE.md"
+  },
+  "binary-extensions@2.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/binary-extensions",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "https://sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/binary-extensions",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/binary-extensions/license"
+  },
+  "body-parser@1.20.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/expressjs/body-parser",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/body-parser",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/body-parser/LICENSE"
+  },
+  "brace-expansion@2.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/juliangruber/brace-expansion",
+    "publisher": "Julian Gruber",
+    "email": "mail@juliangruber.com",
+    "url": "http://juliangruber.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/brace-expansion",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/brace-expansion/LICENSE"
+  },
+  "braces@3.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/micromatch/braces",
+    "publisher": "Jon Schlinkert",
+    "url": "https://github.com/jonschlinkert",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/braces",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/braces/LICENSE"
+  },
+  "bufferutil@4.0.8": {
+    "licenses": "MIT",
+    "repository": "https://github.com/websockets/bufferutil",
+    "publisher": "Einar Otto Stangvik",
+    "email": "einaros@gmail.com",
+    "url": "http://2x.io",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/bufferutil",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/bufferutil/LICENSE"
+  },
+  "bytes@3.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/visionmedia/bytes.js",
+    "publisher": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca",
+    "url": "http://tjholowaychuk.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/bytes",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/bytes/LICENSE"
+  },
+  "call-bind-apply-helpers@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/call-bind-apply-helpers",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/call-bind-apply-helpers",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/call-bind-apply-helpers/LICENSE"
+  },
+  "call-bind@1.0.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/call-bind",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/call-bind",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/call-bind/LICENSE"
+  },
+  "camelcase-css@2.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/stevenvachon/camelcase-css",
+    "publisher": "Steven Vachon",
+    "email": "contact@svachon.com",
+    "url": "https://www.svachon.com/",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/camelcase-css",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/camelcase-css/license"
+  },
+  "chokidar@3.6.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/paulmillr/chokidar",
+    "publisher": "Paul Miller",
+    "url": "https://paulmillr.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/chokidar",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/chokidar/LICENSE"
+  },
+  "class-variance-authority@0.7.1": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/joe-bell/cva",
+    "publisher": "Joe Bell",
+    "url": "https://joebell.co.uk",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/class-variance-authority",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/class-variance-authority/LICENSE"
+  },
+  "clsx@2.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/lukeed/clsx",
+    "publisher": "Luke Edwards",
+    "email": "luke.edwards05@gmail.com",
+    "url": "https://lukeed.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/clsx",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/clsx/license"
+  },
+  "cmdk@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/pacocoursey/cmdk",
+    "publisher": "Paco",
+    "url": "https://github.com/pacocoursey",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/cmdk",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/cmdk/LICENSE.md"
+  },
+  "color-convert@2.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Qix-/color-convert",
+    "publisher": "Heather Arthur",
+    "email": "fayearthur@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/color-convert",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/color-convert/LICENSE"
+  },
+  "color-name@1.1.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/colorjs/color-name",
+    "publisher": "DY",
+    "email": "dfcreative@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/color-name",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/color-name/LICENSE"
+  },
+  "commander@4.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/tj/commander.js",
+    "publisher": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/commander",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/commander/LICENSE"
+  },
+  "content-disposition@0.5.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/content-disposition",
+    "publisher": "Douglas Christopher Wilson",
+    "email": "doug@somethingdoug.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/content-disposition",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/content-disposition/LICENSE"
+  },
+  "content-type@1.0.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/content-type",
+    "publisher": "Douglas Christopher Wilson",
+    "email": "doug@somethingdoug.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/content-type",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/content-type/LICENSE"
+  },
+  "cookie-signature@1.0.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/visionmedia/node-cookie-signature",
+    "publisher": "TJ Holowaychuk",
+    "email": "tj@learnboost.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/cookie-signature",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/cookie-signature/Readme.md"
+  },
+  "cookie@0.7.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/cookie",
+    "publisher": "Roman Shtylman",
+    "email": "shtylman@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/cookie",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/cookie/LICENSE"
+  },
+  "cross-spawn@7.0.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/moxystudio/node-cross-spawn",
+    "publisher": "André Cruz",
+    "email": "andre@moxy.studio",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/cross-spawn",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/cross-spawn/LICENSE"
+  },
+  "cssesc@3.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mathiasbynens/cssesc",
+    "publisher": "Mathias Bynens",
+    "url": "https://mathiasbynens.be/",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/cssesc",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/cssesc/LICENSE-MIT.txt"
+  },
+  "csstype@3.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/frenic/csstype",
+    "publisher": "Fredrik Nicol",
+    "email": "fredrik.nicol@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/csstype",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/csstype/LICENSE"
+  },
+  "d3-array@3.2.4": {
+    "licenses": "ISC",
+    "repository": "https://github.com/d3/d3-array",
+    "publisher": "Mike Bostock",
+    "url": "http://bost.ocks.org/mike",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-array",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-array/LICENSE"
+  },
+  "d3-color@3.1.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/d3/d3-color",
+    "publisher": "Mike Bostock",
+    "url": "http://bost.ocks.org/mike",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-color",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-color/LICENSE"
+  },
+  "d3-ease@3.0.1": {
+    "licenses": "BSD-3-Clause",
+    "repository": "https://github.com/d3/d3-ease",
+    "publisher": "Mike Bostock",
+    "url": "http://bost.ocks.org/mike",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-ease",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-ease/LICENSE"
+  },
+  "d3-format@3.1.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/d3/d3-format",
+    "publisher": "Mike Bostock",
+    "url": "http://bost.ocks.org/mike",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-format",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-format/LICENSE"
+  },
+  "d3-interpolate@3.0.1": {
+    "licenses": "ISC",
+    "repository": "https://github.com/d3/d3-interpolate",
+    "publisher": "Mike Bostock",
+    "url": "http://bost.ocks.org/mike",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-interpolate",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-interpolate/LICENSE"
+  },
+  "d3-path@3.1.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/d3/d3-path",
+    "publisher": "Mike Bostock",
+    "url": "http://bost.ocks.org/mike",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-path",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-path/LICENSE"
+  },
+  "d3-scale@4.0.2": {
+    "licenses": "ISC",
+    "repository": "https://github.com/d3/d3-scale",
+    "publisher": "Mike Bostock",
+    "url": "https://bost.ocks.org/mike",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-scale",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-scale/LICENSE"
+  },
+  "d3-shape@3.2.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/d3/d3-shape",
+    "publisher": "Mike Bostock",
+    "url": "http://bost.ocks.org/mike",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-shape",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-shape/LICENSE"
+  },
+  "d3-time-format@4.1.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/d3/d3-time-format",
+    "publisher": "Mike Bostock",
+    "url": "http://bost.ocks.org/mike",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-time-format",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-time-format/LICENSE"
+  },
+  "d3-time@3.1.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/d3/d3-time",
+    "publisher": "Mike Bostock",
+    "url": "http://bost.ocks.org/mike",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-time",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-time/LICENSE"
+  },
+  "d3-timer@3.0.1": {
+    "licenses": "ISC",
+    "repository": "https://github.com/d3/d3-timer",
+    "publisher": "Mike Bostock",
+    "url": "http://bost.ocks.org/mike",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-timer",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/d3-timer/LICENSE"
+  },
+  "date-fns@3.6.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/date-fns/date-fns",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/date-fns",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/date-fns/LICENSE.md"
+  },
+  "debug@2.6.9": {
+    "licenses": "MIT",
+    "repository": "https://github.com/visionmedia/debug",
+    "publisher": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/body-parser/node_modules/debug",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/body-parser/node_modules/debug/LICENSE"
+  },
+  "decimal.js-light@2.5.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/MikeMcl/decimal.js-light",
+    "publisher": "Michael Mclaughlin",
+    "email": "M8ch88l@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/decimal.js-light",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/decimal.js-light/LICENCE.md"
+  },
+  "define-data-property@1.1.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/define-data-property",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/define-data-property",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/define-data-property/LICENSE"
+  },
+  "depd@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dougwilson/nodejs-depd",
+    "publisher": "Douglas Christopher Wilson",
+    "email": "doug@somethingdoug.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/depd",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/depd/LICENSE"
+  },
+  "destroy@1.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/stream-utils/destroy",
+    "publisher": "Jonathan Ong",
+    "email": "me@jongleberry.com",
+    "url": "http://jongleberry.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/destroy",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/destroy/LICENSE"
+  },
+  "detect-node-es@1.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/thekashey/detect-node",
+    "publisher": "Ilya Kantor",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/detect-node-es",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/detect-node-es/LICENSE"
+  },
+  "didyoumean@1.2.2": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/dcporter/didyoumean.js",
+    "publisher": "Dave Porter",
+    "email": "dcporter@gmail.com",
+    "url": "http://dcporter.net/",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/didyoumean",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/didyoumean/LICENSE"
+  },
+  "dlv@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/developit/dlv",
+    "publisher": "Jason Miller",
+    "email": "jason@developit.ca",
+    "url": "http://jasonformat.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/dlv",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/dlv/README.md"
+  },
+  "dom-helpers@5.2.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/react-bootstrap/dom-helpers",
+    "publisher": "Jason Quense",
+    "email": "monastic.panic@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/dom-helpers",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/dom-helpers/LICENSE"
+  },
+  "drizzle-orm@0.39.3": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/drizzle-team/drizzle-orm",
+    "publisher": "Drizzle Team",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/drizzle-orm",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/drizzle-orm/README.md"
+  },
+  "drizzle-zod@0.7.0": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/drizzle-team/drizzle-orm",
+    "publisher": "Drizzle Team",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/drizzle-zod",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/drizzle-zod/README.md"
+  },
+  "dunder-proto@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/es-shims/dunder-proto",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/dunder-proto",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/dunder-proto/LICENSE"
+  },
+  "eastasianwidth@0.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/komagata/eastasianwidth",
+    "publisher": "Masaki Komagata",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/eastasianwidth",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/eastasianwidth/README.md"
+  },
+  "ee-first@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonathanong/ee-first",
+    "publisher": "Jonathan Ong",
+    "email": "me@jongleberry.com",
+    "url": "http://jongleberry.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/ee-first",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/ee-first/LICENSE"
+  },
+  "embla-carousel-react@8.6.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/davidjerleke/embla-carousel",
+    "publisher": "David Jerleke",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/embla-carousel-react",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/embla-carousel-react/README.md"
+  },
+  "embla-carousel-reactive-utils@8.6.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/davidjerleke/embla-carousel",
+    "publisher": "David Jerleke",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/embla-carousel-reactive-utils",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/embla-carousel-reactive-utils/README.md"
+  },
+  "embla-carousel@8.6.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/davidjerleke/embla-carousel",
+    "publisher": "David Jerleke",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/embla-carousel",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/embla-carousel/README.md"
+  },
+  "emoji-regex@8.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mathiasbynens/emoji-regex",
+    "publisher": "Mathias Bynens",
+    "url": "https://mathiasbynens.be/",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/string-width-cjs/node_modules/emoji-regex",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/string-width-cjs/node_modules/emoji-regex/LICENSE-MIT.txt"
+  },
+  "emoji-regex@9.2.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mathiasbynens/emoji-regex",
+    "publisher": "Mathias Bynens",
+    "url": "https://mathiasbynens.be/",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/emoji-regex",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/emoji-regex/LICENSE-MIT.txt"
+  },
+  "encodeurl@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/pillarjs/encodeurl",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/send/node_modules/encodeurl",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/send/node_modules/encodeurl/LICENSE"
+  },
+  "encodeurl@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/pillarjs/encodeurl",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/encodeurl",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/encodeurl/LICENSE"
+  },
+  "es-define-property@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/es-define-property",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/es-define-property",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/es-define-property/LICENSE"
+  },
+  "es-errors@1.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/es-errors",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/es-errors",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/es-errors/LICENSE"
+  },
+  "es-object-atoms@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/es-object-atoms",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/es-object-atoms",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/es-object-atoms/LICENSE"
+  },
+  "escape-html@1.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/component/escape-html",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/escape-html",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/escape-html/LICENSE"
+  },
+  "etag@1.8.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/etag",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/etag",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/etag/LICENSE"
+  },
+  "eventemitter3@4.0.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/primus/eventemitter3",
+    "publisher": "Arnout Kazemier",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/eventemitter3",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/eventemitter3/LICENSE"
+  },
+  "express@4.21.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/expressjs/express",
+    "publisher": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/express",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/express/LICENSE"
+  },
+  "fast-equals@5.2.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/planttheidea/fast-equals",
+    "publisher": "tony_quetano@planttheidea.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/fast-equals",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/fast-equals/LICENSE"
+  },
+  "fast-glob@3.3.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mrmlnc/fast-glob",
+    "publisher": "Denis Malinochkin",
+    "url": "https://mrmlnc.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/fast-glob",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/fast-glob/LICENSE"
+  },
+  "fastq@1.17.1": {
+    "licenses": "ISC",
+    "repository": "https://github.com/mcollina/fastq",
+    "publisher": "Matteo Collina",
+    "email": "hello@matteocollina.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/fastq",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/fastq/LICENSE"
+  },
+  "fill-range@7.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/fill-range",
+    "publisher": "Jon Schlinkert",
+    "url": "https://github.com/jonschlinkert",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/fill-range",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/fill-range/LICENSE"
+  },
+  "finalhandler@1.3.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/pillarjs/finalhandler",
+    "publisher": "Douglas Christopher Wilson",
+    "email": "doug@somethingdoug.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/finalhandler",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/finalhandler/LICENSE"
+  },
+  "foreground-child@3.3.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/tapjs/foreground-child",
+    "publisher": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "url": "http://blog.izs.me/",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/foreground-child",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/foreground-child/LICENSE"
+  },
+  "forwarded@0.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/forwarded",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/forwarded",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/forwarded/LICENSE"
+  },
+  "framer-motion@11.13.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/framer/motion",
+    "publisher": "Matt Perry",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/framer-motion",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/framer-motion/LICENSE.md"
+  },
+  "fresh@0.5.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/fresh",
+    "publisher": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca",
+    "url": "http://tjholowaychuk.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/fresh",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/fresh/LICENSE"
+  },
+  "fsevents@2.3.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/fsevents/fsevents",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/fsevents",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/fsevents/LICENSE"
+  },
+  "function-bind@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Raynos/function-bind",
+    "publisher": "Raynos",
+    "email": "raynos2@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/function-bind",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/function-bind/LICENSE"
+  },
+  "get-intrinsic@1.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/get-intrinsic",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/get-intrinsic",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/get-intrinsic/LICENSE"
+  },
+  "get-nonce@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/theKashey/get-nonce",
+    "publisher": "Anton Korzunov",
+    "email": "thekashey@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/get-nonce",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/get-nonce/LICENSE"
+  },
+  "get-proto@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/get-proto",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/get-proto",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/get-proto/LICENSE"
+  },
+  "glob-parent@5.1.2": {
+    "licenses": "ISC",
+    "repository": "https://github.com/gulpjs/glob-parent",
+    "publisher": "Gulp Team",
+    "email": "team@gulpjs.com",
+    "url": "https://gulpjs.com/",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/chokidar/node_modules/glob-parent",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/chokidar/node_modules/glob-parent/LICENSE"
+  },
+  "glob-parent@6.0.2": {
+    "licenses": "ISC",
+    "repository": "https://github.com/gulpjs/glob-parent",
+    "publisher": "Gulp Team",
+    "email": "team@gulpjs.com",
+    "url": "https://gulpjs.com/",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/glob-parent",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/glob-parent/LICENSE"
+  },
+  "glob@10.5.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/node-glob",
+    "publisher": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "url": "https://blog.izs.me/",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/glob",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/glob/LICENSE"
+  },
+  "gopd@1.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/gopd",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/gopd",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/gopd/LICENSE"
+  },
+  "has-property-descriptors@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/inspect-js/has-property-descriptors",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/has-property-descriptors",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/has-property-descriptors/LICENSE"
+  },
+  "has-symbols@1.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/inspect-js/has-symbols",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "url": "http://ljharb.codes",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/has-symbols",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/has-symbols/LICENSE"
+  },
+  "hasown@2.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/inspect-js/hasOwn",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/hasown",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/hasown/LICENSE"
+  },
+  "http-errors@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/http-errors",
+    "publisher": "Jonathan Ong",
+    "email": "me@jongleberry.com",
+    "url": "http://jongleberry.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/http-errors",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/http-errors/LICENSE"
+  },
+  "iconv-lite@0.4.24": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ashtuchkin/iconv-lite",
+    "publisher": "Alexander Shtuchkin",
+    "email": "ashtuchkin@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/iconv-lite",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/iconv-lite/LICENSE"
+  },
+  "inherits@2.0.4": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/inherits",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/inherits",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/inherits/LICENSE"
+  },
+  "input-otp@1.4.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/guilhermerodz/input-otp",
+    "publisher": "Guilherme Rodz",
+    "email": "g@rodz.dev",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/input-otp",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/input-otp/README.md"
+  },
+  "internmap@2.0.3": {
+    "licenses": "ISC",
+    "repository": "https://github.com/mbostock/internmap",
+    "publisher": "Mike Bostock",
+    "url": "https://bost.ocks.org/mike",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/internmap",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/internmap/LICENSE"
+  },
+  "ipaddr.js@1.9.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/whitequark/ipaddr.js",
+    "publisher": "whitequark",
+    "email": "whitequark@whitequark.org",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/ipaddr.js",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/ipaddr.js/LICENSE"
+  },
+  "is-binary-path@2.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/is-binary-path",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/is-binary-path",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/is-binary-path/license"
+  },
+  "is-core-module@2.15.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/inspect-js/is-core-module",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/is-core-module",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/is-core-module/LICENSE"
+  },
+  "is-extglob@2.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/is-extglob",
+    "publisher": "Jon Schlinkert",
+    "url": "https://github.com/jonschlinkert",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/is-extglob",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/is-extglob/LICENSE"
+  },
+  "is-fullwidth-code-point@3.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/is-fullwidth-code-point",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/is-fullwidth-code-point",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/is-fullwidth-code-point/license"
+  },
+  "is-glob@4.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/micromatch/is-glob",
+    "publisher": "Jon Schlinkert",
+    "url": "https://github.com/jonschlinkert",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/is-glob",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/is-glob/LICENSE"
+  },
+  "is-number@7.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/is-number",
+    "publisher": "Jon Schlinkert",
+    "url": "https://github.com/jonschlinkert",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/is-number",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/is-number/LICENSE"
+  },
+  "isexe@2.0.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/isexe",
+    "publisher": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "url": "http://blog.izs.me/",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/isexe",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/isexe/LICENSE"
+  },
+  "jackspeak@3.4.3": {
+    "licenses": "BlueOak-1.0.0",
+    "repository": "https://github.com/isaacs/jackspeak",
+    "publisher": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/jackspeak",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/jackspeak/LICENSE.md"
+  },
+  "jiti@1.21.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/unjs/jiti",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/jiti",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/jiti/LICENSE"
+  },
+  "js-tokens@4.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/lydell/js-tokens",
+    "publisher": "Simon Lydell",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/js-tokens",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/js-tokens/LICENSE"
+  },
+  "lilconfig@3.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/antonk52/lilconfig",
+    "publisher": "antonk52",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/lilconfig",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/lilconfig/LICENSE"
+  },
+  "lines-and-columns@1.2.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/eventualbuddha/lines-and-columns",
+    "publisher": "Brian Donovan",
+    "email": "brian@donovans.cc",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/lines-and-columns",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/lines-and-columns/LICENSE"
+  },
+  "lodash@4.17.21": {
+    "licenses": "MIT",
+    "repository": "https://github.com/lodash/lodash",
+    "publisher": "John-David Dalton",
+    "email": "john.david.dalton@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/lodash",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/lodash/LICENSE"
+  },
+  "loose-envify@1.4.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/zertosh/loose-envify",
+    "publisher": "Andres Suarez",
+    "email": "zertosh@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/loose-envify",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/loose-envify/LICENSE"
+  },
+  "lru-cache@10.4.3": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/node-lru-cache",
+    "publisher": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/path-scurry/node_modules/lru-cache",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/path-scurry/node_modules/lru-cache/LICENSE"
+  },
+  "lucide-react@0.453.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/lucide-icons/lucide",
+    "publisher": "Eric Fennis",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/lucide-react",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/lucide-react/LICENSE"
+  },
+  "math-intrinsics@1.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/es-shims/math-intrinsics",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/math-intrinsics",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/math-intrinsics/LICENSE"
+  },
+  "media-typer@0.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/media-typer",
+    "publisher": "Douglas Christopher Wilson",
+    "email": "doug@somethingdoug.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/media-typer",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/media-typer/LICENSE"
+  },
+  "merge-descriptors@1.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/merge-descriptors",
+    "publisher": "Jonathan Ong",
+    "email": "me@jongleberry.com",
+    "url": "http://jongleberry.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/merge-descriptors",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/merge-descriptors/LICENSE"
+  },
+  "merge2@1.4.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/teambition/merge2",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/merge2",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/merge2/LICENSE"
+  },
+  "methods@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/methods",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/methods",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/methods/LICENSE"
+  },
+  "micromatch@4.0.8": {
+    "licenses": "MIT",
+    "repository": "https://github.com/micromatch/micromatch",
+    "publisher": "Jon Schlinkert",
+    "url": "https://github.com/jonschlinkert",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/micromatch",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/micromatch/LICENSE"
+  },
+  "mime-db@1.52.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/mime-db",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/mime-db",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/mime-db/LICENSE"
+  },
+  "mime-types@2.1.35": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/mime-types",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/mime-types",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/mime-types/LICENSE"
+  },
+  "mime@1.6.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/broofa/node-mime",
+    "publisher": "Robert Kieffer",
+    "email": "robert@broofa.com",
+    "url": "http://github.com/broofa",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/mime",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/mime/LICENSE"
+  },
+  "minimatch@9.0.5": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/minimatch",
+    "publisher": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "url": "http://blog.izs.me",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/minimatch",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/minimatch/LICENSE"
+  },
+  "minipass@7.1.2": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/minipass",
+    "publisher": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "url": "http://blog.izs.me/",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/minipass",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/minipass/LICENSE"
+  },
+  "mitt@3.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/developit/mitt",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/mitt",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/mitt/LICENSE"
+  },
+  "motion-dom@11.13.0": {
+    "licenses": "MIT*",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/motion-dom",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/motion-dom/LICENSE.md"
+  },
+  "motion-utils@11.13.0": {
+    "licenses": "MIT*",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/motion-utils",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/motion-utils/LICENSE.md"
+  },
+  "ms@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/zeit/ms",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/body-parser/node_modules/ms",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/body-parser/node_modules/ms/license.md"
+  },
+  "ms@2.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/vercel/ms",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/ms",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/ms/license.md"
+  },
+  "mz@2.7.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/normalize/mz",
+    "publisher": "Jonathan Ong",
+    "email": "me@jongleberry.com",
+    "url": "http://jongleberry.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/mz",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/mz/LICENSE"
+  },
+  "nanoid@3.3.11": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ai/nanoid",
+    "publisher": "Andrey Sitnik",
+    "email": "andrey@sitnik.ru",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/nanoid",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/nanoid/LICENSE"
+  },
+  "negotiator@0.6.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/negotiator",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/negotiator",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/negotiator/LICENSE"
+  },
+  "next-themes@0.4.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/pacocoursey/next-themes",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/next-themes",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/next-themes/license.md"
+  },
+  "node-gyp-build@4.8.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/prebuild/node-gyp-build",
+    "publisher": "Mathias Buus",
+    "url": "@mafintosh",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/node-gyp-build",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/node-gyp-build/LICENSE"
+  },
+  "normalize-path@3.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/normalize-path",
+    "publisher": "Jon Schlinkert",
+    "url": "https://github.com/jonschlinkert",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/normalize-path",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/normalize-path/LICENSE"
+  },
+  "object-assign@4.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/object-assign",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/object-assign",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/object-assign/license"
+  },
+  "object-hash@3.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/puleos/object-hash",
+    "publisher": "Scott Puleo",
+    "email": "puleos@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/object-hash",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/object-hash/LICENSE"
+  },
+  "object-inspect@1.13.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/inspect-js/object-inspect",
+    "publisher": "James Halliday",
+    "email": "mail@substack.net",
+    "url": "http://substack.net",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/object-inspect",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/object-inspect/LICENSE"
+  },
+  "obuf@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/indutny/offset-buffer",
+    "publisher": "Fedor Indutny",
+    "email": "fedor@indutny.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/obuf",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/obuf/LICENSE"
+  },
+  "on-finished@2.4.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/on-finished",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/on-finished",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/on-finished/LICENSE"
+  },
+  "package-json-from-dist@1.0.1": {
+    "licenses": "BlueOak-1.0.0",
+    "repository": "https://github.com/isaacs/package-json-from-dist",
+    "publisher": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "url": "https://izs.me",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/package-json-from-dist",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/package-json-from-dist/LICENSE.md"
+  },
+  "parseurl@1.3.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/pillarjs/parseurl",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/parseurl",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/parseurl/LICENSE"
+  },
+  "path-key@3.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/path-key",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/path-key",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/path-key/license"
+  },
+  "path-parse@1.0.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jbgutierrez/path-parse",
+    "publisher": "Javier Blanco",
+    "email": "http://jbgutierrez.info",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/path-parse",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/path-parse/LICENSE"
+  },
+  "path-scurry@1.11.1": {
+    "licenses": "BlueOak-1.0.0",
+    "repository": "https://github.com/isaacs/path-scurry",
+    "publisher": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "url": "https://blog.izs.me",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/path-scurry",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/path-scurry/LICENSE.md"
+  },
+  "path-to-regexp@0.1.12": {
+    "licenses": "MIT",
+    "repository": "https://github.com/pillarjs/path-to-regexp",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/path-to-regexp",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/path-to-regexp/LICENSE"
+  },
+  "pg-cloudflare@1.2.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/brianc/node-postgres",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg-cloudflare",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg-cloudflare/LICENSE"
+  },
+  "pg-connection-string@2.9.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/brianc/node-postgres",
+    "publisher": "Blaine Bublitz",
+    "email": "blaine@iceddev.com",
+    "url": "http://iceddev.com/",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg-connection-string",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg-connection-string/LICENSE"
+  },
+  "pg-int8@1.0.1": {
+    "licenses": "ISC",
+    "repository": "https://github.com/charmander/pg-int8",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg-int8",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg-int8/LICENSE"
+  },
+  "pg-numeric@1.0.2": {
+    "licenses": "ISC",
+    "repository": "https://github.com/charmander/pg-numeric",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg-numeric",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg-numeric/LICENSE"
+  },
+  "pg-pool@3.10.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/brianc/node-postgres",
+    "publisher": "Brian M. Carlson",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg-pool",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg-pool/LICENSE"
+  },
+  "pg-protocol@1.10.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/brianc/node-postgres",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg-protocol",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg-protocol/LICENSE"
+  },
+  "pg-types@2.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/brianc/node-pg-types",
+    "publisher": "Brian M. Carlson",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg/node_modules/pg-types",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg/node_modules/pg-types/README.md"
+  },
+  "pg-types@4.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/brianc/node-pg-types",
+    "publisher": "Brian M. Carlson",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg-types",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg-types/README.md"
+  },
+  "pg@8.16.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/brianc/node-postgres",
+    "publisher": "Brian Carlson",
+    "email": "brian.m.carlson@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg/LICENSE"
+  },
+  "pgpass@1.0.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/hoegaarden/pgpass",
+    "publisher": "Hannes Hörl",
+    "email": "hannes.hoerl+pgpass@snowreporter.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pgpass",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pgpass/README.md"
+  },
+  "picocolors@1.1.1": {
+    "licenses": "ISC",
+    "repository": "https://github.com/alexeyraspopov/picocolors",
+    "publisher": "Alexey Raspopov",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/picocolors",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/picocolors/LICENSE"
+  },
+  "picomatch@2.3.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/micromatch/picomatch",
+    "publisher": "Jon Schlinkert",
+    "url": "https://github.com/jonschlinkert",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/picomatch",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/picomatch/LICENSE"
+  },
+  "pify@2.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/pify",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pify",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pify/license"
+  },
+  "pirates@4.0.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/danez/pirates",
+    "publisher": "Ari Porad",
+    "email": "ari@ariporad.com",
+    "url": "http://ariporad.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pirates",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pirates/LICENSE"
+  },
+  "postcss-import@15.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/postcss/postcss-import",
+    "publisher": "Maxime Thirouin",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postcss-import",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postcss-import/LICENSE"
+  },
+  "postcss-js@4.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/postcss/postcss-js",
+    "publisher": "Andrey Sitnik",
+    "email": "andrey@sitnik.ru",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postcss-js",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postcss-js/LICENSE"
+  },
+  "postcss-load-config@4.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/postcss/postcss-load-config",
+    "publisher": "Michael Ciniawky",
+    "email": "michael.ciniawsky@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postcss-load-config",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postcss-load-config/LICENSE"
+  },
+  "postcss-nested@6.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/postcss/postcss-nested",
+    "publisher": "Andrey Sitnik",
+    "email": "andrey@sitnik.ru",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postcss-nested",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postcss-nested/LICENSE"
+  },
+  "postcss-selector-parser@6.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/postcss/postcss-selector-parser",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postcss-selector-parser",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postcss-selector-parser/LICENSE-MIT"
+  },
+  "postcss-value-parser@4.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/TrySound/postcss-value-parser",
+    "publisher": "Bogdan Chadkin",
+    "email": "trysound@yandex.ru",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postcss-value-parser",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postcss-value-parser/LICENSE"
+  },
+  "postcss@8.5.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/postcss/postcss",
+    "publisher": "Andrey Sitnik",
+    "email": "andrey@sitnik.ru",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postcss",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postcss/LICENSE"
+  },
+  "postgres-array@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/bendrucker/postgres-array",
+    "publisher": "Ben Drucker",
+    "email": "bvdrucker@gmail.com",
+    "url": "bendrucker.me",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg/node_modules/postgres-array",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg/node_modules/postgres-array/license"
+  },
+  "postgres-array@3.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/bendrucker/postgres-array",
+    "publisher": "Ben Drucker",
+    "email": "bvdrucker@gmail.com",
+    "url": "bendrucker.me",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postgres-array",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postgres-array/license"
+  },
+  "postgres-bytea@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/bendrucker/postgres-bytea",
+    "publisher": "Ben Drucker",
+    "email": "bvdrucker@gmail.com",
+    "url": "bendrucker.me",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg/node_modules/postgres-bytea",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg/node_modules/postgres-bytea/license"
+  },
+  "postgres-bytea@3.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/bendrucker/postgres-bytea",
+    "publisher": "Ben Drucker",
+    "email": "bvdrucker@gmail.com",
+    "url": "bendrucker.me",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postgres-bytea",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postgres-bytea/license"
+  },
+  "postgres-date@1.0.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/bendrucker/postgres-date",
+    "publisher": "Ben Drucker",
+    "email": "bvdrucker@gmail.com",
+    "url": "bendrucker.me",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg/node_modules/postgres-date",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg/node_modules/postgres-date/license"
+  },
+  "postgres-date@2.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/bendrucker/postgres-date",
+    "publisher": "Ben Drucker",
+    "email": "bvdrucker@gmail.com",
+    "url": "bendrucker.me",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postgres-date",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postgres-date/license"
+  },
+  "postgres-interval@1.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/bendrucker/postgres-interval",
+    "publisher": "Ben Drucker",
+    "email": "bvdrucker@gmail.com",
+    "url": "bendrucker.me",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg/node_modules/postgres-interval",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/pg/node_modules/postgres-interval/license"
+  },
+  "postgres-interval@3.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/bendrucker/postgres-interval",
+    "publisher": "Ben Drucker",
+    "email": "bvdrucker@gmail.com",
+    "url": "https://www.bendrucker.me",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postgres-interval",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postgres-interval/license"
+  },
+  "postgres-range@1.1.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/martianboy/postgres-range",
+    "publisher": "Abbas Mashayekh",
+    "email": "martianboy2005@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postgres-range",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/postgres-range/LICENSE"
+  },
+  "prop-types@15.8.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/facebook/prop-types",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/prop-types",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/prop-types/LICENSE"
+  },
+  "proxy-addr@2.0.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/proxy-addr",
+    "publisher": "Douglas Christopher Wilson",
+    "email": "doug@somethingdoug.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/proxy-addr",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/proxy-addr/LICENSE"
+  },
+  "qs@6.13.0": {
+    "licenses": "BSD-3-Clause",
+    "repository": "https://github.com/ljharb/qs",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/qs",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/qs/LICENSE.md"
+  },
+  "queue-microtask@1.2.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/queue-microtask",
+    "publisher": "Feross Aboukhadijeh",
+    "email": "feross@feross.org",
+    "url": "https://feross.org",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/queue-microtask",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/queue-microtask/LICENSE"
+  },
+  "range-parser@1.2.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/range-parser",
+    "publisher": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca",
+    "url": "http://tjholowaychuk.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/range-parser",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/range-parser/LICENSE"
+  },
+  "raw-body@2.5.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/stream-utils/raw-body",
+    "publisher": "Jonathan Ong",
+    "email": "me@jongleberry.com",
+    "url": "http://jongleberry.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/raw-body",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/raw-body/LICENSE"
+  },
+  "react-day-picker@8.10.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/gpbl/react-day-picker",
+    "publisher": "Giampaolo Bellavite",
+    "email": "io@gpbl.dev",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-day-picker",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-day-picker/LICENSE"
+  },
+  "react-dom@18.3.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/facebook/react",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-dom",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-dom/LICENSE"
+  },
+  "react-hook-form@7.55.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/react-hook-form/react-hook-form",
+    "publisher": "Beier",
+    "email": "bluebill1049@hotmail.com",
+    "url": "Bill",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-hook-form",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-hook-form/LICENSE"
+  },
+  "react-icons@5.4.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/react-icons/react-icons",
+    "publisher": "Goran Gajic",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-icons",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-icons/LICENSE"
+  },
+  "react-is@16.13.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/facebook/react",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/prop-types/node_modules/react-is",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/prop-types/node_modules/react-is/LICENSE"
+  },
+  "react-is@18.3.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/facebook/react",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-is",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-is/LICENSE"
+  },
+  "react-remove-scroll-bar@2.3.8": {
+    "licenses": "MIT",
+    "repository": "https://github.com/theKashey/react-remove-scroll-bar",
+    "publisher": "Anton Korzunov",
+    "email": "thekashey@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-remove-scroll-bar",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-remove-scroll-bar/README.md"
+  },
+  "react-remove-scroll@2.6.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/theKashey/react-remove-scroll",
+    "publisher": "Anton Korzunov",
+    "email": "thekashey@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-remove-scroll",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-remove-scroll/LICENSE"
+  },
+  "react-resizable-panels@2.1.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/bvaughn/react-resizable-panels",
+    "publisher": "Brian Vaughn",
+    "email": "brian.david.vaughn@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-resizable-panels",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-resizable-panels/README.md"
+  },
+  "react-smooth@4.0.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/recharts/react-smooth",
+    "publisher": "JasonHzq",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-smooth",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-smooth/LICENSE"
+  },
+  "react-style-singleton@2.2.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/theKashey/react-style-singleton",
+    "publisher": "Anton Korzunov",
+    "url": "thekashey@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-style-singleton",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-style-singleton/LICENSE"
+  },
+  "react-transition-group@4.4.5": {
+    "licenses": "BSD-3-Clause",
+    "repository": "https://github.com/reactjs/react-transition-group",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-transition-group",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react-transition-group/LICENSE"
+  },
+  "react@18.3.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/facebook/react",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/react/LICENSE"
+  },
+  "read-cache@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/TrySound/read-cache",
+    "publisher": "Bogdan Chadkin",
+    "email": "trysound@yandex.ru",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/read-cache",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/read-cache/LICENSE"
+  },
+  "readdirp@3.6.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/paulmillr/readdirp",
+    "publisher": "Thorsten Lorenz",
+    "email": "thlorenz@gmx.de",
+    "url": "thlorenz.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/readdirp",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/readdirp/LICENSE"
+  },
+  "recharts-scale@0.4.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/recharts/recharts-scale",
+    "publisher": "recharts group",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/recharts-scale",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/recharts-scale/LICENSE"
+  },
+  "recharts@2.15.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/recharts/recharts",
+    "publisher": "recharts group",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/recharts",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/recharts/LICENSE"
+  },
+  "regenerator-runtime@0.14.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/facebook/regenerator/tree/main/packages/runtime",
+    "publisher": "Ben Newman",
+    "email": "bn@cs.stanford.edu",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/regenerator-runtime",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/regenerator-runtime/LICENSE"
+  },
+  "regexparam@3.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/lukeed/regexparam",
+    "publisher": "Luke Edwards",
+    "email": "luke.edwards05@gmail.com",
+    "url": "https://lukeed.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/regexparam",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/regexparam/license"
+  },
+  "resolve@1.22.8": {
+    "licenses": "MIT",
+    "repository": "https://github.com/browserify/resolve",
+    "publisher": "James Halliday",
+    "email": "mail@substack.net",
+    "url": "http://substack.net",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/resolve",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/resolve/LICENSE"
+  },
+  "rest-express@1.0.0": {
+    "licenses": "UNKNOWN",
+    "publisher": "Grand Gaia LLC",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/LICENSE"
+  },
+  "reusify@1.0.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mcollina/reusify",
+    "publisher": "Matteo Collina",
+    "email": "hello@matteocollina.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/reusify",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/reusify/LICENSE"
+  },
+  "run-parallel@1.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/run-parallel",
+    "publisher": "Feross Aboukhadijeh",
+    "email": "feross@feross.org",
+    "url": "https://feross.org",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/run-parallel",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/run-parallel/LICENSE"
+  },
+  "safe-buffer@5.2.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/safe-buffer",
+    "publisher": "Feross Aboukhadijeh",
+    "email": "feross@feross.org",
+    "url": "https://feross.org",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/safe-buffer",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/safe-buffer/LICENSE"
+  },
+  "safer-buffer@2.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ChALkeR/safer-buffer",
+    "publisher": "Nikita Skovoroda",
+    "email": "chalkerx@gmail.com",
+    "url": "https://github.com/ChALkeR",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/safer-buffer",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/safer-buffer/LICENSE"
+  },
+  "scheduler@0.23.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/facebook/react",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/scheduler",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/scheduler/LICENSE"
+  },
+  "send@0.19.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/pillarjs/send",
+    "publisher": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/send",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/send/LICENSE"
+  },
+  "serve-static@1.16.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/expressjs/serve-static",
+    "publisher": "Douglas Christopher Wilson",
+    "email": "doug@somethingdoug.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/serve-static",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/serve-static/LICENSE"
+  },
+  "set-function-length@1.2.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/set-function-length",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/set-function-length",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/set-function-length/LICENSE"
+  },
+  "setprototypeof@1.2.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/wesleytodd/setprototypeof",
+    "publisher": "Wes Todd",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/setprototypeof",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/setprototypeof/LICENSE"
+  },
+  "shebang-command@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/kevva/shebang-command",
+    "publisher": "Kevin Mårtensson",
+    "email": "kevinmartensson@gmail.com",
+    "url": "github.com/kevva",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/shebang-command",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/shebang-command/license"
+  },
+  "shebang-regex@3.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/shebang-regex",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/shebang-regex",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/shebang-regex/license"
+  },
+  "side-channel@1.0.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/side-channel",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/side-channel",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/side-channel/LICENSE"
+  },
+  "signal-exit@4.1.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/tapjs/signal-exit",
+    "publisher": "Ben Coe",
+    "email": "ben@npmjs.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/signal-exit",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/signal-exit/LICENSE.txt"
+  },
+  "source-map-js@1.2.1": {
+    "licenses": "BSD-3-Clause",
+    "repository": "https://github.com/7rulnik/source-map-js",
+    "publisher": "Valentin 7rulnik Semirulnik",
+    "email": "v7rulnik@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/source-map-js",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/source-map-js/LICENSE"
+  },
+  "split2@4.2.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/mcollina/split2",
+    "publisher": "Matteo Collina",
+    "email": "hello@matteocollina.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/split2",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/split2/LICENSE"
+  },
+  "statuses@2.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/statuses",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/statuses",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/statuses/LICENSE"
+  },
+  "string-width@4.2.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/string-width",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/string-width-cjs",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/string-width-cjs/license"
+  },
+  "string-width@5.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/string-width",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "https://sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/string-width",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/string-width/license"
+  },
+  "strip-ansi@6.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/chalk/strip-ansi",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/string-width-cjs/node_modules/strip-ansi",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/string-width-cjs/node_modules/strip-ansi/license"
+  },
+  "strip-ansi@7.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/chalk/strip-ansi",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "https://sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/strip-ansi",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/strip-ansi/license"
+  },
+  "sucrase@3.35.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/alangpierce/sucrase",
+    "publisher": "Alan Pierce",
+    "email": "alangpierce@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/sucrase",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/sucrase/LICENSE"
+  },
+  "supports-preserve-symlinks-flag@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/inspect-js/node-supports-preserve-symlinks-flag",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/supports-preserve-symlinks-flag",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/supports-preserve-symlinks-flag/LICENSE"
+  },
+  "tailwind-merge@2.6.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dcastil/tailwind-merge",
+    "publisher": "Dany Castillo",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/tailwind-merge",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/tailwind-merge/LICENSE.md"
+  },
+  "tailwindcss-animate@1.0.7": {
+    "licenses": "MIT",
+    "publisher": "Jamie Kyle",
+    "email": "me@thejameskyle.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/tailwindcss-animate",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/tailwindcss-animate/LICENSE"
+  },
+  "tailwindcss@3.4.17": {
+    "licenses": "MIT",
+    "repository": "https://github.com/tailwindlabs/tailwindcss",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/tailwindcss",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/tailwindcss/LICENSE"
+  },
+  "thenify-all@1.6.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/thenables/thenify-all",
+    "publisher": "Jonathan Ong",
+    "email": "me@jongleberry.com",
+    "url": "http://jongleberry.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/thenify-all",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/thenify-all/LICENSE"
+  },
+  "thenify@3.3.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/thenables/thenify",
+    "publisher": "Jonathan Ong",
+    "email": "me@jongleberry.com",
+    "url": "http://jongleberry.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/thenify",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/thenify/LICENSE"
+  },
+  "tiny-invariant@1.3.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/alexreardon/tiny-invariant",
+    "publisher": "Alex Reardon",
+    "email": "alexreardon@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/tiny-invariant",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/tiny-invariant/LICENSE"
+  },
+  "to-regex-range@5.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/micromatch/to-regex-range",
+    "publisher": "Jon Schlinkert",
+    "url": "https://github.com/jonschlinkert",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/to-regex-range",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/to-regex-range/LICENSE"
+  },
+  "toidentifier@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/component/toidentifier",
+    "publisher": "Douglas Christopher Wilson",
+    "email": "doug@somethingdoug.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/toidentifier",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/toidentifier/LICENSE"
+  },
+  "ts-interface-checker@0.1.13": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/gristlabs/ts-interface-checker",
+    "publisher": "Dmitry S, Grist Labs",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/ts-interface-checker",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/ts-interface-checker/LICENSE"
+  },
+  "tslib@2.8.1": {
+    "licenses": "0BSD",
+    "repository": "https://github.com/Microsoft/tslib",
+    "publisher": "Microsoft Corp.",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/tslib",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/tslib/LICENSE.txt"
+  },
+  "tw-animate-css@1.2.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Wombosvideo/tw-animate-css",
+    "publisher": "Luca Bosin",
+    "url": "https://github.com/Wombosvideo",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/tw-animate-css",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/tw-animate-css/LICENSE"
+  },
+  "type-is@1.6.18": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/type-is",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/type-is",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/type-is/LICENSE"
+  },
+  "undici-types@6.21.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/nodejs/undici",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/undici-types",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/undici-types/LICENSE"
+  },
+  "unpipe@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/stream-utils/unpipe",
+    "publisher": "Douglas Christopher Wilson",
+    "email": "doug@somethingdoug.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/unpipe",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/unpipe/LICENSE"
+  },
+  "use-callback-ref@1.3.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/theKashey/use-callback-ref",
+    "publisher": "theKashey",
+    "email": "thekashey@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/use-callback-ref",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/use-callback-ref/LICENSE"
+  },
+  "use-sidecar@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/theKashey/use-sidecar",
+    "publisher": "theKashey",
+    "email": "thekashey@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/use-sidecar",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/use-sidecar/LICENSE"
+  },
+  "use-sync-external-store@1.2.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/facebook/react",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/use-sync-external-store",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/use-sync-external-store/LICENSE"
+  },
+  "util-deprecate@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/TooTallNate/util-deprecate",
+    "publisher": "Nathan Rajlich",
+    "email": "nathan@tootallnate.net",
+    "url": "http://n8.io/",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/util-deprecate",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/util-deprecate/LICENSE"
+  },
+  "utils-merge@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jaredhanson/utils-merge",
+    "publisher": "Jared Hanson",
+    "email": "jaredhanson@gmail.com",
+    "url": "http://www.jaredhanson.net/",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/utils-merge",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/utils-merge/LICENSE"
+  },
+  "vary@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/vary",
+    "publisher": "Douglas Christopher Wilson",
+    "email": "doug@somethingdoug.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/vary",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/vary/LICENSE"
+  },
+  "vaul@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/emilkowalski/vaul",
+    "publisher": "Emil Kowalski",
+    "email": "e@emilkowal.ski",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/vaul",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/vaul/LICENSE.md"
+  },
+  "victory-vendor@36.9.2": {
+    "licenses": "MIT AND ISC",
+    "repository": "https://github.com/FormidableLabs/victory",
+    "publisher": "Formidable",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/victory-vendor",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/victory-vendor/README.md"
+  },
+  "which@2.0.2": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/node-which",
+    "publisher": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "url": "http://blog.izs.me",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/which",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/which/LICENSE"
+  },
+  "wouter@3.3.5": {
+    "licenses": "Unlicense",
+    "repository": "https://github.com/molefrog/wouter",
+    "publisher": "Alexey Taktarov",
+    "email": "molefrog@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/wouter",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/wouter/README.md"
+  },
+  "wrap-ansi@7.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/chalk/wrap-ansi",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "https://sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/wrap-ansi-cjs",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/wrap-ansi-cjs/license"
+  },
+  "wrap-ansi@8.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/chalk/wrap-ansi",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "https://sindresorhus.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/wrap-ansi",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/wrap-ansi/license"
+  },
+  "ws@8.18.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/websockets/ws",
+    "publisher": "Einar Otto Stangvik",
+    "email": "einaros@gmail.com",
+    "url": "http://2x.io",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/ws",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/ws/LICENSE"
+  },
+  "xtend@4.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Raynos/xtend",
+    "publisher": "Raynos",
+    "email": "raynos2@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/xtend",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/xtend/LICENSE"
+  },
+  "yaml@2.6.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/eemeli/yaml",
+    "publisher": "Eemeli Aro",
+    "email": "eemeli@gmail.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/yaml",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/yaml/LICENSE"
+  },
+  "zod-validation-error@3.4.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/causaly/zod-validation-error",
+    "publisher": "Dimitrios C. Michalakos",
+    "email": "dimitris@jmike.gr",
+    "url": "https://github.com/jmike",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/zod-validation-error",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/zod-validation-error/LICENSE"
+  },
+  "zod@3.24.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/colinhacks/zod",
+    "publisher": "Colin McDonnell",
+    "email": "colin@colinhacks.com",
+    "path": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/zod",
+    "licenseFile": "/Users/dtaplin21/Desktop/Procore-Integrator/node_modules/zod/LICENSE"
+  }
+}
+
