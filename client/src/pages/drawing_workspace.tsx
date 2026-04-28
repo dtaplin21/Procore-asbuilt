@@ -202,7 +202,7 @@ export function DrawingWorkspaceBody({
       <CompareSubDrawingButton onClick={openCompareModal} disabled={uploadDisabled} />
       <button
         type="button"
-        className="inline-flex w-full items-center justify-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-60"
+        className="inline-flex w-full items-center justify-center rounded-md border border-primary bg-background px-3 py-2 text-sm font-medium text-primary shadow-sm hover:bg-primary-soft disabled:opacity-60"
         onClick={() => setUploadModalOpen(true)}
         disabled={uploadDisabled}
         data-testid="upload-drawing-open"

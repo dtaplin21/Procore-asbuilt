@@ -3,8 +3,15 @@
 @tailwind utilities;
 
 /**
- * Procore-inspired palette (light default).
- * Primary: hsl(19, 100%, 50%) — tokens use "H S% L%" for hsl(var(--token) / alpha).
+ * Color system — single source of truth for shadcn semantic colors.
+ *
+ * - Define HSL components here (`--primary`, `--primary-hover`, `--primary-soft`, neutrals, etc.).
+ * - Tailwind maps those vars in `tailwind.config.ts` (e.g. `bg-primary` → hsl(var(--primary))).
+ * - Prefer theme utilities in components; use `tailwind.config` `procore.*` literals only when
+ *   you must bypass CSS vars. Avoid raw hex / `blue-*` in TSX.
+ * - There is no `App.css`; global styles for the client live in this file.
+ *
+ * Procore-inspired primary: hsl(19, 100%, 50%). Tokens use "H S% L%" for hsl(var(--token) / alpha).
  */
 :root {
   --button-outline: rgba(0, 0, 0, 0.08);

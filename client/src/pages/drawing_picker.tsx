@@ -44,7 +44,7 @@ export default function DrawingPickerPage() {
   if (isLoading) {
     return (
       <div className="p-4">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
+        <h1 className="text-xl font-semibold text-foreground mb-4">
           Select a Drawing
         </h1>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -90,42 +90,42 @@ export default function DrawingPickerPage() {
     <div className="p-4">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+          <h1 className="text-xl font-semibold text-foreground">
             Select a Drawing
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Project {projectId} • Choose a master drawing to open the workspace
           </p>
         </div>
-        <button
+        <Button
           type="button"
-          className="inline-flex w-full shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 sm:w-auto dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+          variant="outline"
+          className="w-full shrink-0 border-primary bg-background text-primary hover:bg-primary-soft hover:text-primary sm:w-auto"
           onClick={() => setUploadModalOpen(true)}
           data-testid="drawing-picker-upload-open"
         >
           Upload drawing
-        </button>
+        </Button>
       </div>
 
       {list.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <FileImage className="w-12 h-12 mx-auto mb-3 text-slate-400" />
-            <p className="text-sm text-slate-600 dark:text-slate-300">
+            <FileImage className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+            <p className="text-sm text-foreground">
               No drawings in this project yet.
             </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+            <p className="text-sm text-muted-foreground mt-2">
               Upload a master drawing to open the workspace, or return to the dashboard.
             </p>
             <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <button
+              <Button
                 type="button"
-                className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
                 onClick={() => setUploadModalOpen(true)}
                 data-testid="drawing-picker-empty-upload"
               >
                 Upload drawing
-              </button>
+              </Button>
               <Link href="/">
                 <Button variant="outline" data-testid="drawing-picker-back-dashboard">
                   Back to Dashboard
@@ -141,14 +141,14 @@ export default function DrawingPickerPage() {
               key={drawing.id}
               href={`/projects/${projectId}/drawings/${drawing.id}/workspace${preserveSearchParams()}`}
             >
-              <Card className="cursor-pointer transition hover:bg-slate-50 hover:border-slate-300 dark:hover:bg-slate-900/50">
+              <Card className="cursor-pointer transition-colors hover:border-primary/50 hover:bg-primary-soft/40">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base font-medium truncate">
                     {drawing.name}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground">
                     Drawing #{drawing.id}
                     {drawing.page_count != null ? ` • ${drawing.page_count} page(s)` : ""}
                   </p>

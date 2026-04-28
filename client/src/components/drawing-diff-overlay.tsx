@@ -21,7 +21,8 @@ const SEVERITY_STYLES: Record<
 > = {
   low: { stroke: "rgb(34 197 94)", fill: "rgba(34 197 94 / 0.15)", badge: "bg-green-500/90" },
   medium: { stroke: "rgb(234 179 8)", fill: "rgba(234 179 8 / 0.15)", badge: "bg-yellow-500/90" },
-  high: { stroke: "rgb(249 115 22)", fill: "rgba(249 115 22 / 0.2)", badge: "bg-orange-500/90" },
+  /** Dark amber — avoids confusion with brand primary (Procore orange ~hsl 19). */
+  high: { stroke: "rgb(180 83 9)", fill: "rgba(180 83 9 / 0.2)", badge: "bg-amber-700/90" },
   critical: { stroke: "rgb(239 68 68)", fill: "rgba(239 68 68 / 0.25)", badge: "bg-red-500/90" },
 };
 

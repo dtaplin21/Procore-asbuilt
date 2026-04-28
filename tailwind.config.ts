@@ -1,5 +1,9 @@
 import type { Config } from "tailwindcss";
 
+/**
+ * Tailwind theme extends shadcn tokens from `client/src/index.css` (:root / .dark).
+ * Do not duplicate primary/neutral hex here for semantic colors — keep vars in CSS and map with hsl(var(--*)).
+ */
 export default {
   darkMode: ["class"],
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],

@@ -255,7 +255,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
           <div className="flex flex-col">
             <label className="text-xs text-muted-foreground">Project</label>
             <select
-              className="h-9 rounded-md border bg-background px-3 text-sm"
+              className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground"
               value={selectedProjectId ?? ""}
               onChange={(e) => setSelectedProjectId(e.target.value)}
               disabled={projectsLoading || !projects || projects.length === 0}
@@ -276,14 +276,15 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
           </div>
 
           {selectedProjectId ? (
-            <button
+            <Button
               type="button"
-              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 h-9 self-end"
+              variant="outline"
+              className="h-9 self-end border-primary bg-background text-primary hover:bg-primary-soft hover:text-primary"
               onClick={() => setUploadModalOpen(true)}
               data-testid="dashboard-upload-drawing"
             >
               Upload drawing
-            </button>
+            </Button>
           ) : null}
 
           {/* Existing Procore status */}
@@ -297,7 +298,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               {[1, 2].map((i) => (
-                <div key={i} className="rounded-lg border p-4">
+                <div key={i} className="rounded-lg border border-border p-4">
                   <Skeleton className="h-4 w-32 mb-2" />
                   <Skeleton className="h-8 w-24 mt-2" />
                   <Skeleton className="h-3 w-full max-w-sm mt-2" />
@@ -318,7 +319,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
         ) : (
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-lg border p-4">
+              <div className="rounded-lg border border-border border-l-4 border-l-primary bg-card p-4 shadow-sm">
                 <div className="text-sm text-muted-foreground">Comparison progress</div>
                 <div className="mt-2 text-2xl font-semibold">
                   {comparisonProgress
@@ -330,7 +331,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
                 </div>
               </div>
 
-              <div className="rounded-lg border p-4">
+              <div className="rounded-lg border border-border border-l-4 border-l-primary/70 bg-card p-4 shadow-sm">
                 <div className="text-sm text-muted-foreground">High-severity diff risk</div>
                 <div className="mt-2 text-2xl font-semibold">
                   {highSeverityRisk !== null
@@ -409,22 +410,22 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
             ))}
           </div>
         ) : (
-          <div className="rounded-xl border bg-white">
-            <div className="border-b px-4 py-3">
-              <h3 className="text-sm font-semibold text-slate-900">Insights</h3>
+          <div className="rounded-xl border border-border bg-card shadow-sm">
+            <div className="border-b border-border px-4 py-3">
+              <h3 className="text-sm font-semibold text-foreground">Insights</h3>
             </div>
-            <div className="divide-y">
+            <div className="divide-y divide-border">
               {insightsPreview.length === 0 ? (
-                <div className="px-4 py-6 text-sm text-slate-500">
+                <div className="px-4 py-6 text-sm text-muted-foreground">
                   No insights yet for this project.
                 </div>
               ) : (
                 insightsPreview.map((insight) => {
                   const content = (
-                    <div className="px-4 py-3 hover:bg-slate-50">
-                      <div className="text-sm font-medium text-slate-900">{insight.title}</div>
+                    <div className="px-4 py-3 transition-colors hover:bg-muted/50">
+                      <div className="text-sm font-medium text-foreground">{insight.title}</div>
                       {insight.description ? (
-                        <div className="mt-1 text-sm text-slate-500">{insight.description}</div>
+                        <div className="mt-1 text-sm text-muted-foreground">{insight.description}</div>
                       ) : null}
                     </div>
                   );
@@ -482,22 +483,22 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
         ) : findingsError ? (
           <div className="text-sm text-destructive">Failed to load recent findings</div>
         ) : (
-          <div className="rounded-xl border bg-white">
-            <div className="border-b px-4 py-3">
-              <h3 className="text-sm font-semibold text-slate-900">Recent Findings</h3>
+          <div className="rounded-xl border border-border bg-card shadow-sm">
+            <div className="border-b border-border px-4 py-3">
+              <h3 className="text-sm font-semibold text-foreground">Recent Findings</h3>
             </div>
-            <div className="divide-y">
+            <div className="divide-y divide-border">
               {(recentFindings?.findings ?? []).length === 0 ? (
-                <div className="px-4 py-6 text-sm text-slate-500">
+                <div className="px-4 py-6 text-sm text-muted-foreground">
                   No recent findings for this project.
                 </div>
               ) : (
                 (recentFindings?.findings ?? []).map((finding) => {
                   const content = (
-                    <div className="px-4 py-3 hover:bg-slate-50">
-                      <div className="text-sm font-medium text-slate-900">{finding.title}</div>
+                    <div className="px-4 py-3 transition-colors hover:bg-muted/50">
+                      <div className="text-sm font-medium text-foreground">{finding.title}</div>
                       {finding.severity ? (
-                        <div className="mt-1 text-xs text-slate-500">Severity: {finding.severity}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">Severity: {finding.severity}</div>
                       ) : null}
                     </div>
                   );

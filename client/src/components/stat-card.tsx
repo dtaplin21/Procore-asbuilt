@@ -33,7 +33,10 @@ export function StatCard({
   const { iconBg, iconColor } = variantConfig[variant];
   
   return (
-    <Card data-testid={`stat-card-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+    <Card
+      data-testid={`stat-card-${title.toLowerCase().replace(/\s+/g, '-')}`}
+      className="border-l-2 border-l-primary/25"
+    >
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">

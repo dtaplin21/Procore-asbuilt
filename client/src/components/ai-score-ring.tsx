@@ -19,10 +19,11 @@ export function AIScoreRing({ score, size = "md", showLabel = true }: AIScoreRin
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
   
+  /** Mid bands use amber/yellow so rings don’t read as the same hue as brand primary orange. */
   const getColor = (score: number) => {
     if (score >= 90) return "stroke-emerald-500";
     if (score >= 70) return "stroke-amber-500";
-    if (score >= 50) return "stroke-orange-500";
+    if (score >= 50) return "stroke-yellow-600";
     return "stroke-red-500";
   };
   
