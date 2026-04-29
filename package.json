@@ -5,6 +5,8 @@
   "author": "Grand Gaia LLC",
   "license": "UNLICENSED",
   "scripts": {
+    "dev:kill-port": "sh -c 'pids=$(lsof -ti :2000 2>/dev/null); [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null; exit 0'",
+    "predev": "npm run dev:kill-port",
     "dev": "concurrently -k -n backend,frontend -c magenta,cyan \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && ./venv/bin/uvicorn main:app --reload --host 0.0.0.0 --port 2000",
     "dev:frontend": "vite",

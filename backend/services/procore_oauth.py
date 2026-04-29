@@ -5,7 +5,7 @@ Manages OAuth flow, token exchange/refresh, and DB persistence via procore_conne
 import httpx
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from config import settings
+from config import procore_api_base_url, procore_authorization_url, procore_token_url, settings
 from typing import Dict, Any, Optional, cast
 import secrets
 from errors import ExternalServiceError, ProcoreAuthExpired, ProcoreNotConnected, ProcoreOAuthError
@@ -16,14 +16,13 @@ from services.procore_connection_store import get_active_connection, upsert_conn
 class ProcoreOAuth:
     """Handles Procore OAuth 2.0 authentication flow"""
     
-    AUTHORIZATION_URL = "https://login.procore.com/oauth/authorize"
-    TOKEN_URL = "https://login.procore.com/oauth/token"
-    
     def __init__(self, db: Session):
         self.db = db
         self.client_id = settings.procore_client_id
         self.client_secret = settings.procore_client_secret
         self.redirect_uri = settings.procore_redirect_uri
+        self.authorization_url = procore_authorization_url()
+        self.token_url = procore_token_url()
     
     def generate_state(self) -> str:
         """Generate secure state parameter for OAuth flow"""
@@ -41,7 +40,7 @@ class ProcoreOAuth:
         }
         
         query_string = "&".join([f"{k}={v}" for k, v in params.items()])
-        return f"{self.AUTHORIZATION_URL}?{query_string}"
+        return f"{self.authorization_url}?{query_string}"
     
     async def exchange_code_for_tokens(self, code: str) -> Dict[str, Any]:
         """
@@ -52,7 +51,7 @@ class ProcoreOAuth:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
-                    self.TOKEN_URL,
+                    self.token_url,
                     data={
                         "client_id": self.client_id,
                         "client_secret": self.client_secret,
@@ -99,7 +98,7 @@ class ProcoreOAuth:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
-                    self.TOKEN_URL,
+                    self.token_url,
                     data={
                         "client_id": self.client_id,
                         "client_secret": self.client_secret,
@@ -149,9 +148,10 @@ class ProcoreOAuth:
     
     async def get_user_info(self, access_token: str) -> Dict[str, Any]:
         """Get current user info from Procore"""
+        api_base = procore_api_base_url()
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                "https://api.procore.com/rest/v1.0/me",
+                f"{api_base}/rest/v1.0/me",
                 headers={
                     "Authorization": f"Bearer {access_token}",
                     "Content-Type": "application/json",
@@ -169,11 +169,12 @@ class ProcoreOAuth:
         access_token = token_payload["access_token"]
         user_info = await self.get_user_info(access_token)
         procore_user_id = str(user_info["id"])
-        
+        api_base = procore_api_base_url()
+
         # Get companies user belongs to
         async with httpx.AsyncClient(timeout=30.0) as client:
             companies_response = await client.get(
-                "https://api.procore.com/rest/v1.0/companies",
+                f"{api_base}/rest/v1.0/companies",
                 headers={
                     "Authorization": f"Bearer {access_token}",
                     "Content-Type": "application/json",
@@ -188,7 +189,7 @@ class ProcoreOAuth:
             if companies:
                 first_procore_company_id = str(companies[0]["id"])
                 projects_response = await client.get(
-                    "https://api.procore.com/rest/v1.0/projects",
+                    f"{api_base}/rest/v1.0/projects",
                     headers={
                         "Authorization": f"Bearer {access_token}",
                         "Procore-Company-Id": first_procore_company_id,

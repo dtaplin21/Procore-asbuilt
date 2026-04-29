@@ -15,16 +15,17 @@ from errors import (
 )
 from models.models import Company
 from services.procore_connection_store import get_active_connection
+from config import procore_api_base_url
 
 class ProcoreAPIClient:
     """Main client for interacting with Procore REST API"""
     
-    BASE_URL = "https://api.procore.com"
     API_VERSION = "v1.0"
     
     def __init__(self, db: Session, user_id: str):
         self.db = db
         self.user_id = user_id
+        self.base_url = procore_api_base_url()
         self._client: Optional[httpx.AsyncClient] = None
     
     async def __aenter__(self):
@@ -65,7 +66,7 @@ class ProcoreAPIClient:
         """Make authenticated request to Procore API"""
         access_token = await self._get_access_token()
         
-        url = f"{self.BASE_URL}/rest/{self.API_VERSION}/{endpoint.lstrip('/')}"
+        url = f"{self.base_url}/rest/{self.API_VERSION}/{endpoint.lstrip('/')}"
 
         request_headers = {
             "Authorization": f"Bearer {access_token}",
@@ -422,7 +423,7 @@ class ProcoreAPIClient:
     ) -> bytes:
         """Download drawing PDF file"""
         access_token = await self._get_access_token()
-        url = f"{self.BASE_URL}/rest/{self.API_VERSION}/drawings/{drawing_id}/file"
+        url = f"{self.base_url}/rest/{self.API_VERSION}/drawings/{drawing_id}/file"
         
         headers = {
             "Authorization": f"Bearer {access_token}",
@@ -602,7 +603,7 @@ class ProcoreAPIClient:
     ) -> bytes:
         """Download document file"""
         access_token = await self._get_access_token()
-        url = f"{self.BASE_URL}/rest/{self.API_VERSION}/documents/{document_id}/download"
+        url = f"{self.base_url}/rest/{self.API_VERSION}/documents/{document_id}/download"
         
         headers = {
             "Authorization": f"Bearer {access_token}",
