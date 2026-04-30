@@ -19,3 +19,4 @@ Use [`Notes/TEMPLATE_FEATURE_DOC.md`](../TEMPLATE_FEATURE_DOC.md) as a starting 
 | [`findings_and_alembic_plan.md`](./findings_and_alembic_plan.md) | Findings and Alembic planning |
 | [`inspection_drawing_procore_pipline.md`](./inspection_drawing_procore_pipline.md) | Inspection / drawing / Procore pipeline |
 | [`procore_token_persistence.md`](./procore_token_persistence.md) | Procore OAuth token DB persistence (Approach B) |
+| [`render_postgres_migration.md`](./render_postgres_migration.md) | Copy local Postgres schema+data to Render (`dump_restore_render_postgres.sh`) |
