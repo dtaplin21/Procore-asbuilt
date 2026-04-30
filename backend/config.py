@@ -22,6 +22,25 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _ensure_psycopg3_driver_scheme(cls, v: object) -> object:
+        """
+        SQLAlchemy uses psycopg2 for plain postgresql:// URLs. This project ships psycopg v3
+        only (psycopg[binary]). Render and other hosts often supply postgres:// or
+        postgresql:// — rewrite so create_engine loads psycopg3 without psycopg2.
+        """
+        if not isinstance(v, str):
+            return v
+        s = v.strip()
+        if s.startswith("postgresql+psycopg://"):
+            return s
+        if s.startswith("postgres://"):
+            return "postgresql+psycopg://" + s[len("postgres://") :]
+        if s.startswith("postgresql://"):
+            return "postgresql+psycopg://" + s[len("postgresql://") :]
+        return s
+
     @field_validator("procore_environment", mode="before")
     @classmethod
     def _normalize_procore_environment(cls, v: object) -> object:
