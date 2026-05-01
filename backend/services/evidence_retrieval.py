@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Sequence, Set
+from typing import Any, Dict, List, Optional, Sequence, Set, cast
 
 from sqlalchemy.orm import Session
 
@@ -123,7 +123,7 @@ class EvidenceRetrievalService:
         )
         links_by_evidence: Dict[int, List[EvidenceDrawingLink]] = {}
         for link in links:
-            links_by_evidence.setdefault(int(link.evidence_id), []).append(link)
+            links_by_evidence.setdefault(cast(int, link.evidence_id), []).append(link)
 
         evidence_records = (
             self.db.query(EvidenceRecord)
@@ -136,7 +136,7 @@ class EvidenceRetrievalService:
         matches: List[EvidenceMatchResult] = []
 
         for record in evidence_records:
-            direct_links = links_by_evidence.get(int(record.id), [])
+            direct_links = links_by_evidence.get(cast(int, record.id), [])
             if not direct_links and not drawing_disciplines:
                 continue
 
@@ -155,7 +155,9 @@ class EvidenceRetrievalService:
                         "weight": round(weight, 3),
                         "details": {
                             "count": len(direct_links),
-                            "link_types": sorted({link.link_type for link in direct_links}),
+                            "link_types": sorted(
+                                {cast(str, link.link_type) for link in direct_links}
+                            ),
                         },
                     }
                 )
@@ -206,11 +208,13 @@ class EvidenceRetrievalService:
 
     def _infer_drawing_disciplines(self, drawing: Drawing) -> Set[str]:
         disciplines: Set[str] = set()
-        fields = [drawing.name or "", getattr(drawing, "source", None) or ""]
+        name = cast(Optional[str], drawing.name) or ""
+        source = cast(Optional[str], getattr(drawing, "source", None)) or ""
+        fields = [name, source]
         for field in fields:
             disciplines.update(self._disciplines_from_text(field))
 
-        prefix = self._extract_sheet_prefix(drawing.name or "")
+        prefix = self._extract_sheet_prefix(name)
         if prefix:
             for mapped in self.PREFIX_DISCIPLINE_MAP.get(prefix, ()):
                 disciplines.add(mapped)

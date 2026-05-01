@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import mimetypes
 from pathlib import Path
+from typing import Optional, cast
 
 import fitz  # PyMuPDF
 
@@ -30,37 +31,38 @@ class DrawingRenderingService:
 
     def render_drawing_pages(self, drawing_id: int) -> None:
         drawing = self.storage.get_drawing_by_id(drawing_id)
-        if not drawing:
+        if drawing is None:
             raise ValueError(f"Drawing {drawing_id} not found")
 
-        if not drawing.storage_key:
+        storage_key = cast(Optional[str], drawing.storage_key)
+        if not storage_key:
             raise ValueError(f"Drawing {drawing_id} has no storage_key")
 
         self.storage.set_drawing_processing_status(drawing_id, "processing", error=None)
 
         try:
-            source_path = open_storage_path(drawing.storage_key)
+            source_path = open_storage_path(storage_key)
             if not source_path.exists():
                 raise FileNotFoundError(f"Source file not found: {source_path}")
 
             mime_type = (
-                drawing.content_type
+                cast(Optional[str], drawing.content_type)
                 or mimetypes.guess_type(str(source_path))[0]
                 or ""
             )
 
             if mime_type == "application/pdf" or source_path.suffix.lower() == ".pdf":
                 page_count = self._render_pdf(
-                    drawing.project_id, drawing.id, source_path
+                    cast(int, drawing.project_id), cast(int, drawing.id), source_path
                 )
                 self.storage.set_drawing_processing_status(
                     drawing_id, "ready", page_count=page_count
                 )
             elif mime_type.startswith("image/"):
                 self._register_existing_image_as_rendition(
-                    drawing.project_id,
-                    drawing.id,
-                    drawing.storage_key,
+                    cast(int, drawing.project_id),
+                    cast(int, drawing.id),
+                    storage_key,
                     source_path,
                     mime_type,
                 )
@@ -119,7 +121,7 @@ class DrawingRenderingService:
         mime_type: str,
     ) -> None:
         """Reuse original image as page 1 viewer asset if already renderable."""
-        import cv2
+        import cv2  # type: ignore[import-untyped]
 
         img = cv2.imread(str(source_path))
         width_px = int(img.shape[1]) if img is not None else None

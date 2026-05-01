@@ -10,6 +10,8 @@ Integration tests: compare flow with DB, alignment lifecycle, reuse.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -30,7 +32,7 @@ def _unique_id() -> str:
 
 
 @pytest.fixture
-def db() -> Session:
+def db() -> Iterator[Session]:
     session = SessionLocal()
     try:
         yield session
@@ -143,7 +145,9 @@ def test_validate_project_drawings_raises_when_master_not_found(
 ) -> None:
     svc = DrawingComparisonService(db)
     with pytest.raises(ValueError, match="Master drawing 99999 not found"):
-        svc._validate_project_drawings(project.id, 99999, sub_drawing.id)
+        svc._validate_project_drawings(
+            cast(int, project.id), 99999, cast(int, sub_drawing.id)
+        )
 
 
 def test_validate_project_drawings_raises_when_sub_not_found(
@@ -151,7 +155,9 @@ def test_validate_project_drawings_raises_when_sub_not_found(
 ) -> None:
     svc = DrawingComparisonService(db)
     with pytest.raises(ValueError, match="Sub drawing 99999 not found"):
-        svc._validate_project_drawings(project.id, master_drawing.id, 99999)
+        svc._validate_project_drawings(
+            cast(int, project.id), cast(int, master_drawing.id), 99999
+        )
 
 
 def test_validate_project_drawings_raises_when_master_equals_sub(
@@ -159,7 +165,11 @@ def test_validate_project_drawings_raises_when_master_equals_sub(
 ) -> None:
     svc = DrawingComparisonService(db)
     with pytest.raises(ValueError, match="Master drawing and sub drawing must be different"):
-        svc._validate_project_drawings(project.id, master_drawing.id, master_drawing.id)
+        svc._validate_project_drawings(
+            cast(int, project.id),
+            cast(int, master_drawing.id),
+            cast(int, master_drawing.id),
+        )
 
 
 def test_validate_project_drawings_returns_master_sub_when_valid(
@@ -167,10 +177,12 @@ def test_validate_project_drawings_returns_master_sub_when_valid(
 ) -> None:
     svc = DrawingComparisonService(db)
     master, sub = svc._validate_project_drawings(
-        project.id, master_drawing.id, sub_drawing.id
+        cast(int, project.id),
+        cast(int, master_drawing.id),
+        cast(int, sub_drawing.id),
     )
-    assert master.id == master_drawing.id
-    assert sub.id == sub_drawing.id
+    assert cast(int, master.id) == cast(int, master_drawing.id)
+    assert cast(int, sub.id) == cast(int, sub_drawing.id)
 
 
 # ---------------------------------------------------------------------------
@@ -258,7 +270,9 @@ def test_get_reusable_alignment_returns_none_when_no_alignment(
     db: Session, master_drawing: Drawing, sub_drawing: Drawing
 ) -> None:
     storage = StorageService(db)
-    result = storage.get_reusable_alignment(master_drawing.id, sub_drawing.id)
+    result = storage.get_reusable_alignment(
+        cast(int, master_drawing.id), cast(int, sub_drawing.id)
+    )
     assert result is None
 
 
@@ -267,9 +281,11 @@ def test_get_reusable_alignment_returns_none_when_queued(
 ) -> None:
     storage = StorageService(db)
     alignment = storage.create_drawing_alignment(
-        master_drawing.id, sub_drawing.id, "feature_match"
+        cast(int, master_drawing.id), cast(int, sub_drawing.id), "feature_match"
     )
-    result = storage.get_reusable_alignment(master_drawing.id, sub_drawing.id)
+    result = storage.get_reusable_alignment(
+        cast(int, master_drawing.id), cast(int, sub_drawing.id)
+    )
     assert result is None  # queued, no transform
 
 
@@ -278,11 +294,13 @@ def test_get_reusable_alignment_returns_alignment_when_complete_with_transform(
 ) -> None:
     storage = StorageService(db)
     alignment = storage.create_drawing_alignment(
-        master_drawing.id, sub_drawing.id, "manual"
+        cast(int, master_drawing.id), cast(int, sub_drawing.id), "manual"
     )
-    result = storage.get_reusable_alignment(master_drawing.id, sub_drawing.id)
+    result = storage.get_reusable_alignment(
+        cast(int, master_drawing.id), cast(int, sub_drawing.id)
+    )
     assert result is not None
-    assert result.id == alignment.id
+    assert cast(int, result.id) == cast(int, alignment.id)
     assert getattr(result, "transform", None) is not None
 
 
@@ -301,14 +319,14 @@ def test_compare_creates_alignment_and_runs_lifecycle_when_feature_match(
 ) -> None:
     """When drawings have storage_key, creates feature_match alignment and runs lifecycle."""
     master = Drawing(
-        project_id=project.id,
+        project_id=cast(int, project.id),
         source="upload",
         name="master.pdf",
         storage_key="drawings/fake-master.pdf",
         content_type="application/pdf",
     )
     sub = Drawing(
-        project_id=project.id,
+        project_id=cast(int, project.id),
         source="upload",
         name="sub.pdf",
         storage_key="drawings/fake-sub.pdf",
@@ -323,9 +341,9 @@ def test_compare_creates_alignment_and_runs_lifecycle_when_feature_match(
     mock_diff.return_value = []
     result = compare_sub_drawing_to_master(
         db,
-        project_id=project.id,
-        master_drawing_id=master.id,
-        sub_drawing_id=sub.id,
+        project_id=cast(int, project.id),
+        master_drawing_id=cast(int, master.id),
+        sub_drawing_id=cast(int, sub.id),
     )
     assert result.master_drawing is not None
     assert result.sub_drawing is not None
@@ -345,20 +363,20 @@ def test_compare_reuses_existing_alignment_when_transform_valid(
 ) -> None:
     storage = StorageService(db)
     alignment = storage.create_drawing_alignment(
-        master_drawing.id, sub_drawing.id, "manual"
+        cast(int, master_drawing.id), cast(int, sub_drawing.id), "manual"
     )
     mock_diff.return_value = []
 
     with patch("services.drawing_comparison.run_alignment_lifecycle") as mock_lifecycle:
         result = compare_sub_drawing_to_master(
             db,
-            project_id=project.id,
-            master_drawing_id=master_drawing.id,
-            sub_drawing_id=sub_drawing.id,
+            project_id=cast(int, project.id),
+            master_drawing_id=cast(int, master_drawing.id),
+            sub_drawing_id=cast(int, sub_drawing.id),
         )
         mock_lifecycle.assert_not_called()
 
-    assert result.alignment.id == alignment.id
+    assert cast(int, result.alignment.id) == cast(int, alignment.id)
     mock_diff.assert_called_once()
 
 
@@ -372,9 +390,9 @@ def test_compare_raises_when_master_not_found(
     with pytest.raises(ValueError, match="Master drawing 99999 not found"):
         compare_sub_drawing_to_master(
             db,
-            project_id=project.id,
+            project_id=cast(int, project.id),
             master_drawing_id=99999,
-            sub_drawing_id=sub_drawing.id,
+            sub_drawing_id=cast(int, sub_drawing.id),
         )
     mock_diff.assert_not_called()
 
@@ -388,15 +406,15 @@ def test_compare_force_recompute_runs_lifecycle_even_with_existing(
     sub_drawing: Drawing,
 ) -> None:
     storage = StorageService(db)
-    storage.create_drawing_alignment(master_drawing.id, sub_drawing.id, "manual")
+    storage.create_drawing_alignment(cast(int, master_drawing.id), cast(int, sub_drawing.id), "manual")
     mock_diff.return_value = []
 
     with patch("services.drawing_comparison.run_alignment_lifecycle") as mock_lifecycle:
         compare_sub_drawing_to_master(
             db,
-            project_id=project.id,
-            master_drawing_id=master_drawing.id,
-            sub_drawing_id=sub_drawing.id,
+            project_id=cast(int, project.id),
+            master_drawing_id=cast(int, master_drawing.id),
+            sub_drawing_id=cast(int, sub_drawing.id),
             force_recompute=True,
         )
         mock_lifecycle.assert_called_once()
@@ -424,7 +442,7 @@ def test_run_alignment_lifecycle_updates_to_complete_on_success(
     }
     storage = StorageService(db)
     alignment = storage.create_drawing_alignment(
-        master_drawing.id, sub_drawing.id, "feature_match"
+        cast(int, master_drawing.id), cast(int, sub_drawing.id), "feature_match"
     )
 
     run_alignment_lifecycle(db, alignment, master_drawing, sub_drawing)
@@ -445,7 +463,7 @@ def test_run_alignment_lifecycle_updates_to_failed_on_error(
     mock_compute.side_effect = RuntimeError("Compute failed")
     storage = StorageService(db)
     alignment = storage.create_drawing_alignment(
-        master_drawing.id, sub_drawing.id, "feature_match"
+        cast(int, master_drawing.id), cast(int, sub_drawing.id), "feature_match"
     )
 
     with pytest.raises(RuntimeError, match="Compute failed"):
@@ -470,23 +488,23 @@ def test_list_alignments_returns_newest_first_with_sub_drawing(
     """Alignments history: newest first, subDrawing.id and subDrawing.name included."""
     storage = StorageService(db)
     a1 = storage.create_drawing_alignment(
-        master_drawing.id, sub_drawing.id, "manual"
+        cast(int, master_drawing.id), cast(int, sub_drawing.id), "manual"
     )
     db.refresh(a1)
 
     svc = DrawingComparisonService(db)
-    result = svc.list_alignments(project.id, master_drawing.id)
+    result = svc.list_alignments(cast(int, project.id), cast(int, master_drawing.id))
 
     assert "alignments" in result
     alignments = result["alignments"]
     assert len(alignments) >= 1
     first = alignments[0]
-    assert first.id == a1.id
-    assert first.project_id == project.id
-    assert first.master_drawing_id == master_drawing.id
-    assert first.sub_drawing_id == sub_drawing.id
+    assert cast(int, first.id) == cast(int, a1.id)
+    assert cast(int, first.project_id) == cast(int, project.id)
+    assert cast(int, first.master_drawing_id) == cast(int, master_drawing.id)
+    assert cast(int, first.sub_drawing_id) == cast(int, sub_drawing.id)
     assert first.sub_drawing is not None
-    assert first.sub_drawing.id == sub_drawing.id
+    assert cast(int, first.sub_drawing.id) == cast(int, sub_drawing.id)
     assert first.sub_drawing.name == sub_drawing.name
 
 
@@ -495,7 +513,7 @@ def test_list_alignments_raises_when_master_not_found(
 ) -> None:
     svc = DrawingComparisonService(db)
     with pytest.raises(ValueError, match="Master drawing 99999 not found"):
-        svc.list_alignments(project.id, 99999)
+        svc.list_alignments(cast(int, project.id), 99999)
 
 
 # ---------------------------------------------------------------------------
@@ -512,10 +530,10 @@ def test_list_diffs_returns_newest_first_with_required_fields(
     """Diffs history: newest first, includes summary, severity, createdAt, diffRegions."""
     storage = StorageService(db)
     alignment = storage.create_drawing_alignment(
-        master_drawing.id, sub_drawing.id, "manual"
+        cast(int, master_drawing.id), cast(int, sub_drawing.id), "manual"
     )
     diff = storage.create_drawing_diff(
-        alignment.id,
+        cast(int, alignment.id),
         summary="Three differences detected",
         severity="medium",
         diff_regions=[
@@ -530,14 +548,14 @@ def test_list_diffs_returns_newest_first_with_required_fields(
     db.refresh(diff)
 
     svc = DrawingComparisonService(db)
-    result = svc.list_diffs(project.id, master_drawing.id)
+    result = svc.list_diffs(cast(int, project.id), cast(int, master_drawing.id))
 
     assert "diffs" in result
     diffs = result["diffs"]
     assert len(diffs) >= 1
     first = diffs[0]
-    assert first.id == diff.id
-    assert first.alignment_id == alignment.id
+    assert cast(int, first.id) == cast(int, diff.id)
+    assert cast(int, first.alignment_id) == cast(int, alignment.id)
     assert first.summary == "Three differences detected"
     assert first.severity == "medium"
     assert first.created_at is not None
@@ -556,10 +574,10 @@ def test_list_diffs_filtered_by_alignment_id(
     """Diffs filtered to one alignment only returns diffs from that alignment."""
     storage = StorageService(db)
     a1 = storage.create_drawing_alignment(
-        master_drawing.id, sub_drawing.id, "manual"
+        cast(int, master_drawing.id), cast(int, sub_drawing.id), "manual"
     )
     sub2 = Drawing(
-        project_id=project.id,
+        project_id=cast(int, project.id),
         source="upload",
         name="sub2.pdf",
         storage_key=None,
@@ -568,28 +586,34 @@ def test_list_diffs_filtered_by_alignment_id(
     db.add(sub2)
     db.commit()
     db.refresh(sub2)
-    a2 = storage.create_drawing_alignment(master_drawing.id, sub2.id, "manual")
+    a2 = storage.create_drawing_alignment(
+        cast(int, master_drawing.id), cast(int, sub2.id), "manual"
+    )
 
     storage.create_drawing_diff(
-        a1.id,
+        cast(int, a1.id),
         summary="Diff for alignment 1",
         severity="low",
         diff_regions=[{"page": 1, "bbox": {"x": 0, "y": 0, "width": 10, "height": 10}}],
     )
     storage.create_drawing_diff(
-        a2.id,
+        cast(int, a2.id),
         summary="Diff for alignment 2",
         severity="high",
         diff_regions=[{"page": 1, "bbox": {"x": 0, "y": 0, "width": 20, "height": 20}}],
     )
 
     svc = DrawingComparisonService(db)
-    result = svc.list_diffs(project.id, master_drawing.id, alignment_id=a1.id)
+    result = svc.list_diffs(
+        cast(int, project.id),
+        cast(int, master_drawing.id),
+        alignment_id=cast(int, a1.id),
+    )
 
     assert "diffs" in result
     diffs = result["diffs"]
     assert len(diffs) == 1
-    assert diffs[0].alignment_id == a1.id
+    assert cast(int, diffs[0].alignment_id) == cast(int, a1.id)
     assert diffs[0].summary == "Diff for alignment 1"
     assert diffs[0].severity == "low"
 
@@ -599,4 +623,4 @@ def test_list_diffs_raises_when_master_not_found(
 ) -> None:
     svc = DrawingComparisonService(db)
     with pytest.raises(ValueError, match="Master drawing 99999 not found"):
-        svc.list_diffs(project.id, 99999)
+        svc.list_diffs(cast(int, project.id), 99999)

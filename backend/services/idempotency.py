@@ -1,7 +1,7 @@
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -37,8 +37,8 @@ def begin_idempotent_operation(
         .first()
     )
 
-    if existing:
-        if existing.request_hash != req_hash:
+    if existing is not None:
+        if cast(str, existing.request_hash) != req_hash:
             raise ValueError("Idempotency-Key was reused with a different request payload")
         return existing, False
 
@@ -62,6 +62,8 @@ def begin_idempotent_operation(
             )
             .first()
         )
+        if row is None:
+            raise ValueError("Idempotency race: row missing after IntegrityError")
         return row, False
 
     db.refresh(row)
@@ -76,10 +78,12 @@ def finish_idempotent_operation(
     resource_reference: Optional[dict[str, Any]] = None,
 ) -> IdempotencyKey:
     row = db.query(IdempotencyKey).filter(IdempotencyKey.id == row_id).first()
-    row.status = "completed"
-    row.response_payload = response_payload
-    row.resource_reference = resource_reference
-    row.locked_until = None
+    if row is None:
+        raise ValueError(f"Idempotency row not found: {row_id}")
+    row.status = "completed"  # type: ignore[assignment]
+    row.response_payload = response_payload  # type: ignore[assignment]
+    row.resource_reference = resource_reference  # type: ignore[assignment]
+    row.locked_until = None  # type: ignore[assignment]
     db.commit()
     db.refresh(row)
     return row
@@ -92,9 +96,11 @@ def fail_idempotent_operation(
     response_payload: dict[str, Any],
 ) -> IdempotencyKey:
     row = db.query(IdempotencyKey).filter(IdempotencyKey.id == row_id).first()
-    row.status = "failed"
-    row.response_payload = response_payload
-    row.locked_until = None
+    if row is None:
+        raise ValueError(f"Idempotency row not found: {row_id}")
+    row.status = "failed"  # type: ignore[assignment]
+    row.response_payload = response_payload  # type: ignore[assignment]
+    row.locked_until = None  # type: ignore[assignment]
     db.commit()
     db.refresh(row)
     return row

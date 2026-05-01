@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
 from pathlib import Path
+from typing import cast
 
 import pytest
 from sqlalchemy.orm import Session
@@ -22,7 +24,7 @@ def _unique_id() -> str:
 
 
 @pytest.fixture
-def db_session() -> Session:
+def db_session() -> Iterator[Session]:
     session = SessionLocal()
     try:
         yield session
@@ -60,7 +62,7 @@ def _create_minimal_pdf() -> bytes:
     doc = fitz.open()
     page = doc.new_page(width=200, height=200)
     page.insert_text((50, 100), "Test PDF")
-    pdf_bytes = doc.write_tobytes()
+    pdf_bytes = doc.tobytes()
     doc.close()
     return pdf_bytes
 
@@ -81,14 +83,14 @@ def sample_pdf_drawing(db_session: Session, project: Project) -> Drawing:
     db_session.refresh(drawing)
 
     storage_key = build_drawing_source_storage_key(
-        project.id, drawing.id, "sample.pdf"
+        cast(int, project.id), cast(int, drawing.id), "sample.pdf"
     )
     abs_path = UPLOAD_ROOT / storage_key
     ensure_parent_dir(abs_path)
     pdf_bytes = _create_minimal_pdf()
     abs_path.write_bytes(pdf_bytes)
 
-    drawing.storage_key = storage_key
+    drawing.storage_key = storage_key  # type: ignore[assignment]
     db_session.add(drawing)
     db_session.commit()
     db_session.refresh(drawing)
@@ -104,7 +106,7 @@ def seeded_ready_pdf_drawing(
     from services.drawing_rendering import DrawingRenderingService
 
     service = DrawingRenderingService(db_session)
-    service.render_drawing_pages(sample_pdf_drawing.id)
+    service.render_drawing_pages(cast(int, sample_pdf_drawing.id))
 
     db_session.refresh(sample_pdf_drawing)
     return sample_pdf_drawing

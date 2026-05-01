@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from sqlalchemy.orm import Session
 
@@ -39,14 +39,15 @@ def find_project_drawings_for_refs(
     matches: List[Dict[str, Any]] = []
 
     for drawing in drawings:
-        drawing_name = _normalize_name(drawing.name or "")
+        name_raw = cast(Optional[str], drawing.name)
+        drawing_name = _normalize_name(name_raw or "")
         for ref in refs:
             normalized_ref = _normalize_name(ref)
             if normalized_ref in drawing_name or drawing_name.startswith(normalized_ref):
                 matches.append(
                     {
-                        "drawing_id": drawing.id,
-                        "drawing_name": drawing.name,
+                        "drawing_id": cast(int, drawing.id),
+                        "drawing_name": name_raw,
                         "matched_text": ref,
                         "confidence": 0.9,
                         "source": "regex",
@@ -60,14 +61,17 @@ def replace_evidence_drawing_links(
     db: Session,
     evidence: EvidenceRecord,
 ) -> List[EvidenceDrawingLink]:
-    refs = extract_sheet_refs(evidence.text_content)
-    matches = find_project_drawings_for_refs(db, evidence.project_id, refs)
+    refs = extract_sheet_refs(cast(Optional[str], evidence.text_content))
+    matches = find_project_drawings_for_refs(
+        db, cast(int, evidence.project_id), refs
+    )
 
     # merge sheet_refs into existing cross_refs_json (preserve rfi_number, etc.)
-    existing = list(evidence.cross_refs_json or [])
+    cross_raw = cast(Optional[List[Any]], evidence.cross_refs_json)
+    existing = list(cross_raw or [])
     non_sheet = [c for c in existing if isinstance(c, dict) and c.get("kind") != "sheet_ref"]
     new_sheet_refs = [{"kind": "sheet_ref", "value": ref} for ref in refs]
-    evidence.cross_refs_json = non_sheet + new_sheet_refs
+    evidence.cross_refs_json = non_sheet + new_sheet_refs  # type: ignore[assignment]
 
     # remove old auto-generated regex links
     old_links = (

@@ -8,7 +8,9 @@ behavior without external API calls.
 from __future__ import annotations
 
 import uuid
-from unittest.mock import patch
+from collections.abc import Iterator
+from typing import cast
+from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy.orm import Session
@@ -25,7 +27,7 @@ def _unique_id() -> str:
 
 
 @pytest.fixture
-def db() -> Session:
+def db() -> Iterator[Session]:
     """Provide a DB session. Rolls back after each test to avoid polluting the database."""
     session = SessionLocal()
     try:
@@ -104,9 +106,9 @@ def inspection_run(
     """Create an inspection run in queued status."""
     storage = StorageService(db)
     run = storage.create_inspection_run(
-        project_id=project.id,
-        master_drawing_id=master_drawing.id,
-        evidence_id=evidence_record.id,
+        project_id=cast(int, project.id),
+        master_drawing_id=cast(int, master_drawing.id),
+        evidence_id=cast(int, evidence_record.id),
         inspection_type=None,
     )
     return run
@@ -115,8 +117,8 @@ def inspection_run(
 @patch("ai.pipelines.inspection_mapping._extract_outcomes_llm")
 @patch("ai.pipelines.inspection_mapping._classify_inspection_type_llm")
 def test_run_inspection_mapping_complete_success(
-    mock_classify_llm: object,
-    mock_extract_llm: object,
+    mock_classify_llm: MagicMock,
+    mock_extract_llm: MagicMock,
     db: Session,
     project: Project,
     master_drawing: Drawing,
@@ -153,9 +155,9 @@ def test_run_inspection_mapping_complete_success(
 @patch("ai.pipelines.inspection_mapping._classify_inspection_type_llm")
 @patch("ai.pipelines.inspection_mapping._lookup_inspection_type_from_evidence")
 def test_run_inspection_mapping_llm_classify_when_no_lookup(
-    mock_lookup: object,
-    mock_classify_llm: object,
-    mock_extract_llm: object,
+    mock_lookup: MagicMock,
+    mock_classify_llm: MagicMock,
+    mock_extract_llm: MagicMock,
     db: Session,
     project: Project,
     master_drawing: Drawing,
@@ -179,8 +181,8 @@ def test_run_inspection_mapping_llm_classify_when_no_lookup(
 @patch("ai.pipelines.inspection_mapping._extract_outcomes_llm")
 @patch("ai.pipelines.inspection_mapping._classify_inspection_type_llm")
 def test_run_inspection_mapping_fail_creates_finding(
-    mock_classify_llm: object,
-    mock_extract_llm: object,
+    mock_classify_llm: MagicMock,
+    mock_extract_llm: MagicMock,
     db: Session,
     project: Project,
     master_drawing: Drawing,
@@ -205,9 +207,9 @@ def test_run_inspection_mapping_fail_creates_finding(
 @patch("ai.pipelines.inspection_mapping._extract_outcomes_llm")
 @patch("ai.pipelines.inspection_mapping._classify_inspection_type_llm")
 def test_run_inspection_mapping_master_drawing_not_found(
-    mock_classify_llm: object,
-    mock_extract_llm: object,
-    mock_load: object,
+    mock_classify_llm: MagicMock,
+    mock_extract_llm: MagicMock,
+    mock_load: MagicMock,
     db: Session,
     project: Project,
     master_drawing: Drawing,
@@ -222,8 +224,8 @@ def test_run_inspection_mapping_master_drawing_not_found(
     }
     storage = StorageService(db)
     run = storage.create_inspection_run(
-        project_id=project.id,
-        master_drawing_id=master_drawing.id,
+        project_id=cast(int, project.id),
+        master_drawing_id=cast(int, master_drawing.id),
         evidence_id=None,
     )
     mock_load.return_value = {
@@ -242,8 +244,8 @@ def test_run_inspection_mapping_master_drawing_not_found(
 @patch("ai.pipelines.inspection_mapping._extract_outcomes_llm")
 @patch("ai.pipelines.inspection_mapping._classify_inspection_type_llm")
 def test_run_inspection_mapping_no_evidence_uses_unknown(
-    mock_classify_llm: object,
-    mock_extract_llm: object,
+    mock_classify_llm: MagicMock,
+    mock_extract_llm: MagicMock,
     db: Session,
     project: Project,
     master_drawing: Drawing,
@@ -253,8 +255,8 @@ def test_run_inspection_mapping_no_evidence_uses_unknown(
     """
     storage = StorageService(db)
     run = storage.create_inspection_run(
-        project_id=project.id,
-        master_drawing_id=master_drawing.id,
+        project_id=cast(int, project.id),
+        master_drawing_id=cast(int, master_drawing.id),
         evidence_id=None,
     )
 

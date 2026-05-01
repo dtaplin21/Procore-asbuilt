@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, cast
 
 from models.models import Finding
 from models.schemas import FindingResponse, WorkspaceLinkMetadata
@@ -36,13 +36,13 @@ class FindingService:
 
     def serialize_finding(self, finding: Finding) -> FindingResponse:
         return FindingResponse(
-            id=finding.id,
-            project_id=finding.project_id,
-            title=finding.title,
-            description=getattr(finding, "description", None),
-            severity=getattr(finding, "severity", None),
-            type=getattr(finding, "type", None),
-            created_at=getattr(finding, "created_at", None),
+            id=cast(int, finding.id),
+            project_id=cast(int, finding.project_id),
+            title=cast(str, finding.title),
+            description=cast(Optional[str], getattr(finding, "description", None)),
+            severity=cast(Optional[str], getattr(finding, "severity", None)),
+            type=cast(Optional[str], getattr(finding, "type", None)),
+            created_at=cast(Any, getattr(finding, "created_at", None)),
             workspace_link=self._build_workspace_link_for_finding(finding),
         )
 

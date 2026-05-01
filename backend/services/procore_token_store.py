@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from threading import RLock
+from threading import Lock
 from typing import Dict, Optional
 
 
@@ -29,7 +29,7 @@ class ProcoreTokenRecord:
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
 
-_lock = RLock()
+_lock = Lock()
 _tokens: Dict[str, ProcoreTokenRecord] = {}
 
 
