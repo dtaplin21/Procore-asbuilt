@@ -13,6 +13,12 @@ Frontend (post-OAuth browser redirect)::
 
     FRONTEND_PUBLIC_URL     # origin only, e.g. https://app.example.com
 
+CORS (browser → API). For production set an explicit allowlist; when unset, only local dev
+origins are used::
+
+    CORS_ALLOW_ORIGINS      # comma-separated, e.g. https://app.example.com
+                            # ``FRONTEND_PUBLIC_URL`` is merged in if not already listed.
+
 ``backend/services/procore_oauth`` uses ``settings.procore_*`` for authorize URL and token
 exchange so redirect_uri is never hardcoded there.
 """
@@ -31,6 +37,11 @@ class Settings(BaseSettings):
     frontend_public_url: str = Field(
         default="http://localhost:5173",
         description="Browser-accessible frontend origin (no path), e.g. https://app.example.com",
+    )
+    #: Comma-separated browser origins allowed for CORS. Empty → local dev defaults only.
+    cors_allow_origins: str = Field(
+        default="",
+        description="Comma-separated origins (e.g. https://app.example.com). Empty uses built-in localhost list.",
     )
     # Sandbox Developer Portal apps must use login-sandbox + sandbox API, not production hosts.
     procore_environment: Literal["production", "sandbox"] = "production"
@@ -74,6 +85,32 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+_DEV_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:2000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:2000",
+]
+
+
+def cors_allowed_origins() -> list[str]:
+    """
+    Origins for FastAPI CORSMiddleware.
+
+    If ``CORS_ALLOW_ORIGINS`` is set, only those entries are used (comma-separated), plus
+    ``FRONTEND_PUBLIC_URL`` if missing. If unset, the local development list is used.
+    """
+    raw = settings.cors_allow_origins.strip()
+    if raw:
+        origins = [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
+    else:
+        origins = list(_DEV_CORS_ORIGINS)
+    front = settings.frontend_public_url.strip().rstrip("/")
+    if front and front not in origins:
+        origins.append(front)
+    return origins
 
 
 def procore_authorization_url() -> str:

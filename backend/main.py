@@ -30,6 +30,7 @@ from api.routes import (
     drawing_progress,
 )
 from database import init_db
+from config import cors_allowed_origins
 import os
 import logging
 import httpx
@@ -140,15 +141,10 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         },
     )
 
-# CORS middleware - allow frontend to connect
+# CORS: local dev defaults unless CORS_ALLOW_ORIGINS is set (production); see config.cors_allowed_origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",  # Vite dev server
-        "http://localhost:2000",  # Production
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:2000",
-    ],
+    allow_origins=cors_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
