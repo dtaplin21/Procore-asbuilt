@@ -18,6 +18,7 @@ import type {
   ProjectResponse,
   DrawingResponse,
   DrawingRegionCreate,
+  DrawingRegionGeometry,
   DrawingRegionResponse,
 } from "@shared/schema";
 
@@ -33,19 +34,6 @@ interface CreateRegionFormProps {
 }
 
 type GeometryType = "rect" | "polygon";
-
-interface RectGeometry {
-  type: "rect";
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-interface PolygonGeometry {
-  type: "polygon";
-  points: [number, number][];
-}
 
 async function createRegion(
   projectId: string,
@@ -140,7 +128,7 @@ export function CreateRegionForm({
     e.preventDefault();
     if (!canSubmit) return;
 
-    let geometry: RectGeometry | PolygonGeometry;
+    let geometry: DrawingRegionGeometry;
     if (geometryType === "rect") {
       geometry = {
         type: "rect",

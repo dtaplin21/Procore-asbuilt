@@ -108,10 +108,27 @@ export interface EvidenceListResponse {
 // geometry: rect { type, x, y, width, height } or polygon { type, points } — normalized 0-1
 // ----------------------------
 
+export interface DrawingRegionRectGeometry {
+  type: "rect";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface DrawingRegionPolygonGeometry {
+  type: "polygon";
+  points: [number, number][];
+}
+
+export type DrawingRegionGeometry =
+  | DrawingRegionRectGeometry
+  | DrawingRegionPolygonGeometry;
+
 export interface DrawingRegionCreate {
   label: string;
   page?: number;
-  geometry: Record<string, unknown>; // { type: "rect", x, y, width, height } or { type: "polygon", points }
+  geometry: DrawingRegionGeometry;
 }
 
 export interface DrawingRegionResponse {
@@ -119,7 +136,7 @@ export interface DrawingRegionResponse {
   master_drawing_id: number;
   label: string;
   page: number;
-  geometry: Record<string, unknown>;
+  geometry: DrawingRegionGeometry;
   created_at: string;
   updated_at: string;
 }
