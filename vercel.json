@@ -1,4 +1,14 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/public",
+  "rewrites": [
+    {
+      "source": "/((?!api$|api/).*)",
+      "destination": "/index.html"
+    }
+  ],
   "experimentalServices": {
     "frontend": {
       "entrypoint": ".",
