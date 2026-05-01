@@ -1,7 +1,7 @@
 import type { DrawingResponse } from "@shared/schema";
 import type { ProjectDrawingsResponse } from "@/types/drawing_workspace";
 
-import { readApiError, requestJson } from "@/lib/api/http";
+import { readApiError, requestJson, resolveFetchUrl } from "@/lib/api/http";
 
 /** Positive integer id for URLs and comparisons — works for project id or drawing id route params. */
 function coercePositiveIntId(id: number | string): number {
@@ -96,7 +96,7 @@ export async function uploadProjectDrawing(
     formData.append("upload_intent", uploadIntent);
   }
 
-  const response = await fetch(`/api/projects/${pid}/drawings`, {
+  const response = await fetch(resolveFetchUrl(`/api/projects/${pid}/drawings`), {
     method: "POST",
     credentials: "include",
     headers: {

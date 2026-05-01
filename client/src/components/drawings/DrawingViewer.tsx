@@ -14,6 +14,8 @@ import type {
   DrawingWorkspaceDrawing,
 } from "@/types/drawing_workspace";
 
+import { apiUrl } from "@/lib/api/base_url";
+
 type Props = {
   drawing: DrawingWorkspaceDrawing | null;
   selectedDiff: DrawingDiff | null;
@@ -48,7 +50,8 @@ export default function DrawingViewer({
     height: number;
   } | null>(null);
 
-  const masterSrc = comparisonWorkspace?.masterDrawing.fileUrl ?? drawing?.fileUrl;
+  const masterSrcRaw =
+    comparisonWorkspace?.masterDrawing.fileUrl ?? drawing?.fileUrl;
   const masterName = comparisonWorkspace?.masterDrawing.name ?? drawing?.name;
 
   useEffect(() => {
@@ -57,7 +60,7 @@ export default function DrawingViewer({
     setNaturalSize(null);
     setSubNaturalSize(null);
     setComparisonStackBox(null);
-  }, [masterSrc, comparisonWorkspace?.subDrawing.fileUrl]);
+  }, [masterSrcRaw, comparisonWorkspace?.subDrawing.fileUrl]);
 
   /** Recompute the comparison box when the row width changes (resize) or natural size updates. */
   useEffect(() => {
@@ -261,7 +264,7 @@ export default function DrawingViewer({
                   }
                 >
                   <img
-                  src={masterSrc}
+                  src={masterSrcRaw ? apiUrl(masterSrcRaw) : ""}
                   alt={masterName ?? "Master drawing"}
                   className={
                     comparisonStackBox
@@ -278,7 +281,11 @@ export default function DrawingViewer({
 
                 {showSubOverlay && alignmentTransform ? (
                   <AlignedSubOverlay
-                    src={comparisonWorkspace.subDrawing.fileUrl}
+                    src={
+                      comparisonWorkspace.subDrawing.fileUrl
+                        ? apiUrl(comparisonWorkspace.subDrawing.fileUrl)
+                        : ""
+                    }
                     alt={comparisonWorkspace.subDrawing.name}
                     transform={alignmentTransform}
                     opacity={overlayOpacity}
@@ -310,7 +317,7 @@ export default function DrawingViewer({
             ) : (
               <>
                 <img
-                  src={drawing.fileUrl}
+                  src={drawing.fileUrl ? apiUrl(drawing.fileUrl) : ""}
                   alt={drawing.name}
                   className="relative z-0 block max-h-[80vh] max-w-[1200px] select-none rounded"
                   onLoad={onLegacyMasterLoad}

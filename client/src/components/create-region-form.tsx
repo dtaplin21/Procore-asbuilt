@@ -21,6 +21,7 @@ import type {
   DrawingRegionGeometry,
   DrawingRegionResponse,
 } from "@shared/schema";
+import { resolveFetchUrl } from "@/lib/api/http";
 
 interface CreateRegionFormProps {
   projectId: string | null;
@@ -41,7 +42,9 @@ async function createRegion(
   body: DrawingRegionCreate
 ): Promise<DrawingRegionResponse> {
   const res = await fetch(
-    `/api/projects/${projectId}/drawings/${masterDrawingId}/regions`,
+    resolveFetchUrl(
+      `/api/projects/${projectId}/drawings/${masterDrawingId}/regions`
+    ),
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

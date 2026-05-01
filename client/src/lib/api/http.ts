@@ -3,6 +3,15 @@
  * JSON requests set default Content-Type; multipart uploads must not (see `uploadProjectDrawing` in drawings.ts).
  */
 
+import { apiUrl } from "@/lib/api/base_url";
+
+/** Resolve relative API paths for `fetch` (same rules as `requestJson`). */
+export function resolveFetchUrl(url: string): string {
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  if (url.startsWith("/api")) return apiUrl(url);
+  return url;
+}
+
 export async function parseJsonSafe(response: Response) {
   const contentType = response.headers.get("content-type");
 
@@ -71,7 +80,7 @@ export async function readApiError(response: Response): Promise<never> {
 }
 
 export async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
+  const response = await fetch(resolveFetchUrl(url), {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",

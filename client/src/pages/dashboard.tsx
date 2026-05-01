@@ -30,6 +30,7 @@ import {
   buildWorkspaceUrlWithFinding,
 } from "@/lib/workspace-links";
 import { fetchProjectDashboardSummary } from "@/lib/api/projects";
+import { resolveFetchUrl } from "@/lib/api/http";
 import { UploadDrawingModal } from "@/components/drawing-workspace/UploadDrawingModal";
 
 function getProjectIdFromUrl(): string | null {
@@ -144,7 +145,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
       }
 
       const res = await fetch(
-        `/api/projects/${selectedProjectId}/findings?limit=5`,
+        resolveFetchUrl(`/api/projects/${selectedProjectId}/findings?limit=5`),
         { credentials: "include" }
       );
 
@@ -170,7 +171,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
       }
 
       const res = await fetch(
-        `/api/projects/${selectedProjectId}/jobs?status=active`,
+        resolveFetchUrl(`/api/projects/${selectedProjectId}/jobs?status=active`),
         { credentials: "include" }
       );
 

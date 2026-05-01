@@ -17,6 +17,8 @@ import DrawingPickerPage from "@/pages/drawing_picker";
 import NotFound from "@/pages/not-found";
 import type { ProcoreConnection } from "@shared/schema";
 
+import { apiUrl } from "@/lib/api/base_url";
+
 type ProcoreStatusResponse = {
   connected: boolean;
   last_synced_at: string | null;
@@ -98,9 +100,12 @@ function App() {
   const [activeCompanyId, setActiveCompanyId] = useState<number | null>(null);
 
   async function loadProcoreStatus(userId: string) {
-    const res = await fetch(`/api/procore/status?user_id=${encodeURIComponent(userId)}`, {
-      credentials: "include",
-    });
+    const res = await fetch(
+      apiUrl(`/api/procore/status?user_id=${encodeURIComponent(userId)}`),
+      {
+        credentials: "include",
+      }
+    );
     const status = await res.json();
 
     setProcoreUserId(status.procore_user_id ?? null);
@@ -139,7 +144,7 @@ function App() {
   }, []);
 
   const handleConnectProcore = () => {
-    window.location.href = "/api/procore/oauth/authorize";
+    window.location.href = apiUrl("/api/procore/oauth/authorize");
   };
 
   const handleDisconnectProcore = async () => {
@@ -147,7 +152,7 @@ function App() {
 
     const qs = new URLSearchParams({ user_id: procoreUserId });
     if (activeCompanyId) qs.set("company_id", String(activeCompanyId));
-    await fetch(`/api/procore/disconnect?${qs.toString()}`, {
+    await fetch(apiUrl(`/api/procore/disconnect?${qs.toString()}`), {
       method: "POST",
       credentials: "include",
     });
@@ -171,10 +176,13 @@ function App() {
 
     setProcoreConnection((prev) => ({ ...prev, syncStatus: "syncing" }));
     try {
-      await fetch(`/api/procore/sync?user_id=${encodeURIComponent(procoreUserId)}`, {
-        method: "POST",
-        credentials: "include",
-      });
+      await fetch(
+        apiUrl(`/api/procore/sync?user_id=${encodeURIComponent(procoreUserId)}`),
+        {
+          method: "POST",
+          credentials: "include",
+        }
+      );
       await loadProcoreStatus(procoreUserId);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Sync failed";

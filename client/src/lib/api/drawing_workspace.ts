@@ -12,14 +12,11 @@ export async function fetchMasterDrawing(
   drawingId: number,
   page?: number
 ): Promise<DrawingWorkspaceDrawing> {
-  const url = new URL(
-    `/api/projects/${projectId}/drawings/${drawingId}`,
-    window.location.origin
-  );
+  let path = `/api/projects/${projectId}/drawings/${drawingId}`;
   if (page != null && page >= 1) {
-    url.searchParams.set("page", String(page));
+    path += `?page=${encodeURIComponent(String(page))}`;
   }
-  return requestJson<DrawingWorkspaceDrawing>(url.pathname + url.search);
+  return requestJson<DrawingWorkspaceDrawing>(path);
 }
 
 export async function fetchMasterDrawingAlignments(
@@ -36,14 +33,8 @@ export async function fetchAlignmentDiffs(
   drawingId: number,
   alignmentId: number
 ): Promise<DrawingDiffsResponse> {
-  const url = new URL(
-    `/api/projects/${projectId}/drawings/${drawingId}/diffs`,
-    window.location.origin
-  );
-
-  url.searchParams.set("alignment_id", String(alignmentId));
-
-  return requestJson<DrawingDiffsResponse>(url.pathname + url.search);
+  const path = `/api/projects/${projectId}/drawings/${drawingId}/diffs?alignment_id=${encodeURIComponent(String(alignmentId))}`;
+  return requestJson<DrawingDiffsResponse>(path);
 }
 
 export async function compareSubDrawing(

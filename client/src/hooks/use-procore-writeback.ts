@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ProcoreWritebackResponse } from "@shared/schema";
 
+import { resolveFetchUrl } from "@/lib/api/http";
+
 type WritebackParams = {
   projectId: string | null;
   procoreUserId: string | null;
@@ -16,7 +18,9 @@ async function fetchWriteback(
   procoreUserId: string,
   body: WritebackBody
 ): Promise<ProcoreWritebackResponse> {
-  const url = `/api/projects/${projectId}/procore/writeback?user_id=${encodeURIComponent(procoreUserId)}`;
+  const url = resolveFetchUrl(
+    `/api/projects/${projectId}/procore/writeback?user_id=${encodeURIComponent(procoreUserId)}`
+  );
   const res = await fetch(url, {
     method: "POST",
     headers: {

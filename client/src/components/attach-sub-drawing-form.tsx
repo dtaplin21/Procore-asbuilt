@@ -17,6 +17,7 @@ import type {
   DrawingRegionResponse,
   DrawingAlignmentCreate,
 } from "@shared/schema";
+import { resolveFetchUrl } from "@/lib/api/http";
 
 interface AttachSubDrawingFormProps {
   projectId: string | null;
@@ -30,7 +31,9 @@ async function fetchRegions(
   masterDrawingId: string
 ): Promise<DrawingRegionResponse[]> {
   const res = await fetch(
-    `/api/projects/${projectId}/drawings/${masterDrawingId}/regions`,
+    resolveFetchUrl(
+      `/api/projects/${projectId}/drawings/${masterDrawingId}/regions`
+    ),
     { credentials: "include" }
   );
   if (!res.ok) throw new Error("Failed to fetch regions");
@@ -43,7 +46,9 @@ async function createAlignment(
   body: DrawingAlignmentCreate
 ) {
   const res = await fetch(
-    `/api/projects/${projectId}/drawings/${masterDrawingId}/alignments`,
+    resolveFetchUrl(
+      `/api/projects/${projectId}/drawings/${masterDrawingId}/alignments`
+    ),
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

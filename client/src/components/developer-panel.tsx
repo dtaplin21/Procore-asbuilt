@@ -26,6 +26,7 @@ import type {
   DrawingDiffResponse,
 } from "@shared/schema";
 import type { ProjectDrawingCandidate } from "@/types/drawing_workspace";
+import { resolveFetchUrl } from "@/lib/api/http";
 
 const ALIGNMENT_STATUS_CONFIG: Record<
   "queued" | "processing" | "complete" | "failed",
@@ -56,7 +57,9 @@ async function createRegion(
   body: unknown
 ) {
   const res = await fetch(
-    `/api/projects/${projectId}/drawings/${masterDrawingId}/regions`,
+    resolveFetchUrl(
+      `/api/projects/${projectId}/drawings/${masterDrawingId}/regions`
+    ),
     {
       method: "POST",
       headers: jsonPostHeaders(),
@@ -75,7 +78,9 @@ async function createAlignment(
   body: unknown
 ) {
   const res = await fetch(
-    `/api/projects/${projectId}/drawings/${masterDrawingId}/alignments`,
+    resolveFetchUrl(
+      `/api/projects/${projectId}/drawings/${masterDrawingId}/alignments`
+    ),
     {
       method: "POST",
       headers: jsonPostHeaders(),
@@ -93,7 +98,9 @@ async function fetchAlignments(
   masterDrawingId: string
 ): Promise<DrawingAlignmentListResponse> {
   const res = await fetch(
-    `/api/projects/${projectId}/drawings/${masterDrawingId}/alignments`,
+    resolveFetchUrl(
+      `/api/projects/${projectId}/drawings/${masterDrawingId}/alignments`
+    ),
     { credentials: "include" }
   );
   if (!res.ok) throw new Error("Failed to fetch alignments");

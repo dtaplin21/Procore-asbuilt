@@ -29,6 +29,8 @@ import {
 } from "@/components/ui/tabs";
 import type { ProcoreConnection } from "@shared/schema";
 
+import { resolveFetchUrl } from "@/lib/api/http";
+
 type LocalCompany = { id: number; name: string; procore_company_id: string | null };
 
 interface SettingsProps {
@@ -75,9 +77,14 @@ export default function SettingsPage({
     setCompanyLoading(true);
     setCompanyError(null);
 
-    fetch(`/api/procore/companies/local?user_id=${encodeURIComponent(userId)}`, {
-      credentials: "include",
-    })
+    fetch(
+      resolveFetchUrl(
+        `/api/procore/companies/local?user_id=${encodeURIComponent(userId)}`
+      ),
+      {
+        credentials: "include",
+      }
+    )
       .then(async (res) => {
         if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
         return (await res.json()) as LocalCompany[];
@@ -110,10 +117,13 @@ export default function SettingsPage({
     setCompanyError(null);
     try {
       const qs = new URLSearchParams({ user_id: userId, company_id: nextCompanyId });
-      const res = await fetch(`/api/procore/company/select?${qs.toString()}`, {
-        method: "POST",
-        credentials: "include",
-      });
+      const res = await fetch(
+        resolveFetchUrl(`/api/procore/company/select?${qs.toString()}`),
+        {
+          method: "POST",
+          credentials: "include",
+        }
+      );
       if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
       await onRefreshProcoreStatus?.();
       onInvalidateCompanyScopedData?.();

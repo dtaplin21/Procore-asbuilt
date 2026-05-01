@@ -1,5 +1,7 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+import { apiUrl } from "@/lib/api/base_url";
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -12,7 +14,8 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const resolved = url.startsWith("/api") ? apiUrl(url) : url;
+  const res = await fetch(resolved, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
@@ -29,7 +32,9 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const path = queryKey.join("/") as string;
+    const url = path.startsWith("/api") ? apiUrl(path) : path;
+    const res = await fetch(url, {
       credentials: "include",
     });
 
@@ -39,7 +44,7 @@ export const getQueryFn: <T>(options: {
       }
       if (unauthorizedBehavior === "redirectToProcore") {
         // Redirect to Procore OAuth flow
-        window.location.href = "/api/procore/oauth/authorize";
+        window.location.href = apiUrl("/api/procore/oauth/authorize");
         throw new Error("Redirecting to Procore authentication");
       }
     }

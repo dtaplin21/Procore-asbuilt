@@ -8,6 +8,8 @@ import type {
   DrawingWorkspaceDrawing,
 } from "@/types/drawing_workspace";
 
+import { apiUrl } from "@/lib/api/base_url";
+
 type Props = {
   drawing: DrawingWorkspaceDrawing | null;
   selectedDiff: DrawingDiff | null;
@@ -128,7 +130,7 @@ export default function DrawingViewer({ drawing, selectedDiff }: Props) {
           ) : (
             <>
               <img
-                src={drawing.fileUrl}
+                src={apiUrl(drawing.fileUrl)}
                 alt={drawing.name}
                 className="block max-h-[80vh] max-w-[1200px] select-none rounded"
                 onLoad={() => {

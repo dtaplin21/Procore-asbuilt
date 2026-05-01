@@ -1,6 +1,6 @@
 import type { DashboardSummaryResponse } from "@shared/schema";
 
-import { readApiError } from "@/lib/api/http";
+import { readApiError, resolveFetchUrl } from "@/lib/api/http";
 
 export type FetchProjectDashboardSummaryOptions = {
   /** Scopes comparison KPIs to this master drawing (query `currentDrawingId`). */
@@ -37,7 +37,7 @@ export async function fetchProjectDashboardSummary(
     ? `/api/projects/${projectId}/dashboard/summary?${query}`
     : `/api/projects/${projectId}/dashboard/summary`;
 
-  const response = await fetch(url, {
+  const response = await fetch(resolveFetchUrl(url), {
     method: "GET",
     credentials: "include",
   });

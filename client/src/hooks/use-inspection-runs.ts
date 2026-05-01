@@ -6,6 +6,8 @@ import type {
   RunInspectionRequest,
 } from "@shared/schema";
 
+import { resolveFetchUrl } from "@/lib/api/http";
+
 /**
  * Fetch inspection runs for a project.
  * GET /api/projects/${projectId}/inspections/runs
@@ -49,7 +51,7 @@ export function useRunInspection(projectId: string | null) {
       if (!projectId) {
         throw new Error("Project required");
       }
-      const url = `/api/projects/${projectId}/inspections/runs`;
+      const url = resolveFetchUrl(`/api/projects/${projectId}/inspections/runs`);
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

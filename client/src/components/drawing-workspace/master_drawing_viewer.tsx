@@ -1,5 +1,6 @@
 import { DrawingDiff, DrawingSummary } from "@/types/drawing_workspace";
 import WorkspaceEmptyState from "@/components/drawing-workspace/workspace_empty_state";
+import { apiUrl } from "@/lib/api/base_url";
 
 type Props = {
   drawing: DrawingSummary | null;
@@ -46,12 +47,12 @@ export default function MasterDrawingViewer({ drawing, selectedDiff }: Props) {
         ) : isPdf ? (
           <iframe
             title={drawing.name}
-            src={drawing.fileUrl}
+            src={apiUrl(drawing.fileUrl)}
             className="h-full w-full rounded-lg border border-border bg-card"
           />
         ) : (
           <img
-            src={drawing.fileUrl}
+            src={apiUrl(drawing.fileUrl)}
             alt={drawing.name}
             className="h-full w-full rounded-lg border border-border bg-card object-contain"
           />
