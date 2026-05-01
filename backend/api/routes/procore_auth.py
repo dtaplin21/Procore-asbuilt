@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db, get_idempotency_key
+from config import settings
 from services.idempotency import (
     begin_idempotent_operation,
     finish_idempotent_operation,
@@ -87,8 +88,8 @@ async def procore_oauth_callback(
     active_conn = get_active_connection(db, procore_user_id)
     active_company_id = cast(int, active_conn.company_id) if active_conn else None
 
-    # Redirect to frontend
-    base = "http://localhost:5173/settings"
+    # Redirect to frontend (same origin as CORS / deployed SPA — config, not hardcoded)
+    base = f"{settings.frontend_public_url.rstrip('/')}/settings"
     qs = f"?procore_connected=true&user_id={procore_user_id}"
     if active_company_id is not None:
         qs += f"&company_id={active_company_id}"

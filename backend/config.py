@@ -1,4 +1,23 @@
-from pydantic import field_validator
+"""
+Application settings via environment variables (Pydantic Settings).
+
+Procore OAuth (and related) env keys read here — use the same values in the Procore app
+registration (especially ``PROCORE_REDIRECT_URI``)::
+
+    PROCORE_CLIENT_ID
+    PROCORE_CLIENT_SECRET
+    PROCORE_REDIRECT_URI    # must match authorize + token exchange redirect_uri exactly
+    PROCORE_ENVIRONMENT     # production | sandbox
+
+Frontend (post-OAuth browser redirect)::
+
+    FRONTEND_PUBLIC_URL     # origin only, e.g. https://app.example.com
+
+``backend/services/procore_oauth`` uses ``settings.procore_*`` for authorize URL and token
+exchange so redirect_uri is never hardcoded there.
+"""
+
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Literal, Optional
 
@@ -8,6 +27,11 @@ class Settings(BaseSettings):
     procore_client_id: Optional[str] = None
     procore_client_secret: Optional[str] = None
     procore_redirect_uri: str = "http://localhost:2000/api/procore/oauth/callback"
+    #: SPA origin for redirects after OAuth (path /settings is appended in procore_auth).
+    frontend_public_url: str = Field(
+        default="http://localhost:5173",
+        description="Browser-accessible frontend origin (no path), e.g. https://app.example.com",
+    )
     # Sandbox Developer Portal apps must use login-sandbox + sandbox API, not production hosts.
     procore_environment: Literal["production", "sandbox"] = "production"
     anthropic_api_key: Optional[str] = None
