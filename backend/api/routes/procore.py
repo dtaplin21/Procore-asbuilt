@@ -6,7 +6,7 @@ from services.procore_client import ProcoreAPIClient
 from services.storage import StorageService
 from services.rfi_ingestion import ingest_rfis_for_project
 from models.schemas import RfiIngestionResponse
-from typing import Optional
+from typing import Optional, cast
 from errors import ProcoreNotConnected
 from services.procore_connection_store import get_active_connection
 
@@ -55,7 +55,7 @@ async def sync_procore(
     conn = get_active_connection(db, user_id)
     if not conn:
         fail_idempotent_operation(
-            db, row_id=int(idem_row.id), response_payload={"error": "Procore not connected", "user_id": user_id}
+            db, row_id=cast(int, idem_row.id), response_payload={"error": "Procore not connected", "user_id": user_id}
         )
         raise ProcoreNotConnected(details={"user_id": user_id})
 
@@ -69,12 +69,12 @@ async def sync_procore(
                 # Sync specific project data
                 # TODO: Sync submittals, RFIs, inspections, etc.
                 response = {"synced": True, "project_id": project_id}
-        finish_idempotent_operation(db, row_id=int(idem_row.id), response_payload=response)
+        finish_idempotent_operation(db, row_id=cast(int, idem_row.id), response_payload=response)
         return response
     except Exception as e:
         fail_idempotent_operation(
             db,
-            row_id=int(idem_row.id),
+            row_id=cast(int, idem_row.id),
             response_payload={"error": str(e), "synced": False},
         )
         raise

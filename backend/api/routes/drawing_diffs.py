@@ -110,8 +110,13 @@ def run_diffs_for_alignment(
     if not should_execute:
         row_status = getattr(idem_row, "status", None)
         cached_resp = getattr(idem_row, "response_payload", None)
-        if row_status == "completed" and cached_resp and isinstance(cached_resp, list):
-            return [DrawingDiffResponse.model_validate(d) for d in cached_resp]
+        if row_status == "completed" and cached_resp:
+            if isinstance(cached_resp, list):
+                return [DrawingDiffResponse.model_validate(d) for d in cached_resp]
+            if isinstance(cached_resp, dict):
+                items = cached_resp.get("diffs")
+                if isinstance(items, list):
+                    return [DrawingDiffResponse.model_validate(d) for d in items]
         if row_status == "in_progress":
             raise HTTPException(status_code=409, detail="Request already in progress")
         if row_status == "failed":
@@ -184,7 +189,9 @@ def run_diffs_for_alignment(
         finish_idempotent_operation(
             db,
             row_id=cast(int, idem_row.id),
-            response_payload=[r.model_dump(mode="json") for r in result],
+            response_payload={
+                "diffs": [r.model_dump(mode="json") for r in result],
+            },
             resource_reference={"alignment_id": alignment_id, "diff_count": len(result)},
         )
         return result
@@ -230,7 +237,7 @@ def get_drawing_diff(
         raise HTTPException(status_code=404, detail="alignment not found")
 
     diff = storage.get_drawing_diff(diff_id)
-    if diff is None or diff.alignment_id != alignment_id:
+    if diff is None or cast(int, diff.alignment_id) != alignment_id:
         raise HTTPException(
             status_code=404,
             detail=f"Diff {diff_id} not found",

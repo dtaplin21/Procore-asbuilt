@@ -133,12 +133,12 @@ async def refresh_procore_token(
             "success": True,
             "expires_at": new_payload["expires_at"].isoformat(),
         }
-        finish_idempotent_operation(db, row_id=int(idem_row.id), response_payload=response)
+        finish_idempotent_operation(db, row_id=cast(int, idem_row.id), response_payload=response)
         return response
     except Exception as e:
         fail_idempotent_operation(
             db,
-            row_id=int(idem_row.id),
+            row_id=cast(int, idem_row.id),
             response_payload={"success": False, "error": str(e)},
         )
         raise
@@ -296,7 +296,7 @@ async def select_active_company(
     if not conn:
         fail_idempotent_operation(
             db,
-            row_id=int(idem_row.id),
+            row_id=cast(int, idem_row.id),
             response_payload={"success": False, "error": "No Procore connection found for that company/user"},
         )
         raise HTTPException(status_code=404, detail="No Procore connection found for that company/user")
@@ -305,7 +305,7 @@ async def select_active_company(
     db.commit()
 
     response = {"success": True, "active_company_id": int(company_id)}
-    finish_idempotent_operation(db, row_id=int(idem_row.id), response_payload=response)
+    finish_idempotent_operation(db, row_id=cast(int, idem_row.id), response_payload=response)
     return response
 
 @router.get("/projects")
@@ -398,7 +398,7 @@ async def disconnect_procore(
         if not active:
             fail_idempotent_operation(
                 db,
-                row_id=int(idem_row.id),
+                row_id=cast(int, idem_row.id),
                 response_payload={"success": False, "error": "No Procore connection found"},
             )
             raise HTTPException(status_code=404, detail="No Procore connection found")
@@ -407,6 +407,6 @@ async def disconnect_procore(
     delete_connection(db, user_id, company_id)
 
     response = {"success": True, "message": "Disconnected from Procore"}
-    finish_idempotent_operation(db, row_id=int(idem_row.id), response_payload=response)
+    finish_idempotent_operation(db, row_id=cast(int, idem_row.id), response_payload=response)
     return response
 

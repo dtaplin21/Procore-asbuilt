@@ -1,3 +1,5 @@
+from typing import cast
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -18,24 +20,27 @@ def get_rendered_drawing_page_image(
     storage = StorageService(db)
     drawing = storage.get_drawing_by_id(drawing_id)
 
-    if not drawing or drawing.project_id != project_id:
+    if drawing is None or cast(int, drawing.project_id) != project_id:
         raise HTTPException(status_code=404, detail="Drawing not found")
 
     rendition = storage.get_drawing_rendition(drawing_id, page_number)
     if not rendition:
-        if drawing.processing_status in ("pending", "processing"):
+        status = cast(str, drawing.processing_status)
+        if status in ("pending", "processing"):
             raise HTTPException(
                 status_code=409, detail="Drawing rendition is not ready yet"
             )
         raise HTTPException(status_code=404, detail="Rendered page image not found")
 
-    abs_path = open_storage_path(rendition.image_storage_key)
+    image_key = cast(str, rendition.image_storage_key)
+    abs_path = open_storage_path(image_key)
     if not abs_path.exists():
         raise HTTPException(status_code=404, detail="Rendered page image file missing")
 
+    mime = cast(str, rendition.mime_type)
     return FileResponse(
         path=str(abs_path),
-        media_type=rendition.mime_type,
+        media_type=mime,
         filename=abs_path.name,
         headers={"Cache-Control": "public, max-age=31536000, immutable"},
     )
