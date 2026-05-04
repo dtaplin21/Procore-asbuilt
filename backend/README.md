@@ -28,10 +28,45 @@ OPENAI_API_KEY=your_openai_key
 **Beta:** inspection runs (`/api/projects/.../inspections/runs`) call OpenAI when `OPENAI_API_KEY` is set. Without it, type/outcome fall back to heuristics and `"unknown"`. Confirm configuration with `GET /health` (`openai_configured`).
 
 On **Render** (or any API host), add `OPENAI_API_KEY` in the service environment; redeploy if you add it after first deploy.
+
 3. **Initialize database:**
 ```bash
 python -c "from database import init_db; init_db()"
 ```
+
+4. **Beta / staging — wipe all application data (keep schema & migrations):**
+
+Run from the **backend app directory** (the folder that contains `main.py` and `scripts/`), so imports and optional `backend/.env` resolve correctly.
+
+**Local (venv inside `backend/`):**
+```bash
+cd backend
+./venv/bin/python scripts/reset_app_data.py          # confirm by typing RESET
+./venv/bin/python scripts/reset_app_data.py --yes
+./venv/bin/python scripts/reset_app_data.py --yes --clear-uploads
+```
+
+**Render shell (and many PaaS shells):** there is often **no** `.venv` under `backend/`. Use `python` on your `PATH` from the same directory Render uses for the API (commonly `~/project/src/backend` or similar—check with `pwd`).
+```bash
+pwd
+ls -la
+ls -la scripts
+which python
+python --version
+python scripts/reset_app_data.py --yes
+python scripts/reset_app_data.py --yes --clear-uploads
+```
+If `python` is missing, try `python3`. If the platform installs deps in a **repo-root** venv, use that interpreter explicitly, e.g.:
+```text
+/opt/render/project/src/.venv/bin/python scripts/reset_app_data.py --yes --clear-uploads
+```
+(Exact path can differ; `which python` on the Render shell is authoritative.)
+
+On Render, `DATABASE_URL` is usually already in the **environment** for the shell; you do not need a local `.env` file if that is true.
+
+Preserves the ``alembic_version`` row and all table definitions; only **rows** are removed. ``--clear-uploads`` only affects files under ``backend/uploads/`` on the machine running the script.
+
+5. **Legacy full drop** (rarely needed): ``python scripts/reset_db.py --drop-schema`` then ``alembic upgrade head``.
 
 ## Running the Server
 
