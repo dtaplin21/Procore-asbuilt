@@ -121,7 +121,7 @@ Respond with only the type, e.g. hvac or electrical."""
 
     try:
         resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=settings.openai_chat_model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=32,
         )
@@ -170,7 +170,7 @@ NOTES: <short summary, 1-2 sentences>"""
 
     try:
         resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=settings.openai_chat_model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=256,
         )

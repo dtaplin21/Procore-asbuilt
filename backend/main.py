@@ -30,7 +30,7 @@ from api.routes import (
     drawing_progress,
 )
 from database import init_db
-from config import cors_allowed_origins
+from config import cors_allowed_origins, settings as app_settings
 import os
 import logging
 import httpx
@@ -180,11 +180,24 @@ app.include_router(drawing_progress.router)
 async def startup_event():
     """Initialize database on startup"""
     init_db()
+    logger.info(
+        "startup_complete",
+        extra={
+            "openai_configured": bool(app_settings.openai_api_key and app_settings.openai_api_key.strip()),
+            "openai_chat_model": app_settings.openai_chat_model,
+        },
+    )
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "ok", "service": "qc-qa-platform"}
+    return {
+        "status": "ok",
+        "service": "qc-qa-platform",
+        "openai_configured": bool(
+            app_settings.openai_api_key and str(app_settings.openai_api_key).strip()
+        ),
+    }
 
 @app.get("/")
 async def root():

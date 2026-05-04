@@ -26,6 +26,8 @@ Application environment::
 
     APP_ENV                     # development | production (production on Render)
     DATABASE_SSL_INSECURE_DEV   # optional; local dev only — skip Postgres TLS cert verification
+    OPENAI_API_KEY              # API host only — required for inspection/GPT features (beta)
+    OPENAI_CHAT_MODEL           # optional — defaults to gpt-4o-mini
 """
 
 from pydantic import Field, field_validator, model_validator
@@ -52,7 +54,10 @@ class Settings(BaseSettings):
     # Sandbox Developer Portal apps must use login-sandbox + sandbox API, not production hosts.
     procore_environment: Literal["production", "sandbox"] = "production"
     anthropic_api_key: Optional[str] = None
-    openai_api_key: Optional[str] = None
+    #: Required on the API host for inspection mapping / GPT calls (set ``OPENAI_API_KEY`` in env or ``backend/.env``).
+    openai_api_key: Optional[str] = Field(default=None, description="OPENAI_API_KEY")
+    #: Chat model for inspection pipeline (optional). Env: ``OPENAI_CHAT_MODEL``.
+    openai_chat_model: str = Field(default="gpt-4o-mini", description="OPENAI_CHAT_MODEL")
     redis_url: Optional[str] = None
     #: ``development`` | ``production`` — use ``production`` on Render. Gates dev-only DB TLS workarounds.
     app_env: str = Field(default="development", description="APP_ENV")
@@ -67,6 +72,21 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
+
+    @field_validator("openai_chat_model", mode="before")
+    @classmethod
+    def _strip_openai_chat_model(cls, v: object) -> object:
+        if isinstance(v, str):
+            s = v.strip()
+            return s if s else "gpt-4o-mini"
+        return v
+
+    @field_validator("openai_api_key", mode="before")
+    @classmethod
+    def _empty_openai_key_to_none(cls, v: object) -> object:
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
     @field_validator("database_url", mode="before")
     @classmethod
