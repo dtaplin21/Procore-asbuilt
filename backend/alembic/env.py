@@ -3,10 +3,10 @@ from __future__ import annotations
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
 
 # When running Alembic from backend/, imports resolve from this directory.
-from config import settings
+from config import settings, sqlalchemy_connect_args
 from models.models import Base
 
 
@@ -43,13 +43,10 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
-    ini_section = config.get_section(config.config_ini_section) or {}
-    ini_section["sqlalchemy.url"] = _database_url()
-
-    connectable = engine_from_config(
-        ini_section,
-        prefix="sqlalchemy.",
+    connectable = create_engine(
+        _database_url(),
         poolclass=pool.NullPool,
+        connect_args=sqlalchemy_connect_args(),
     )
 
     with connectable.connect() as connection:

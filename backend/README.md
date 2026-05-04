@@ -2,6 +2,10 @@
 
 This is the FastAPI backend for the QC/QA AI Platform.
 
+## Python version
+
+Use **Python 3.11 or 3.12** for local development (see repo root ``.python-version`` for pyenv). **Python 3.14** may hit TLS certificate verification failures when connecting to cloud Postgres (e.g. Render) from macOS; prefer 3.12 or set ``DATABASE_SSL_INSECURE_DEV=true`` with ``APP_ENV=development`` only (see ``.env.example``).
+
 ## Setup
 
 1. **Install Python dependencies:**

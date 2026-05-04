@@ -21,11 +21,19 @@ origins are used::
 
 ``backend/services/procore_oauth`` uses ``settings.procore_*`` for authorize URL and token
 exchange so redirect_uri is never hardcoded there.
+
+Application environment::
+
+    APP_ENV                     # development | production (production on Render)
+    DATABASE_SSL_INSECURE_DEV   # optional; local dev only — skip Postgres TLS cert verification
 """
 
-from pydantic import Field, field_validator
+import ssl
+
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
+
 
 class Settings(BaseSettings):
     # Use psycopg v3 driver by default (matches requirements.txt: psycopg[binary])
@@ -48,7 +56,12 @@ class Settings(BaseSettings):
     anthropic_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
     redis_url: Optional[str] = None
-    
+    #: ``development`` | ``production`` — use ``production`` on Render. Gates dev-only DB TLS workarounds.
+    app_env: str = Field(default="development", description="APP_ENV")
+    #: DEV ONLY: skip Postgres server certificate verification (fixes some macOS/Python↔cloud DB TLS issues).
+    #: Forced off when ``app_env`` is ``production``. Never enable on deployed API.
+    database_ssl_insecure_dev: bool = Field(default=False, description="DATABASE_SSL_INSECURE_DEV")
+
     # In some environments (CI, sandboxes), extra env vars may be present.
     # Ignore unknown keys instead of erroring at import time.
     model_config = SettingsConfigDict(
@@ -76,6 +89,19 @@ class Settings(BaseSettings):
             return "postgresql+psycopg://" + s[len("postgresql://") :]
         return s
 
+    @field_validator("app_env", mode="before")
+    @classmethod
+    def _normalize_app_env(cls, v: object) -> object:
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
+    @model_validator(mode="after")
+    def _never_insecure_db_ssl_in_production(self) -> "Settings":
+        if self.app_env == "production" and self.database_ssl_insecure_dev:
+            object.__setattr__(self, "database_ssl_insecure_dev", False)
+        return self
+
     @field_validator("procore_environment", mode="before")
     @classmethod
     def _normalize_procore_environment(cls, v: object) -> object:
@@ -85,6 +111,23 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def sqlalchemy_connect_args(s: Optional[Settings] = None) -> dict[str, Any]:
+    """
+    Extra arguments for SQLAlchemy/psycopg ``create_engine(connect_args=...)``.
+
+    When ``DATABASE_SSL_INSECURE_DEV=true`` and ``APP_ENV`` is not ``production``, TLS is still
+    used but server certificate verification is skipped. Use only for local dev against cloud
+    Postgres when the machine's trust store fails (e.g. Python 3.14 on macOS).
+    """
+    cfg = s or settings
+    if cfg.app_env == "production" or not cfg.database_ssl_insecure_dev:
+        return {}
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return {"ssl_context": ctx}
 
 
 _DEV_CORS_ORIGINS = [
