@@ -28,8 +28,6 @@ Application environment::
     DATABASE_SSL_INSECURE_DEV   # optional; local dev only — skip Postgres TLS cert verification
 """
 
-import ssl
-
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Any, Literal, Optional
@@ -119,15 +117,22 @@ def sqlalchemy_connect_args(s: Optional[Settings] = None) -> dict[str, Any]:
 
     When ``DATABASE_SSL_INSECURE_DEV=true`` and ``APP_ENV`` is not ``production``, TLS is still
     used but server certificate verification is skipped. Use only for local dev against cloud
-    Postgres when the machine's trust store fails (e.g. Python 3.14 on macOS).
+    Postgres when verification fails (e.g. macOS + libpq loading ``~/.postgresql/root.crt``,
+    which makes ``sslmode=require`` behave like ``verify-ca``, or a mismatch with system trust).
+
+    Psycopg turns connection kwargs into a libpq conninfo string. ``ssl_context`` is not a libpq
+    keyword and does not disable verification in this stack; use libpq's ``sslrootcert`` instead.
     """
     cfg = s or settings
     if cfg.app_env == "production" or not cfg.database_ssl_insecure_dev:
         return {}
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    return {"ssl_context": ctx}
+    return {
+        # Override URL modes like verify-full / verify-ca from managed providers.
+        "sslmode": "require",
+        # Stops libpq from loading a root CA (including ~/.postgresql/root.crt), so `require`
+        # stays "encrypt only" per Table 32.1 in the libpq SSL docs. Requires modern libpq (e.g. PG16+).
+        "sslrootcert": "disable",
+    }
 
 
 _DEV_CORS_ORIGINS = [
