@@ -31,7 +31,7 @@ Review should check for:
 
 Permissive licenses such as **MIT**, **Apache-2.0**, **BSD**, and **ISC** are generally more compatible with proprietary commercial software, but **all** dependency licenses should be reviewed before commercial launch.
 
-**SPDX** is useful because it provides standardized license identifiers and is commonly used in software bills of materials and license tracking.
+**SPDX** (https://spdx.org/licenses/) standardizes **license identifiers** and stable references for common open-source licenses. Use SPDX IDs in SBOMs, `THIRD_PARTY_NOTICES.md` blocks, and internal clearance where possible. For dependencies not on the SPDX list, capture the full license text as counsel requires.
 
 ---
 

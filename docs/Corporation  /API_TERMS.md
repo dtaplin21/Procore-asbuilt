@@ -23,7 +23,7 @@ APIs may be **rate-limited**. Grand Gaia may **modify or deprecate** endpoints w
 
 ## 4. Data & privacy
 
-Use of the API is subject to the **[Privacy policy](PRIVACY_POLICY.md)** and applicable **DPA**. You must not exfiltrate data you are not entitled to under your customer relationship.
+Use of the API is subject to the **[Privacy policy](../../legal/PRIVACY_POLICY.md)** and applicable **DPA**. You must not exfiltrate data you are not entitled to under your customer relationship.
 
 ## 5. Disclaimer of warranties; limitation of liability
 

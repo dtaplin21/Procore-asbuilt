@@ -4,7 +4,7 @@
 **Controller / operator (draft):** Grand Gaia LLC  
 
 > **Important:** For customer-facing products, publish a **Privacy Policy** reviewed by counsel. This file is an **internal working outline** of data practices.  
-> **Public draft (counsel review):** [`../docs/trust/PRIVACY_POLICY.md`](../docs/trust/PRIVACY_POLICY.md) — subprocessors: [`../docs/trust/SUBPROCESSOR_AND_API_COMPLIANCE.md`](../docs/trust/SUBPROCESSOR_AND_API_COMPLIANCE.md).
+> **Public draft (counsel review):** [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md) — subprocessors: [`../docs/Corporation  /SUBPROCESSOR_AND_API_COMPLIANCE.md`](../docs/Corporation%20%20/SUBPROCESSOR_AND_API_COMPLIANCE.md).
 
 ## Data the application may process
 

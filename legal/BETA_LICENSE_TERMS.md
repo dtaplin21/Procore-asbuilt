@@ -5,6 +5,8 @@
 
 Grand Gaia LLC grants **approved beta testers** a **limited, revocable, non-exclusive, non-transferable** license to access and use the **beta version** of the software **solely for evaluation and testing**.
 
+Paid production subscriptions are governed by **`TERMS_OF_SERVICE.md`** (draft) and counsel-approved order forms—not this beta document.
+
 The software is **pre-release** and may contain bugs, errors, incomplete features, or interruptions.
 
 Beta testers **may not**:
@@ -44,7 +46,7 @@ Typical production beta agreements also address: **disclaimer of warranties** (A
 
 - [ ] Counsel review and jurisdiction-specific language.  
 - [ ] Wire tester **acceptance** (UI, email, or contract) before granting access.  
-- [ ] Align privacy / data processing with **`PRIVACY_NOTES.md`** and external policy if published.  
+- [ ] Align privacy / data processing with **`PRIVACY_POLICY.md`**, **`PRIVACY_NOTES.md`**, and external policy if published.  
 
 ---
 

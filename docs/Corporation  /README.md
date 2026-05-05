@@ -8,7 +8,7 @@ Customer and vendor diligence materials **drafted for refinement** with counsel 
 | Document | Path | Purpose |
 |----------|------|---------|
 | Security disclosures | [`../../SECURITY.md`](../../SECURITY.md) (repo root) | Vulnerability reporting |
-| Privacy policy (public draft) | [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md) | End-user / customer privacy |
+| Privacy policy (public draft) | [`../../legal/PRIVACY_POLICY.md`](../../legal/PRIVACY_POLICY.md) | End-user / customer privacy |
 | Data retention | [`DATA_RETENTION_POLICY.md`](DATA_RETENTION_POLICY.md) | Retention & deletion |
 | SOC 2 roadmap | [`SOC2_ROADMAP.md`](SOC2_ROADMAP.md) | Attestation planning |
 | API terms (your API) | [`API_TERMS.md`](API_TERMS.md) | Terms for API consumers |

@@ -1,20 +1,37 @@
-Proprietary license — all rights reserved
+Proprietary — All Rights Reserved
 
 Copyright (c) 2026 Grand Gaia LLC. All rights reserved.
 
-The software, documentation, and other materials in this repository (collectively,
-the "Software") are proprietary and confidential. No license or other right is
-granted to you by implication, estoppel, or otherwise under any intellectual
-property rights except as expressly set forth in a written agreement signed by
-Grand Gaia LLC or its authorized representative.
+The software, documentation, and other materials in this repository
+(collectively, the "Software") are proprietary and confidential. No license
+or other rights are granted except as expressly set forth in a written
+agreement signed by Grand Gaia LLC or its authorized representative (for
+example, a SaaS subscription, order form, beta testing agreement, or other
+commercial contract).
 
-Without limiting the foregoing, you may not copy, modify, distribute, sell, lease,
-sublicense, or use the Software for any purpose, in whole or in part, except as
-expressly permitted in such a written agreement.
+Without limiting the foregoing, unless your agreement expressly allows it,
+you may not copy, modify, distribute, publicly display, sell, lease, offer as a
+hosted service, sublicense, or otherwise use the Software for any purpose,
+in whole or in part.
 
-Third-party components may be subject to their own licenses; see /legal/THIRD_PARTY_NOTICES.md
-and /legal/DEPENDENCY_LICENSE_REPORT.md.
+Access to a hosted instance of Grand Gaia LLC's product (e.g., production or
+beta environments) is governed solely by the terms presented or executed for
+that service—not by this file alone.
+
+Third-party open-source components may be subject to their own licenses; see
+`legal/THIRD_PARTY_NOTICES.md` and `legal/DEPENDENCY_LICENSE_REPORT.md`.
+
+Product legal drafts (counsel review before reliance):
+
+  legal/BETA_LICENSE_TERMS.md           — beta testers
+  legal/TERMS_OF_SERVICE.md             — paying customers / hosted SaaS (draft)
+  legal/PRIVACY_POLICY.md               — privacy (draft)
+
+Internal records:
+
+  legal/AI_DEVELOPMENT_RECORD.md
+  legal/SOURCE_CODE_CLEARANCE_LOG.md
 
 ---
 
-Have counsel review before relying on this text for commercial distribution.
+Have counsel review before relying on this text for enforcement or diligence.

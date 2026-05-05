@@ -8,7 +8,7 @@
 
 ## 1. Purpose
 
-Define **how long** categories of data are kept and **how** deletion is performed, consistent with the **[Privacy policy draft](PRIVACY_POLICY.md)** and customer agreements.
+Define **how long** categories of data are kept and **how** deletion is performed, consistent with the **[Privacy policy draft](../../legal/PRIVACY_POLICY.md)** and customer agreements.
 
 ## 2. Retention schedule *(fill with real periods)*
 

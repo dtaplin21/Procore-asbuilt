@@ -4,6 +4,18 @@
 
 This file summarizes **notices you may need to display** for open-source and third-party components shipped with or used to build the product. It should be kept in sync with `DEPENDENCY_LICENSE_REPORT.md` and any vendor `NOTICE` files.
 
+## SPDX (Software Package Data Exchange)
+
+**SPDX** standardizes how you record **license identifiers** (e.g. `MIT`, `Apache-2.0`), **license text** references, and **stable URIs** for well-known licenses—useful for SBOMs, CI checks, and enterprise diligence.
+
+| Resource | URL / note |
+|----------|------------|
+| SPDX License List | https://spdx.org/licenses/ |
+| SPDX specification | https://spdx.dev/ |
+| CycloneDX SBOMs (this repo) | `legal/sbom/*.json` |
+
+When you add notice blocks for dependencies (below), prefer **`SPDX-License-Identifier:`** where the license is on the SPDX list. For custom or non-SPDX licenses, paste or link the **full license text** as your counsel requires.
+
 ## How this repo is built
 
 | Layer | Manifest | Notes |
