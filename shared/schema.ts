@@ -196,10 +196,10 @@ export interface DrawingAlignmentListResponse {
 export type DrawingTransformType = "identity" | "affine" | "homography";
 
 /**
- * Homography (9) or affine (6) coefficients as flat numbers — never `any`.
+ * Homography (9) or affine (6 or 9) coefficients as flat numbers — never `any`.
  *
- * **Affine MVP (6 numbers)** — row-major 2×3 that maps column vectors [x, y, 1]ᵀ (sub → master):
- * `[a, b, tx, c, d, ty]`  ≡  `[[a, b, tx], [c, d, ty]]`
+ * **Affine (6 or 9 numbers)** — typically 2×3 as six floats; the API may also send a full row-major
+ * 3×3 (nine floats) where the bottom row is `[0, 0, 1]` (same 2×3 block in the first six entries).
  * CSS `matrix(a, b, c, d, e, f)` uses columns `[[a, c, e], [b, d, f]]`, so convert in one place
  * (see `toCssMatrix` in `AlignedSubOverlay.tsx`): `matrix(a, c, b, d, tx, ty)`.
  *

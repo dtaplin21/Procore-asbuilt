@@ -1,0 +1,1 @@
+python -m services.job_worker #start worker 

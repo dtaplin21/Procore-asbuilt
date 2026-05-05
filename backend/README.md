@@ -25,7 +25,9 @@ OPENAI_API_KEY=your_openai_key
 # OPENAI_CHAT_MODEL=gpt-4o-mini
 ```
 
-**Beta:** inspection runs (`/api/projects/.../inspections/runs`) call OpenAI when `OPENAI_API_KEY` is set. Without it, type/outcome fall back to heuristics and `"unknown"`. Confirm configuration with `GET /health` (`openai_configured`).
+**Local development:** use ``APP_ENV=development`` (default) so tools like ``scripts/seed_dev_data.py`` are allowed. Keep ``OPENAI_API_KEY`` only on the API host as needed.
+
+**Inspections:** inspection runs (`/api/projects/.../inspections/runs`) call OpenAI when `OPENAI_API_KEY` is set. Without it, type/outcome fall back to heuristics and `"unknown"`. Confirm configuration with `GET /health` (`openai_configured`).
 
 On **Render** (or any API host), add `OPENAI_API_KEY` in the service environment; redeploy if you add it after first deploy.
 
@@ -34,7 +36,7 @@ On **Render** (or any API host), add `OPENAI_API_KEY` in the service environment
 python -c "from database import init_db; init_db()"
 ```
 
-4. **Beta / staging — wipe all application data (keep schema & migrations):**
+4. **Wipe all application data (keep schema & migrations):**
 
 Run from the **backend app directory** (the folder that contains `main.py` and `scripts/`), so imports and optional `backend/.env` resolve correctly.
 
@@ -66,7 +68,25 @@ On Render, `DATABASE_URL` is usually already in the **environment** for the shel
 
 Preserves the ``alembic_version`` row and all table definitions; only **rows** are removed. ``--clear-uploads`` only affects files under ``backend/uploads/`` on the machine running the script.
 
-5. **Legacy full drop** (rarely needed): ``python scripts/reset_db.py --drop-schema`` then ``alembic upgrade head``.
+5. **Development — mock company + projects (dashboard / upload):**
+
+The dashboard project selector and **Upload drawing** button need at least one row in ``projects``. Drawing uploads enqueue a **JobQueue** row with a ``user_id`` resolved from ``user_companies`` (or any ``users`` row). This seed adds company, **demo user** ``dev-seed@example.local``, membership, and two projects (idempotent).
+
+```bash
+cd backend
+./venv/bin/python scripts/seed_dev_data.py --yes
+```
+
+Typical clean slate:
+
+```bash
+./venv/bin/python scripts/reset_app_data.py --yes --clear-uploads
+./venv/bin/python scripts/seed_dev_data.py --yes
+```
+
+The script **refuses** when ``APP_ENV=production`` unless you pass ``--allow-production`` (avoid on real tenant data).
+
+6. **Legacy full drop** (rarely needed): ``python scripts/reset_db.py --drop-schema`` then ``alembic upgrade head``.
 
 ## Running the Server
 

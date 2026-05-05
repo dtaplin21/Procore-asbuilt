@@ -118,7 +118,7 @@ export default function DrawingComparisonWorkspace({
   }, [selectedAlignment]);
 
   const debugPayload = buildAlignmentDebugPayload(workspace);
-  const transformValidation = validateTransform(workspace?.alignment?.transform);
+  const transformValidation = validateTransform(displayTransform);
 
   const comparisonProgress = readComparisonProgressFromWorkspace(workspace);
 
