@@ -312,15 +312,27 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
           </div>
 
           {selectedProjectId ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="h-9 self-end border-primary bg-background text-primary hover:bg-primary-soft hover:text-primary"
-              onClick={() => setUploadModalOpen(true)}
-              data-testid="dashboard-upload-drawing"
-            >
-              Upload drawing
-            </Button>
+            <div className="flex flex-wrap items-center gap-2 self-end">
+              <Link href={`/projects/${selectedProjectId}/drawings/manage`}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 border-border"
+                  data-testid="dashboard-manage-drawings"
+                >
+                  Manage drawings
+                </Button>
+              </Link>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 border-primary bg-background text-primary hover:bg-primary-soft hover:text-primary"
+                onClick={() => setUploadModalOpen(true)}
+                data-testid="dashboard-upload-drawing"
+              >
+                Upload drawing
+              </Button>
+            </div>
           ) : null}
 
           {/* Existing Procore status */}

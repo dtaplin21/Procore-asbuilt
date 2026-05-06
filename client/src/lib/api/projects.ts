@@ -74,3 +74,20 @@ export async function fetchDrawingDeleteSummary(
 
   return (await response.json()) as DrawingDeleteSummaryResponse;
 }
+
+/**
+ * DELETE /api/projects/{project_id}/drawings/{drawing_id}
+ */
+export async function deleteProjectDrawing(
+  projectId: number,
+  drawingId: number
+): Promise<void> {
+  const response = await fetch(
+    resolveFetchUrl(`/api/projects/${projectId}/drawings/${drawingId}`),
+    { method: "DELETE", credentials: "include" }
+  );
+
+  if (!response.ok) {
+    await readApiError(response);
+  }
+}

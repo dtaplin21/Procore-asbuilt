@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FileImage } from "lucide-react";
 import { Link, useLocation, useParams } from "wouter";
-import type { DashboardSummaryResponse, DrawingResponse } from "@shared/schema";
+import type { DashboardSummaryResponse } from "@shared/schema";
 
+import type { ProjectDrawingsResponse } from "@/types/drawing_workspace";
 import { UploadDrawingModal } from "@/components/drawing-workspace/UploadDrawingModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { fetchProjectDrawings } from "@/lib/api/drawings";
 import { fetchProjectDashboardSummary } from "@/lib/api/projects";
 import { buildWorkspaceUrl } from "@/lib/workspace-links";
 
@@ -66,11 +68,12 @@ export default function DrawingPickerPage() {
   ]);
 
   const {
-    data: drawings,
+    data: drawingsPayload,
     isLoading: drawingsLoading,
     error: drawingsError,
-  } = useQuery<DrawingResponse[]>({
+  } = useQuery<ProjectDrawingsResponse>({
     queryKey: [`/api/projects/${projectId}/drawings`],
+    queryFn: () => fetchProjectDrawings(parsedProjectId),
     enabled: isValidProject && !summaryLoading && !hasCanonicalMaster,
   });
 
@@ -118,7 +121,7 @@ export default function DrawingPickerPage() {
     );
   }
 
-  const list = drawings ?? [];
+  const list = drawingsPayload?.drawings ?? [];
 
   const uploadModal = (
     <UploadDrawingModal
@@ -211,8 +214,8 @@ export default function DrawingPickerPage() {
                 <CardContent className="pt-0">
                   <p className="text-xs text-muted-foreground">
                     Drawing #{drawing.id}
-                    {drawing.page_count != null
-                      ? ` • ${drawing.page_count} page(s)`
+                    {drawing.pageCount != null
+                      ? ` • ${drawing.pageCount} page(s)`
                       : ""}
                   </p>
                 </CardContent>
