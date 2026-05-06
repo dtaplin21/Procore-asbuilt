@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import DrawingOverlayLayer from "@/components/drawing-workspace/drawing_overlay_layer";
 import PanZoomContainer from "@/components/drawing-workspace/pan_zoom_container";
@@ -15,6 +15,15 @@ import type {
 } from "@/types/drawing_workspace";
 
 import { apiUrl } from "@/lib/api/base_url";
+
+/** User-facing hint when <img> cannot load master (e.g. PDF /file URL before renditions exist). */
+function messageForDrawingImageLoadFailure(relativeUrl: string): string {
+  const u = relativeUrl.toLowerCase();
+  if (u.includes("/file") && !u.includes("/pages/")) {
+    return "Could not display the drawing as an image. The URL points at the original upload (often PDF). Run the render worker until page PNGs exist, then reload.";
+  }
+  return "Failed to load drawing image.";
+}
 
 type Props = {
   drawing: DrawingWorkspaceDrawing | null;
@@ -53,14 +62,36 @@ export default function DrawingViewer({
   const masterSrcRaw =
     comparisonWorkspace?.masterDrawing.fileUrl ?? drawing?.fileUrl;
   const masterName = comparisonWorkspace?.masterDrawing.name ?? drawing?.name;
+  const subSrcRaw = comparisonWorkspace?.subDrawing.fileUrl ?? null;
+  const masterImgRef = useRef<HTMLImageElement | null>(null);
 
+  /** Master URL changed: full reset. Do not reset master load state when only sub URL updates (cached master may not refire onLoad). */
   useEffect(() => {
     setImageLoaded(false);
     setImageError(null);
     setNaturalSize(null);
-    setSubNaturalSize(null);
     setComparisonStackBox(null);
-  }, [masterSrcRaw, comparisonWorkspace?.subDrawing.fileUrl]);
+    setSubNaturalSize(null);
+  }, [masterSrcRaw]);
+
+  /** Sub-only change: remeasure sub overlay; keep master dimensions and imageLoaded. */
+  useEffect(() => {
+    setSubNaturalSize(null);
+  }, [subSrcRaw]);
+
+  /**
+   * After DOM updates, if the master img is already decoded (memory/disk cache), `load` may not fire.
+   * Sync loaded dimensions so the overlay can clear without relying on a second onLoad.
+   */
+  useLayoutEffect(() => {
+    if (isLoadingComparisonWorkspace) return;
+    const img = masterImgRef.current;
+    if (!img || !masterSrcRaw) return;
+    if (img.complete && img.naturalWidth > 0) {
+      setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+      setImageLoaded(true);
+    }
+  }, [masterSrcRaw, isLoadingComparisonWorkspace]);
 
   /** Recompute the comparison box when the row width changes (resize) or natural size updates. */
   useEffect(() => {
@@ -264,6 +295,7 @@ export default function DrawingViewer({
                   }
                 >
                   <img
+                  ref={masterImgRef}
                   src={masterSrcRaw ? apiUrl(masterSrcRaw) : ""}
                   alt={masterName ?? "Master drawing"}
                   className={
@@ -273,7 +305,9 @@ export default function DrawingViewer({
                   }
                   onLoad={onComparisonMasterLoad}
                   onError={() => {
-                    setImageError("Failed to load drawing image.");
+                    setImageError(
+                      messageForDrawingImageLoadFailure(masterSrcRaw ?? "")
+                    );
                   }}
                   data-testid="drawing-viewer-image"
                   draggable={false}
@@ -317,12 +351,15 @@ export default function DrawingViewer({
             ) : (
               <>
                 <img
+                  ref={masterImgRef}
                   src={drawing.fileUrl ? apiUrl(drawing.fileUrl) : ""}
                   alt={drawing.name}
                   className="relative z-0 block max-h-[80vh] max-w-[1200px] select-none rounded"
                   onLoad={onLegacyMasterLoad}
                   onError={() => {
-                    setImageError("Failed to load drawing image.");
+                    setImageError(
+                      messageForDrawingImageLoadFailure(drawing.fileUrl ?? "")
+                    );
                   }}
                   data-testid="drawing-viewer-image"
                   draggable={false}

@@ -80,13 +80,18 @@ export async function readApiError(response: Response): Promise<never> {
 }
 
 export async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const { headers: initHeaders, ...restInit } = init ?? {};
+  const headers = new Headers({ "Content-Type": "application/json" });
+  if (initHeaders) {
+    new Headers(initHeaders).forEach((value, key) => {
+      headers.set(key, value);
+    });
+  }
+
   const response = await fetch(resolveFetchUrl(url), {
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-    ...init,
+    ...restInit,
+    headers,
   });
 
   if (!response.ok) {
