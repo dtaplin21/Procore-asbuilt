@@ -61,7 +61,7 @@ export function buildWorkspaceUrlWithFinding(
   return `${base}${sep}findingId=${encodeURIComponent(String(findingId))}`;
 }
 
-/** Picker route when there is no master drawing / diff context. */
+/** When the project already has a canonical master, this route usually redirects to the workspace; use only when `masterDrawingId` is still unset. */
 export function buildDrawingPickerUrl(
   projectId: number,
   findingId?: string | number | null,

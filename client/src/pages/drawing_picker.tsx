@@ -1,17 +1,30 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FileImage } from "lucide-react";
 import { Link, useLocation, useParams } from "wouter";
-import type { DrawingResponse } from "@shared/schema";
+import type { DashboardSummaryResponse, DrawingResponse } from "@shared/schema";
 
 import { UploadDrawingModal } from "@/components/drawing-workspace/UploadDrawingModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { fetchProjectDashboardSummary } from "@/lib/api/projects";
+import { buildWorkspaceUrl } from "@/lib/workspace-links";
 
 function preserveSearchParams(): string {
   const search = typeof window !== "undefined" ? window.location.search : "";
   return search ? `?${search}` : "";
+}
+
+/** Append current window search params to a path that may already include `?`. */
+function pathWithPreservedSearch(pathWithOptionalQuery: string): string {
+  const preserved = preserveSearchParams();
+  if (!preserved) {
+    return pathWithOptionalQuery;
+  }
+  return pathWithOptionalQuery.includes("?")
+    ? `${pathWithOptionalQuery}&${preserved.slice(1)}`
+    : `${pathWithOptionalQuery}${preserved}`;
 }
 
 export default function DrawingPickerPage() {
@@ -20,13 +33,46 @@ export default function DrawingPickerPage() {
   const params = useParams<{ projectId: string }>();
   const projectId = params?.projectId ?? "";
 
-  const { data: drawings, isLoading, error } = useQuery<DrawingResponse[]>({
-    queryKey: [`/api/projects/${projectId}/drawings`],
-    enabled: !!projectId,
-  });
-
   const parsedProjectId = Number(projectId);
   const isValidProject = Number.isFinite(parsedProjectId);
+
+  const {
+    data: summary,
+    isLoading: summaryLoading,
+    error: summaryError,
+  } = useQuery<DashboardSummaryResponse>({
+    queryKey: ["drawing-picker-dashboard-summary", parsedProjectId],
+    queryFn: () => fetchProjectDashboardSummary(parsedProjectId),
+    enabled: isValidProject,
+  });
+
+  const masterDrawingId = summary?.project?.masterDrawingId;
+  const hasCanonicalMaster =
+    typeof masterDrawingId === "number" && Number.isFinite(masterDrawingId);
+
+  useEffect(() => {
+    if (!hasCanonicalMaster || !isValidProject) return;
+    const ws = buildWorkspaceUrl({
+      projectId: parsedProjectId,
+      masterDrawingId: masterDrawingId as number,
+    });
+    setLocation(pathWithPreservedSearch(ws));
+  }, [
+    hasCanonicalMaster,
+    isValidProject,
+    masterDrawingId,
+    parsedProjectId,
+    setLocation,
+  ]);
+
+  const {
+    data: drawings,
+    isLoading: drawingsLoading,
+    error: drawingsError,
+  } = useQuery<DrawingResponse[]>({
+    queryKey: [`/api/projects/${projectId}/drawings`],
+    enabled: isValidProject && !summaryLoading && !hasCanonicalMaster,
+  });
 
   if (!isValidProject) {
     return (
@@ -41,7 +87,10 @@ export default function DrawingPickerPage() {
     );
   }
 
-  if (isLoading) {
+  const listLoading = summaryLoading || (!hasCanonicalMaster && drawingsLoading);
+  const loadError = summaryError ?? drawingsError;
+
+  if (listLoading || hasCanonicalMaster) {
     return (
       <div className="p-4">
         <h1 className="text-xl font-semibold text-foreground mb-4">
@@ -56,10 +105,10 @@ export default function DrawingPickerPage() {
     );
   }
 
-  if (error) {
+  if (loadError) {
     return (
       <div className="p-4">
-        <p className="text-sm text-red-600">Failed to load drawings.</p>
+        <p className="text-sm text-red-600">Failed to load project or drawings.</p>
         <Link href="/">
           <Button variant="outline" className="mt-4">
             Back to Dashboard
@@ -80,7 +129,12 @@ export default function DrawingPickerPage() {
       allowSub={false}
       onUploadSuccess={(drawing) => {
         setLocation(
-          `/projects/${projectId}/drawings/${drawing.id}/workspace${preserveSearchParams()}`
+          pathWithPreservedSearch(
+            buildWorkspaceUrl({
+              projectId: parsedProjectId,
+              masterDrawingId: drawing.id,
+            })
+          )
         );
       }}
     />
@@ -94,7 +148,8 @@ export default function DrawingPickerPage() {
             Select a Drawing
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Project {projectId} • Choose a master drawing to open the workspace
+            Project {projectId} • No canonical master yet — choose a sheet or upload
+            one (first upload becomes master).
           </p>
         </div>
         <Button
@@ -116,7 +171,8 @@ export default function DrawingPickerPage() {
               No drawings in this project yet.
             </p>
             <p className="text-sm text-muted-foreground mt-2">
-              Upload a master drawing to open the workspace, or return to the dashboard.
+              Upload a drawing (it will become the project master) or return to the
+              dashboard.
             </p>
             <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button
@@ -139,7 +195,12 @@ export default function DrawingPickerPage() {
           {list.map((drawing) => (
             <Link
               key={drawing.id}
-              href={`/projects/${projectId}/drawings/${drawing.id}/workspace${preserveSearchParams()}`}
+              href={pathWithPreservedSearch(
+                buildWorkspaceUrl({
+                  projectId: parsedProjectId,
+                  masterDrawingId: drawing.id,
+                })
+              )}
             >
               <Card className="cursor-pointer transition-colors hover:border-primary/50 hover:bg-primary-soft/40">
                 <CardHeader className="pb-2">
@@ -150,7 +211,9 @@ export default function DrawingPickerPage() {
                 <CardContent className="pt-0">
                   <p className="text-xs text-muted-foreground">
                     Drawing #{drawing.id}
-                    {drawing.page_count != null ? ` • ${drawing.page_count} page(s)` : ""}
+                    {drawing.page_count != null
+                      ? ` • ${drawing.page_count} page(s)`
+                      : ""}
                   </p>
                 </CardContent>
               </Card>

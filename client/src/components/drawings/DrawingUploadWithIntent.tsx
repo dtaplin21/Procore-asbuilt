@@ -25,6 +25,9 @@ export type DrawingUploadWithIntentProps = {
 const DEFAULT_MASTER_WARNING =
   "Uploading a new master drawing should switch the active workspace to that drawing.";
 
+const REPLACE_MASTER_WARNING =
+  "This upload will replace the project’s canonical master sheet. Confirm below when you pick a file.";
+
 const DEFAULT_SUB_NEEDS_MASTER =
   "A sub drawing requires an active master drawing. Open a workspace drawing first.";
 
@@ -43,8 +46,17 @@ export function DrawingUploadWithIntent({
   subDisabledReason,
 }: DrawingUploadWithIntentProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const projectHasCanonicalMaster =
+    workspaceMasterDrawingId != null &&
+    Number.isFinite(Number(workspaceMasterDrawingId));
+
   const [intent, setIntent] = useState<DrawingUploadIntent>(() =>
-    allowMaster ? "master" : "sub"
+    allowMaster && !projectHasCanonicalMaster
+      ? "master"
+      : allowSub
+        ? "sub"
+        : "master"
   );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -84,6 +96,23 @@ export function DrawingUploadWithIntent({
 
     if (!file) return;
     if (intent === "sub" && !subAllowed) return;
+
+    if (
+      intent === "master" &&
+      projectHasCanonicalMaster &&
+      allowMaster
+    ) {
+      const ok = window.confirm(
+        "Replace this project’s canonical master drawing? The workspace will use the new sheet; other uploads remain as subs."
+      );
+      if (!ok) {
+        setSelectedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        return;
+      }
+    }
 
     try {
       await handleUpload(file);
@@ -143,7 +172,10 @@ export function DrawingUploadWithIntent({
           role="status"
           data-testid="upload-master-warning"
         >
-          {masterWarningText ?? DEFAULT_MASTER_WARNING}
+          {masterWarningText ??
+            (projectHasCanonicalMaster
+              ? REPLACE_MASTER_WARNING
+              : DEFAULT_MASTER_WARNING)}
         </div>
       ) : null}
 

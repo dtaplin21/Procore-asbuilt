@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import type { DrawingResponse, InsightListResponse } from "@shared/schema";
+import type { DrawingUploadIntent } from "@/components/drawings/DrawingUploadWithIntent";
 import { useQuery } from "@tanstack/react-query";
 import { 
   AlertTriangle,
@@ -84,6 +85,37 @@ function readHighSeverityRiskFromKpis(
   const label = typeof o.label === "string" ? o.label : "";
   if (count === undefined) return null;
   return { unresolved_high_severity_count: count, label };
+}
+
+function readMasterDrawingIdFromSummary(
+  summary: DashboardSummary | undefined | null
+): number | undefined {
+  const mid = summary?.project?.masterDrawingId;
+  if (typeof mid === "number" && Number.isFinite(mid)) {
+    return mid;
+  }
+  return undefined;
+}
+
+/** Deep-link to canonical master workspace when summary matches selected project; else picker. */
+function workspaceOrPickerWithFinding(
+  projectId: number,
+  findingFocusId: string | number,
+  selectedProjectIdStr: string | null,
+  projectSummary: DashboardSummary | undefined | null
+): string {
+  const canonical = readMasterDrawingIdFromSummary(projectSummary);
+  if (
+    selectedProjectIdStr != null &&
+    String(projectId) === selectedProjectIdStr &&
+    canonical !== undefined
+  ) {
+    return buildWorkspaceUrlWithFinding(
+      { projectId, masterDrawingId: canonical },
+      findingFocusId
+    );
+  }
+  return buildDrawingPickerUrl(projectId, findingFocusId);
 }
 
 interface DashboardProps {
@@ -220,7 +252,10 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
   const comparisonProgress = readComparisonProgressFromKpis(summary?.kpis);
   const highSeverityRisk = readHighSeverityRiskFromKpis(summary?.kpis);
 
-  const handleDashboardUploadSuccess = (drawing: DrawingResponse) => {
+  const handleDashboardUploadSuccess = (
+    drawing: DrawingResponse,
+    _intent: DrawingUploadIntent
+  ) => {
     if (!selectedProjectId) return;
     const pid = Number(selectedProjectId);
     if (!Number.isFinite(pid)) return;
@@ -444,7 +479,12 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
                   return (
                     <Link
                       key={insight.id}
-                      href={buildDrawingPickerUrl(Number(insight.projectId), insight.id)}
+                      href={workspaceOrPickerWithFinding(
+                        Number(insight.projectId),
+                        insight.id,
+                        selectedProjectId,
+                        summary
+                      )}
                     >
                       {content}
                     </Link>
@@ -506,7 +546,12 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
                   const ws = finding.workspaceLink;
                   const href = ws
                     ? buildWorkspaceUrlWithFinding(ws, finding.id)
-                    : buildDrawingPickerUrl(finding.projectId, finding.id);
+                    : workspaceOrPickerWithFinding(
+                        finding.projectId,
+                        finding.id,
+                        selectedProjectId,
+                        summary
+                      );
                   return (
                     <Link key={finding.id} href={href}>
                       {content}
@@ -551,6 +596,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
           open={uploadModalOpen}
           onOpenChange={setUploadModalOpen}
           projectId={Number(selectedProjectId)}
+          workspaceMasterDrawingId={readMasterDrawingIdFromSummary(summary) ?? null}
           allowMaster
           allowSub={false}
           onUploadSuccess={handleDashboardUploadSuccess}

@@ -284,6 +284,18 @@ class StorageService:
 
         Then ``commit`` (single transaction). An explicit ``sub`` upload never changes project master.
         """
+        replacing_canonical_master = upload_intent == "master" and not self._project_has_no_canonical_master(
+            project_id
+        )
+        # Partial unique index: only one row per project may have upload_intent='master' at flush time.
+        # When user uploads a new master while a canonical master exists, insert as 'sub' first, then
+        # :meth:`set_project_master` promotes this row and demotes the rest.
+        row_upload_intent: Literal["master", "sub"] | None
+        if replacing_canonical_master:
+            row_upload_intent = "sub"
+        else:
+            row_upload_intent = upload_intent
+
         drawing = Drawing(
             project_id=project_id,
             source=source,
@@ -291,7 +303,7 @@ class StorageService:
             storage_key=storage_key,
             content_type=content_type,
             page_count=page_count,
-            upload_intent=upload_intent,
+            upload_intent=row_upload_intent,
         )
         self.db.add(drawing)
         try:

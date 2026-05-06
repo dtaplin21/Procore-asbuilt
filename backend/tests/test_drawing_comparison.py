@@ -624,3 +624,42 @@ def test_list_diffs_raises_when_master_not_found(
     svc = DrawingComparisonService(db)
     with pytest.raises(ValueError, match="Master drawing 99999 not found"):
         svc.list_diffs(cast(int, project.id), 99999)
+
+
+# ---------------------------------------------------------------------------
+# Single canonical master (StorageService)
+# ---------------------------------------------------------------------------
+
+
+def test_upload_master_twice_demotes_first_and_updates_project_fk(
+    db: Session, project: Project
+) -> None:
+    """Second master upload sets project FK to the new row and marks prior master as sub."""
+    storage = StorageService(db)
+    pid = cast(int, project.id)
+    first = storage.create_drawing(
+        pid,
+        source="upload",
+        name="first-master.pdf",
+        storage_key=f"drawings/test/{pid}/first.pdf",
+        content_type="application/pdf",
+        upload_intent="master",
+    )
+    db.refresh(project)
+    assert project.master_drawing_id == first.id
+    assert first.upload_intent == "master"
+
+    second = storage.create_drawing(
+        pid,
+        source="upload",
+        name="second-master.pdf",
+        storage_key=f"drawings/test/{pid}/second.pdf",
+        content_type="application/pdf",
+        upload_intent="master",
+    )
+    db.refresh(project)
+    db.refresh(first)
+    db.refresh(second)
+    assert project.master_drawing_id == second.id
+    assert second.upload_intent == "master"
+    assert first.upload_intent == "sub"

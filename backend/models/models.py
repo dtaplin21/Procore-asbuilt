@@ -75,7 +75,12 @@ class Project(Base):
     company = relationship("Company", back_populates="projects")
     jobs = relationship("JobQueue", back_populates="project")
     findings = relationship("Finding", back_populates="project", cascade="all, delete-orphan")
-    drawings = relationship("Drawing", back_populates="project", cascade="all, delete-orphan")
+    drawings = relationship(
+        "Drawing",
+        back_populates="project",
+        foreign_keys="Drawing.project_id",
+        cascade="all, delete-orphan",
+    )
     evidence_records = relationship("EvidenceRecord", back_populates="project", cascade="all, delete-orphan")
     inspection_runs = relationship("InspectionRun", back_populates="project", cascade="all, delete-orphan")
     master_drawing = relationship(
@@ -346,7 +351,7 @@ class Drawing(Base):
     )
     
     # Relationships
-    project = relationship("Project", back_populates="drawings")
+    project = relationship("Project", back_populates="drawings", foreign_keys=[project_id])
     renditions = relationship(
         "DrawingRendition",
         back_populates="drawing",
