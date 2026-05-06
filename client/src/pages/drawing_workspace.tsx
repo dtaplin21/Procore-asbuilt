@@ -19,6 +19,10 @@ import {
 } from "@/hooks/use_workspace_selection_query_params";
 import { compareSubDrawingToMaster } from "@/lib/api/drawing_workspace";
 import { fetchProjectDashboardSummary } from "@/lib/api/projects";
+import {
+  setLastProjectIdForWorkspaceFallback,
+  setWorkspaceReturnPath,
+} from "@/lib/workspace-return-path";
 import type { DrawingUploadIntent } from "@/components/drawings/DrawingUploadWithIntent";
 import type { WorkspaceRouteParams } from "@/types/drawing_workspace";
 
@@ -41,6 +45,13 @@ export function DrawingWorkspaceBody({
   const projectId = parsedProjectId;
   /** Workspace “master” side of compare — always from route `drawingId`, not from dashboard summary. */
   const masterDrawingId = parsedDrawingId;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const path = `${window.location.pathname}${window.location.search}`;
+    setWorkspaceReturnPath(path);
+    setLastProjectIdForWorkspaceFallback(parsedProjectId);
+  }, [location, parsedProjectId, parsedDrawingId]);
 
   useEffect(() => {
     setSelectedSubDrawingId(null);
