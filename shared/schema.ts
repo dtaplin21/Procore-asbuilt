@@ -514,12 +514,14 @@ export interface DashboardStats {
 // A minimal project summary returned by the dashboard endpoint. This mirrors
 // ``ProjectSummary`` on the backend and is intentionally small so the UI can
 // show basic information even before the full project record is fetched.
-// Uses snake_case to match API response.
+// New fields use camelCase in JSON (`masterDrawingId`) per backend aliases.
 export interface ProjectSummary {
   id: number;
   name: string;
   company_id: number;
   procore_project_id?: string | null;
+  /** Canonical master drawing id; camelCase in JSON from the API. */
+  masterDrawingId?: number | null;
 }
 
 // Active company context information used for display/validation.
@@ -573,6 +575,8 @@ export interface DashboardSummaryResponse {
   sync_health: SyncHealth;
   /** `None` / omitted when no current drawing; never use as the workspace route id source. */
   current_drawing?: CurrentDrawingSummary | null;
+  /** Canonical master sheet (same shape as `CurrentDrawingSummary`); camelCase key `masterDrawing` in JSON. */
+  masterDrawing?: CurrentDrawingSummary | null;
   kpis: ProjectSummaryKpis;
 }
 

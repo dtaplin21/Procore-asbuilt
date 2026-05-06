@@ -31,12 +31,28 @@ def _ensure_master_drawing_in_project(
     project_id: int,
     master_drawing_id: int,
 ) -> None:
-    """Raise 404 if master drawing does not belong to project."""
+    """Raise 404 if master drawing does not belong to project.
+
+    If the project has a canonical ``master_drawing_id``, raise 409 when the path
+    does not match (workspace routes must use the project's master sheet).
+    """
     drawing = storage.get_drawing(project_id, master_drawing_id)
     if drawing is None:
         raise HTTPException(
             status_code=404,
             detail=f"Drawing {master_drawing_id} not found in project",
+        )
+    project = storage.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    canonical_id = getattr(project, "master_drawing_id", None)
+    if canonical_id is not None and int(canonical_id) != int(master_drawing_id):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Drawing {master_drawing_id} is not this project's canonical master; "
+                f"use master drawing id {int(canonical_id)} (project.masterDrawingId on dashboard summary)."
+            ),
         )
 
 

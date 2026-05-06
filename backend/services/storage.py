@@ -131,7 +131,23 @@ class StorageService:
         current_drawing_row = get_current_drawing_for_project(
             self.db, project_id, current_drawing_id
         )
-        master_drawing_id = cast(int, current_drawing_row.id) if current_drawing_row else None
+        kpi_scoped_master_id = (
+            cast(int, current_drawing_row.id) if current_drawing_row else None
+        )
+
+        canonical_master_id = getattr(project, "master_drawing_id", None)
+        canonical_master_id_int = (
+            cast(int, canonical_master_id) if canonical_master_id is not None else None
+        )
+        master_drawing_summary: Optional[Dict[str, Any]] = None
+        if canonical_master_id_int is not None:
+            md_row = self.get_drawing(project_id, canonical_master_id_int)
+            if md_row is not None:
+                master_drawing_summary = {
+                    "id": cast(int, md_row.id),
+                    "name": md_row.name,
+                    "updated_at": md_row.updated_at,
+                }
 
         # KPIs
         total_findings = self.db.query(Finding).filter(Finding.project_id == project_id).count()
@@ -144,7 +160,7 @@ class StorageService:
         inspections_count = self.db.query(InspectionRun).filter(InspectionRun.project_id == project_id).count()
 
         comparison_progress = get_project_comparison_progress(
-            self.db, project_id, master_drawing_id=master_drawing_id
+            self.db, project_id, master_drawing_id=kpi_scoped_master_id
         )
         high_severity = get_unresolved_high_severity_diff_metric(self.db)
 
@@ -157,6 +173,7 @@ class StorageService:
                 "name": project.name,
                 "company_id": project_company_id,
                 "procore_project_id": getattr(project, "procore_project_id", None),
+                "master_drawing_id": canonical_master_id_int,
             },
             "company_context": {
                 "active_company_id": active_company_id,
@@ -179,6 +196,7 @@ class StorageService:
                 if current_drawing_row
                 else None
             ),
+            "master_drawing": master_drawing_summary,
             "kpis": {
                 "total_findings": total_findings,
                 "open_findings": open_findings,

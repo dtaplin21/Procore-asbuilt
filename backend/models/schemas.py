@@ -90,6 +90,12 @@ class ProjectSummary(BaseModel):
     name: str
     company_id: int
     procore_project_id: Optional[str] = None
+    master_drawing_id: Optional[int] = Field(
+        default=None,
+        serialization_alias="masterDrawingId",
+    )
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 
 
 class CompanyContext(BaseModel):
@@ -152,7 +158,13 @@ class DashboardSummaryResponse(BaseModel):
     company_context: CompanyContext
     sync_health: SyncHealth
     current_drawing: Optional[CurrentDrawingSummary] = None
+    master_drawing: Optional[CurrentDrawingSummary] = Field(
+        default=None,
+        serialization_alias="masterDrawing",
+    )
     kpis: ProjectSummaryKpis = Field(default_factory=ProjectSummaryKpis)
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 
 # ============================================
 # INSIGHTS (FINDINGS) SCHEMAS
