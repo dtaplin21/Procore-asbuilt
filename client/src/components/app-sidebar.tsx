@@ -1,10 +1,12 @@
+import { useSyncExternalStore } from "react";
 import { useLocation, Link } from "wouter";
-import { 
-  LayoutDashboard, 
+import {
+  LayoutDashboard,
   ClipboardCheck,
   Layers,
   Settings,
-  Cloud
+  Cloud,
+  DraftingCompass,
 } from "lucide-react";
 import {
   Sidebar,
@@ -20,6 +22,11 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { ProcoreStatus } from "@/components/procore-status";
+import {
+  getWorkspaceSidebarNav,
+  subscribeWorkspaceStorage,
+  type WorkspaceSidebarNav,
+} from "@/lib/workspace-return-path";
 import type { ProcoreConnection } from "@shared/schema";
 
 const mainNavItems = [
@@ -53,8 +60,36 @@ interface AppSidebarProps {
   onProcoreSync?: () => void;
 }
 
+function workspaceRoutePathOnly(loc: string): string {
+  const q = loc.indexOf("?");
+  return q === -1 ? loc : loc.slice(0, q);
+}
+
+/** Active when current route matches this row's href (path only); picker href also matches workspaces under that project. */
+function isWorkspaceNavActive(location: string, nav: WorkspaceSidebarNav): boolean {
+  if (nav.disabled) return false;
+  const locPath = workspaceRoutePathOnly(location);
+  const hrefPath = workspaceRoutePathOnly(nav.href);
+  if (hrefPath.includes("/workspace")) {
+    return locPath === hrefPath;
+  }
+  if (locPath === hrefPath) return true;
+  const underDrawings = hrefPath.endsWith("/") ? hrefPath : `${hrefPath}/`;
+  return locPath.startsWith(underDrawings) && locPath.includes("/workspace");
+}
+
 export function AppSidebar({ procoreConnection, onProcoreSync }: AppSidebarProps) {
   const [location] = useLocation();
+
+  const workspaceNavJson = useSyncExternalStore(
+    subscribeWorkspaceStorage,
+    () => JSON.stringify(getWorkspaceSidebarNav()),
+    () => JSON.stringify(getWorkspaceSidebarNav())
+  );
+
+  const workspaceNav = JSON.parse(workspaceNavJson) as WorkspaceSidebarNav;
+
+  const workspaceActive = isWorkspaceNavActive(location, workspaceNav);
 
   return (
     <Sidebar>
@@ -91,6 +126,30 @@ export function AppSidebar({ procoreConnection, onProcoreSync }: AppSidebarProps
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              <SidebarMenuItem key="workspace">
+                {workspaceNav.disabled ? (
+                  <SidebarMenuButton
+                    disabled
+                    isActive={false}
+                    tooltip={workspaceNav.tooltip}
+                    data-testid="nav-workspace"
+                  >
+                    <DraftingCompass className="w-4 h-4" />
+                    <span>Workspace</span>
+                  </SidebarMenuButton>
+                ) : (
+                  <SidebarMenuButton
+                    asChild
+                    isActive={workspaceActive}
+                    tooltip={workspaceNav.tooltip}
+                  >
+                    <Link href={workspaceNav.href} data-testid="nav-workspace">
+                      <DraftingCompass className="w-4 h-4" />
+                      <span>Workspace</span>
+                    </Link>
+                  </SidebarMenuButton>
+                )}
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

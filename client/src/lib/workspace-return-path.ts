@@ -19,9 +19,22 @@ export const WORKSPACE_RETURN_PATH_STORAGE_KEY = "qcqa:lastDrawingWorkspace";
 /** Sidebar fallback: last project id as decimal string (integer > 0). */
 export const LAST_PROJECT_ID_STORAGE_KEY = "qcqa:lastProjectId";
 
+export const WORKSPACE_STORAGE_CHANGE_EVENT = "qcqa-workspace-storage";
+
 function safeSessionStorage(): Storage | null {
   if (typeof sessionStorage === "undefined") return null;
   return sessionStorage;
+}
+
+function notifyWorkspaceStorageUpdated(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(WORKSPACE_STORAGE_CHANGE_EVENT));
+}
+
+export function subscribeWorkspaceStorage(callback: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(WORKSPACE_STORAGE_CHANGE_EVENT, callback);
+  return () => window.removeEventListener(WORKSPACE_STORAGE_CHANGE_EVENT, callback);
 }
 
 export function getWorkspaceReturnPath(): string | null {
@@ -46,6 +59,7 @@ export function setWorkspaceReturnPath(fullPath: string): void {
   if (!trimmed.startsWith("/")) return;
   try {
     s.setItem(WORKSPACE_RETURN_PATH_STORAGE_KEY, trimmed);
+    notifyWorkspaceStorageUpdated();
   } catch {
     /* quota / private mode */
   }
@@ -62,6 +76,7 @@ export function setLastProjectIdForWorkspaceFallback(projectId: number): void {
   if (!s) return;
   try {
     s.setItem(LAST_PROJECT_ID_STORAGE_KEY, String(projectId));
+    notifyWorkspaceStorageUpdated();
   } catch {
     /* quota / private mode */
   }
@@ -79,4 +94,40 @@ export function getLastProjectIdForWorkspaceFallback(): number | null {
   } catch {
     return null;
   }
+}
+
+export type WorkspaceSidebarNav = {
+  /** Target when `disabled` is false; ignored when disabled. */
+  href: string;
+  disabled: boolean;
+  tooltip: string;
+};
+
+/** Nav row: full workspace URL, else project drawing picker (B), else disabled (C). */
+export function getWorkspaceSidebarNav(): WorkspaceSidebarNav {
+  const last = getWorkspaceReturnPath();
+  if (
+    last &&
+    last.startsWith("/projects/") &&
+    last.includes("/workspace")
+  ) {
+    return {
+      href: last,
+      disabled: false,
+      tooltip: "Workspace",
+    };
+  }
+  const pid = getLastProjectIdForWorkspaceFallback();
+  if (pid != null) {
+    return {
+      href: `/projects/${pid}/drawings`,
+      disabled: false,
+      tooltip: "Drawings — open workspace from a drawing",
+    };
+  }
+  return {
+    href: "/",
+    disabled: true,
+    tooltip: "Open a drawing workspace from the dashboard first.",
+  };
 }
