@@ -8,9 +8,13 @@ so routes can continue to import it while the new data model is designed.
 
 from __future__ import annotations
 
+import logging
+from dataclasses import dataclass
 from pathlib import Path
 from datetime import datetime
-from sqlalchemy import func
+from shutil import rmtree
+from sqlalchemy import func, or_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
 # ---------------------------------------------------------------------------
@@ -52,7 +56,8 @@ def get_storage_file_size(storage_key: str) -> int | None:
 
 def open_storage_path(storage_key: str) -> Path:
     return storage_key_to_abs_path(storage_key)
-from sqlalchemy.exc import SQLAlchemyError
+
+
 from typing import Any, Dict, List, Literal, Optional, Sequence, Set, cast
 
 from models.models import (
@@ -80,6 +85,20 @@ from services.dashboard import (
     get_project_comparison_progress,
     get_unresolved_high_severity_diff_metric,
 )
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class DrawingDeletionImpact:
+    """Row counts for UI confirmation / audit before hard-deleting a drawing."""
+
+    alignments_count: int
+    diffs_count: int
+    regions_count: int
+    overlays_count: int
+    findings_with_drawing_count: int
+    evidence_links_count: int
 
 
 class StorageService:
@@ -361,6 +380,151 @@ class StorageService:
     def get_drawing_by_id(self, drawing_id: int) -> Optional[Drawing]:
         """Get a drawing by ID only (no project scope)."""
         return self.db.query(Drawing).filter(Drawing.id == drawing_id).first()
+
+    def get_drawing_deletion_impact(
+        self, project_id: int, drawing_id: int
+    ) -> DrawingDeletionImpact:
+        """Read-only counts for delete confirmation UIs. Raises if the drawing is not in the project."""
+        if self.get_drawing(project_id, drawing_id) is None:
+            raise ValueError(
+                f"Drawing {drawing_id} not found in project {project_id}"
+            )
+        return self._drawing_deletion_impact_counts(project_id, drawing_id)
+
+    def _drawing_deletion_impact_counts(
+        self, project_id: int, drawing_id: int
+    ) -> DrawingDeletionImpact:
+        alignment_filter = (
+            DrawingAlignment.project_id == project_id,
+            or_(
+                DrawingAlignment.master_drawing_id == drawing_id,
+                DrawingAlignment.sub_drawing_id == drawing_id,
+            ),
+        )
+        alignments_count = self.db.query(DrawingAlignment).filter(*alignment_filter).count()
+        diffs_count = (
+            self.db.query(DrawingDiff)
+            .join(DrawingAlignment, DrawingDiff.alignment_id == DrawingAlignment.id)
+            .filter(*alignment_filter)
+            .count()
+        )
+        regions_count = (
+            self.db.query(DrawingRegion)
+            .filter(DrawingRegion.master_drawing_id == drawing_id)
+            .count()
+        )
+        overlays_count = (
+            self.db.query(DrawingOverlay)
+            .filter(DrawingOverlay.master_drawing_id == drawing_id)
+            .count()
+        )
+        findings_with_drawing_count = (
+            self.db.query(Finding)
+            .filter(
+                Finding.project_id == project_id,
+                Finding.drawing_id == drawing_id,
+            )
+            .count()
+        )
+        evidence_links_count = (
+            self.db.query(EvidenceDrawingLink)
+            .filter(
+                EvidenceDrawingLink.project_id == project_id,
+                EvidenceDrawingLink.drawing_id == drawing_id,
+            )
+            .count()
+        )
+        return DrawingDeletionImpact(
+            alignments_count=alignments_count,
+            diffs_count=diffs_count,
+            regions_count=regions_count,
+            overlays_count=overlays_count,
+            findings_with_drawing_count=findings_with_drawing_count,
+            evidence_links_count=evidence_links_count,
+        )
+
+    def _paths_under_upload_root_for_keys(self, *storage_keys: Optional[str]) -> List[Path]:
+        """Resolve storage keys to absolute paths only when they stay under UPLOAD_ROOT."""
+        root = UPLOAD_ROOT.resolve()
+        out: List[Path] = []
+        for key in storage_keys:
+            if not key:
+                continue
+            try:
+                p = storage_key_to_abs_path(key).resolve()
+            except OSError:
+                continue
+            try:
+                p.relative_to(root)
+            except ValueError:
+                continue
+            out.append(p)
+        return out
+
+    def delete_drawing_hard(self, project_id: int, drawing_id: int) -> None:
+        """Hard-delete a drawing row, related ORM rows, evidence links, and local upload files.
+
+        Findings' ``drawing_id`` is cleared via FK (SET NULL). ``projects.master_drawing_id``
+        clears via FK when this drawing was the canonical master.
+
+        Raises:
+            ValueError: If the drawing does not exist in the project.
+        """
+        drawing = self.get_drawing(project_id, drawing_id)
+        if drawing is None:
+            raise ValueError(
+                f"Drawing {drawing_id} not found in project {project_id}"
+            )
+
+        # Read-only impact (for future logging / parity with GET delete-summary).
+        _impact = self._drawing_deletion_impact_counts(project_id, drawing_id)
+        logger.debug(
+            "delete_drawing_hard impact drawing_id=%s project_id=%s %s",
+            drawing_id,
+            project_id,
+            _impact,
+        )
+
+        paths: List[Path] = []
+        sk = cast(Optional[str], drawing.storage_key)
+        paths.extend(self._paths_under_upload_root_for_keys(sk))
+
+        for rn in self.list_drawing_renditions(drawing_id):
+            ik = cast(Optional[str], getattr(rn, "image_storage_key", None))
+            paths.extend(self._paths_under_upload_root_for_keys(ik))
+
+        deduped: List[Path] = []
+        seen: Set[str] = set()
+        for p in paths:
+            key = str(p.resolve())
+            if key not in seen:
+                seen.add(key)
+                deduped.append(p)
+
+        self.db.query(EvidenceDrawingLink).filter(
+            EvidenceDrawingLink.project_id == project_id,
+            EvidenceDrawingLink.drawing_id == drawing_id,
+        ).delete(synchronize_session=False)
+
+        try:
+            self.db.delete(drawing)
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+
+        for path in deduped:
+            try:
+                if path.is_file():
+                    path.unlink(missing_ok=True)
+                elif path.is_dir():
+                    rmtree(path, ignore_errors=True)
+            except OSError as exc:
+                logger.warning(
+                    "delete_drawing_hard: could not remove path %s: %s",
+                    path,
+                    exc,
+                )
 
     def set_drawing_processing_status(
         self,

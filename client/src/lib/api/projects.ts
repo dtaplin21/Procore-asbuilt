@@ -1,4 +1,7 @@
-import type { DashboardSummaryResponse } from "@shared/schema";
+import type {
+  DashboardSummaryResponse,
+  DrawingDeleteSummaryResponse,
+} from "@shared/schema";
 
 import { readApiError, resolveFetchUrl } from "@/lib/api/http";
 
@@ -47,4 +50,27 @@ export async function fetchProjectDashboardSummary(
   }
 
   return (await response.json()) as DashboardSummaryResponse;
+}
+
+/**
+ * GET /api/projects/{project_id}/drawings/{drawing_id}/delete-summary
+ *
+ * Read-only impact counts and master context for delete confirmation modals.
+ */
+export async function fetchDrawingDeleteSummary(
+  projectId: number,
+  drawingId: number
+): Promise<DrawingDeleteSummaryResponse> {
+  const response = await fetch(
+    resolveFetchUrl(
+      `/api/projects/${projectId}/drawings/${drawingId}/delete-summary`
+    ),
+    { method: "GET", credentials: "include" }
+  );
+
+  if (!response.ok) {
+    await readApiError(response);
+  }
+
+  return (await response.json()) as DrawingDeleteSummaryResponse;
 }

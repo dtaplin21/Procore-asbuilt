@@ -81,6 +81,19 @@ export interface DrawingResponse {
   updated_at: string;
 }
 
+/** GET /api/projects/{project_id}/drawings/{drawing_id}/delete-summary — camelCase JSON. */
+export interface DrawingDeleteSummaryResponse {
+  alignmentsCount: number;
+  diffsCount: number;
+  regionsCount: number;
+  overlaysCount: number;
+  findingsWithDrawingCount: number;
+  evidenceLinksCount: number;
+  isCanonicalMaster: boolean;
+  /** Project canonical master id before delete; null if none. */
+  masterDrawingId: number | null;
+}
+
 // ----------------------------
 // Evidence API types (matches backend EvidenceRecordResponse, EvidenceListResponse)
 // ----------------------------

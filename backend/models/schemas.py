@@ -369,6 +369,28 @@ class ProjectDrawingsResponse(BaseModel):
     drawings: List[DrawingSummary]
 
 
+class DrawingDeleteSummaryResponse(BaseModel):
+    """Pre-delete impact for GET .../drawings/{drawing_id}/delete-summary (modal confirmation)."""
+
+    alignments_count: int = Field(..., serialization_alias="alignmentsCount")
+    diffs_count: int = Field(..., serialization_alias="diffsCount")
+    regions_count: int = Field(..., serialization_alias="regionsCount")
+    overlays_count: int = Field(..., serialization_alias="overlaysCount")
+    findings_with_drawing_count: int = Field(
+        ...,
+        serialization_alias="findingsWithDrawingCount",
+    )
+    evidence_links_count: int = Field(..., serialization_alias="evidenceLinksCount")
+    is_canonical_master: bool = Field(..., serialization_alias="isCanonicalMaster")
+    master_drawing_id: Optional[int] = Field(
+        default=None,
+        serialization_alias="masterDrawingId",
+        description="Project's current canonical master id before delete (FK on projects).",
+    )
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
 class ProjectDrawingsListResponse(BaseModel):
     """Typed response for project drawings list - matches frontend ProjectDrawingsResponse."""
 

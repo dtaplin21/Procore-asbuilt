@@ -1,5 +1,8 @@
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
+import logging
+
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from typing import List, Literal, Optional, cast
 
@@ -17,12 +20,15 @@ from models.schemas import (
     DashboardSummaryResponse,
     DrawingResponse,
     DrawingSummary,
+    DrawingDeleteSummaryResponse,
     DrawingWorkspaceDrawingResponse,
     JobListResponse,
     ProjectDrawingsResponse,
 )
 from models.models import Drawing, Project
 from services.file_storage import save_upload, get_file_path
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -201,6 +207,63 @@ def list_project_drawings(
         result.append(item)
 
     return ProjectDrawingsResponse(drawings=result)
+
+
+@router.delete("/{project_id}/drawings/{drawing_id}", status_code=204)
+def delete_project_drawing(
+    project_id: int,
+    drawing_id: int,
+    db: Session = Depends(get_db),
+):
+    """Hard-delete a drawing and its local files. Related DB rows cascade or are cleared per FK rules."""
+    storage = StorageService(db)
+    if storage.get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    try:
+        storage.delete_drawing_hard(project_id, drawing_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Drawing not found")
+    except SQLAlchemyError:
+        logger.exception("delete_project_drawing failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to delete drawing",
+        )
+
+
+@router.get(
+    "/{project_id}/drawings/{drawing_id}/delete-summary",
+    response_model=DrawingDeleteSummaryResponse,
+)
+def get_project_drawing_delete_summary(
+    project_id: int,
+    drawing_id: int,
+    db: Session = Depends(get_db),
+):
+    """Row counts and master context for delete confirmation UIs (read-only)."""
+    storage = StorageService(db)
+    project = storage.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    try:
+        impact = storage.get_drawing_deletion_impact(project_id, drawing_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Drawing not found")
+    master_raw = getattr(project, "master_drawing_id", None)
+    master_drawing_id = int(master_raw) if master_raw is not None else None
+    is_canonical = (
+        master_drawing_id is not None and master_drawing_id == drawing_id
+    )
+    return DrawingDeleteSummaryResponse(
+        alignments_count=impact.alignments_count,
+        diffs_count=impact.diffs_count,
+        regions_count=impact.regions_count,
+        overlays_count=impact.overlays_count,
+        findings_with_drawing_count=impact.findings_with_drawing_count,
+        evidence_links_count=impact.evidence_links_count,
+        is_canonical_master=is_canonical,
+        master_drawing_id=master_drawing_id,
+    )
 
 
 @router.get(
