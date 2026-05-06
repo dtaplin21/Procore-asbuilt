@@ -281,9 +281,22 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
               : "Quality control overview and AI insights"}
           </p>
           {selectedProjectName && (
-            <p className="text-sm text-muted-foreground mt-1" data-testid="text-selected-project">
-              Project: <span className="font-medium text-foreground">{selectedProjectName}</span>
-            </p>
+            <div className="text-sm text-muted-foreground mt-1 space-y-1" data-testid="text-selected-project">
+              <p>
+                Project: <span className="font-medium text-foreground">{selectedProjectName}</span>
+              </p>
+              {selectedProjectId ? (
+                <p>
+                  <Link
+                    href={`/projects/${selectedProjectId}/drawings/manage`}
+                    className="text-primary hover:underline font-normal"
+                    data-testid="dashboard-manage-drawings-project-link"
+                  >
+                    Manage project drawings
+                  </Link>
+                </p>
+              ) : null}
+            </div>
           )}
         </div>
         <div className="flex items-center gap-3">
@@ -313,16 +326,6 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
 
           {selectedProjectId ? (
             <div className="flex flex-wrap items-center gap-2 self-end">
-              <Link href={`/projects/${selectedProjectId}/drawings/manage`}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-9 border-border"
-                  data-testid="dashboard-manage-drawings"
-                >
-                  Manage drawings
-                </Button>
-              </Link>
               <Button
                 type="button"
                 variant="outline"
@@ -410,6 +413,15 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
                 value={projectSummary?.kpis?.drawings_count ?? 0}
                 icon={FolderOpen}
                 variant="default"
+                footer={
+                  <Link
+                    href={`/projects/${selectedProjectId}/drawings/manage`}
+                    className="text-sm font-medium text-primary hover:underline"
+                    data-testid="dashboard-manage-drawings-kpi-link"
+                  >
+                    Manage drawings
+                  </Link>
+                }
               />
               <StatCard
                 title="Evidence"

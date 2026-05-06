@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation, useParams } from "wouter";
+import { useLocation, useParams, Link } from "wouter";
 import type { DrawingResponse } from "@shared/schema";
 
 import AlignmentsPanel from "@/components/drawing-workspace/alignments_panel";
@@ -220,6 +220,13 @@ export function DrawingWorkspaceBody({
       >
         Upload drawing
       </button>
+      <Link
+        href={`/projects/${projectId}/drawings/manage`}
+        className="inline-flex w-full items-center justify-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-muted"
+        data-testid="workspace-manage-drawings"
+      >
+        Manage drawings
+      </Link>
     </div>
   );
 
