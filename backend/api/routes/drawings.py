@@ -4,7 +4,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db, get_idempotency_key
-from api.upload_intent_form import coalesce_upload_intent_form
+from api.upload_intent_form import (
+    UPLOAD_INTENT_OPENAPI_DESCRIPTION,
+    coalesce_upload_intent_form,
+)
 from models.models import Drawing
 from models.schemas import (
     DrawingOverlayResponse,
@@ -38,14 +41,20 @@ router = APIRouter(tags=["drawings"])
 async def upload_drawing(
     project_id: int,
     file: UploadFile = File(...),
-    upload_intent: str | None = Form(default=None),
-    uploadIntent: str | None = Form(default=None),
+    upload_intent: str | None = Form(default=None, description=UPLOAD_INTENT_OPENAPI_DESCRIPTION),
+    uploadIntent: str | None = Form(
+        default=None,
+        description="camelCase alias of upload_intent; prefer upload_intent when both are sent",
+    ),
     idempotency_key: str = Depends(get_idempotency_key),
     db: Session = Depends(get_db),
 ) -> DrawingResponse:
     """
     POST /api/projects/{project_id}/drawings
-    Upload a drawing file and persist metadata to database.
+
+    Upload a drawing file and persist metadata. Behavior matches ``POST /api/projects/{id}/drawings``
+    (projects router) for ``upload_intent`` — see OpenAPI form field description.
+    Idempotency fingerprint includes normalized ``upload_intent`` so master vs sub vs omitted cannot collide.
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")

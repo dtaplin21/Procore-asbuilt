@@ -64,7 +64,13 @@ class Project(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
-    
+    master_drawing_id = Column(
+        Integer,
+        ForeignKey("drawings.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # Relationships
     company = relationship("Company", back_populates="projects")
     jobs = relationship("JobQueue", back_populates="project")
@@ -72,6 +78,11 @@ class Project(Base):
     drawings = relationship("Drawing", back_populates="project", cascade="all, delete-orphan")
     evidence_records = relationship("EvidenceRecord", back_populates="project", cascade="all, delete-orphan")
     inspection_runs = relationship("InspectionRun", back_populates="project", cascade="all, delete-orphan")
+    master_drawing = relationship(
+        "Drawing",
+        foreign_keys=[master_drawing_id],
+        post_update=True,
+    )
 
 class UserCompany(Base):
     __tablename__ = "user_companies"

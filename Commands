@@ -1,1 +1,6 @@
 python -m services.job_worker #start worker 
+
+psql "postgresql://dtaplin21:PROCORE@localhost:5432/procore_int" (postgers terminal start)
+
+# Same DB as Alembic (DATABASE_URL from backend/.env); redacted URL + master_drawing_id check
+cd backend && python3 scripts/check_db_context.py

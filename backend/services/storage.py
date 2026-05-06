@@ -209,6 +209,42 @@ class StorageService:
     # Drawings (Phase 1)
     # ------------------------------------------------------------------
 
+    def set_project_master(self, project_id: int, drawing_id: int) -> None:
+        """Declare the canonical master sheet for a project.
+
+        Loads ``Project`` and ``Drawing`` (by id). Raises if the drawing is missing or
+        ``drawing.project_id != project_id``. Sets ``project.master_drawing_id = drawing_id``,
+        bulk-updates all other drawings in that project to ``upload_intent = 'sub'``, then sets
+        the chosen drawing to ``upload_intent = 'master'``.
+
+        Does not ``commit``. :meth:`create_drawing` uses ``flush`` → this method → ``commit`` in
+        one transaction when ``upload_intent == 'master'`` or when intent is omitted and the project
+        has no ``master_drawing_id`` yet (auto-first-master).
+        """
+        project = self.get_project(project_id)
+        if project is None:
+            raise ValueError(f"Project {project_id} not found")
+        drawing = self.get_drawing_by_id(drawing_id)
+        if drawing is None:
+            raise ValueError(f"Drawing {drawing_id} not found")
+        if cast(int, drawing.project_id) != project_id:
+            raise ValueError(
+                f"Drawing {drawing_id} belongs to project {drawing.project_id}, not {project_id}"
+            )
+
+        self.db.query(Drawing).filter(
+            Drawing.project_id == project_id,
+            Drawing.id != drawing_id,
+        ).update({"upload_intent": "sub"}, synchronize_session=False)
+
+        drawing.upload_intent = "master"
+        project.master_drawing_id = drawing_id
+
+    def _project_has_no_canonical_master(self, project_id: int) -> bool:
+        """True if the project exists and ``master_drawing_id`` is not set."""
+        project = self.get_project(project_id)
+        return project is not None and getattr(project, "master_drawing_id", None) is None
+
     def create_drawing(
         self,
         project_id: int,
@@ -220,6 +256,16 @@ class StorageService:
         page_count: Optional[int] = None,
         upload_intent: Literal["master", "sub"] | None = None,
     ) -> Drawing:
+        """Persist a new drawing row.
+
+        Calls :meth:`set_project_master` after ``flush`` when:
+
+        - ``upload_intent == 'master'``, or
+        - ``upload_intent`` is omitted and the project has no ``master_drawing_id`` yet
+          (auto-first-master onboarding).
+
+        Then ``commit`` (single transaction). An explicit ``sub`` upload never changes project master.
+        """
         drawing = Drawing(
             project_id=project_id,
             source=source,
@@ -231,6 +277,13 @@ class StorageService:
         )
         self.db.add(drawing)
         try:
+            self.db.flush()
+            promote_to_project_master = upload_intent == "master" or (
+                upload_intent is None
+                and self._project_has_no_canonical_master(project_id)
+            )
+            if promote_to_project_master:
+                self.set_project_master(project_id, cast(int, drawing.id))
             self.db.commit()
         except SQLAlchemyError:
             self.db.rollback()

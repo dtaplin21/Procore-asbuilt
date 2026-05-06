@@ -1,0 +1,193 @@
+Manual plan: Workspace sidebar tab
+
+Goal
+
+Expose Drawing workspace as its own sidebar item. No changes to compare logic, hooks, or API routes—only navigation + remembering where the user last worked.
+
+The canonical route already exists in [client/src/App.tsx](client/src/App.tsx):
+
+ /projects/:projectId/drawings/:drawingId/workspace
+
+
+
+Step 1: Choose storage and key
+
+
+
+
+
+Storage: Prefer sessionStorage if “come back” should be per browser tab; use localStorage if it should survive new tabs and browser restarts.
+
+
+
+Key: a single app-specific string, e.g. qcqa:lastDrawingWorkspace.
+
+
+
+Value: the full return path, including query string if you rely on it for selection (e.g.  /projects/2/drawings/3/workspace?subDrawingId=5 — only include params your app actually uses; see [useWorkspaceSelectionQueryParams](client/src/hooks/use_workspace_selection_query_params.ts)).
+
+
+
+Step 2: Write the path when the user is on the workspace page
+
+Where: [client/src/pages/drawing_workspace.tsx](client/src/pages/drawing_workspace.tsx).
+
+When: After you know projectId and drawingId are valid (the same place you already gate before rendering DrawingWorkspaceBody, or inside DrawingWorkspaceBody with a useEffect).
+
+Logic (manual):
+
+
+
+
+
+Import useLocation from wouter if not already available in that module.
+
+
+
+In a useEffect, depend on [location, projectId, drawingId] (or useLocation()’s full string + search).
+
+
+
+Compute: const path = ${pathname}${search}`` (wouter’s location is often pathname-only; use window.location.search if you need the query).
+
+
+
+storage.setItem(KEY, path).
+
+Optional: also store projectId under qcqa:lastProjectId as a number string for a smarter fallback (see Step 4).
+
+
+
+Step 3: Add the sidebar item
+
+Where: [client/src/components/app-sidebar.tsx](client/src/components/app-sidebar.tsx).
+
+Changes:
+
+
+
+
+
+Import an icon (e.g. DraftingCompass or PanelsTopLeft from lucide-react).
+
+
+
+At render time, read storage.getItem(KEY) into a variable (e.g. lastWorkspacePath).
+
+
+
+Decide href for Workspace:
+
+
+
+
+
+If lastWorkspacePath is non-empty and starts with /projects/ and includes /workspace, use it as Link href={lastWorkspacePath}.
+
+
+
+Else use your fallback (Step 4).
+
+
+
+Insert a new SidebarMenuItem in the main nav group (with Dashboard / Inspections / Objects), same pattern as existing items: SidebarMenuButton + Link + data-testid (e.g. nav-workspace).
+
+
+
+Step 4: Fallback when nothing is stored
+
+Pick one behavior and implement it in the sidebar:
+
+
+
+
+
+A (simplest): href="/" so the user lands on the dashboard and opens a workspace from there again.
+
+
+
+B: If you stored qcqa:lastProjectId, href={/projects/${id}/drawings} (opens picker for that project).
+
+
+
+C: Disable the button when no lastWorkspacePath (no navigation; optional tooltip “Open a drawing workspace from the dashboard first”).
+
+
+
+Step 5: Fix “active” state for Workspace
+
+[app-sidebar.tsx](client/src/components/app-sidebar.tsx) currently uses exact match: isActive={location === item.url}.
+
+Workspace will use a dynamic href, so for that row only use something like:
+
+
+
+
+
+isActive={location.startsWith("/projects/") && location.includes("/drawings/") && location.includes("/workspace")}
+
+—or compare location to the stored path if you normalize both the same way.
+
+
+
+Step 6: Verify manually
+
+
+
+
+
+Navigate to a workspace URL; confirm sessionStorage/localStorage contains the expected key/value.
+
+
+
+Click Dashboard (or another tab); confirm URL changes.
+
+
+
+Click Workspace; confirm you return to the same project/drawing (and query params if you stored them).
+
+
+
+Open a new tab (if you used sessionStorage): confirm fallback behavior matches Step 4.
+
+
+
+Optional: run client unit tests if you add data-testid and a test later.
+
+
+
+Files touched (summary)
+
+
+
+
+
+
+
+File
+
+
+
+Action
+
+
+
+
+
+[client/src/pages/drawing_workspace.tsx](client/src/pages/drawing_workspace.tsx)
+
+
+
+useEffect to persist last workspace path (+ optional lastProjectId)
+
+
+
+
+
+[client/src/components/app-sidebar.tsx](client/src/components/app-sidebar.tsx)
+
+
+
+New nav item, read storage, custom isActive, fallback href
+
+No changes required to [client/src/App.tsx](client/src/App.tsx) routes unless you introduce a new path (you are not required to).

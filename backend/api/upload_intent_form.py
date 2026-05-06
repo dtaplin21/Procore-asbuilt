@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+UPLOAD_INTENT_OPENAPI_DESCRIPTION = (
+    "Drawing role: `master` — canonical workspace sheet (sets `projects.master_drawing_id` "
+    "and reconciles intents). `sub` — sub sheet only. Omit or empty — no explicit intent on the "
+    "new row; **if the project has no master yet** (`master_drawing_id` is null), this upload "
+    "becomes the master automatically (first-upload onboarding); otherwise the project's master "
+    "is unchanged."
+)
+
 
 def coalesce_upload_intent_form(
     upload_intent: str | None,

@@ -4,7 +4,10 @@ from sqlalchemy.orm import Session
 from typing import List, Literal, Optional, cast
 
 from api.dependencies import get_db
-from api.upload_intent_form import coalesce_upload_intent_form
+from api.upload_intent_form import (
+    UPLOAD_INTENT_OPENAPI_DESCRIPTION,
+    coalesce_upload_intent_form,
+)
 from services.drawing_comparison import serialize_drawing_for_workspace
 from services.drawing_render_jobs import enqueue_drawing_render_job
 from services.storage import StorageService
@@ -109,15 +112,17 @@ def get_project_jobs(
 async def upload_project_drawing(
     project_id: int,
     file: UploadFile = File(...),
-    upload_intent: str | None = Form(default=None),
-    uploadIntent: str | None = Form(default=None),
+    upload_intent: str | None = Form(default=None, description=UPLOAD_INTENT_OPENAPI_DESCRIPTION),
+    uploadIntent: str | None = Form(
+        default=None,
+        description="camelCase alias of upload_intent; prefer upload_intent when both are sent",
+    ),
     db: Session = Depends(get_db),
 ):
     """Upload a drawing file for a project.
-    
-    - Validates file type and size
-    - Saves file to disk
-    - Creates database record with file_url pointing to /file endpoint
+
+    - Validates file type and size; saves file to disk; creates DB row.
+    - Multipart ``upload_intent`` / ``uploadIntent`` behavior is documented on those fields (OpenAPI).
     """
     # Verify project exists
     proj = db.query(Project).filter(Project.id == project_id).first()
