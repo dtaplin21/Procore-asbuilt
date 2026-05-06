@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Trash2 } from "lucide-react";
 import { useLocation, useParams, Link } from "wouter";
 import type { DrawingResponse } from "@shared/schema";
 
@@ -8,6 +9,7 @@ import CompareSubDrawingButton from "@/components/drawing-workspace/compare_sub_
 import CompareSubDrawingModal from "@/components/drawing-workspace/compare_sub_drawing_modal";
 import DiffTimelinePanel from "@/components/drawing-workspace/diff_timeline_panel";
 import { UploadDrawingModal } from "@/components/drawing-workspace/UploadDrawingModal";
+import { DeleteDrawingDialog } from "@/components/drawings/DeleteDrawingDialog";
 import DrawingComparisonWorkspace from "@/components/drawings/DrawingComparisonWorkspace";
 import DrawingWorkspaceLayout from "@/components/drawing-workspace/drawing_workspace_layout";
 import WorkspaceErrorState from "@/components/drawing-workspace/workspace_error_state";
@@ -17,6 +19,7 @@ import {
   stripWorkspaceSelectionFromSearch,
   useWorkspaceSelectionQueryParams,
 } from "@/hooks/use_workspace_selection_query_params";
+import { toast } from "@/hooks/use-toast";
 import { compareSubDrawingToMaster } from "@/lib/api/drawing_workspace";
 import { fetchProjectDashboardSummary } from "@/lib/api/projects";
 import {
@@ -38,6 +41,7 @@ export function DrawingWorkspaceBody({
   const [location, setLocation] = useLocation();
   const [compareModalOpen, setCompareModalOpen] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedSubDrawingId, setSelectedSubDrawingId] = useState<number | null>(null);
   const [compareLoading, setCompareLoading] = useState(false);
   const [compareError, setCompareError] = useState<string | null>(null);
@@ -107,6 +111,14 @@ export function DrawingWorkspaceBody({
     initialAlignmentId: alignmentIdFromUrl,
     initialDiffId: diffIdFromUrl,
   });
+
+  const routeDrawingForDelete = useMemo(() => {
+    const name =
+      masterDrawing?.id === parsedDrawingId
+        ? masterDrawing.name
+        : currentDrawingName ?? `Drawing ${parsedDrawingId}`;
+    return { id: parsedDrawingId, name };
+  }, [masterDrawing, parsedDrawingId, currentDrawingName]);
 
   useEffect(() => {
     setSelectionQueryParams({
@@ -208,7 +220,10 @@ export function DrawingWorkspaceBody({
     />
   );
 
-  const sidebarUploadControls = (uploadDisabled: boolean) => (
+  const sidebarUploadControls = (
+    uploadDisabled: boolean,
+    compareBusy: boolean
+  ) => (
     <div className="space-y-2">
       <CompareSubDrawingButton onClick={openCompareModal} disabled={uploadDisabled} />
       <button
@@ -227,7 +242,34 @@ export function DrawingWorkspaceBody({
       >
         Manage drawings
       </Link>
+      <button
+        type="button"
+        className="inline-flex w-full items-center justify-center rounded-md border border-destructive/40 bg-background px-3 py-2 text-sm font-medium text-destructive shadow-sm hover:bg-destructive/10 disabled:opacity-60"
+        onClick={() => setDeleteDialogOpen(true)}
+        disabled={compareBusy}
+        data-testid="workspace-delete-drawing-open"
+      >
+        <Trash2 className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+        Delete drawing
+      </button>
     </div>
+  );
+
+  const deleteDrawingDialog = (
+    <DeleteDrawingDialog
+      projectId={projectId}
+      drawing={routeDrawingForDelete}
+      open={deleteDialogOpen}
+      onOpenChange={setDeleteDialogOpen}
+      onDeleteSuccess={(deletedId) => {
+        if (deletedId !== parsedDrawingId) return;
+        toast({
+          title: "Drawing deleted",
+          description: "Removed from this project.",
+        });
+        setLocation(`/projects/${projectId}/drawings`);
+      }}
+    />
   );
 
   if (workspaceLoading) {
@@ -236,11 +278,12 @@ export function DrawingWorkspaceBody({
         <DrawingWorkspaceLayout
           header={header}
           viewer={<WorkspaceLoadingState />}
-          sidebar={sidebarUploadControls(true)}
+          sidebar={sidebarUploadControls(true, false)}
         />
 
         {compareModal}
         {uploadModal}
+        {deleteDrawingDialog}
       </>
     );
   }
@@ -256,11 +299,12 @@ export function DrawingWorkspaceBody({
               onRetry={() => void reloadWorkspace()}
             />
           }
-          sidebar={sidebarUploadControls(false)}
+          sidebar={sidebarUploadControls(false, false)}
         />
 
         {compareModal}
         {uploadModal}
+        {deleteDrawingDialog}
       </>
     );
   }
@@ -279,7 +323,7 @@ export function DrawingWorkspaceBody({
         }
         sidebar={
           <>
-            {sidebarUploadControls(compareLoading)}
+            {sidebarUploadControls(compareLoading, compareLoading)}
 
             <AlignmentsPanel
               projectId={projectId}
@@ -305,6 +349,7 @@ export function DrawingWorkspaceBody({
 
       {compareModal}
       {uploadModal}
+      {deleteDrawingDialog}
     </>
   );
 }

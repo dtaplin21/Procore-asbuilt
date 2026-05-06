@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import type { DrawingDeleteSummaryResponse } from "@shared/schema";
@@ -6,11 +7,14 @@ import {
   AlertDialog,
   AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   deleteProjectDrawing,
   fetchDrawingDeleteSummary,
@@ -26,6 +30,10 @@ export type DeleteDrawingDialogProps = {
   drawing: DrawingRow | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * After cache cleanup; receives the deleted drawing id (for conditional navigation, e.g. workspace route).
+   */
+  onDeleteSuccess?: (deletedDrawingId: number) => void | Promise<void>;
 };
 
 function impactLines(summary: DrawingDeleteSummaryResponse) {
@@ -45,14 +53,37 @@ function impactLines(summary: DrawingDeleteSummaryResponse) {
 const STATIC_IMPACT_COPY =
   "This removes the uploaded file and related comparison data from the project. Findings keep their records but may lose the link to this sheet.";
 
+function drawingConfirmationLabel(d: DrawingRow): string {
+  const t = d.name.trim();
+  return t.length > 0 ? t : `Drawing ${d.id}`;
+}
+
 export function DeleteDrawingDialog({
   projectId,
   drawing,
   open,
   onOpenChange,
+  onDeleteSuccess,
 }: DeleteDrawingDialogProps) {
   const queryClient = useQueryClient();
   const drawingId = drawing?.id;
+  const [confirmName, setConfirmName] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setConfirmName("");
+    }
+  }, [open, drawing?.id]);
+
+  const expectedName = drawing ? drawingConfirmationLabel(drawing) : "";
+  const nameMatches =
+    Boolean(drawing) &&
+    expectedName.length > 0 &&
+    confirmName.trim() === expectedName;
+  const nameHint =
+    confirmName.trim().length > 0 && !nameMatches
+      ? "Type the full name exactly as shown above."
+      : null;
 
   const impactQuery = useQuery({
     queryKey: ["drawing-delete-summary", projectId, drawingId],
@@ -72,21 +103,57 @@ export function DeleteDrawingDialog({
       await deleteProjectDrawing(projectId, drawingId);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
+      if (typeof drawingId !== "number" || !Number.isFinite(drawingId)) {
+        onOpenChange(false);
+        return;
+      }
+      const deletedId = drawingId;
+
+      await queryClient.removeQueries({
         queryKey: [`/api/projects/${projectId}/drawings`],
       });
-      await queryClient.invalidateQueries({
+      await queryClient.removeQueries({
         queryKey: ["drawing-manage-dashboard-summary", projectId],
       });
-      await queryClient.invalidateQueries({
+      await queryClient.removeQueries({
         queryKey: ["drawing-picker-dashboard-summary", projectId],
       });
-      await queryClient.invalidateQueries({
-        queryKey: ["project-dashboard-summary"],
+      await queryClient.removeQueries({
+        queryKey: ["project-dashboard-summary", projectId],
+      });
+      queryClient.removeQueries({
+        predicate: (q) => {
+          const k = q.queryKey;
+          if (!Array.isArray(k) || k[0] !== "drawing-diffs") return false;
+          if (k[1] === "disabled") return false;
+          const pid = k[1];
+          return pid === projectId || pid === String(projectId);
+        },
+      });
+      queryClient.removeQueries({
+        predicate: (q) => {
+          const k = q.queryKey;
+          if (!Array.isArray(k)) return false;
+          if (k[0] === "drawingComparisonWorkspace" && k[1] === projectId) {
+            return k[2] === deletedId || k[3] === deletedId;
+          }
+          return false;
+        },
+      });
+      queryClient.removeQueries({
+        predicate: (q) => {
+          const first = q.queryKey[0];
+          return (
+            typeof first === "string" &&
+            first.startsWith(`/api/projects/${projectId}/drawings/${deletedId}`)
+          );
+        },
       });
       await queryClient.removeQueries({
-        queryKey: ["drawing-delete-summary", projectId, drawingId],
+        queryKey: ["drawing-delete-summary", projectId, deletedId],
       });
+
+      await onDeleteSuccess?.(deletedId);
       onOpenChange(false);
     },
   });
@@ -98,6 +165,7 @@ export function DeleteDrawingDialog({
   const handleOpenChange = (next: boolean) => {
     if (!next) {
       deleteMutation.reset();
+      setConfirmName("");
     }
     onOpenChange(next);
   };
@@ -107,10 +175,16 @@ export function DeleteDrawingDialog({
       <AlertDialogContent className="max-w-md" data-testid="delete-drawing-dialog">
         <AlertDialogHeader>
           <AlertDialogTitle>Delete drawing?</AlertDialogTitle>
+          <AlertDialogDescription className="sr-only">
+            Review related data and type the drawing name exactly to confirm permanent
+            deletion.
+          </AlertDialogDescription>
           <div className="text-sm text-muted-foreground space-y-3 pt-1">
             {drawing ? (
               <p>
-                <span className="font-medium text-foreground">{drawing.name}</span>{" "}
+                <span className="font-medium text-foreground">
+                  {drawingConfirmationLabel(drawing)}
+                </span>{" "}
                 (ID {drawing.id}) will be permanently removed.
               </p>
             ) : null}
@@ -155,6 +229,28 @@ export function DeleteDrawingDialog({
                 <p className="text-xs">Detailed counts could not be loaded.</p>
               </div>
             ) : null}
+
+            {drawing && expectedName ? (
+              <div className="space-y-2 pt-1 border-t border-border">
+                <Label htmlFor="delete-drawing-confirm-name">
+                  Type the drawing name to confirm
+                </Label>
+                <Input
+                  id="delete-drawing-confirm-name"
+                  value={confirmName}
+                  onChange={(e) => setConfirmName(e.target.value)}
+                  placeholder={expectedName}
+                  autoComplete="off"
+                  disabled={deleteMutation.isPending}
+                  data-testid="delete-drawing-confirm-name"
+                />
+                {nameHint ? (
+                  <p className="text-xs text-destructive" data-testid="delete-drawing-name-hint">
+                    {nameHint}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -171,7 +267,8 @@ export function DeleteDrawingDialog({
             disabled={
               deleteMutation.isPending ||
               impactQuery.isLoading ||
-              typeof drawingId !== "number"
+              typeof drawingId !== "number" ||
+              !nameMatches
             }
             onClick={() => deleteMutation.mutate()}
             data-testid="delete-drawing-confirm"

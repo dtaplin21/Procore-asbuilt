@@ -17,6 +17,7 @@
     "worker": "cd backend && ./venv/bin/python -m services.job_worker",
     "check": "tsc",
     "db:push": "drizzle-kit push",
+    "db:migrate": "cd backend && ./venv/bin/alembic upgrade head",
     "db:init": "cd backend && python3 scripts/init_db.py",
     "db:reset": "cd backend && python3 scripts/reset_db.py",
     "test": "playwright test",

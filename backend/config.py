@@ -25,10 +25,13 @@ exchange so redirect_uri is never hardcoded there.
 Application environment::
 
     APP_ENV                     # development | production (production on Render)
-    DATABASE_SSL_INSECURE_DEV   # optional; local dev only — skip Postgres TLS cert verification
+    DATABASE_SSL_INSECURE_DEV   # optional; local dev only — skip Postgres TLS cert verification (cloud DB)
+    DATABASE_DISABLE_SSL_FOR_LOCALHOST  # default true in dev — sslmode=disable for localhost DB (non-TLS Postgres)
     OPENAI_API_KEY              # API host only — required for inspection/GPT features (beta)
     OPENAI_CHAT_MODEL           # optional — defaults to gpt-4o-mini
 """
+
+from urllib.parse import urlparse
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -64,6 +67,13 @@ class Settings(BaseSettings):
     #: DEV ONLY: skip Postgres server certificate verification (fixes some macOS/Python↔cloud DB TLS issues).
     #: Forced off when ``app_env`` is ``production``. Never enable on deployed API.
     database_ssl_insecure_dev: bool = Field(default=False, description="DATABASE_SSL_INSECURE_DEV")
+    #: When ``APP_ENV`` is not ``production`` and ``DATABASE_URL`` host is localhost (or unix socket),
+    #: pass ``sslmode=disable`` so non-TLS local Postgres works. Set false if you use an SSH tunnel
+    #: to a remote DB and the URL points at ``127.0.0.1``. Env: ``DATABASE_DISABLE_SSL_FOR_LOCALHOST``.
+    database_disable_ssl_for_localhost: bool = Field(
+        default=True,
+        description="DATABASE_DISABLE_SSL_FOR_LOCALHOST",
+    )
 
     # In some environments (CI, sandboxes), extra env vars may be present.
     # Ignore unknown keys instead of erroring at import time.
@@ -131,19 +141,42 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
+def _database_host_is_local_loopback(database_url: str) -> bool:
+    """True when ``DATABASE_URL`` targets this machine (non-TLS Docker/Homebrew Postgres)."""
+    u = database_url.strip()
+    if u.startswith("postgresql+psycopg://"):
+        u = "postgresql://" + u[len("postgresql+psycopg://") :]
+    elif u.startswith("postgres://"):
+        u = "postgresql://" + u[len("postgres://") :]
+    try:
+        parsed = urlparse(u)
+    except Exception:
+        return False
+    host = (parsed.hostname or "").strip().lower()
+    if not host:
+        return True
+    return host in ("localhost", "127.0.0.1", "::1")
+
+
 def sqlalchemy_connect_args(s: Optional[Settings] = None) -> dict[str, Any]:
     """
     Extra arguments for SQLAlchemy/psycopg ``create_engine(connect_args=...)``.
 
-    When ``DATABASE_SSL_INSECURE_DEV=true`` and ``APP_ENV`` is not ``production``, TLS is still
-    used but server certificate verification is skipped. Use only for local dev against cloud
-    Postgres when verification fails (e.g. macOS + libpq loading ``~/.postgresql/root.crt``,
-    which makes ``sslmode=require`` behave like ``verify-ca``, or a mismatch with system trust).
+    In **development**, when the DB host is localhost (or unix-socket style URL) and
+    ``DATABASE_DISABLE_SSL_FOR_LOCALHOST`` is true (default), ``sslmode=disable`` is set so
+    typical local Postgres without TLS does not fail with "SSL was required".
+
+    When ``DATABASE_SSL_INSECURE_DEV=true`` and ``APP_ENV`` is not ``production`` (and the
+    localhost shortcut above did not apply), TLS is still used but server certificate
+    verification is skipped — for local dev against **cloud** Postgres when verification fails.
 
     Psycopg turns connection kwargs into a libpq conninfo string. ``ssl_context`` is not a libpq
     keyword and does not disable verification in this stack; use libpq's ``sslrootcert`` instead.
     """
     cfg = s or settings
+    if cfg.app_env != "production" and cfg.database_disable_ssl_for_localhost:
+        if _database_host_is_local_loopback(cfg.database_url):
+            return {"sslmode": "disable"}
     if cfg.app_env == "production" or not cfg.database_ssl_insecure_dev:
         return {}
     return {

@@ -3,7 +3,7 @@ import type {
   DrawingDeleteSummaryResponse,
 } from "@shared/schema";
 
-import { readApiError, resolveFetchUrl } from "@/lib/api/http";
+import { apiRequest, readApiError, resolveFetchUrl } from "@/lib/api/http";
 
 export type FetchProjectDashboardSummaryOptions = {
   /** Scopes comparison KPIs to this master drawing (query `currentDrawingId`). */
@@ -82,12 +82,8 @@ export async function deleteProjectDrawing(
   projectId: number,
   drawingId: number
 ): Promise<void> {
-  const response = await fetch(
-    resolveFetchUrl(`/api/projects/${projectId}/drawings/${drawingId}`),
-    { method: "DELETE", credentials: "include" }
+  await apiRequest(
+    "DELETE",
+    `/api/projects/${projectId}/drawings/${drawingId}`
   );
-
-  if (!response.ok) {
-    await readApiError(response);
-  }
 }

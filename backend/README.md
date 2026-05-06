@@ -31,10 +31,22 @@ OPENAI_API_KEY=your_openai_key
 
 On **Render** (or any API host), add `OPENAI_API_KEY` in the service environment; redeploy if you add it after first deploy.
 
-3. **Initialize database:**
+3. **Database schema (Alembic):**
+
+Existing Postgres databases must be migrated when models change. From the ``backend/`` directory:
+
 ```bash
-python -c "from database import init_db; init_db()"
+cd backend
+./venv/bin/alembic upgrade head
 ```
+
+Then ensure tables exist (greenfield / empty DB). ``init_db()`` runs ``create_all`` on startup and from:
+
+```bash
+./venv/bin/python -c "from database import init_db; init_db()"   # optional; see note below
+```
+
+**Note:** ``create_all`` does **not** add new columns to tables that already exist. If you see errors like ``column projects.master_drawing_id does not exist``, run ``alembic upgrade head`` again. Root ``package.json`` exposes ``npm run db:migrate`` for the upgrade step.
 
 4. **Wipe all application data (keep schema & migrations):**
 

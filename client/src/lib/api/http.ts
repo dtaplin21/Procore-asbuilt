@@ -55,6 +55,28 @@ function messageFromFastApiDetail(detail: unknown): string | null {
   return null;
 }
 
+/**
+ * `fetch` with `resolveFetchUrl` + credentials; throws via {@link readApiError} when `!response.ok`.
+ * Use for DELETE/HEAD or non-JSON responses; use {@link requestJson} when the response body is JSON.
+ */
+export async function apiRequest(
+  method: string,
+  url: string,
+  init?: RequestInit
+): Promise<Response> {
+  const response = await fetch(resolveFetchUrl(url), {
+    method,
+    credentials: "include",
+    ...init,
+  });
+
+  if (!response.ok) {
+    await readApiError(response);
+  }
+
+  return response;
+}
+
 export async function readApiError(response: Response): Promise<never> {
   let message = `Request failed with status ${response.status}`;
 

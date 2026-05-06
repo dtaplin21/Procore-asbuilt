@@ -1,4 +1,11 @@
-"""Shared pytest fixtures for backend tests."""
+"""Shared pytest fixtures for backend tests.
+
+DB-backed tests use ``SessionLocal`` against ``DATABASE_URL`` (``backend/.env``).
+If Postgres is local without TLS but the URL enforces SSL (``sslmode=require``),
+use ``?sslmode=disable`` in the URL for pytest against Docker/dev Postgres, or
+set ``DATABASE_SSL_INSECURE_DEV=true`` for encrypted-but-unverified cloud DB
+(see ``config.sqlalchemy_connect_args``).
+"""
 
 from __future__ import annotations
 
