@@ -355,6 +355,11 @@ class DrawingSummary(BaseModel):
     file_url: Optional[str] = Field(default=None, serialization_alias="fileUrl")
     content_type: Optional[str] = Field(default=None, serialization_alias="contentType")
     page_count: Optional[int] = Field(default=None, serialization_alias="pageCount")
+    upload_intent: Literal["master", "sub"] | None = Field(
+        default=None,
+        serialization_alias="uploadIntent",
+        validation_alias=AliasChoices("uploadIntent", "upload_intent"),
+    )
 
     model_config = ConfigDict(
         from_attributes=True,

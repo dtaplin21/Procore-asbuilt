@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fetchProjectDrawings } from "@/lib/api/drawings";
+import { fetchProjectDrawings, projectDrawingsQueryKey } from "@/lib/api/drawings";
 import { fetchProjectDashboardSummary } from "@/lib/api/projects";
 import { buildWorkspaceUrl } from "@/lib/workspace-links";
 
@@ -42,7 +42,7 @@ export default function DrawingLibraryPage() {
     isLoading: drawingsLoading,
     error: drawingsError,
   } = useQuery<ProjectDrawingsResponse>({
-    queryKey: [`/api/projects/${projectId}/drawings`],
+    queryKey: projectDrawingsQueryKey(parsedProjectId),
     queryFn: () => fetchProjectDrawings(parsedProjectId),
     enabled: isValidProject,
   });

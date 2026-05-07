@@ -113,7 +113,10 @@ interface DeveloperPanelProps {
   selectedAlignmentId: number | null;
   onAlignmentChange: (id: number | null) => void;
   projects: ProjectResponse[];
+  /** Full project drawing rows (names, lookups). */
   drawings: ProjectDrawingCandidate[];
+  /** Sub-drawing attach list; when omitted, uses all `drawings` except the selected master. */
+  subDrawingCandidates?: ProjectDrawingCandidate[];
   diffs?: DrawingDiffResponse[];
   diffsLoading?: boolean;
   onDiffRunningChange?: (running: boolean) => void;
@@ -130,6 +133,7 @@ export function DeveloperPanel({
   onAlignmentChange,
   projects,
   drawings,
+  subDrawingCandidates,
   diffs = [],
   diffsLoading = false,
   onDiffRunningChange,
@@ -179,8 +183,9 @@ export function DeveloperPanel({
   const [alignmentRegionId, setAlignmentRegionId] = useState<string | null>(null);
   const [alignmentResponse, setAlignmentResponse] = useState<string | null>(null);
 
+  const subPool = subDrawingCandidates ?? drawings;
   const subDrawings =
-    drawings?.filter((d) => masterDrawingId != null && d.id !== masterDrawingId) ?? [];
+    subPool?.filter((d) => masterDrawingId != null && d.id !== masterDrawingId) ?? [];
 
   const alignmentMutation = useMutation({
     mutationFn: () => {
@@ -235,8 +240,8 @@ export function DeveloperPanel({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Context: Project + Master Drawing */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Context: Project */}
+        <div className="grid grid-cols-1 sm:max-w-md gap-3">
           <div className="grid gap-2">
             <Label>Project</Label>
             <Select
@@ -258,32 +263,12 @@ export function DeveloperPanel({
               </SelectContent>
             </Select>
           </div>
-          <div className="grid gap-2">
-            <Label>Master Drawing</Label>
-            <Select
-              value={masterDrawingId != null ? String(masterDrawingId) : ""}
-              onValueChange={(v) => {
-                onDrawingChange(v ? parseInt(v, 10) : null);
-                onAlignmentChange(null);
-              }}
-              disabled={!projectId || drawingsLoading}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select drawing" />
-              </SelectTrigger>
-              <SelectContent>
-                {drawings.map((d) => (
-                  <SelectItem key={d.id} value={String(d.id)}>
-                    {d.name || `Drawing ${d.id}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
         </div>
 
         {(!projectId || !masterDrawingId) && (
-          <p className="text-sm text-muted-foreground">Select project and master drawing to continue.</p>
+          <p className="text-sm text-muted-foreground">
+            Select a project, then choose a master drawing in the Drawing Viewer below.
+          </p>
         )}
 
         {projectId && masterDrawingId && (

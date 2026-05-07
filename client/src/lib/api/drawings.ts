@@ -64,6 +64,13 @@ function parseDrawingResponsePayload(json: unknown): DrawingResponse {
   return payload;
 }
 
+/** React Query key for GET /api/projects/{id}/drawings (shared list queries). */
+export function projectDrawingsQueryKey(
+  projectId: number
+): readonly ["project-drawings", number] {
+  return ["project-drawings", projectId];
+}
+
 export async function fetchProjectDrawings(
   projectId: number | string
 ): Promise<ProjectDrawingsResponse> {

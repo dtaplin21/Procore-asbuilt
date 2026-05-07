@@ -18,6 +18,7 @@ import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -42,8 +43,9 @@ import type {
   ObjectStatus,
   ProjectListResponse,
 } from "@shared/schema";
-import type { ProjectDrawingsResponse } from "@/types/drawing_workspace";
+import type { ProjectDrawingsResponse, ProjectDrawingCandidate } from "@/types/drawing_workspace";
 import { useDrawingDiffs } from "@/hooks/use-drawing-diffs";
+import { fetchProjectDrawings } from "@/lib/api/drawings";
 
 const statusConfig: Record<ObjectStatus, { label: string; color: string }> = {
   not_started: { label: "Not Started", color: "bg-foreground/30" },
@@ -129,13 +131,33 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     queryKey: ["/api/projects"],
   });
 
-  const { data: drawingsData, isLoading: drawingsLoading } = useQuery<ProjectDrawingsResponse>({
-    queryKey: [`/api/projects/${selectedProjectId}/drawings`],
-    enabled: !!selectedProjectId,
+  const drawingsQuery = useQuery<ProjectDrawingsResponse>({
+    queryKey: ["project-drawings", selectedProjectId],
+    queryFn: () => {
+      if (selectedProjectId === null) {
+        throw new Error("Missing project selection");
+      }
+      return fetchProjectDrawings(selectedProjectId);
+    },
+    enabled: selectedProjectId !== null,
+    refetchOnMount: "always",
   });
+
+  const drawingsData = drawingsQuery.data;
+  const drawingsLoading = drawingsQuery.isLoading;
 
   const projects = projectsData?.items ?? [];
   const drawings = drawingsData?.drawings ?? [];
+
+  const masterDrawingOptions = drawings.filter(
+    (drawing) => drawing.uploadIntent === "master" || drawing.uploadIntent == null
+  );
+
+  const availableSubDrawings =
+    drawingsQuery.data?.drawings?.filter((drawing) => {
+      const row = drawing as ProjectDrawingCandidate & { upload_intent?: "master" | "sub" | null };
+      return row.upload_intent === "sub" || drawing.uploadIntent === "sub";
+    }) ?? [];
 
   const { data: objects, isLoading } = useQuery<DrawingObject[]>({
     queryKey: ["/api/objects"],
@@ -264,6 +286,7 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
         onAlignmentChange={setSelectedAlignmentId}
         projects={projects}
         drawings={drawings}
+        subDrawingCandidates={availableSubDrawings}
         projectsLoading={projectsLoading}
         drawingsLoading={drawingsLoading}
         diffs={diffs}
@@ -289,50 +312,76 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
         </Card>
       )}
 
-      {/* Drawing Viewer Mockup */}
+      {/* Drawing Viewer — master sheet source (master candidates only) */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
-          <CardTitle>Drawing Viewer</CardTitle>
-          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-            <Button
-              variant={selectedTool === "select" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setSelectedTool("select")}
-              data-testid="tool-select"
-            >
-              <MousePointer className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={selectedTool === "pan" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setSelectedTool("pan")}
-              data-testid="tool-pan"
-            >
-              <Move className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={selectedTool === "zoom" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setSelectedTool("zoom")}
-              data-testid="tool-zoom"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </Button>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={showDiffOverlay ? "secondary" : "ghost"}
-                  size="icon"
-                  onClick={() => setShowDiffOverlay(!showDiffOverlay)}
-                  data-testid="tool-toggle-diffs"
+        <CardHeader className="space-y-4 pb-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <CardTitle className="shrink-0">Drawing Viewer</CardTitle>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:flex-1 sm:justify-end">
+              <div className="grid gap-2 w-full sm:max-w-xs">
+                <Label htmlFor="objects-master-drawing">Master drawing</Label>
+                <Select
+                  value={selectedMasterDrawingId != null ? String(selectedMasterDrawingId) : ""}
+                  onValueChange={(v) => {
+                    handleMasterDrawingChange(v ? parseInt(v, 10) : null);
+                    setSelectedAlignmentId(null);
+                  }}
+                  disabled={!selectedProjectId || drawingsLoading}
                 >
-                  {showDiffOverlay ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <SelectTrigger id="objects-master-drawing" data-testid="select-objects-master-drawing">
+                    <SelectValue placeholder="Select master drawing" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {masterDrawingOptions.map((drawing) => (
+                      <SelectItem key={drawing.id} value={String(drawing.id)}>
+                        {drawing.name || `Drawing ${drawing.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-1 bg-muted rounded-lg p-1 shrink-0">
+                <Button
+                  variant={selectedTool === "select" ? "secondary" : "ghost"}
+                  size="icon"
+                  onClick={() => setSelectedTool("select")}
+                  data-testid="tool-select"
+                >
+                  <MousePointer className="w-4 h-4" />
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{showDiffOverlay ? "Hide" : "Show"} diff overlay</p>
-              </TooltipContent>
-            </Tooltip>
+                <Button
+                  variant={selectedTool === "pan" ? "secondary" : "ghost"}
+                  size="icon"
+                  onClick={() => setSelectedTool("pan")}
+                  data-testid="tool-pan"
+                >
+                  <Move className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={selectedTool === "zoom" ? "secondary" : "ghost"}
+                  size="icon"
+                  onClick={() => setSelectedTool("zoom")}
+                  data-testid="tool-zoom"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={showDiffOverlay ? "secondary" : "ghost"}
+                      size="icon"
+                      onClick={() => setShowDiffOverlay(!showDiffOverlay)}
+                      data-testid="tool-toggle-diffs"
+                    >
+                      {showDiffOverlay ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{showDiffOverlay ? "Hide" : "Show"} diff overlay</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -343,7 +392,6 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
               <p className="text-sm">Upload a construction drawing to view AI-recognized objects</p>
             </div>
 
-            {/* Drawing diff overlays (polygon regions, severity badges, tooltips) */}
             <DrawingDiffOverlay
               diffs={diffs}
               visible={showDiffOverlay}
@@ -352,7 +400,6 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
               diffsLoading={diffsLoading}
             />
 
-            {/* Simulated recognized objects overlay */}
             {objects && objects.length > 0 && (
               <div className="absolute inset-0 p-4">
                 {objects.slice(0, 5).map((obj, i) => (

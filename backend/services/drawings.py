@@ -20,6 +20,7 @@ class DrawingService:
             file_url=file_url,
             content_type=getattr(drawing, "content_type", None),
             page_count=getattr(drawing, "page_count", None),
+            upload_intent=getattr(drawing, "upload_intent", None),
         )
 
     def list_project_drawings(self, project_id: int):

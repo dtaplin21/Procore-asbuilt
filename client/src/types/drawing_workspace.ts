@@ -39,6 +39,8 @@ export type ProjectDrawingCandidate = {
   fileUrl?: string | null;
   contentType?: string | null;
   pageCount?: number | null;
+  /** Present when API includes it (camelCase); legacy lists may omit. */
+  uploadIntent?: "master" | "sub" | null;
 };
 
 export type ProjectDrawingsResponse = {
