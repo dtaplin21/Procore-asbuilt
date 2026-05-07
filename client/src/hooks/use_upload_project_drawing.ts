@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { DrawingResponse } from "@shared/schema";
 import {
-  invalidateProjectDrawingsQueries,
+  projectDrawingsQueryKey,
   uploadProjectDrawing,
 } from "@/lib/api/drawings";
 
@@ -49,7 +49,9 @@ export function useUploadProjectDrawing(): UseUploadProjectDrawingResult {
           file,
           uploadIntent
         );
-        await invalidateProjectDrawingsQueries(queryClient, projectId);
+        await queryClient.invalidateQueries({
+          queryKey: projectDrawingsQueryKey(projectId),
+        });
         return drawing;
       } catch (error) {
         const message =
