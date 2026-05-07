@@ -45,7 +45,7 @@ import type {
 } from "@shared/schema";
 import type { ProjectDrawingsResponse, ProjectDrawingCandidate } from "@/types/drawing_workspace";
 import { useDrawingDiffs } from "@/hooks/use-drawing-diffs";
-import { fetchProjectDrawings } from "@/lib/api/drawings";
+import { fetchProjectDrawings, projectDrawingsQueryKey } from "@/lib/api/drawings";
 
 const statusConfig: Record<ObjectStatus, { label: string; color: string }> = {
   not_started: { label: "Not Started", color: "bg-foreground/30" },
@@ -132,7 +132,10 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
   });
 
   const drawingsQuery = useQuery<ProjectDrawingsResponse>({
-    queryKey: ["project-drawings", selectedProjectId],
+    queryKey:
+      selectedProjectId != null
+        ? projectDrawingsQueryKey(selectedProjectId)
+        : ["project-drawings", "disabled"],
     queryFn: () => {
       if (selectedProjectId === null) {
         throw new Error("Missing project selection");

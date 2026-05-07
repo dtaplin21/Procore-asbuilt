@@ -1,6 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { coerceDrawingIdForApi, fetchProjectDrawings } from "@/lib/api/drawings";
-import type { ProjectDrawingCandidate } from "@/types/drawing_workspace";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  coerceDrawingIdForApi,
+  fetchProjectDrawings,
+  projectDrawingsQueryKey,
+} from "@/lib/api/drawings";
+import type {
+  ProjectDrawingsResponse,
+  ProjectDrawingCandidate,
+} from "@/types/drawing_workspace";
 
 type UseProjectDrawingsArgs = {
   projectId: number;
@@ -21,56 +29,41 @@ export function useProjectDrawings({
   masterDrawingId,
   enabled = true,
 }: UseProjectDrawingsArgs): UseProjectDrawingsResult {
-  const [drawings, setDrawings] = useState<ProjectDrawingCandidate[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data,
+    isFetching,
+    error: queryError,
+    refetch,
+  } = useQuery<ProjectDrawingsResponse>({
+    queryKey: projectDrawingsQueryKey(projectId),
+    queryFn: () => fetchProjectDrawings(projectId),
+    enabled: enabled && Number.isFinite(projectId) && projectId > 0,
+  });
 
-  const requestIdRef = useRef(0);
-
-  const load = useCallback(async () => {
-    if (!enabled) return;
-
-    const requestId = ++requestIdRef.current;
-
-    setLoading(true);
-    setError(null);
-
+  const drawings = useMemo(() => {
+    const list = data?.drawings ?? [];
+    let normalizedMaster: number;
     try {
-      const normalizedMasterDrawingId = coerceDrawingIdForApi(masterDrawingId);
-      const response = await fetchProjectDrawings(projectId);
-
-      if (requestId !== requestIdRef.current) return;
-
-      const filtered = (response.drawings ?? []).filter(
-        (drawing) => drawing.id !== normalizedMasterDrawingId
-      );
-
-      setDrawings(filtered);
-    } catch (error) {
-      if (requestId !== requestIdRef.current) return;
-
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to load project drawings."
-      );
-    } finally {
-      if (requestId === requestIdRef.current) {
-        setLoading(false);
-      }
+      normalizedMaster = coerceDrawingIdForApi(masterDrawingId);
+    } catch {
+      return list;
     }
-  }, [enabled, projectId, masterDrawingId]);
+    return list.filter((drawing) => drawing.id !== normalizedMaster);
+  }, [data, masterDrawingId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const stableDrawings = useMemo(() => drawings, [drawings]);
+  const error =
+    queryError instanceof Error
+      ? queryError.message
+      : queryError
+        ? String(queryError)
+        : null;
 
   return {
-    drawings: stableDrawings,
-    loading,
+    drawings,
+    loading: isFetching,
     error,
-    reload: load,
+    reload: async () => {
+      await refetch();
+    },
   };
 }

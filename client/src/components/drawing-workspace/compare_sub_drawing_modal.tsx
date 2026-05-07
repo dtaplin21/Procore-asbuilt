@@ -9,7 +9,11 @@ import React, {
 import SubDrawingList from "@/components/drawing-workspace/sub_drawing_list";
 import SubDrawingSearchInput from "@/components/drawing-workspace/sub_drawing_search_input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { uploadProjectDrawing } from "@/lib/api/drawings";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  invalidateProjectDrawingsQueries,
+  uploadProjectDrawing,
+} from "@/lib/api/drawings";
 import { useProjectDrawings } from "@/hooks/use_project_drawings";
 
 /** Matches `ALLOWED_CONTENT_TYPES` in `backend/services/file_storage.py` (drawings upload). */
@@ -51,6 +55,7 @@ export default function CompareSubDrawingModal({
   compareError = null,
   onConfirmCompare,
 }: CompareSubDrawingModalProps) {
+  const queryClient = useQueryClient();
   const compareErrorMessage = normalizeCompareErrorMessage(compareError);
 
   const [search, setSearch] = useState("");
@@ -172,7 +177,7 @@ export default function CompareSubDrawingModal({
     try {
       const response = await uploadProjectDrawing(projectId, file, "sub");
 
-      await reload();
+      await invalidateProjectDrawingsQueries(queryClient, projectId);
 
       onSelectSubDrawing?.(response.id);
       setActiveTab("choose");

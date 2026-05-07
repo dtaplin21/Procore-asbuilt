@@ -1,6 +1,10 @@
 import { useCallback, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { DrawingResponse } from "@shared/schema";
-import { uploadProjectDrawing } from "@/lib/api/drawings";
+import {
+  invalidateProjectDrawingsQueries,
+  uploadProjectDrawing,
+} from "@/lib/api/drawings";
 
 /** Return type for {@link useUploadProjectDrawing} — safe to import in components and tests. */
 export type UseUploadProjectDrawingResult = {
@@ -16,6 +20,7 @@ export type UseUploadProjectDrawingResult = {
 };
 
 export function useUploadProjectDrawing(): UseUploadProjectDrawingResult {
+  const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -44,6 +49,7 @@ export function useUploadProjectDrawing(): UseUploadProjectDrawingResult {
           file,
           uploadIntent
         );
+        await invalidateProjectDrawingsQueries(queryClient, projectId);
         return drawing;
       } catch (error) {
         const message =
@@ -54,7 +60,7 @@ export function useUploadProjectDrawing(): UseUploadProjectDrawingResult {
         setUploading(false);
       }
     },
-    []
+    [queryClient]
   );
 
   return {

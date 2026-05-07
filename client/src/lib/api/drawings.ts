@@ -1,3 +1,4 @@
+import type { QueryClient } from "@tanstack/react-query";
 import type { DrawingResponse } from "@shared/schema";
 import type { ProjectDrawingsResponse } from "@/types/drawing_workspace";
 
@@ -69,6 +70,16 @@ export function projectDrawingsQueryKey(
   projectId: number
 ): readonly ["project-drawings", number] {
   return ["project-drawings", projectId];
+}
+
+/** Invalidate cached GET /api/projects/{id}/drawings for all mounted list consumers. */
+export function invalidateProjectDrawingsQueries(
+  queryClient: QueryClient,
+  projectId: number
+): Promise<void> {
+  return queryClient.invalidateQueries({
+    queryKey: projectDrawingsQueryKey(projectId),
+  });
 }
 
 export async function fetchProjectDrawings(
