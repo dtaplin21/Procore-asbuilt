@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { 
@@ -56,6 +56,19 @@ const statusConfig: Record<ObjectStatus, { label: string; color: string }> = {
 
 export default function Objects({ procoreUserId }: { procoreUserId?: string | null }) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const projectIdFromUrlRaw = searchParams.get("projectId");
+  const drawingIdFromUrlRaw = searchParams.get("drawingId");
+
+  const projectIdFromUrl =
+    projectIdFromUrlRaw !== null && Number.isFinite(Number(projectIdFromUrlRaw))
+      ? Number(projectIdFromUrlRaw)
+      : null;
+
+  const drawingIdFromUrl =
+    drawingIdFromUrlRaw !== null && Number.isFinite(Number(drawingIdFromUrlRaw))
+      ? Number(drawingIdFromUrlRaw)
+      : null;
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -65,6 +78,52 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
   const [selectedAlignmentId, setSelectedAlignmentId] = useState<number | null>(null);
   const [showDiffOverlay, setShowDiffOverlay] = useState(true);
   const [diffRunning, setDiffRunning] = useState(false);
+
+  useEffect(() => {
+    if (projectIdFromUrl !== null) {
+      setSelectedProjectId(projectIdFromUrl);
+    }
+  }, [projectIdFromUrl]);
+
+  useEffect(() => {
+    if (drawingIdFromUrl !== null) {
+      setSelectedMasterDrawingId(drawingIdFromUrl);
+    }
+  }, [drawingIdFromUrl]);
+
+  function handleProjectChange(nextProjectId: number | null) {
+    setSelectedProjectId(nextProjectId);
+    setSelectedMasterDrawingId(null);
+
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+
+      if (nextProjectId === null) {
+        next.delete("projectId");
+      } else {
+        next.set("projectId", String(nextProjectId));
+      }
+
+      next.delete("drawingId");
+      return next;
+    });
+  }
+
+  function handleMasterDrawingChange(nextDrawingId: number | null) {
+    setSelectedMasterDrawingId(nextDrawingId);
+
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+
+      if (nextDrawingId === null) {
+        next.delete("drawingId");
+      } else {
+        next.set("drawingId", String(nextDrawingId));
+      }
+
+      return next;
+    });
+  }
 
   const { data: projectsData, isLoading: projectsLoading } = useQuery<ProjectListResponse>({
     queryKey: ["/api/projects"],
@@ -210,8 +269,8 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
         diffs={diffs}
         diffsLoading={diffsLoading}
         onDiffRunningChange={setDiffRunning}
-        onProjectChange={setSelectedProjectId}
-        onDrawingChange={setSelectedMasterDrawingId}
+        onProjectChange={handleProjectChange}
+        onDrawingChange={handleMasterDrawingChange}
       />
 
       {/* Procore Writeback */}
