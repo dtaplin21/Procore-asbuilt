@@ -37,10 +37,7 @@ export default function AlignmentsPanel({
   onSelectAlignment,
   onRerunComplete,
 }: AlignmentsPanelProps) {
-  const runDrawingDiffMutation = useRunDrawingDiff(
-    String(projectId),
-    String(masterDrawingId)
-  );
+  const runDrawingDiffMutation = useRunDrawingDiff(projectId, masterDrawingId);
 
   /** Which alignment row is currently re-running (only that row shows loading / disabled). */
   const [rerunningAlignmentId, setRerunningAlignmentId] = useState<number | null>(

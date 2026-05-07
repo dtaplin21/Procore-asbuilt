@@ -28,10 +28,10 @@ import type { ProcoreWritebackResponse, ProjectListResponse } from "@shared/sche
 import { AlertTriangle, Loader2, Upload } from "lucide-react";
 
 interface ProcoreWritebackPanelProps {
-  projectId: string | null;
+  projectId: number | null;
   procoreUserId: string | null;
   projectName?: string | null;
-  masterDrawingId?: string | null;
+  masterDrawingId?: number | null;
   onCommitSuccess?: () => void;
 }
 
@@ -65,19 +65,15 @@ export function ProcoreWritebackPanel({
     enabled: !!projectId && !projectName,
   });
   const projects = projectsData?.items ?? [];
-  const resolvedProjectName = projectName ?? projects.find((p) => String(p.id) === String(projectId))?.name ?? null;
+  const resolvedProjectName =
+    projectName ?? projects.find((p) => p.id === projectId)?.name ?? null;
   const [previewData, setPreviewData] = useState<ProcoreWritebackResponse | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [writebackError, setWritebackError] = useState<string | null>(null);
   const [commitConfirmOpen, setCommitConfirmOpen] = useState(false);
 
-  const masterDrawingIdNum =
-    masterDrawingId != null && masterDrawingId !== ""
-      ? Number(masterDrawingId)
-      : null;
-
   const { data: runsData, isLoading: runsLoading } = useInspectionRuns(projectId, {
-    masterDrawingId: masterDrawingIdNum,
+    masterDrawingId: masterDrawingId ?? null,
     status: "complete",
   });
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BrowserRouter } from "react-router-dom";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -214,36 +215,38 @@ function App() {
 
   return (
     <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-            <div className="flex h-screen w-full">
-              <AppSidebar 
-                procoreConnection={procoreConnection} 
-                onProcoreSync={handleProcoreSync}
-              />
-              <div className="flex flex-col flex-1 min-w-0">
-                <header className="flex items-center justify-between gap-4 px-4 h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-                  <SidebarTrigger data-testid="button-sidebar-toggle" />
-                </header>
-                <main className="flex-1 overflow-auto bg-muted/30">
-                  <Router 
-                    procoreConnection={procoreConnection}
-                    onProcoreSync={handleProcoreSync}
-                    onConnectProcore={handleConnectProcore}
-                    onDisconnectProcore={handleDisconnectProcore}
-                    procoreUserId={procoreUserId}
-                    activeCompanyId={activeCompanyId}
-                    onRefreshProcoreStatus={refreshProcoreStatus}
-                    onInvalidateCompanyScopedData={invalidateCompanyScopedData}
-                  />
-                </main>
+      <BrowserRouter>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+              <div className="flex h-screen w-full">
+                <AppSidebar 
+                  procoreConnection={procoreConnection} 
+                  onProcoreSync={handleProcoreSync}
+                />
+                <div className="flex flex-col flex-1 min-w-0">
+                  <header className="flex items-center justify-between gap-4 px-4 h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+                    <SidebarTrigger data-testid="button-sidebar-toggle" />
+                  </header>
+                  <main className="flex-1 overflow-auto bg-muted/30">
+                    <Router 
+                      procoreConnection={procoreConnection}
+                      onProcoreSync={handleProcoreSync}
+                      onConnectProcore={handleConnectProcore}
+                      onDisconnectProcore={handleDisconnectProcore}
+                      procoreUserId={procoreUserId}
+                      activeCompanyId={activeCompanyId}
+                      onRefreshProcoreStatus={refreshProcoreStatus}
+                      onInvalidateCompanyScopedData={invalidateCompanyScopedData}
+                    />
+                  </main>
+                </div>
               </div>
-            </div>
-          </SidebarProvider>
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
+            </SidebarProvider>
+            <Toaster />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </BrowserRouter>
     </ThemeProvider>
   );
 }

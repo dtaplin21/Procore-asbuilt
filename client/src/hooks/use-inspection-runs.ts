@@ -14,7 +14,7 @@ import { resolveFetchUrl } from "@/lib/api/http";
  * Query params: master_drawing_id, status (optional)
  */
 export function useInspectionRuns(
-  projectId: string | null,
+  projectId: number | null,
   filters?: { masterDrawingId?: number | null; status?: string | null }
 ) {
   const params = new URLSearchParams();
@@ -26,7 +26,7 @@ export function useInspectionRuns(
   }
   const query = params.toString();
   const url =
-    projectId && projectId !== ""
+    projectId != null
       ? `/api/projects/${projectId}/inspections/runs${query ? `?${query}` : ""}`
       : "";
 

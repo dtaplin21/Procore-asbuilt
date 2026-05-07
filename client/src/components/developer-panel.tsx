@@ -52,8 +52,8 @@ function jsonPostHeaders(): HeadersInit {
 }
 
 async function createRegion(
-  projectId: string,
-  masterDrawingId: string,
+  projectId: string | number,
+  masterDrawingId: string | number,
   body: unknown
 ) {
   const res = await fetch(
@@ -73,8 +73,8 @@ async function createRegion(
 }
 
 async function createAlignment(
-  projectId: string,
-  masterDrawingId: string,
+  projectId: string | number,
+  masterDrawingId: string | number,
   body: unknown
 ) {
   const res = await fetch(
@@ -94,8 +94,8 @@ async function createAlignment(
 }
 
 async function fetchAlignments(
-  projectId: string,
-  masterDrawingId: string
+  projectId: string | number,
+  masterDrawingId: string | number
 ): Promise<DrawingAlignmentListResponse> {
   const res = await fetch(
     resolveFetchUrl(
@@ -108,8 +108,8 @@ async function fetchAlignments(
 }
 
 interface DeveloperPanelProps {
-  projectId: string | null;
-  masterDrawingId: string | null;
+  projectId: number | null;
+  masterDrawingId: number | null;
   selectedAlignmentId: number | null;
   onAlignmentChange: (id: number | null) => void;
   projects: ProjectResponse[];
@@ -119,8 +119,8 @@ interface DeveloperPanelProps {
   onDiffRunningChange?: (running: boolean) => void;
   projectsLoading?: boolean;
   drawingsLoading?: boolean;
-  onProjectChange: (id: string | null) => void;
-  onDrawingChange: (id: string | null) => void;
+  onProjectChange: (id: number | null) => void;
+  onDrawingChange: (id: number | null) => void;
 }
 
 export function DeveloperPanel({
@@ -179,9 +179,8 @@ export function DeveloperPanel({
   const [alignmentRegionId, setAlignmentRegionId] = useState<string | null>(null);
   const [alignmentResponse, setAlignmentResponse] = useState<string | null>(null);
 
-  const subDrawings = drawings?.filter(
-    (d) => masterDrawingId && String(d.id) !== String(masterDrawingId)
-  ) ?? [];
+  const subDrawings =
+    drawings?.filter((d) => masterDrawingId != null && d.id !== masterDrawingId) ?? [];
 
   const alignmentMutation = useMutation({
     mutationFn: () => {
@@ -241,9 +240,9 @@ export function DeveloperPanel({
           <div className="grid gap-2">
             <Label>Project</Label>
             <Select
-              value={projectId ?? ""}
+              value={projectId != null ? String(projectId) : ""}
               onValueChange={(v) => {
-                onProjectChange(v || null);
+                onProjectChange(v ? parseInt(v, 10) : null);
                 onDrawingChange(null);
                 onAlignmentChange(null);
               }}
@@ -262,9 +261,9 @@ export function DeveloperPanel({
           <div className="grid gap-2">
             <Label>Master Drawing</Label>
             <Select
-              value={masterDrawingId ?? ""}
+              value={masterDrawingId != null ? String(masterDrawingId) : ""}
               onValueChange={(v) => {
-                onDrawingChange(v || null);
+                onDrawingChange(v ? parseInt(v, 10) : null);
                 onAlignmentChange(null);
               }}
               disabled={!projectId || drawingsLoading}

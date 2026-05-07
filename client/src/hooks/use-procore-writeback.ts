@@ -4,7 +4,7 @@ import type { ProcoreWritebackResponse } from "@shared/schema";
 import { resolveFetchUrl } from "@/lib/api/http";
 
 type WritebackParams = {
-  projectId: string | null;
+  projectId: number | null;
   procoreUserId: string | null;
 };
 
@@ -14,7 +14,7 @@ type WritebackBody = {
 };
 
 async function fetchWriteback(
-  projectId: string,
+  projectId: number,
   procoreUserId: string,
   body: WritebackBody
 ): Promise<ProcoreWritebackResponse> {
@@ -46,17 +46,21 @@ async function fetchWriteback(
   return res.json();
 }
 
-function invalidateAfterWriteback(queryClient: ReturnType<typeof useQueryClient>, projectId: string) {
+function invalidateAfterWriteback(
+  queryClient: ReturnType<typeof useQueryClient>,
+  projectId: number
+) {
+  const pid = String(projectId);
   queryClient.invalidateQueries({
     predicate: (query) => {
       const key = query.queryKey[0];
       return (
         typeof key === "string" &&
-        (key.includes(`/api/projects/${projectId}/inspections/runs`) ||
-          (key.includes(`/api/projects/${projectId}/drawings/`) && key.includes("/overlays")) ||
-          key.includes(`/api/projects/${projectId}/dashboard/summary`) ||
+        (key.includes(`/api/projects/${pid}/inspections/runs`) ||
+          (key.includes(`/api/projects/${pid}/drawings/`) && key.includes("/overlays")) ||
+          key.includes(`/api/projects/${pid}/dashboard/summary`) ||
           (key === "project-dashboard-summary" &&
-            String(query.queryKey[1]) === String(projectId)))
+            String(query.queryKey[1]) === pid))
       );
     },
   });
@@ -98,7 +102,7 @@ export function useProcoreWriteback({ projectId, procoreUserId }: WritebackParam
       });
     },
     onSuccess: () => {
-      if (projectId) {
+      if (projectId != null) {
         invalidateAfterWriteback(queryClient, projectId);
       }
     },

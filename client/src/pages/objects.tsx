@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Layers, 
@@ -54,12 +55,13 @@ const statusConfig: Record<ObjectStatus, { label: string; color: string }> = {
 };
 
 export default function Objects({ procoreUserId }: { procoreUserId?: string | null }) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedTool, setSelectedTool] = useState<"select" | "pan" | "zoom">("select");
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [selectedMasterDrawingId, setSelectedMasterDrawingId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [selectedMasterDrawingId, setSelectedMasterDrawingId] = useState<number | null>(null);
   const [selectedAlignmentId, setSelectedAlignmentId] = useState<number | null>(null);
   const [showDiffOverlay, setShowDiffOverlay] = useState(true);
   const [diffRunning, setDiffRunning] = useState(false);
@@ -217,7 +219,7 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
         <ProcoreWritebackPanel
           projectId={selectedProjectId}
           procoreUserId={procoreUserId ?? null}
-          projectName={projects.find((p) => String(p.id) === selectedProjectId)?.name ?? null}
+          projectName={projects.find((p) => p.id === selectedProjectId)?.name ?? null}
           masterDrawingId={selectedMasterDrawingId}
         />
       ) : (

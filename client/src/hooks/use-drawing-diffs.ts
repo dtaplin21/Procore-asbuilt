@@ -18,8 +18,8 @@ import { getQueryFn } from "@/lib/queryClient";
  * that UI via `reloadSelectedDiffs` / `onRerunComplete` on the alignments panel.
  */
 export function drawingDiffsQueryKey(
-  projectId: string,
-  masterDrawingId: string,
+  projectId: number,
+  masterDrawingId: number,
   alignmentId: number | null
 ) {
   return [
@@ -33,8 +33,8 @@ export function drawingDiffsQueryKey(
 /** Invalidate every cached GET diffs list for this project + master drawing (all alignment filters). */
 export function invalidateDrawingDiffsQueries(
   queryClient: QueryClient,
-  projectId: string,
-  masterDrawingId: string
+  projectId: number,
+  masterDrawingId: number
 ) {
   void queryClient.invalidateQueries({
     queryKey: ["drawing-diffs", projectId, masterDrawingId],
@@ -49,12 +49,12 @@ export function invalidateDrawingDiffsQueries(
  * Query param: ?alignment_id=X (optional)
  */
 export function useDrawingDiffs(
-  projectId: string | null,
-  masterDrawingId: string | null,
+  projectId: number | null,
+  masterDrawingId: number | null,
   alignmentId: number | null
 ) {
   const url =
-    projectId && masterDrawingId
+    projectId != null && masterDrawingId != null
       ? `/api/projects/${projectId}/drawings/${masterDrawingId}/diffs${alignmentId != null ? `?alignment_id=${alignmentId}` : ""}`
       : "";
 
@@ -62,11 +62,11 @@ export function useDrawingDiffs(
 
   return useQuery<DrawingDiffsListResponse>({
     queryKey:
-      projectId && masterDrawingId
+      projectId != null && masterDrawingId != null
         ? drawingDiffsQueryKey(projectId, masterDrawingId, alignmentId)
         : ["drawing-diffs", "disabled"],
     queryFn: (ctx) => queryFn({ ...ctx, queryKey: [url] }),
-    enabled: !!projectId && !!masterDrawingId && !!url,
+    enabled: projectId != null && masterDrawingId != null && !!url,
   });
 }
 
@@ -87,15 +87,15 @@ export type RunDrawingDiffMutationVariables = {
  * On success, invalidates `drawing-diffs` queries for this project + master drawing so
  * `useDrawingDiffs` refetches. Broad enough for MVP; narrows to same drawing as the POST.
  *
- * **Usage** (ids are strings to match URL segments / existing callers):
+ * **Usage**:
  * ```ts
- * const { mutateAsync } = useRunDrawingDiff(String(projectId), String(masterDrawingId));
+ * const { mutateAsync } = useRunDrawingDiff(projectId, masterDrawingId);
  * await mutateAsync({ alignmentId });
  * ```
  */
 export function useRunDrawingDiff(
-  projectId: string | null,
-  masterDrawingId: string | null
+  projectId: number | null,
+  masterDrawingId: number | null
 ): UseMutationResult<
   DrawingDiffResponse[],
   Error,
@@ -109,17 +109,17 @@ export function useRunDrawingDiff(
     RunDrawingDiffMutationVariables
   >({
     mutationFn: async ({ alignmentId }) => {
-      if (!projectId || !masterDrawingId) {
+      if (projectId == null || masterDrawingId == null) {
         throw new Error("Project and master drawing required");
       }
       return runDrawingDiff({
-        projectId: Number(projectId),
-        masterDrawingId: Number(masterDrawingId),
+        projectId,
+        masterDrawingId,
         alignmentId,
       });
     },
     onSuccess: () => {
-      if (projectId && masterDrawingId) {
+      if (projectId != null && masterDrawingId != null) {
         invalidateDrawingDiffsQueries(queryClient, projectId, masterDrawingId);
       }
     },
