@@ -11,7 +11,6 @@ import {
   Grid3X3,
   List,
   Eye,
-  EyeOff,
   AlertTriangle,
   Loader2,
 } from "lucide-react";
@@ -36,7 +35,6 @@ import {
 } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/status-badge";
-import { DrawingDiffOverlay } from "@/components/drawing-diff-overlay";
 import DrawingViewer from "@/components/drawings/DrawingViewer";
 import { ProcoreWritebackPanel } from "@/components/ProcoreWritebackPanel";
 import type {
@@ -91,7 +89,6 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
   const [selectedTool, setSelectedTool] = useState<"select" | "pan" | "zoom">("select");
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [selectedMasterDrawingId, setSelectedMasterDrawingId] = useState<number | null>(null);
-  const [showDiffOverlay, setShowDiffOverlay] = useState(true);
 
   useEffect(() => {
     if (projectIdFromUrl !== null) {
@@ -204,7 +201,7 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     queryKey: ["/api/objects"],
   });
 
-  const { data: diffsData, isLoading: diffsLoading } = useDrawingDiffs(
+  const { data: diffsData } = useDrawingDiffs(
     selectedProjectId,
     selectedMasterDrawingId,
     null
@@ -481,21 +478,6 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
                 >
                   <ZoomIn className="w-4 h-4" />
                 </Button>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={showDiffOverlay ? "secondary" : "ghost"}
-                      size="icon"
-                      onClick={() => setShowDiffOverlay(!showDiffOverlay)}
-                      data-testid="tool-toggle-diffs"
-                    >
-                      {showDiffOverlay ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{showDiffOverlay ? "Hide" : "Show"} diff overlay</p>
-                  </TooltipContent>
-                </Tooltip>
               </div>
             </div>
           </div>
@@ -528,15 +510,8 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
                 <DrawingViewer
                   drawing={masterWorkspaceQuery.data ?? null}
                   selectedDiff={null}
-                  showOverlay={showDiffOverlay}
+                  showOverlay={false}
                   overlayOpacity={1}
-                />
-                <DrawingDiffOverlay
-                  diffs={diffs}
-                  visible={showDiffOverlay}
-                  onVisibilityChange={setShowDiffOverlay}
-                  diffRunning={false}
-                  diffsLoading={diffsLoading}
                 />
                 {objects && objects.length > 0 && (
                   <div className="pointer-events-none absolute inset-0 z-[4] p-4">
