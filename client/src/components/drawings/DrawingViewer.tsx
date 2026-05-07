@@ -16,7 +16,16 @@ import type {
 
 import { apiUrl } from "@/lib/api/base_url";
 
-/** User-facing hint when <img> cannot load master (e.g. PDF /file URL before renditions exist). */
+/** True when `fileUrl` is the raw upload route (PDF/image bytes), not a rendered page PNG. */
+function legacyMasterUsesPdfEmbed(drawing: DrawingWorkspaceDrawing): boolean {
+  const file = drawing.fileUrl.toLowerCase();
+  if (file.includes("/pages/") && file.includes("/image")) return false;
+  if (file.includes("/file")) return true;
+  const source = (drawing.sourceFileUrl ?? "").toLowerCase();
+  if (source.includes("/file")) return true;
+  return drawing.name.toLowerCase().endsWith(".pdf");
+}
+
 function messageForDrawingImageLoadFailure(relativeUrl: string): string {
   const u = relativeUrl.toLowerCase();
   if (u.includes("/file") && !u.includes("/pages/")) {
@@ -184,7 +193,7 @@ export default function DrawingViewer({
 
   if (status === "failed") {
     return (
-      <div className="flex h-full min-h-[70vh] flex-col overflow-hidden rounded-xl border bg-white">
+      <div className="flex min-h-[70vh] w-full flex-1 flex-col overflow-hidden rounded-xl border bg-white">
         <div className="border-b px-5 py-4">
           <h2 className="text-lg font-semibold text-slate-900">{drawing.name}</h2>
           <p className="text-sm text-slate-500">Drawing #{drawing.id}</p>
@@ -203,7 +212,7 @@ export default function DrawingViewer({
 
   if (status === "pending" || status === "processing") {
     return (
-      <div className="flex h-full min-h-[70vh] flex-col overflow-hidden rounded-xl border bg-white">
+      <div className="flex min-h-[70vh] w-full flex-1 flex-col overflow-hidden rounded-xl border bg-white">
         <div className="border-b px-5 py-4">
           <h2 className="text-lg font-semibold text-slate-900">{drawing.name}</h2>
           <p className="text-sm text-slate-500">
@@ -232,9 +241,12 @@ export default function DrawingViewer({
     );
   }
 
+  const legacyPdfEmbed =
+    !comparisonWorkspace && legacyMasterUsesPdfEmbed(drawing);
+
   return (
-    <div className="flex h-full min-h-[70vh] flex-col overflow-hidden rounded-xl border bg-white">
-      <div className="border-b px-5 py-4">
+    <div className="flex min-h-[70vh] w-full flex-1 flex-col overflow-hidden rounded-xl border bg-white">
+      <div className="shrink-0 border-b px-5 py-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">{drawing.name}</h2>
@@ -251,7 +263,8 @@ export default function DrawingViewer({
         </div>
       </div>
 
-      <PanZoomContainer>
+      <div className="flex w-full flex-1 flex-col min-h-[min(28rem,70vh)]">
+        <PanZoomContainer>
         <div
           ref={layoutRef}
           className="relative inline-block w-full max-w-[1200px]"
@@ -263,7 +276,10 @@ export default function DrawingViewer({
             </div>
           ) : null}
 
-          {!isLoadingComparisonWorkspace && !imageLoaded && !imageError ? (
+          {!isLoadingComparisonWorkspace &&
+          !imageLoaded &&
+          !imageError &&
+          !legacyPdfEmbed ? (
             <div className="absolute inset-0 z-10 flex min-h-[240px] min-w-[320px] items-center justify-center rounded bg-card/80 text-sm text-muted-foreground">
               Loading drawing image...
             </div>
@@ -348,6 +364,13 @@ export default function DrawingViewer({
                 ) : null}
                 </div>
               </>
+            ) : legacyPdfEmbed ? (
+              <iframe
+                title={drawing.name}
+                src={apiUrl(drawing.fileUrl)}
+                className="relative z-0 block min-h-[min(75vh,36rem)] h-[min(85vh,56.25rem)] w-full max-w-[1200px] rounded-lg border border-border bg-card"
+                data-testid="drawing-viewer-pdf"
+              />
             ) : (
               <>
                 <img
@@ -379,6 +402,7 @@ export default function DrawingViewer({
           ) : null}
         </div>
       </PanZoomContainer>
+      </div>
     </div>
   );
 }

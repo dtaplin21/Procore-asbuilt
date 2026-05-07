@@ -86,9 +86,9 @@ export function DrawingDiffOverlay({
 
   if (isLoading) {
     return (
-      <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-        <div className="flex items-center gap-2 rounded-lg bg-background/90 px-4 py-3 text-sm text-muted-foreground shadow-md">
-          <Loader2 className="h-5 w-5 animate-spin shrink-0" />
+      <div className="pointer-events-none absolute right-3 top-3 z-10">
+        <div className="pointer-events-auto flex items-center gap-2 rounded-lg border bg-background/95 px-3 py-2 text-sm text-muted-foreground shadow-md">
+          <Loader2 className="h-4 w-4 animate-spin shrink-0" />
           <span>{diffRunning ? "Running diff…" : "Loading diffs…"}</span>
         </div>
       </div>
@@ -97,14 +97,14 @@ export function DrawingDiffOverlay({
 
   if (regions.length === 0) {
     return (
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3 rounded-lg bg-background/90 px-4 py-4 text-center text-sm text-muted-foreground shadow-md max-w-xs">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center p-3 pt-12">
+        <div className="pointer-events-auto flex max-w-md flex-col items-center gap-2 rounded-lg border bg-background/95 px-4 py-3 text-center text-sm text-muted-foreground shadow-md">
           {diffs.length === 0 ? (
             <>
-              <p className="font-medium">No diffs yet</p>
+              <p className="font-medium text-foreground">No diffs yet</p>
               <p>
-                Select a project and master drawing above, then pick an alignment with status{" "}
-                <strong>Complete</strong> and click <strong>Run Diff</strong> in the Developer Panel.
+                Generate diffs from the <strong>Drawing workspace</strong> (align sheets and run a
+                comparison). Diff regions will appear here afterward; the drawing stays visible above.
               </p>
             </>
           ) : (

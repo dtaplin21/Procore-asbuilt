@@ -278,7 +278,7 @@ export default function PanZoomContainer({
   const percent = useMemo(() => Math.round(transform.scale * 100), [transform.scale]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex min-h-0 w-full flex-1 flex-col">
       <div className="flex items-center justify-between border-b border-border px-4 py-2">
         <div className="text-xs text-muted-foreground">
           Zoom: {percent}% {isPinching ? "• Pinching" : ""}

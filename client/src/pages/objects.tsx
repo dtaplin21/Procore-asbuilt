@@ -12,7 +12,8 @@ import {
   List,
   Eye,
   EyeOff,
-  AlertTriangle
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,8 +36,8 @@ import {
 } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/status-badge";
-import { DeveloperPanel } from "@/components/developer-panel";
 import { DrawingDiffOverlay } from "@/components/drawing-diff-overlay";
+import DrawingViewer from "@/components/drawings/DrawingViewer";
 import { ProcoreWritebackPanel } from "@/components/ProcoreWritebackPanel";
 import type {
   DrawingObject,
@@ -46,6 +47,19 @@ import type {
 import type { ProjectDrawingsResponse, ProjectDrawingCandidate } from "@/types/drawing_workspace";
 import { useDrawingDiffs } from "@/hooks/use-drawing-diffs";
 import { fetchProjectDrawings, projectDrawingsQueryKey } from "@/lib/api/drawings";
+import { fetchMasterDrawing } from "@/lib/api/drawing_workspace";
+
+/**
+ * Part 6 (Option A): `/objects?projectId=…&drawingId=…` drives project + master selection.
+ * When `drawingId` is missing or invalid, we default to the newest master candidate.
+ * GET /drawings list items omit `created_at`; highest numeric `id` approximates latest upload.
+ */
+function pickNewestMasterId(
+  masters: ProjectDrawingCandidate[]
+): number | null {
+  if (masters.length === 0) return null;
+  return masters.reduce((max, d) => (d.id > max ? d.id : max), masters[0].id);
+}
 
 const statusConfig: Record<ObjectStatus, { label: string; color: string }> = {
   not_started: { label: "Not Started", color: "bg-foreground/30" },
@@ -77,21 +91,13 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
   const [selectedTool, setSelectedTool] = useState<"select" | "pan" | "zoom">("select");
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [selectedMasterDrawingId, setSelectedMasterDrawingId] = useState<number | null>(null);
-  const [selectedAlignmentId, setSelectedAlignmentId] = useState<number | null>(null);
   const [showDiffOverlay, setShowDiffOverlay] = useState(true);
-  const [diffRunning, setDiffRunning] = useState(false);
 
   useEffect(() => {
     if (projectIdFromUrl !== null) {
       setSelectedProjectId(projectIdFromUrl);
     }
   }, [projectIdFromUrl]);
-
-  useEffect(() => {
-    if (drawingIdFromUrl !== null) {
-      setSelectedMasterDrawingId(drawingIdFromUrl);
-    }
-  }, [drawingIdFromUrl]);
 
   function handleProjectChange(nextProjectId: number | null) {
     setSelectedProjectId(nextProjectId);
@@ -152,15 +158,47 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
   const projects = projectsData?.items ?? [];
   const drawings = drawingsData?.drawings ?? [];
 
+  /** One project + no URL — pick it so the viewer and master auto-default can run. */
+  useEffect(() => {
+    if (projectIdFromUrl !== null) return;
+    if (projectsLoading) return;
+    if (projects.length !== 1) return;
+    if (selectedProjectId !== null) return;
+    const id = projects[0].id;
+    setSelectedProjectId(id);
+    setSelectedMasterDrawingId(null);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("projectId", String(id));
+      next.delete("drawingId");
+      return next;
+    });
+  }, [
+    projectIdFromUrl,
+    projectsLoading,
+    projects,
+    selectedProjectId,
+    setSearchParams,
+  ]);
+
   const masterDrawingOptions = drawings.filter(
     (drawing) => drawing.uploadIntent === "master" || drawing.uploadIntent == null
   );
 
-  const availableSubDrawings =
-    drawingsQuery.data?.drawings?.filter((drawing) => {
-      const row = drawing as ProjectDrawingCandidate & { upload_intent?: "master" | "sub" | null };
-      return row.upload_intent === "sub" || drawing.uploadIntent === "sub";
-    }) ?? [];
+  const masterWorkspaceQuery = useQuery({
+    queryKey: [
+      "objects-workspace-drawing",
+      selectedProjectId,
+      selectedMasterDrawingId,
+    ] as const,
+    queryFn: () =>
+      fetchMasterDrawing(selectedProjectId!, selectedMasterDrawingId!),
+    enabled:
+      selectedProjectId != null &&
+      selectedMasterDrawingId != null &&
+      selectedProjectId > 0 &&
+      selectedMasterDrawingId > 0,
+  });
 
   const { data: objects, isLoading } = useQuery<DrawingObject[]>({
     queryKey: ["/api/objects"],
@@ -169,8 +207,78 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
   const { data: diffsData, isLoading: diffsLoading } = useDrawingDiffs(
     selectedProjectId,
     selectedMasterDrawingId,
-    selectedAlignmentId
+    null
   );
+
+  useEffect(() => {
+    if (selectedProjectId === null || !drawingsQuery.isSuccess) {
+      return;
+    }
+
+    const rowList = drawingsQuery.data?.drawings ?? [];
+    const masters = rowList.filter(
+      (d) => d.uploadIntent === "master" || d.uploadIntent == null
+    );
+    if (masters.length === 0) {
+      return;
+    }
+
+    const newestId = pickNewestMasterId(masters);
+    if (newestId === null) return;
+
+    if (drawingIdFromUrl !== null) {
+      const exists = masters.some((m) => m.id === drawingIdFromUrl);
+      if (exists) {
+        if (selectedMasterDrawingId !== drawingIdFromUrl) {
+          setSelectedMasterDrawingId(drawingIdFromUrl);
+        }
+        return;
+      }
+
+      setSelectedMasterDrawingId(newestId);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("drawingId", String(newestId));
+        return next;
+      });
+      return;
+    }
+
+    const stateMasterInProject =
+      selectedMasterDrawingId !== null &&
+      masters.some((m) => m.id === selectedMasterDrawingId);
+    if (selectedMasterDrawingId !== null && !stateMasterInProject) {
+      setSelectedMasterDrawingId(newestId);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (selectedProjectId !== null) {
+          next.set("projectId", String(selectedProjectId));
+        }
+        next.set("drawingId", String(newestId));
+        return next;
+      });
+      return;
+    }
+
+    if (selectedMasterDrawingId === null) {
+      setSelectedMasterDrawingId(newestId);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (selectedProjectId !== null) {
+          next.set("projectId", String(selectedProjectId));
+        }
+        next.set("drawingId", String(newestId));
+        return next;
+      });
+    }
+  }, [
+    selectedProjectId,
+    drawingsQuery.isSuccess,
+    drawingsQuery.data,
+    drawingIdFromUrl,
+    selectedMasterDrawingId,
+    setSearchParams,
+  ]);
 
   const diffs = diffsData?.items ?? [];
 
@@ -281,24 +389,6 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
         </div>
       )}
 
-      {/* Developer Panel (Phase 2 API) */}
-      <DeveloperPanel
-        projectId={selectedProjectId}
-        masterDrawingId={selectedMasterDrawingId}
-        selectedAlignmentId={selectedAlignmentId}
-        onAlignmentChange={setSelectedAlignmentId}
-        projects={projects}
-        drawings={drawings}
-        subDrawingCandidates={availableSubDrawings}
-        projectsLoading={projectsLoading}
-        drawingsLoading={drawingsLoading}
-        diffs={diffs}
-        diffsLoading={diffsLoading}
-        onDiffRunningChange={setDiffRunning}
-        onProjectChange={handleProjectChange}
-        onDrawingChange={handleMasterDrawingChange}
-      />
-
       {/* Procore Writeback */}
       {selectedProjectId ? (
         <ProcoreWritebackPanel
@@ -310,7 +400,9 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
       ) : (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
-            <p className="text-sm">Select a project above to write inspection results back to Procore.</p>
+            <p className="text-sm">
+              Select a project in the Drawing Viewer to write inspection results back to Procore.
+            </p>
           </CardContent>
         </Card>
       )}
@@ -322,12 +414,33 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
             <CardTitle className="shrink-0">Drawing Viewer</CardTitle>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:flex-1 sm:justify-end">
               <div className="grid gap-2 w-full sm:max-w-xs">
+                <Label htmlFor="objects-project">Project</Label>
+                <Select
+                  value={selectedProjectId != null ? String(selectedProjectId) : ""}
+                  onValueChange={(v) => {
+                    const id = v ? parseInt(v, 10) : null;
+                    handleProjectChange(id);
+                  }}
+                  disabled={projectsLoading}
+                >
+                  <SelectTrigger id="objects-project" data-testid="select-objects-project">
+                    <SelectValue placeholder="Select project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((p) => (
+                      <SelectItem key={String(p.id)} value={String(p.id)}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2 w-full sm:max-w-xs">
                 <Label htmlFor="objects-master-drawing">Master drawing</Label>
                 <Select
                   value={selectedMasterDrawingId != null ? String(selectedMasterDrawingId) : ""}
                   onValueChange={(v) => {
                     handleMasterDrawingChange(v ? parseInt(v, 10) : null);
-                    setSelectedAlignmentId(null);
                   }}
                   disabled={!selectedProjectId || drawingsLoading}
                 >
@@ -387,46 +500,72 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="relative aspect-video bg-muted/50 rounded-lg border-2 border-dashed border-muted-foreground/20 flex items-center justify-center overflow-hidden">
-            <div className="text-center text-muted-foreground">
-              <Layers className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p className="font-medium">Drawing Canvas</p>
-              <p className="text-sm">Upload a construction drawing to view AI-recognized objects</p>
-            </div>
-
-            <DrawingDiffOverlay
-              diffs={diffs}
-              visible={showDiffOverlay}
-              onVisibilityChange={setShowDiffOverlay}
-              diffRunning={diffRunning}
-              diffsLoading={diffsLoading}
-            />
-
-            {objects && objects.length > 0 && (
-              <div className="absolute inset-0 p-4">
-                {objects.slice(0, 5).map((obj, i) => (
-                  <Tooltip key={obj.id}>
-                    <TooltipTrigger asChild>
-                      <div
-                        className={`absolute w-8 h-8 rounded-full border-2 cursor-pointer transition-transform hover:scale-110 ${
-                          statusConfig[obj.status]?.color || 'bg-foreground/30'
-                        } bg-opacity-50 flex items-center justify-center`}
-                        style={{
-                          left: `${15 + (i * 18)}%`,
-                          top: `${20 + (i * 12)}%`,
-                        }}
-                      >
-                        <span className="text-xs font-bold text-white">{i + 1}</span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="font-mono text-xs">{obj.objectId}</p>
-                      <p className="text-xs capitalize">{obj.objectType}</p>
-                      <p className="text-xs text-muted-foreground">{statusConfig[obj.status]?.label}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
+        <CardContent className="pt-0">
+          <div className="relative min-h-[480px] overflow-hidden rounded-lg border bg-muted/30">
+            {!selectedProjectId || !selectedMasterDrawingId ? (
+              <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 border-2 border-dashed border-muted-foreground/25 p-8 text-center text-muted-foreground">
+                <Layers className="h-12 w-12 opacity-50" />
+                <p className="font-medium">Drawing canvas</p>
+                <p className="text-sm">Select a project and master drawing to load the sheet.</p>
+              </div>
+            ) : masterWorkspaceQuery.isPending ? (
+              <div className="flex min-h-[320px] items-center justify-center gap-2 text-muted-foreground">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span className="text-sm">Loading drawing…</span>
+              </div>
+            ) : masterWorkspaceQuery.isError ? (
+              <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 p-6 text-center">
+                <AlertTriangle className="h-8 w-8 text-destructive" />
+                <p className="text-sm font-medium">Could not load drawing</p>
+                <p className="text-sm text-muted-foreground">
+                  {masterWorkspaceQuery.error instanceof Error
+                    ? masterWorkspaceQuery.error.message
+                    : "Check the network tab or try another drawing."}
+                </p>
+              </div>
+            ) : (
+              <div className="relative">
+                <DrawingViewer
+                  drawing={masterWorkspaceQuery.data ?? null}
+                  selectedDiff={null}
+                  showOverlay={showDiffOverlay}
+                  overlayOpacity={1}
+                />
+                <DrawingDiffOverlay
+                  diffs={diffs}
+                  visible={showDiffOverlay}
+                  onVisibilityChange={setShowDiffOverlay}
+                  diffRunning={false}
+                  diffsLoading={diffsLoading}
+                />
+                {objects && objects.length > 0 && (
+                  <div className="pointer-events-none absolute inset-0 z-[4] p-4">
+                    {objects.slice(0, 5).map((obj, i) => (
+                      <Tooltip key={obj.id}>
+                        <TooltipTrigger asChild>
+                          <div
+                            className={`pointer-events-auto absolute flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 transition-transform hover:scale-110 ${
+                              statusConfig[obj.status]?.color || "bg-foreground/30"
+                            } bg-opacity-50`}
+                            style={{
+                              left: `${15 + i * 18}%`,
+                              top: `${20 + i * 12}%`,
+                            }}
+                          >
+                            <span className="text-xs font-bold text-white">{i + 1}</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="font-mono text-xs">{obj.objectId}</p>
+                          <p className="text-xs capitalize">{obj.objectType}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {statusConfig[obj.status]?.label}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
