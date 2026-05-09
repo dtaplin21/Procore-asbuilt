@@ -336,7 +336,9 @@ class Drawing(Base):
     file_url = Column(String, nullable=True)  # API endpoint for download
     content_type = Column(String, nullable=True)  # 'application/pdf', 'image/png', etc.
     page_count = Column(Integer, nullable=True)  # for PDFs
-    upload_intent = Column(String(16), nullable=True)  # 'master' | 'sub' (upload UX / AI context)
+    # 'master' | 'sub' | NULL (legacy). Auto-compare must gate on ==
+    # getattr(..., "upload_intent", None) == "sub", not truthiness.
+    upload_intent = Column(String(16), nullable=True)
 
     # Rendition processing metadata
     original_filename = Column(String, nullable=True)

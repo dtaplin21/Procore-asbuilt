@@ -330,7 +330,13 @@ class DrawingResponse(BaseModel):
     file_url: Optional[str] = None
     content_type: Optional[str] = None
     page_count: Optional[int] = None
-    upload_intent: Literal["master", "sub"] | None = None
+    upload_intent: Literal["master", "sub"] | None = Field(
+        default=None,
+        description=(
+            "Set from multipart when the client sends master/sub. NULL on legacy rows. "
+            "Triggers such as auto-compare must use equality (== 'sub'), not truthy checks."
+        ),
+    )
     created_at: datetime
     updated_at: Optional[datetime] = None
 

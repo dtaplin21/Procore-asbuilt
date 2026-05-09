@@ -302,6 +302,10 @@ class StorageService:
           (auto-first-master onboarding).
 
         Then ``commit`` (single transaction). An explicit ``sub`` upload never changes project master.
+
+        Downstream jobs (e.g. auto-compare) should only run when
+        ``getattr(drawing, "upload_intent", None) == "sub"`` — never a truthy check,
+        because this field is nullable for legacy rows.
         """
         replacing_canonical_master = upload_intent == "master" and not self._project_has_no_canonical_master(
             project_id

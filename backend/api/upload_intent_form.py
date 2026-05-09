@@ -11,6 +11,18 @@ UPLOAD_INTENT_OPENAPI_DESCRIPTION = (
 )
 
 
+def drawing_has_sub_upload_intent(drawing: object) -> bool:
+    """
+    Return True only when the drawing was uploaded with explicit ``sub`` intent.
+
+    ``upload_intent`` is nullable on legacy rows—use this (or ``== "sub"``) for
+    auto-compare and similar hooks. Do **not** use truthy checks (e.g.
+    ``if drawing.upload_intent:``), which would mis-handle ``None`` and are
+    wrong for ``master``.
+    """
+    return getattr(drawing, "upload_intent", None) == "sub"
+
+
 def coalesce_upload_intent_form(
     upload_intent: str | None,
     uploadIntent: str | None,
