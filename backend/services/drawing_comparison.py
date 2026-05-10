@@ -656,12 +656,19 @@ class DrawingComparisonService:
             sub_drawing_id=sub_drawing_id,
         )
 
-        alignment = self.storage.get_alignment_by_drawing_pair(
-            master_drawing_id=master_drawing_id,
-            sub_drawing_id=sub_drawing_id,
+        # One row per (project, master, sub); reuse the latest alignment instead of inserting duplicates.
+        alignment = (
+            self.db.query(DrawingAlignment)
+            .filter(
+                DrawingAlignment.project_id == project_id,
+                DrawingAlignment.master_drawing_id == master_drawing_id,
+                DrawingAlignment.sub_drawing_id == sub_drawing_id,
+            )
+            .order_by(DrawingAlignment.updated_at.desc(), DrawingAlignment.id.desc())
+            .first()
         )
 
-        if not alignment:
+        if alignment is None:
             has_files = bool(
                 getattr(master_drawing, "storage_key", None)
                 and getattr(sub_drawing, "storage_key", None)
@@ -677,12 +684,15 @@ class DrawingComparisonService:
         if force_recompute:
             transform = None
         else:
-            existing = self.storage.get_reusable_alignment(
-                master_drawing_id=master_drawing_id,
-                sub_drawing_id=sub_drawing_id,
-            )
-            if existing and getattr(existing, "transform", None):
-                transform = existing.transform
+            tf = getattr(alignment, "transform", None)
+            st = getattr(alignment, "status", "")
+            if (
+                tf
+                and isinstance(tf, dict)
+                and tf.get("matrix")
+                and st == "complete"
+            ):
+                transform = tf
             else:
                 transform = None
 
