@@ -173,6 +173,7 @@ async def upload_project_drawing(
 
     # Enqueue async render job for PDF/image rendition generation
     enqueue_drawing_render_job(db, project_id, cast(int, drawing.id))
+    # Compare jobs: see services.drawing_rendering (notify after renditions ready).
 
     return DrawingResponse.model_validate(drawing)
 

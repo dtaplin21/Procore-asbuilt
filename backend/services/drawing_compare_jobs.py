@@ -1,9 +1,11 @@
 """
-Enqueue drawing compare jobs (master vs sub) after uploads.
+Enqueue drawing compare jobs (master vs sub) once page-1 renditions are ready.
 
-Requires page-1 renditions with ``render_status == "ready"`` for both master and
-sub. If either is still rendering, returns ``None`` — call again from the
-drawing render-job completion path (or similar) so compare runs once assets exist.
+``enqueue_drawing_compare_job`` requires both master and sub to have page-1
+renditions. :func:`notify_drawing_render_complete` runs from the render pipeline
+after ``processing_status -> ready`` so compare is triggered when rasters exist;
+when the canonical **master** finishes, it fans out to all
+``upload_intent == "sub"`` rows.
 
 ``input_data`` uses JSON-serializable values only (ints and bools; no ORM objects).
 """
@@ -123,3 +125,42 @@ def enqueue_drawing_compare_job(
         previous_status=previous_status,
     )
     return job
+
+
+def notify_drawing_render_complete(db: Session, drawing_id: int) -> None:
+    """
+    After rasterization succeeds, try to queue compare jobs.
+
+    - If this drawing is an explicit **sub** (``upload_intent == "sub"``), try
+      enqueue for that sub (no job until master page-1 is also ready).
+    - If this drawing is the project's **canonical master** (see
+      :func:`~services.storage.get_project_master_drawing`), try enqueue for
+      each row with ``upload_intent == "sub"`` (covers sub rendered before master).
+    """
+    drawing = db.query(Drawing).filter(Drawing.id == drawing_id).first()
+    if drawing is None:
+        return
+    pid = cast(int, drawing.project_id)
+
+    if drawing_has_sub_upload_intent(drawing):
+        enqueue_drawing_compare_job(
+            db, project_id=pid, sub_drawing_id=drawing_id
+        )
+        return
+
+    master = get_project_master_drawing(db, pid)
+    if master is None or cast(int, master.id) != drawing_id:
+        return
+
+    sub_rows = (
+        db.query(Drawing)
+        .filter(
+            Drawing.project_id == pid,
+            Drawing.upload_intent == "sub",
+        )
+        .all()
+    )
+    for sub in sub_rows:
+        enqueue_drawing_compare_job(
+            db, project_id=pid, sub_drawing_id=cast(int, sub.id)
+        )

@@ -133,6 +133,8 @@ async def upload_drawing(
 
     # Enqueue async render job for PDF/image rendition generation
     enqueue_drawing_render_job(db, project_id, cast(int, drawing.id))
+    # drawing_compare jobs are enqueued from notify_drawing_render_complete() in the
+    # render pipeline once page-1 renditions exist (sub and/or master completion).
 
     finish_idempotent_operation(
         db,

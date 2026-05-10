@@ -20,6 +20,7 @@ from models.models import JobQueue
 from observability.workflow_logging import log_job_status_transition
 from services.drawing_render_jobs import (
     DRAWING_RENDER_JOB_TYPE,
+    chain_compare_after_drawing_render,
     process_drawing_render_job,
 )
 
@@ -100,6 +101,14 @@ async def process_one_job() -> bool:
 
         try:
             await handle_job(job)
+            # Compare queue: after render succeeds, chain from worker (fresh DB session).
+            if cast(str, job.job_type) == DRAWING_RENDER_JOB_TYPE:
+                input_data = cast(dict[str, Any] | None, job.input_data) or {}
+                raw_drawing_id = input_data.get("drawing_id")
+                if raw_drawing_id is not None:
+                    await asyncio.to_thread(
+                        chain_compare_after_drawing_render, int(raw_drawing_id)
+                    )
             previous_status = cast(str | None, job.status)
             _mark_job_completed(db, job_id)
             log_job_status_transition(
