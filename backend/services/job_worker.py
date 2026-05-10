@@ -18,6 +18,8 @@ from sqlalchemy.orm import Session
 from database import SessionLocal
 from models.models import JobQueue
 from observability.workflow_logging import log_job_status_transition
+from services.drawing_compare_jobs import DRAWING_COMPARE_JOB_TYPE
+from services.drawing_comparison import compare_sub_drawing_to_master
 from services.drawing_render_jobs import (
     DRAWING_RENDER_JOB_TYPE,
     chain_compare_after_drawing_render,
@@ -25,6 +27,24 @@ from services.drawing_render_jobs import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _run_drawing_compare_job_payload(payload: dict[str, Any]) -> None:
+    """Sync compare run in a dedicated DB session (CPU/IO may block)."""
+    db = SessionLocal()
+    try:
+        project_id = int(payload["project_id"])
+        master_drawing_id = int(payload["master_drawing_id"])
+        sub_drawing_id = int(payload["sub_drawing_id"])
+        compare_sub_drawing_to_master(
+            db,
+            project_id=project_id,
+            master_drawing_id=master_drawing_id,
+            sub_drawing_id=sub_drawing_id,
+            force_recompute=False,
+        )
+    finally:
+        db.close()
 
 
 async def handle_job(job: JobQueue) -> None:
@@ -37,6 +57,21 @@ async def handle_job(job: JobQueue) -> None:
         if drawing_id is None:
             raise ValueError("drawing_render job missing input_data.drawing_id")
         await process_drawing_render_job(int(drawing_id))
+        return
+
+    if job_type == DRAWING_COMPARE_JOB_TYPE:
+        payload = cast(dict[str, Any] | None, job.input_data) or {}
+        missing = [
+            k
+            for k in ("project_id", "master_drawing_id", "sub_drawing_id")
+            if k not in payload
+        ]
+        if missing:
+            raise ValueError(
+                "drawing_compare job missing input_data keys: "
+                + ", ".join(missing)
+            )
+        await asyncio.to_thread(_run_drawing_compare_job_payload, payload)
         return
 
     raise ValueError(f"Unknown job_type: {job_type}")
