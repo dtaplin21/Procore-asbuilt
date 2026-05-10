@@ -128,6 +128,37 @@ class StorageService:
     def get_project(self, project_id: int) -> Optional[Project]:
         return self.db.query(Project).filter(Project.id == project_id).first()
 
+    def get_project_master_drawing(self, project_id: int) -> Optional[Drawing]:
+        """
+        Resolve the single canonical master sheet for ``project_id``.
+
+        **Primary:** ``projects.master_drawing_id`` when set, scoped with
+        :meth:`get_drawing` so a stale FK returns ``None``.
+
+        **Fallback** (legacy or missing FK): the row with
+        ``upload_intent == 'master'`` (never truthy checks—only the literal ``"master"``),
+        newest by ``updated_at`` then ``id`` so multiple intent rows are not ambiguous.
+
+        Use this for auto-compare against the project master when a sub upload completes.
+        """
+        project = self.get_project(project_id)
+        if project is None:
+            return None
+
+        mid = getattr(project, "master_drawing_id", None)
+        if mid is not None:
+            return self.get_drawing(project_id, int(mid))
+
+        return (
+            self.db.query(Drawing)
+            .filter(
+                Drawing.project_id == project_id,
+                Drawing.upload_intent == "master",
+            )
+            .order_by(Drawing.updated_at.desc(), Drawing.id.desc())
+            .first()
+        )
+
     def get_project_dashboard_summary(
         self,
         project_id: int,
@@ -1871,3 +1902,8 @@ class StorageService:
             "ai_insights_count": 0,
             "critical_alerts": 0,
         }
+
+
+def get_project_master_drawing(db: Session, project_id: int) -> Optional[Drawing]:
+    """Resolve the project master; see :meth:`StorageService.get_project_master_drawing`."""
+    return StorageService(db).get_project_master_drawing(project_id)

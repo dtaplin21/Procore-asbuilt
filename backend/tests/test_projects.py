@@ -1,6 +1,8 @@
 import io
 from typing import cast
 
+from datetime import datetime, timezone
+
 import fitz
 from fastapi.testclient import TestClient
 
@@ -13,7 +15,7 @@ namespace rather than relying on the current working directory.
 
 from api.upload_intent_form import drawing_has_sub_upload_intent
 from models.models import Drawing, Project
-from services.storage import StorageService
+from services.storage import StorageService, get_project_master_drawing
 
 
 def _minimal_pdf_bytes() -> bytes:
@@ -112,3 +114,63 @@ def test_projects_router_upload_persists_upload_intent_sub(
     assert response.status_code == 200, response.text
     body = response.json()
     assert body.get("upload_intent") == "sub"
+
+
+def test_get_project_master_drawing_prefers_project_master_drawing_id(
+    db_session, project: Project
+) -> None:
+    """Canonical master is ``projects.master_drawing_id`` when set."""
+    storage = StorageService(db_session)
+    pid = cast(int, project.id)
+    master = storage.create_drawing(
+        pid,
+        source="upload",
+        name="master.pdf",
+        storage_key=f"drawings/test/{pid}/m1.pdf",
+        content_type="application/pdf",
+        upload_intent="master",
+    )
+    db_session.refresh(project)
+    assert project.master_drawing_id == master.id
+
+    got = storage.get_project_master_drawing(pid)
+    assert got is not None and cast(int, got.id) == cast(int, master.id)
+
+    got_fn = get_project_master_drawing(db_session, pid)
+    assert got_fn is not None and cast(int, got_fn.id) == cast(int, master.id)
+
+
+def test_get_project_master_drawing_fallback_newest_upload_intent_master(
+    db_session, project: Project
+) -> None:
+    """When FK is unset, use ``upload_intent == 'master'`` (newest ``updated_at``)."""
+    pid = cast(int, project.id)
+    older = Drawing(
+        project_id=pid,
+        source="upload",
+        name="old-master.pdf",
+        storage_key=f"drawings/test/{pid}/old.pdf",
+        content_type="application/pdf",
+        upload_intent="master",
+        processing_status="pending",
+        updated_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
+    )
+    newer = Drawing(
+        project_id=pid,
+        source="upload",
+        name="new-master.pdf",
+        storage_key=f"drawings/test/{pid}/new.pdf",
+        content_type="application/pdf",
+        upload_intent="master",
+        processing_status="pending",
+        updated_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
+    )
+    db_session.add_all([older, newer])
+    db_session.commit()
+    db_session.refresh(project)
+    assert project.master_drawing_id is None
+
+    storage = StorageService(db_session)
+    got = storage.get_project_master_drawing(pid)
+    assert got is not None
+    assert cast(int, got.id) == cast(int, newer.id)

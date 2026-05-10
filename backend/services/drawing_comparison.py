@@ -38,6 +38,9 @@ from ai.pipelines.drawing_diff import run_drawing_diff
 
 logger = logging.getLogger(__name__)
 
+# Canonical project master: ``StorageService.get_project_master_drawing``
+# (``projects.master_drawing_id``, else newest row with ``upload_intent == "master"``).
+
 
 def _drawing_file_api_path(project_id: int, drawing_id: int) -> str:
     """Relative URL for GET /api/projects/{project}/drawings/{id}/file (same origin or dev proxy)."""
