@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
 
 if TYPE_CHECKING:
     import numpy as np
+    from numpy import ndarray
 
 from errors import DrawingDiffPipelineError
 from models.models import Drawing, DrawingAlignment, DrawingDiff
@@ -43,6 +44,36 @@ _DIFF_FULL_PAGE_AREA_FRAC = 0.88
 _DIFF_FULL_PAGE_MIN_SIDE_FRAC = 0.92
 
 
+def _bbox_dict_normalized_01(
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    *,
+    raster_w: int,
+    raster_h: int,
+) -> Dict[str, float]:
+    """
+    Persist diff geometry as ``bbox`` only (``x``, ``y``, ``width``, ``height``),
+    normalized 0–1 vs raster width/height — same contract as
+    ``resolveOverlayRegion`` → ``normalizeRect`` on the client.
+
+    Does **not** emit ``points``, ``shapeType``, or ``rect`` (polygon path must
+    stay unused for auto-detected regions).
+    """
+    if raster_w <= 0 or raster_h <= 0:
+        return {"x": 0.0, "y": 0.0, "width": 0.0, "height": 0.0}
+    xf = float(x) / float(raster_w)
+    yf = float(y) / float(raster_h)
+    wf = float(w) / float(raster_w)
+    hf = float(h) / float(raster_h)
+    xf = max(0.0, min(1.0, xf))
+    yf = max(0.0, min(1.0, yf))
+    wf = max(0.0, min(1.0 - xf, wf))
+    hf = max(0.0, min(1.0 - yf, hf))
+    return {"x": xf, "y": yf, "width": wf, "height": hf}
+
+
 def _coerce_transform_dict(raw: Any) -> Optional[Dict[str, Any]]:
     if raw is None:
         return None
@@ -59,7 +90,7 @@ def _coerce_transform_dict(raw: Any) -> Optional[Dict[str, Any]]:
     return raw
 
 
-def _parse_transform_to_homography(transform: Any) -> "np.ndarray | None":
+def _parse_transform_to_homography(transform: Any) -> Optional[ndarray]:
     """
     Parse persisted ``alignment.transform`` into a 3×3 row-major ``H`` (float64),
     mapping sub raster pixels → master raster pixels.
@@ -314,8 +345,9 @@ def _generate_and_score_diff(
     Returns list of { summary, severity, diff_regions }.
 
     Each diff region matches :class:`models.schemas.DrawingDiffRegion`:
-    ``page``, normalized ``bbox`` (x, y, width, height in 0–1), optional
-    ``change_type``, ``note``.
+    ``page``, **only** normalized ``bbox`` ``{x, y, width, height}`` in 0–1
+    (no ``points`` / polygon payloads — the viewer overlay stack resolves rects
+    via ``bbox``). Optional ``change_type``, ``note``, ``confidence``.
     """
     if cv2 is None or np is None:
         logger.warning(
@@ -380,12 +412,9 @@ def _generate_and_score_diff(
         diff_regions.append(
             {
                 "page": page,
-                "bbox": {
-                    "x": float(x) / float(mw),
-                    "y": float(y) / float(mh),
-                    "width": float(bw) / float(mw),
-                    "height": float(bh) / float(mh),
-                },
+                "bbox": _bbox_dict_normalized_01(
+                    x, y, bw, bh, raster_w=mw, raster_h=mh
+                ),
                 "change_type": "changed_region",
                 "note": f"Detected change {idx + 1} of {len(merged)}",
                 "confidence": min(0.95, 0.55 + 0.08 * min(len(merged), 5)),
@@ -417,7 +446,11 @@ def _persist_diff_and_finding(
     item: Dict[str, Any],
     severity_threshold: str,
 ) -> Optional[DrawingDiff]:
-    """Create DrawingDiff, optionally create Finding if severity >= threshold."""
+    """Create DrawingDiff, optionally create Finding if severity >= threshold.
+
+    Callers should pass items with non-empty ``summary`` and ``diff_regions``;
+    otherwise this returns ``None`` without writing.
+    """
     summary = item.get("summary", "")
     severity = item.get("severity", "low")
     diff_regions = item.get("diff_regions", [])
@@ -454,6 +487,12 @@ def run_drawing_diff(
     """
     Run diff analysis for an alignment. Ensures failures do not crash API;
     alignment status and error_message are updated on failure.
+
+    Flow: :func:`_resolve_file_paths` gates first. Render failure marks the
+    alignment **failed** and raises :class:`DrawingDiffPipelineError`. If warping
+    sub into master space fails, logs and returns ``[]`` (no persisted diffs).
+    Persistence runs only when a detected item has non-empty ``summary`` and
+    ``diff_regions``.
     """
     storage = StorageService(db)
     alignment_id = cast(int, alignment.id)
@@ -487,8 +526,12 @@ def run_drawing_diff(
         master_gray = _render_drawing_to_array(db=db, drawing=master, page=page_i)
         sub_gray = _render_drawing_to_array(db=db, drawing=sub, page=page_i)
         if master_gray is None or sub_gray is None:
+            render_err = (
+                "Drawing page render failed for diff "
+                f"(page={page_i}, master_ok={master_gray is not None}, sub_ok={sub_gray is not None})"
+            )
             logger.warning(
-                "drawing_diff_render_skipped",
+                "drawing_diff_render_failed",
                 extra={
                     "alignment_id": alignment_id,
                     "page": page_i,
@@ -496,9 +539,28 @@ def run_drawing_diff(
                     "sub_ok": sub_gray is not None,
                 },
             )
+            storage.update_alignment_status(
+                alignment_id,
+                "failed",
+                error_message=render_err,
+            )
+            raise DrawingDiffPipelineError(
+                message="Pipeline failure",
+                details={"reason": render_err},
+            )
 
         transform = getattr(alignment, "transform", None)
         warped_sub = _warp_sub_raster_into_master(sub_gray, master_gray, transform)
+        if warped_sub is None:
+            logger.warning(
+                "drawing_diff_no_warp_abort",
+                extra={
+                    "alignment_id": alignment_id,
+                    "page": page_i,
+                    "reason": "warp_sub_into_master_unavailable_or_failed",
+                },
+            )
+            return []
 
         # Step 3 & 4 — Generate diff regions, score severity
         detected = _generate_and_score_diff(master_gray, warped_sub, page=page_i)
@@ -506,6 +568,10 @@ def run_drawing_diff(
         created: List[DrawingDiff] = []
 
         for item in detected:
+            regions = item.get("diff_regions") or []
+            summary_s = (item.get("summary") or "").strip()
+            if not summary_s or not regions:
+                continue
             try:
                 diff = _persist_diff_and_finding(
                     storage,
