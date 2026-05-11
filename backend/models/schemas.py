@@ -725,6 +725,10 @@ class DrawingDiffCreate(BaseModel):
         default=None,
         description="Optional structured metadata (semantic layer); geometry lives in diff_regions.",
     )
+    semantic_summary: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Optional JSON semantic narrative (e.g. LLM); detector output may live in change_details.",
+    )
 
 
 class RunDrawingDiffRequest(BaseModel):
@@ -744,6 +748,11 @@ class DrawingDiffResponse(BaseModel):
         default=None,
         serialization_alias="changeDetails",
         description="Structured semantic / detector metadata (optional).",
+    )
+    semantic_summary: Optional[Dict[str, Any]] = Field(
+        default=None,
+        serialization_alias="semanticSummary",
+        description="Optional JSON semantic narrative (e.g. LLM output).",
     )
     created_at: Optional[str] = Field(default=None, serialization_alias="createdAt")
 
@@ -949,6 +958,10 @@ class DrawingDiffHistoryResponse(BaseModel):
     change_details: Optional[Dict[str, Any]] = Field(
         default=None,
         serialization_alias="changeDetails",
+    )
+    semantic_summary: Optional[Dict[str, Any]] = Field(
+        default=None,
+        serialization_alias="semanticSummary",
     )
 
     model_config = {"from_attributes": True, "populate_by_name": True}

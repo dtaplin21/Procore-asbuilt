@@ -473,6 +473,7 @@ def _persist_diff_and_finding(
         severity=severity,
         diff_regions=diff_regions,
         change_details=item.get("change_details"),
+        semantic_summary=item.get("semantic_summary"),
     )
 
     storage.create_finding_for_diff(

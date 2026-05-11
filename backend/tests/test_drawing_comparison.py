@@ -545,6 +545,7 @@ def test_list_diffs_returns_newest_first_with_required_fields(
             }
         ],
         change_details={"schema_version": 1, "source": "test"},
+        semantic_summary={"text": "Synthetic diff for test", "version": 1},
     )
     db.refresh(diff)
 
@@ -565,6 +566,7 @@ def test_list_diffs_returns_newest_first_with_required_fields(
     assert first.diff_regions[0].change_type == "added_markup"
     assert first.diff_regions[0].note == "New inspection symbol"
     assert first.change_details == {"schema_version": 1, "source": "test"}
+    assert first.semantic_summary == {"text": "Synthetic diff for test", "version": 1}
 
 
 def test_list_diffs_filtered_by_alignment_id(
