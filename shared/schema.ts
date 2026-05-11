@@ -447,6 +447,8 @@ export interface DrawingDiffResponse {
   diff_regions: DrawingDiffRegion[];
   /** Structured semantic / detector metadata (optional). */
   changeDetails?: Record<string, unknown> | null;
+  /** Optional JSON semantic narrative (e.g. LLM). */
+  semanticSummary?: Record<string, unknown> | null;
   created_at: string;
 }
 

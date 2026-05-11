@@ -111,6 +111,8 @@ export type DrawingDiff = {
   resolved?: boolean;
   /** Structured semantic / detector metadata (optional); geometry is in diffRegions. */
   changeDetails?: Record<string, unknown> | null;
+  /** Optional JSON semantic narrative (e.g. LLM). */
+  semanticSummary?: Record<string, unknown> | null;
   createdAt?: string | null;
   diffRegions: DrawingDiffRegion[];
 };
