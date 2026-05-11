@@ -426,11 +426,20 @@ def _generate_and_score_diff(
         f"({severity} severity, ~{total_area_frac * 100:.1f}% of page area)."
     )
 
+    change_details = {
+        "source": "raster_pipeline",
+        "page": page,
+        "region_count": len(merged),
+        "total_area_frac": round(total_area_frac, 6),
+        "severity_hint": severity,
+    }
+
     return [
         {
             "summary": summary,
             "severity": severity,
             "diff_regions": diff_regions,
+            "change_details": change_details,
         }
     ]
 
@@ -463,6 +472,7 @@ def _persist_diff_and_finding(
         summary=summary,
         severity=severity,
         diff_regions=diff_regions,
+        change_details=item.get("change_details"),
     )
 
     storage.create_finding_for_diff(

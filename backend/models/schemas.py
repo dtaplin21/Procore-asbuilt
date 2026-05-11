@@ -721,6 +721,10 @@ class DrawingDiffCreate(BaseModel):
     summary: str
     severity: Literal["low", "medium", "high", "critical"]
     diff_regions: List[DrawingDiffRegion]
+    change_details: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Optional structured metadata (semantic layer); geometry lives in diff_regions.",
+    )
 
 
 class RunDrawingDiffRequest(BaseModel):
@@ -736,6 +740,11 @@ class DrawingDiffResponse(BaseModel):
     status: Optional[str] = Field(default=None, validation_alias="severity")
     resolved: bool = False
     diff_regions: List[DrawingDiffRegion] = Field(default_factory=list, serialization_alias="diffRegions")
+    change_details: Optional[Dict[str, Any]] = Field(
+        default=None,
+        serialization_alias="changeDetails",
+        description="Structured semantic / detector metadata (optional).",
+    )
     created_at: Optional[str] = Field(default=None, serialization_alias="createdAt")
 
     model_config = {"from_attributes": True, "populate_by_name": True}
@@ -936,6 +945,10 @@ class DrawingDiffHistoryResponse(BaseModel):
     diff_regions: List[DrawingDiffRegionResponse] = Field(
         default_factory=list,
         serialization_alias="diffRegions",
+    )
+    change_details: Optional[Dict[str, Any]] = Field(
+        default=None,
+        serialization_alias="changeDetails",
     )
 
     model_config = {"from_attributes": True, "populate_by_name": True}

@@ -544,6 +544,7 @@ def test_list_diffs_returns_newest_first_with_required_fields(
                 "note": "New inspection symbol",
             }
         ],
+        change_details={"schema_version": 1, "source": "test"},
     )
     db.refresh(diff)
 
@@ -563,6 +564,7 @@ def test_list_diffs_returns_newest_first_with_required_fields(
     assert first.diff_regions[0].page == 1
     assert first.diff_regions[0].change_type == "added_markup"
     assert first.diff_regions[0].note == "New inspection symbol"
+    assert first.change_details == {"schema_version": 1, "source": "test"}
 
 
 def test_list_diffs_filtered_by_alignment_id(

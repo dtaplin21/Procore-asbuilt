@@ -953,6 +953,7 @@ class StorageService:
         severity: str,
         diff_regions: List[Dict[str, Any]],
         finding_id: Optional[int] = None,
+        change_details: Optional[Dict[str, Any]] = None,
     ) -> DrawingDiff:
         diff = DrawingDiff(
             alignment_id=alignment_id,
@@ -960,6 +961,7 @@ class StorageService:
             summary=summary,
             severity=severity,
             diff_regions=diff_regions,
+            change_details=change_details,
         )
         self.db.add(diff)
         try:

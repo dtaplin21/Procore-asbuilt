@@ -445,6 +445,8 @@ export interface DrawingDiffResponse {
   severity: DrawingDiffSeverity;
   resolved?: boolean;
   diff_regions: DrawingDiffRegion[];
+  /** Structured semantic / detector metadata (optional). */
+  changeDetails?: Record<string, unknown> | null;
   created_at: string;
 }
 

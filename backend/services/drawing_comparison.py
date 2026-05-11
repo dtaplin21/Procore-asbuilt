@@ -289,6 +289,7 @@ class DrawingComparisonService:
             status=getattr(diff, "severity", None),
             resolved=bool(getattr(diff, "resolved", False)),
             diff_regions=diff_regions,
+            change_details=getattr(diff, "change_details", None),
             created_at=diff.created_at.isoformat() if getattr(diff, "created_at", None) else None,
         )
 
@@ -303,6 +304,7 @@ class DrawingComparisonService:
             severity=getattr(diff, "severity", None),
             resolved=bool(getattr(diff, "resolved", False)),
             created_at=diff.created_at.isoformat() if getattr(diff, "created_at", None) else None,
+            change_details=getattr(diff, "change_details", None),
             diff_regions=[
                 DrawingDiffRegionResponse(
                     page=region.get("page"),

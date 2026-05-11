@@ -109,6 +109,8 @@ export type DrawingDiff = {
   summary?: string | null;
   severity?: string | null;
   resolved?: boolean;
+  /** Structured semantic / detector metadata (optional); geometry is in diffRegions. */
+  changeDetails?: Record<string, unknown> | null;
   createdAt?: string | null;
   diffRegions: DrawingDiffRegion[];
 };

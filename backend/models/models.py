@@ -484,7 +484,11 @@ class DrawingAlignment(Base):
 
 
 class DrawingDiff(Base):
-    """Diff analysis between master and sub drawing; optionally linked to a finding."""
+    """Diff analysis between master and sub drawing; optionally linked to a finding.
+
+    ``diff_regions`` holds normalized geometry; ``change_details`` holds optional
+    structured semantic / detector metadata (MVP JSON blob for summaries, LLM, provenance).
+    """
     __tablename__ = "drawing_diffs"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -503,6 +507,8 @@ class DrawingDiff(Base):
     summary = Column(String, nullable=False)
     severity = Column(String, nullable=False, index=True)  # low | medium | high | critical
     diff_regions = Column(JSON, nullable=False)  # list of normalized region objects
+    # Structured semantic / detector metadata (MVP JSON); geometry remains in diff_regions.
+    change_details = Column(JSON, nullable=True)
     resolved = Column(Boolean, nullable=False, default=False)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
