@@ -432,6 +432,7 @@ class DrawingRegion(Base):
     # Relationships
     master_drawing = relationship("Drawing", back_populates="regions")
     alignments = relationship("DrawingAlignment", back_populates="region")
+    inspection_reviews = relationship("DrawingInspectionReview", back_populates="region")
 
 
 class DrawingAlignment(Base):
@@ -481,6 +482,52 @@ class DrawingAlignment(Base):
     )
     region = relationship("DrawingRegion", back_populates="alignments")
     drawing_diffs = relationship("DrawingDiff", back_populates="alignment", cascade="all, delete-orphan")
+    inspection_reviews = relationship(
+        "DrawingInspectionReview",
+        back_populates="alignment",
+        cascade="all, delete-orphan",
+    )
+
+
+class DrawingInspectionReview(Base):
+    """Review outcome for a drawing alignment; optional scope to a ``DrawingRegion``.
+
+    ``status``: ``pending`` | ``passed`` | ``failed`` | ``passed_auto`` | ``passed_human``.
+    """
+
+    __tablename__ = "drawing_inspection_reviews"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending','passed','failed','passed_auto','passed_human')",
+            name="ck_drawing_inspection_reviews_status",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    alignment_id = Column(
+        Integer,
+        ForeignKey("drawing_alignments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    region_id = Column(
+        Integer,
+        ForeignKey("drawing_regions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    status = Column(String(16), nullable=False, default="pending", index=True)
+    reviewer_user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    notes = Column(Text, nullable=True)
+    passed_at = Column(DateTime, nullable=True)
+
+    alignment = relationship("DrawingAlignment", back_populates="inspection_reviews")
+    region = relationship("DrawingRegion", back_populates="inspection_reviews")
 
 
 class DrawingDiff(Base):
