@@ -897,9 +897,14 @@ class DrawingComparisonService:
         page: int = 1,
     ) -> Dict[str, Any]:
         """
-        Production alignment flow: render page images -> extract features ->
-        match descriptors -> estimate homography -> validate.
-        Returns transform dict suitable for drawing_alignments.transform.
+        Production alignment flow: render page images -> (optional learned matcher) ->
+        extract ORB features -> match descriptors -> estimate homography -> validate.
+
+        When ``USE_MODEL_ALIGNMENT`` / :attr:`config.settings.use_model_alignment` is true,
+        calls :func:`ai.pipelines.model_alignment.try_learned_matcher_align` first; on
+        ``None``, exception, or validation failure, continues with the existing ORB path.
+        Persisted shape unchanged: ``type``, ``matrix`` (9), ``confidence``, ``page``,
+        ``residual_error``, optional ``meta``.
         """
         master_image = self.render_drawing_page(master_drawing, page)
         sub_image = self.render_drawing_page(sub_drawing, page)
@@ -907,6 +912,42 @@ class DrawingComparisonService:
         if master_image is None or sub_image is None:
             logger.warning("Failed to render drawing pages; using fallback identity")
             return self.build_fallback_identity_transform(page)
+
+        from config import settings
+
+        if settings.use_model_alignment:
+            try:
+                from ai.pipelines.model_alignment import try_learned_matcher_align
+
+                model_transform = try_learned_matcher_align(
+                    master_image, sub_image, page=page
+                )
+                if model_transform is not None:
+                    model_transform = dict(model_transform)
+                    model_transform["page"] = page
+                    try:
+                        validated = self.validate_transform(
+                            model_transform, expected_page=page
+                        )
+                        prod = _to_production_transform(validated)
+                        meta = prod.get("meta")
+                        if not isinstance(meta, dict):
+                            meta = {}
+                        else:
+                            meta = dict(meta)
+                        meta.setdefault("matcher", "model")
+                        prod["meta"] = meta
+                        return prod
+                    except ValueError as e:
+                        logger.warning(
+                            "Learned matcher output failed validation (%s); falling back to ORB/homography",
+                            e,
+                        )
+            except Exception as e:
+                logger.warning(
+                    "Learned matcher failed (%s); falling back to ORB/homography",
+                    e,
+                )
 
         master_features = self.extract_features(master_image)
         sub_features = self.extract_features(sub_image)
