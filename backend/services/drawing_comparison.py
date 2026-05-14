@@ -27,6 +27,7 @@ from models.schemas import (
     DiffRiskMetric,
     ProjectComparisonProgressMetric,
     TransformKind,
+    ReviewBadgeTone,
 )
 from services.file_storage import get_file_path
 from services.dashboard import (
@@ -37,6 +38,16 @@ from services.storage import StorageService
 from ai.pipelines.drawing_diff import run_drawing_diff
 
 logger = logging.getLogger(__name__)
+
+
+def _review_db_status_to_badge(raw: Optional[str]) -> ReviewBadgeTone:
+    """Map persisted :class:`DrawingInspectionReview` status to workspace ``reviewBadge`` tone."""
+    if raw in ("passed", "passed_auto", "passed_human"):
+        return "passed"
+    if raw == "failed":
+        return "failed"
+    return "changed"
+
 
 # Canonical project master: ``StorageService.get_project_master_drawing``
 # (``projects.master_drawing_id``, else newest row with ``upload_intent == "master"``).
@@ -184,6 +195,35 @@ class DrawingComparisonService:
         self.db = db
         self.storage = StorageService(db)
 
+    def _inspection_review_badge_maps(
+        self,
+        *,
+        project_id: int,
+        alignment_id: int,
+    ) -> tuple[ReviewBadgeTone, Dict[int, ReviewBadgeTone]]:
+        """Latest sheet- and drawing-region-scoped review tones (rows ordered newest first)."""
+        rows = self.storage.list_drawing_inspection_reviews(
+            project_id=project_id,
+            alignment_id=alignment_id,
+        )
+        latest_sheet: Optional[str] = None
+        latest_region: Dict[int, str] = {}
+        for r in rows:
+            rid = getattr(r, "region_id", None)
+            st = getattr(r, "status", None) or "pending"
+            if rid is None:
+                if latest_sheet is None:
+                    latest_sheet = st
+            else:
+                ik = int(rid)
+                if ik not in latest_region:
+                    latest_region[ik] = st
+        alignment_badge = _review_db_status_to_badge(latest_sheet)
+        region_badges: Dict[int, ReviewBadgeTone] = {
+            ik: _review_db_status_to_badge(s) for ik, s in latest_region.items()
+        }
+        return alignment_badge, region_badges
+
     def _serialize_drawing(self, drawing: Drawing, active_page: int = 1) -> DrawingSummary:
         """Serialize drawing for workspace, preferring rendered page image URL."""
         serialized = serialize_drawing_for_workspace(self.db, drawing, active_page=active_page)
@@ -269,18 +309,34 @@ class DrawingComparisonService:
             created_at=alignment.created_at.isoformat() if getattr(alignment, "created_at", None) else None,
         )
 
-    def _serialize_diff(self, diff: DrawingDiff) -> DrawingDiffResponse:
+    def _serialize_diff(
+        self,
+        diff: DrawingDiff,
+        *,
+        alignment_review_badge: ReviewBadgeTone = "changed",
+        region_review_badges: Optional[Dict[int, ReviewBadgeTone]] = None,
+    ) -> DrawingDiffResponse:
         raw_regions = getattr(diff, "diff_regions", None) or []
+        rmap = region_review_badges or {}
 
-        diff_regions = [
-            DrawingDiffRegion(
-                page=region.get("page"),
-                bbox=region.get("bbox"),
-                change_type=region.get("change_type") or region.get("type"),
-                note=region.get("note") or region.get("label"),
+        diff_regions: List[DrawingDiffRegion] = []
+        for region in raw_regions:
+            rid_raw = region.get("drawing_region_id") or region.get("regionId")
+            region_badge = alignment_review_badge
+            if rid_raw is not None:
+                try:
+                    region_badge = rmap.get(int(rid_raw), alignment_review_badge)
+                except (TypeError, ValueError):
+                    region_badge = alignment_review_badge
+            diff_regions.append(
+                DrawingDiffRegion(
+                    page=region.get("page"),
+                    bbox=region.get("bbox"),
+                    change_type=region.get("change_type") or region.get("type"),
+                    note=region.get("note") or region.get("label"),
+                    review_badge=region_badge,
+                )
             )
-            for region in raw_regions
-        ]
 
         return DrawingDiffResponse(
             id=cast(int, diff.id),
@@ -291,6 +347,7 @@ class DrawingComparisonService:
             diff_regions=diff_regions,
             change_details=getattr(diff, "change_details", None),
             semantic_summary=getattr(diff, "semantic_summary", None),
+            review_badge=alignment_review_badge,
             created_at=diff.created_at.isoformat() if getattr(diff, "created_at", None) else None,
         )
 
@@ -730,13 +787,27 @@ class DrawingComparisonService:
             label=hr["label"],
         )
 
+        aid = cast(int, alignment.id)
+        alignment_badge, region_badges = self._inspection_review_badge_maps(
+            project_id=project_id,
+            alignment_id=aid,
+        )
+
         return DrawingComparisonWorkspaceResponse(
             master_drawing=self._serialize_overlay_drawing(master_drawing),
             sub_drawing=self._serialize_overlay_drawing(sub_drawing),
             alignment=self._serialize_alignment_overlay(alignment),
-            diffs=[self._serialize_diff(diff) for diff in diffs],
+            diffs=[
+                self._serialize_diff(
+                    diff,
+                    alignment_review_badge=alignment_badge,
+                    region_review_badges=region_badges,
+                )
+                for diff in diffs
+            ],
             comparison_progress=comparison_progress,
             high_severity_diff_risk=high_severity_diff_risk,
+            review_badge=alignment_badge,
         )
 
     def list_alignments(

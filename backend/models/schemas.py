@@ -704,12 +704,21 @@ class DrawingAlignmentListResponse(BaseModel):
     offset: int
 
 
+ReviewBadgeTone = Literal["changed", "passed", "failed"]
+"""UI: amber / green / red for diff and region chrome (compare workspace)."""
+
+
 class DrawingDiffRegion(BaseModel):
     """A single diff region; geometry normalized 0-1."""
     page: Optional[int] = None
     bbox: Optional[Dict[str, Any]] = None
     change_type: Optional[str] = Field(default=None, serialization_alias="changeType")
     note: Optional[str] = None
+    review_badge: Optional[ReviewBadgeTone] = Field(
+        default=None,
+        serialization_alias="reviewBadge",
+        description="Inspection review tone from latest sheet- or region-scoped review.",
+    )
 
     model_config = {"populate_by_name": True, "extra": "allow"}
 
@@ -754,9 +763,14 @@ class DrawingDiffResponse(BaseModel):
         serialization_alias="semanticSummary",
         description="Optional JSON semantic narrative (e.g. LLM output).",
     )
+    review_badge: Optional[ReviewBadgeTone] = Field(
+        default=None,
+        serialization_alias="reviewBadge",
+        description="Inspection review tone; alignment-level unless per-region reviews apply.",
+    )
     created_at: Optional[str] = Field(default=None, serialization_alias="createdAt")
 
-    model_config = {"from_attributes": True, "populate_by_name": True}
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True, serialize_by_alias=True)
 
     @field_validator("diff_regions", mode="before")
     @classmethod
@@ -860,6 +874,11 @@ class DrawingComparisonWorkspaceResponse(BaseModel):
         default=None,
         serialization_alias="highSeverityDiffRisk",
         description="Project-scoped unresolved high/critical diffs (optional sidebar badge).",
+    )
+    review_badge: Optional[ReviewBadgeTone] = Field(
+        default=None,
+        serialization_alias="reviewBadge",
+        description="Latest sheet-scoped (alignment-wide) inspection review tone for workspace chrome.",
     )
 
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)

@@ -74,6 +74,9 @@ export type NormalizedRect = {
   height: number;
 };
 
+/** Compare workspace / inspection UI chrome (amber=changed, green=passed, red=failed). */
+export type ReviewBadgeTone = "changed" | "passed" | "failed";
+
 export type DrawingDiffRegion = {
   id?: string | number;
   page?: number | null;
@@ -101,6 +104,7 @@ export type DrawingDiffRegion = {
 
   changeType?: string | null;
   note?: string | null;
+  reviewBadge?: ReviewBadgeTone | null;
 };
 
 export type DrawingDiff = {
@@ -113,6 +117,8 @@ export type DrawingDiff = {
   changeDetails?: Record<string, unknown> | null;
   /** Optional JSON semantic narrative (e.g. LLM). */
   semanticSummary?: Record<string, unknown> | null;
+  /** Inspection review tone (alignment-level for this diff row). */
+  reviewBadge?: ReviewBadgeTone | null;
   createdAt?: string | null;
   diffRegions: DrawingDiffRegion[];
 };
@@ -168,6 +174,8 @@ export type DrawingComparisonWorkspaceResponse = {
   diffs: DrawingDiff[];
   comparisonProgress?: ProjectComparisonProgressMetric | null;
   highSeverityDiffRisk?: DiffRiskMetric | null;
+  /** Sheet-scoped inspection review tone for workspace header/summary. */
+  reviewBadge?: ReviewBadgeTone | null;
 };
 
 export type DrawingDiffsResponse = {

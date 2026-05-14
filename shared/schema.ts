@@ -265,6 +265,8 @@ export interface DrawingComparisonWorkspaceResponse {
   alignment: DrawingAlignmentOverlayResponse;
   diffs: unknown[];
   comparison_progress?: ProjectComparisonProgressMetric | null;
+  /** Latest sheet-scoped inspection review tone: changed | passed | failed (UI amber/green/red). */
+  review_badge?: "changed" | "passed" | "failed" | null;
 }
 
 // Submittal (Shop Drawing) interface
@@ -449,6 +451,8 @@ export interface DrawingDiffResponse {
   changeDetails?: Record<string, unknown> | null;
   /** Optional JSON semantic narrative (e.g. LLM). */
   semanticSummary?: Record<string, unknown> | null;
+  /** Inspection review tone (alignment-level). */
+  reviewBadge?: "changed" | "passed" | "failed" | null;
   created_at: string;
 }
 
