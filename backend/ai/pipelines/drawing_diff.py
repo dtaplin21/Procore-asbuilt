@@ -342,12 +342,17 @@ def _generate_and_score_diff(
 ) -> List[Dict[str, Any]]:
     """
     Produce normalized diff geometry and compute severity.
-    Returns list of { summary, severity, diff_regions }.
+    Returns list of ``{ summary, severity, diff_regions, change_details, semantic_summary? }``.
 
     Each diff region matches :class:`models.schemas.DrawingDiffRegion`:
     ``page``, **only** normalized ``bbox`` ``{x, y, width, height}`` in 0–1
     (no ``points`` / polygon payloads — the viewer overlay stack resolves rects
     via ``bbox``). Optional ``change_type``, ``note``, ``confidence``.
+
+    **P2.4:** After regions exist, runs **one** sheet-level semantic pass (full master
+    vs warped sub) via :func:`ai.pipelines.diff_semantics.compare_cropped_regions_semantics`
+    and stores the result under ``semantic_summary`` (plus ``scope``, ``page``,
+    ``region_count``). Failures are logged; ``semantic_summary`` may be omitted.
     """
     if cv2 is None or np is None:
         logger.warning(
@@ -434,14 +439,33 @@ def _generate_and_score_diff(
         "severity_hint": severity,
     }
 
-    return [
-        {
-            "summary": summary,
-            "severity": severity,
-            "diff_regions": diff_regions,
-            "change_details": change_details,
+    semantic_summary: Dict[str, Any] | None = None
+    try:
+        from ai.pipelines.diff_semantics import compare_cropped_regions_semantics
+
+        sheet_delta = compare_cropped_regions_semantics(m, w)
+        semantic_summary = {
+            "scope": "sheet",
+            "page": page,
+            "region_count": len(merged),
         }
-    ]
+        semantic_summary.update(sheet_delta)
+    except Exception as e:
+        logger.warning(
+            "drawing_diff_semantic_sheet_failed",
+            extra={"page": page, "reason": str(e)},
+        )
+
+    payload: Dict[str, Any] = {
+        "summary": summary,
+        "severity": severity,
+        "diff_regions": diff_regions,
+        "change_details": change_details,
+    }
+    if semantic_summary is not None:
+        payload["semantic_summary"] = semantic_summary
+
+    return [payload]
 
 
 # ---------------------------------------------------------------------------

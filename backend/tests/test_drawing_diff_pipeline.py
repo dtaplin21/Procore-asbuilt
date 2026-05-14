@@ -34,3 +34,12 @@ def test_synthetic_rectangle_change_has_at_least_one_region():
         bbox = r.get("bbox") or {}
         assert {"x", "y", "width", "height"} <= set(bbox.keys())
         assert bbox["width"] > 0 and bbox["height"] > 0
+
+    sem = item.get("semantic_summary")
+    assert isinstance(sem, dict)
+    assert sem.get("scope") == "sheet"
+    assert sem.get("page") == 3
+    assert sem.get("region_count") == len(regions)
+    assert sem.get("change_type")
+    assert sem.get("description")
+    assert sem.get("severity") in ("low", "medium", "high", "critical")
