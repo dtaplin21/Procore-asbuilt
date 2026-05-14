@@ -28,6 +28,7 @@ from api.routes import (
     drawing_diffs,
     drawing_comparison,
     drawing_progress,
+    inspection_reviews,
 )
 from database import init_db
 from config import cors_allowed_origins, settings as app_settings
@@ -45,6 +46,7 @@ tags_metadata = [
     {"name": "findings", "description": "Project findings with serialized API rows."},
     {"name": "insights", "description": "AI findings and insights."},
     {"name": "evidence", "description": "Document evidence (specs, inspection docs)."},
+    {"name": "inspection-reviews", "description": "Human pass/fail reviews for drawing alignments and regions."},
     {"name": "drawing-progress", "description": "Per-master drawing comparison coverage and severity counts."},
 ]
 
@@ -170,6 +172,7 @@ app.include_router(drawing_alignment.router)
 app.include_router(drawing_diffs.router)
 app.include_router(drawing_comparison.router)
 app.include_router(drawing_progress.router)
+app.include_router(inspection_reviews.router)
 
 # Serve static files in production (if needed)
 # static_dir = os.path.join(os.path.dirname(__file__), "..", "dist", "public")

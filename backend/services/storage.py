@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from shutil import rmtree
 from sqlalchemy import func, or_
 from sqlalchemy.exc import SQLAlchemyError
@@ -67,6 +67,7 @@ from models.models import (
     Drawing,
     DrawingRegion,
     DrawingAlignment,
+    DrawingInspectionReview,
     DrawingDiff,
     DrawingRendition,
     EvidenceRecord,
@@ -940,6 +941,83 @@ class StorageService:
             raise
         self.db.refresh(alignment)
         return alignment
+
+    # ------------------------------------------------------------------
+    # Drawing inspection reviews (human pass / fail)
+    # ------------------------------------------------------------------
+
+    def create_drawing_inspection_review(
+        self,
+        *,
+        project_id: int,
+        alignment_id: int,
+        outcome: Literal["passed", "failed"],
+        region_id: Optional[int] = None,
+        notes: Optional[str] = None,
+        reviewer_user_id: Optional[int] = None,
+    ) -> DrawingInspectionReview:
+        alignment = (
+            self.db.query(DrawingAlignment)
+            .filter(
+                DrawingAlignment.id == alignment_id,
+                DrawingAlignment.project_id == project_id,
+            )
+            .first()
+        )
+        if alignment is None:
+            raise ValueError("Alignment not found for this project")
+
+        if region_id is not None:
+            region = (
+                self.db.query(DrawingRegion)
+                .filter(DrawingRegion.id == region_id)
+                .first()
+            )
+            if region is None:
+                raise ValueError("Drawing region not found")
+            if int(region.master_drawing_id) != int(alignment.master_drawing_id):
+                raise ValueError("Region does not belong to this alignment's master drawing")
+
+        now = datetime.now(timezone.utc)
+        status = "passed" if outcome == "passed" else "failed"
+        passed_at = now if outcome == "passed" else None
+
+        row = DrawingInspectionReview(
+            alignment_id=alignment_id,
+            region_id=region_id,
+            status=status,
+            reviewer_user_id=reviewer_user_id,
+            notes=notes,
+            passed_at=passed_at,
+        )
+        self.db.add(row)
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(row)
+        return row
+
+    def list_drawing_inspection_reviews(
+        self,
+        *,
+        project_id: int,
+        alignment_id: int,
+    ) -> List[DrawingInspectionReview]:
+        return (
+            self.db.query(DrawingInspectionReview)
+            .join(
+                DrawingAlignment,
+                DrawingInspectionReview.alignment_id == DrawingAlignment.id,
+            )
+            .filter(
+                DrawingAlignment.id == alignment_id,
+                DrawingAlignment.project_id == project_id,
+            )
+            .order_by(DrawingInspectionReview.id.desc())
+            .all()
+        )
 
     # ------------------------------------------------------------------
     # Drawing Diffs

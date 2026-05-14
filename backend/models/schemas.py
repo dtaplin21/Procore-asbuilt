@@ -992,6 +992,48 @@ class DrawingDiffHistoryListResponse(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class InspectionReviewSubmit(BaseModel):
+    """Mark an alignment (or a specific drawing region on that master) passed or failed."""
+
+    outcome: Literal["passed", "failed"]
+    region_id: Optional[int] = Field(default=None, serialization_alias="regionId")
+    notes: Optional[str] = None
+    reviewer_user_id: Optional[int] = Field(default=None, serialization_alias="reviewerUserId")
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+class DrawingInspectionReviewResponse(BaseModel):
+    id: int
+    alignment_id: int = Field(serialization_alias="alignmentId")
+    region_id: Optional[int] = Field(default=None, serialization_alias="regionId")
+    status: str
+    reviewer_user_id: Optional[int] = Field(default=None, serialization_alias="reviewerUserId")
+    notes: Optional[str] = None
+    passed_at: Optional[str] = Field(default=None, serialization_alias="passedAt")
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+    @field_validator("passed_at", mode="before")
+    @classmethod
+    def _passed_at_to_str(cls, v: Any) -> Any:
+        if v is None:
+            return None
+        if hasattr(v, "isoformat"):
+            return v.isoformat()
+        return str(v) if v else None
+
+
+class DrawingInspectionReviewListResponse(BaseModel):
+    items: List[DrawingInspectionReviewResponse] = Field(default_factory=list)
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
 # ============================================
 # INSPECTION RUNS / OVERLAYS / GEOMETRY
 # ============================================
