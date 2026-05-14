@@ -709,7 +709,12 @@ ReviewBadgeTone = Literal["changed", "passed", "failed"]
 
 
 class DrawingDiffRegion(BaseModel):
-    """A single diff region; geometry normalized 0-1."""
+    """A single diff region; geometry normalized 0–1.
+
+    API **geometry** for detector/compare output is ``bbox`` only (``x``, ``y``, ``width``, ``height``).
+    Do not mix polygons/points with ``bbox`` on new writes; list GETs omit regions without a valid bbox.
+    """
+
     page: Optional[int] = None
     bbox: Optional[Dict[str, Any]] = None
     change_type: Optional[str] = Field(default=None, serialization_alias="changeType")
@@ -819,6 +824,11 @@ class DrawingAlignmentTransformResponse(BaseModel):
     matrix: List[float]
     confidence: Optional[float] = None
     meta: Optional[Dict[str, Any]] = None
+    page: int = Field(
+        default=1,
+        ge=1,
+        description="1-based drawing page this transform applies to (default 1).",
+    )
 
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 
@@ -1215,8 +1225,10 @@ class JobResponse(BaseModel):
     id: int
     user_id: int
     company_id: int
+    project_id: Optional[int] = None
     job_type: str
     status: str
+    input_data: Optional[dict] = None
     output_url: Optional[str] = None
     created_at: datetime
     

@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
+UploadIntent = Literal["master", "sub"]
+
 UPLOAD_INTENT_OPENAPI_DESCRIPTION = (
     "Drawing role: `master` — canonical workspace sheet (sets `projects.master_drawing_id` "
     "and reconciles intents). `sub` — sub sheet only. Omit or empty — no explicit intent on the "
@@ -29,8 +33,9 @@ def coalesce_upload_intent_form(
 ) -> str | None:
     """
     Prefer snake_case `upload_intent` when both multipart fields are present.
-    Strips whitespace; maps empty string to None (avoids DB check surprises).
-    Returns a raw string to validate: None, "master", "sub", or any other string (caller returns 400).
+    Prefer :func:`parse_upload_intent_form_fields` for validated ``UploadIntent | None``.
+    Returns a raw string (after strip) to validate: ``None``, ``"master"``, ``"sub"``, or any
+    other string (caller / :func:`parse_upload_intent_form_fields` returns 400).
     """
     raw = upload_intent if upload_intent is not None else uploadIntent
     if raw is not None:
@@ -38,3 +43,23 @@ def coalesce_upload_intent_form(
     if raw == "":
         return None
     return raw
+
+
+def parse_upload_intent_form_fields(
+    upload_intent: str | None,
+    uploadIntent: str | None,
+) -> UploadIntent | None:
+    """
+    Normalized ``UploadIntent`` after multipart coalescing.
+
+    Raises ``ValueError`` with a stable message if the string is non-empty but not
+    ``master`` / ``sub`` (callers map to HTTP 400).
+    """
+    raw = coalesce_upload_intent_form(upload_intent, uploadIntent)
+    if raw is None:
+        return None
+    if raw == "master":
+        return "master"
+    if raw == "sub":
+        return "sub"
+    raise ValueError("upload_intent must be one of: master, sub")

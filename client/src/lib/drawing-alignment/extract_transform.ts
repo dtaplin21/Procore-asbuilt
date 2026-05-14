@@ -16,7 +16,13 @@ export function extractAlignmentTransform(
   if (!item) return null;
 
   if ("transform" in item && item.transform?.matrix?.length) {
-    return item.transform;
+    const t = item.transform;
+    const p = t.page;
+    const page =
+      p !== null && p !== undefined && Number.isFinite(Number(p))
+        ? Math.max(1, Math.floor(Number(p)))
+        : 1;
+    return { ...t, page };
   }
 
   const raw = "transformMatrix" in item ? item.transformMatrix : null;
@@ -28,9 +34,17 @@ export function extractAlignmentTransform(
 
   const matrix = matrixRaw.map((x) => Number(x));
   const type = o.type;
+  let page = 1;
+  if (o.page !== null && o.page !== undefined) {
+    const p = Number(o.page);
+    if (Number.isFinite(p)) {
+      page = Math.max(1, Math.floor(p));
+    }
+  }
   return {
     type: isTransformType(type) ? type : "homography",
     matrix,
+    page,
     confidence:
       o.confidence === null || o.confidence === undefined
         ? null

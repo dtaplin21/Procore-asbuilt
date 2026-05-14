@@ -150,6 +150,8 @@ export default function DrawingViewer({ drawing, selectedDiff }: Props) {
                     width: imageBounds.width,
                     height: imageBounds.height,
                   }}
+                  showChangesOnly={false}
+                  showInspectionStatuses={true}
                 />
               ) : null}
             </>

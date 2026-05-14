@@ -4,12 +4,12 @@ import logging
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-from typing import List, Literal, Optional, cast
+from typing import List, Optional, cast
 
 from api.dependencies import get_db
 from api.upload_intent_form import (
     UPLOAD_INTENT_OPENAPI_DESCRIPTION,
-    coalesce_upload_intent_form,
+    parse_upload_intent_form_fields,
 )
 from services.drawing_comparison import serialize_drawing_for_workspace
 from services.drawing_render_jobs import enqueue_drawing_render_job
@@ -135,21 +135,12 @@ async def upload_project_drawing(
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    normalized_upload_intent = coalesce_upload_intent_form(
-        upload_intent, uploadIntent
-    )
-    if normalized_upload_intent not in (None, "master", "sub"):
-        raise HTTPException(
-            status_code=400,
-            detail="upload_intent must be one of: master, sub",
+    try:
+        upload_intent_for_create = parse_upload_intent_form_fields(
+            upload_intent, uploadIntent
         )
-    upload_intent_for_create: Literal["master", "sub"] | None
-    if normalized_upload_intent == "master":
-        upload_intent_for_create = "master"
-    elif normalized_upload_intent == "sub":
-        upload_intent_for_create = "sub"
-    else:
-        upload_intent_for_create = None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Persist file via helper (validates size/type and writes to disk)
     storage_key, content_type, original_name = save_upload(file, project_id, category="drawings")

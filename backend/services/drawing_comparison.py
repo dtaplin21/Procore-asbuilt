@@ -124,12 +124,52 @@ def parse_alignment_transform_for_overlay(raw: Any) -> Optional[DrawingAlignment
     meta = raw.get("meta")
     if meta is not None and not isinstance(meta, dict):
         meta = None
+    page = 1
+    raw_page = raw.get("page")
+    if raw_page is not None:
+        try:
+            page = max(1, int(raw_page))
+        except (TypeError, ValueError):
+            page = 1
     return DrawingAlignmentTransformResponse(
         type=t,
         matrix=matrix,
         confidence=conf,
         meta=meta,
+        page=page,
     )
+
+
+def _normalized_bbox_from_region_dict(region: dict) -> Optional[Dict[str, float]]:
+    """Return a float bbox copy if ``region['bbox']`` is valid; else None (skip in API lists)."""
+    bbox = region.get("bbox")
+    if not isinstance(bbox, dict):
+        return None
+    keys = ("x", "y", "width", "height")
+    if not set(keys) <= set(bbox.keys()):
+        return None
+    try:
+        out = {
+            "x": float(bbox["x"]),
+            "y": float(bbox["y"]),
+            "width": float(bbox["width"]),
+            "height": float(bbox["height"]),
+        }
+    except (TypeError, ValueError, KeyError):
+        return None
+    if out["width"] <= 0 or out["height"] <= 0:
+        return None
+    return out
+
+
+def _page_int_from_region_dict(region: dict, default: int = 1) -> int:
+    raw_page = region.get("page")
+    if raw_page is None:
+        return default
+    try:
+        return max(1, int(raw_page))
+    except (TypeError, ValueError):
+        return default
 
 
 def serialize_drawing_for_workspace(db: Session, drawing: Drawing, active_page: int = 1) -> Dict[str, Any]:
@@ -321,6 +361,11 @@ class DrawingComparisonService:
 
         diff_regions: List[DrawingDiffRegion] = []
         for region in raw_regions:
+            if not isinstance(region, dict):
+                continue
+            bbox_norm = _normalized_bbox_from_region_dict(region)
+            if bbox_norm is None:
+                continue
             rid_raw = region.get("drawing_region_id") or region.get("regionId")
             region_badge = alignment_review_badge
             if rid_raw is not None:
@@ -330,8 +375,8 @@ class DrawingComparisonService:
                     region_badge = alignment_review_badge
             diff_regions.append(
                 DrawingDiffRegion(
-                    page=region.get("page"),
-                    bbox=region.get("bbox"),
+                    page=_page_int_from_region_dict(region),
+                    bbox=bbox_norm,
                     change_type=region.get("change_type") or region.get("type"),
                     note=region.get("note") or region.get("label"),
                     review_badge=region_badge,
@@ -355,6 +400,22 @@ class DrawingComparisonService:
         """Serialize diff for history view."""
         raw_regions = getattr(diff, "diff_regions", None) or []
 
+        hist_regions: List[DrawingDiffRegionResponse] = []
+        for region in raw_regions:
+            if not isinstance(region, dict):
+                continue
+            bbox_norm = _normalized_bbox_from_region_dict(region)
+            if bbox_norm is None:
+                continue
+            hist_regions.append(
+                DrawingDiffRegionResponse(
+                    page=_page_int_from_region_dict(region),
+                    bbox=bbox_norm,
+                    change_type=region.get("change_type") or region.get("changeType"),
+                    note=region.get("note") or region.get("label"),
+                )
+            )
+
         return DrawingDiffHistoryResponse(
             id=cast(int, diff.id),
             alignment_id=cast(int, diff.alignment_id),
@@ -364,16 +425,7 @@ class DrawingComparisonService:
             created_at=diff.created_at.isoformat() if getattr(diff, "created_at", None) else None,
             change_details=getattr(diff, "change_details", None),
             semantic_summary=getattr(diff, "semantic_summary", None),
-            diff_regions=[
-                DrawingDiffRegionResponse(
-                    page=region.get("page"),
-                    bbox=region.get("bbox"),
-                    change_type=region.get("change_type")
-                    or region.get("changeType"),
-                    note=region.get("note") or region.get("label"),
-                )
-                for region in raw_regions
-            ],
+            diff_regions=hist_regions,
         )
 
     def _validate_master_drawing(
@@ -435,6 +487,9 @@ class DrawingComparisonService:
         Render a drawing page to a grayscale numpy image.
         Supports PDF (via pymupdf) and raster images (PNG, JPEG via OpenCV).
         Returns (H, W) uint8 array or None if render fails.
+
+        **Page index:** ``page`` is **1-based** (first PDF page is ``1``). Non-PDF rasters
+        ignore ``page`` beyond validation. Out-of-range PDF pages fall back to page 1.
         """
         if not _CV2_AVAILABLE or cv2 is None or np is None:
             return None

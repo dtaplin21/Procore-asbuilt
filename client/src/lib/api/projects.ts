@@ -1,9 +1,10 @@
 import type {
   DashboardSummaryResponse,
   DrawingDeleteSummaryResponse,
+  JobListResponse,
 } from "@shared/schema";
 
-import { apiRequest, readApiError, resolveFetchUrl } from "@/lib/api/http";
+import { apiRequest, readApiError, requestJson, resolveFetchUrl } from "@/lib/api/http";
 
 export type FetchProjectDashboardSummaryOptions = {
   /** Scopes comparison KPIs to this master drawing (query `currentDrawingId`). */
@@ -86,4 +87,16 @@ export async function deleteProjectDrawing(
     "DELETE",
     `/api/projects/${projectId}/drawings/${drawingId}`
   );
+}
+
+/** GET /api/projects/{project_id}/jobs — optional `status=active` (pending + in-flight). */
+export async function fetchProjectJobs(
+  projectId: number,
+  status?: string
+): Promise<JobListResponse> {
+  const q =
+    status != null && status !== ""
+      ? `?status=${encodeURIComponent(status)}`
+      : "";
+  return requestJson<JobListResponse>(`/api/projects/${projectId}/jobs${q}`);
 }

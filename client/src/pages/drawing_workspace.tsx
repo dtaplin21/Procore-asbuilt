@@ -316,9 +316,11 @@ export function DrawingWorkspaceBody({
         viewer={
           <DrawingComparisonWorkspace
             projectId={parsedProjectId}
+            masterDrawingId={masterDrawingId}
             masterDrawing={masterDrawing}
             selectedAlignment={selectedAlignment}
             selectedDiff={selectedDiff}
+            compareBusy={compareLoading}
           />
         }
         sidebar={

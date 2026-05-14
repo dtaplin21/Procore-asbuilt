@@ -267,7 +267,8 @@ class StorageService:
         q = self.db.query(JobQueue).filter(JobQueue.project_id == project_id)
 
         if status == "active":
-            q = q.filter(JobQueue.status.in_(["queued", "running", "processing"]))
+            # Include `pending` — workers claim pending jobs; without it, dashboards never see queued work.
+            q = q.filter(JobQueue.status.in_(["pending", "queued", "running", "processing"]))
         elif status is not None:
             q = q.filter(JobQueue.status == status)
 

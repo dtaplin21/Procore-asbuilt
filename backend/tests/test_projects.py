@@ -4,6 +4,7 @@ from typing import cast
 from datetime import datetime, timezone
 
 import fitz
+import pytest
 from fastapi.testclient import TestClient
 
 """Basic API tests for project-related endpoints.
@@ -13,7 +14,10 @@ most reliable way in a pytest environment is to import via the package
 namespace rather than relying on the current working directory.
 """
 
-from api.upload_intent_form import drawing_has_sub_upload_intent
+from api.upload_intent_form import (
+    drawing_has_sub_upload_intent,
+    parse_upload_intent_form_fields,
+)
 from models.models import Drawing, Project
 from services.storage import StorageService, get_project_master_drawing
 
@@ -100,6 +104,18 @@ def test_drawing_has_sub_upload_intent_only_matches_literal_sub(project: Project
     )
     assert drawing_has_sub_upload_intent(d_none) is False
     assert drawing_has_sub_upload_intent(d_master) is False
+
+
+def test_parse_upload_intent_form_fields_literal_union() -> None:
+    assert parse_upload_intent_form_fields("master", None) == "master"
+    assert parse_upload_intent_form_fields(None, "sub") == "sub"
+    assert parse_upload_intent_form_fields(None, None) is None
+    assert parse_upload_intent_form_fields("", "") is None
+
+
+def test_parse_upload_intent_form_fields_rejects_unknown() -> None:
+    with pytest.raises(ValueError, match="master, sub"):
+        parse_upload_intent_form_fields("primary", None)
 
 
 def test_projects_router_upload_persists_upload_intent_sub(

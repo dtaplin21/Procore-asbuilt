@@ -4,12 +4,18 @@ import {
   normalizedRectToPixels,
   polygonPointsToSvgString,
 } from "@/lib/drawing-overlays/geometry";
+import {
+  overlayColorsForTone,
+  type OverlayInspectionTone,
+} from "@/lib/drawing-overlays/inspection_overlay";
 
 type Props = {
   region: ResolvedOverlayRegion;
   viewerSize: ViewerSize;
   selected?: boolean;
   index: number;
+  /** Inspection tone; `neutral` draws a single highlight when statuses are hidden. */
+  inspectionTone: OverlayInspectionTone;
 };
 
 export default function DiffOverlayShape({
@@ -17,10 +23,9 @@ export default function DiffOverlayShape({
   viewerSize,
   selected = false,
   index,
+  inspectionTone,
 }: Props) {
-  const strokeWidth = selected ? 3 : 2;
-  const stroke = selected ? "#dc2626" : "#f97316";
-  const fill = selected ? "rgba(220, 38, 38, 0.16)" : "rgba(249, 115, 22, 0.14)";
+  const { stroke, fill, strokeWidth } = overlayColorsForTone(inspectionTone, selected);
 
   if (region.kind === "rect") {
     const rect = normalizedRectToPixels(region.rect, viewerSize);

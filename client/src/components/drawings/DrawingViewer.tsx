@@ -42,6 +42,10 @@ type Props = {
   isLoadingComparisonWorkspace?: boolean;
   showOverlay: boolean;
   overlayOpacity: number;
+  /** Diff SVG: only unresolved / "changed" regions. */
+  overlayShowChangesOnly?: boolean;
+  /** Diff SVG: color by passed/failed/changed; when false, use a single highlight tone. */
+  overlayShowInspectionStatuses?: boolean;
 };
 
 export default function DrawingViewer({
@@ -51,6 +55,8 @@ export default function DrawingViewer({
   isLoadingComparisonWorkspace,
   showOverlay,
   overlayOpacity,
+  overlayShowChangesOnly = false,
+  overlayShowInspectionStatuses = true,
 }: Props) {
   /** Shared width probe for comparison layout (max-w-[1200px] row). */
   const layoutRef = useRef<HTMLDivElement | null>(null);
@@ -360,6 +366,8 @@ export default function DrawingViewer({
                       width: viewerSize.width,
                       height: viewerSize.height,
                     }}
+                    showChangesOnly={overlayShowChangesOnly}
+                    showInspectionStatuses={overlayShowInspectionStatuses}
                   />
                 ) : null}
                 </div>
@@ -395,6 +403,8 @@ export default function DrawingViewer({
                       width: layoutSize.width,
                       height: layoutSize.height,
                     }}
+                    showChangesOnly={overlayShowChangesOnly}
+                    showInspectionStatuses={overlayShowInspectionStatuses}
                   />
                 ) : null}
               </>

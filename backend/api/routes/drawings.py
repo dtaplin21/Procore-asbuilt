@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional, cast
+from typing import List, Optional, cast
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from api.dependencies import get_db, get_idempotency_key
 from api.upload_intent_form import (
     UPLOAD_INTENT_OPENAPI_DESCRIPTION,
-    coalesce_upload_intent_form,
+    parse_upload_intent_form_fields,
 )
 from models.models import Drawing
 from models.schemas import (
@@ -59,21 +59,14 @@ async def upload_drawing(
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
 
-    normalized_upload_intent = coalesce_upload_intent_form(
-        upload_intent, uploadIntent
-    )
-    if normalized_upload_intent not in (None, "master", "sub"):
-        raise HTTPException(
-            status_code=400,
-            detail="upload_intent must be one of: master, sub",
+    try:
+        upload_intent_for_create = parse_upload_intent_form_fields(
+            upload_intent, uploadIntent
         )
-    upload_intent_for_create: Literal["master", "sub"] | None
-    if normalized_upload_intent == "master":
-        upload_intent_for_create = "master"
-    elif normalized_upload_intent == "sub":
-        upload_intent_for_create = "sub"
-    else:
-        upload_intent_for_create = None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    normalized_upload_intent = upload_intent_for_create
 
     file_bytes, content_type, original_name = read_and_validate_upload(file, category="drawings")
     checksum = sha256_bytes(file_bytes)

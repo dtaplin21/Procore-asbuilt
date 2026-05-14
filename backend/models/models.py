@@ -165,10 +165,11 @@ class JobQueue(Base):
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     
     job_type = Column(String, nullable=False)  # "drawing_markup", "clash_detection", etc.
-    status = Column(String, default="pending")  # pending, processing, completed, failed
-    
-    # Input/Output references
-    input_data = Column(JSON)  # Store drawing IDs, parameters, etc.
+    # Lifecycle values are plain strings (pending → processing → completed|failed), not Python enums.
+    status = Column(String, default="pending")
+
+    # JSON-serializable dict only (ints, bools, str, lists); never ORM instances.
+    input_data = Column(JSON)  # e.g. drawing_id, project_id — see services.job_input_data.coerce_job_int
     output_url = Column(String)  # S3/object storage URL for result
     
     # Tracking

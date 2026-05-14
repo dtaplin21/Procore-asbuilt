@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 
 import DrawingViewer from "@/components/drawings/DrawingViewer";
 import { compareSubDrawing } from "@/lib/api/drawing_workspace";
+import { fetchProjectJobs } from "@/lib/api/projects";
+import { findActiveDrawingCompareJob } from "@/lib/drawing-workspace/compare_jobs";
 import { drawingComparisonWorkspaceQueryKey } from "@/lib/drawing-comparison-query";
 import { validateTransform } from "@/lib/drawings";
 import { extractAlignmentTransform } from "@/lib/drawing-alignment/extract_transform";
@@ -61,36 +63,65 @@ function buildAlignmentDebugPayload(
 
 type Props = {
   projectId: number;
+  /** Route master id — used to match background `drawing_compare` jobs. */
+  masterDrawingId: number;
   masterDrawing: DrawingWorkspaceDrawing | null;
   selectedAlignment: DrawingAlignmentListItem | null;
   selectedDiff: DrawingDiff | null;
+  /** True while synchronous POST /compare runs from the workspace chrome. */
+  compareBusy?: boolean;
 };
 
 export default function DrawingComparisonWorkspace({
   projectId,
+  masterDrawingId,
   masterDrawing,
   selectedAlignment,
   selectedDiff,
+  compareBusy = false,
 }: Props) {
-  const [showOverlay, setShowOverlay] = useState(true);
+  const [showAlignedSubOverlay, setShowAlignedSubOverlay] = useState(true);
   const [overlayOpacity, setOverlayOpacity] = useState(0.45);
+  const [showChangesOnly, setShowChangesOnly] = useState(false);
+  const [showInspectionStatuses, setShowInspectionStatuses] = useState(true);
 
   const subId = selectedAlignment?.subDrawing.id;
-  const masterId = masterDrawing?.id;
 
   const comparisonEnabled = Boolean(
-    projectId && masterId != null && subId != null && selectedAlignment
+    projectId && subId != null && selectedAlignment
   );
 
   const { data: workspace, isPending: isComparisonPending } = useQuery({
     queryKey: drawingComparisonWorkspaceQueryKey(
       projectId,
-      masterId ?? 0,
+      masterDrawingId,
       subId ?? 0
     ),
-    queryFn: () => compareSubDrawing(projectId, masterId!, subId!),
+    queryFn: () => compareSubDrawing(projectId, masterDrawingId, subId!),
     enabled: comparisonEnabled,
   });
+
+  const { data: activeJobsPayload } = useQuery({
+    queryKey: ["projectJobs", "active", projectId],
+    queryFn: () => fetchProjectJobs(projectId, "active"),
+    enabled: comparisonEnabled,
+    refetchInterval: (q) => {
+      const match = findActiveDrawingCompareJob(
+        q.state.data?.jobs,
+        masterDrawingId,
+        subId!
+      );
+      return match ? 2500 : false;
+    },
+  });
+
+  const activeCompareJob = useMemo(
+    () =>
+      subId != null
+        ? findActiveDrawingCompareJob(activeJobsPayload?.jobs, masterDrawingId, subId)
+        : null,
+    [activeJobsPayload?.jobs, masterDrawingId, subId]
+  );
 
   const transformFromList = useMemo(
     () => extractAlignmentTransform(selectedAlignment),
@@ -121,6 +152,36 @@ export default function DrawingComparisonWorkspace({
   const transformValidation = validateTransform(displayTransform);
 
   const comparisonProgress = readComparisonProgressFromWorkspace(workspace);
+
+  const compareProgressBanner = useMemo(() => {
+    if (compareBusy) {
+      return {
+        title: "Comparing drawings…",
+        detail: "Aligning, detecting changes, and loading the workspace.",
+      };
+    }
+    if (activeCompareJob) {
+      const st = (activeCompareJob.status ?? "").toLowerCase();
+      if (st === "pending") {
+        return {
+          title: "Compare job queued…",
+          detail: "Waiting for the worker to pick up this comparison.",
+        };
+      }
+      return {
+        title: "Comparison running…",
+        detail: "Aligning and detecting changes in the background.",
+      };
+    }
+    const ast = (metadata?.status ?? "").toLowerCase();
+    if (selectedAlignment && ast === "processing") {
+      return {
+        title: "Alignment in progress…",
+        detail: "This sheet is still being aligned.",
+      };
+    }
+    return null;
+  }, [compareBusy, activeCompareJob, metadata?.status, selectedAlignment]);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -194,34 +255,95 @@ export default function DrawingComparisonWorkspace({
         </div>
       ) : null}
 
-      {selectedAlignment && workspace && alignmentOverlayUsable ? (
-        <div className="mb-4 flex flex-wrap items-center gap-4 rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
-            <input
-              type="checkbox"
-              checked={showOverlay}
-              onChange={(e) => setShowOverlay(e.target.checked)}
-              className="rounded border-border text-primary focus:ring-primary"
-            />
-            Show sub overlay
-          </label>
+      {compareProgressBanner ? (
+        <div
+          className="flex items-start gap-3 rounded-lg border border-primary/25 bg-primary-soft/90 px-4 py-3 text-sm text-foreground shadow-sm"
+          data-testid="compare-progress-banner"
+        >
+          <div
+            className="mt-0.5 h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-muted border-t-primary"
+            aria-hidden
+          />
+          <div>
+            <div className="font-medium">{compareProgressBanner.title}</div>
+            <div className="mt-0.5 text-muted-foreground">{compareProgressBanner.detail}</div>
+          </div>
+        </div>
+      ) : null}
 
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
-            <span className="text-muted-foreground">Opacity</span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={overlayOpacity}
-              onChange={(e) => setOverlayOpacity(Number(e.target.value))}
-              className="h-2 w-48 min-w-[8rem] accent-primary"
-            />
-          </label>
+      {selectedAlignment ? (
+        <div className="mb-4 flex flex-col gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            {workspace && alignmentOverlayUsable ? (
+              <>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={showAlignedSubOverlay}
+                    onChange={(e) => setShowAlignedSubOverlay(e.target.checked)}
+                    className="rounded border-border text-primary focus:ring-primary"
+                  />
+                  Show aligned sub overlay
+                </label>
 
-          <span className="text-sm text-muted-foreground tabular-nums">
-            {Math.round(overlayOpacity * 100)}%
-          </span>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                  <span className="text-muted-foreground">Sub opacity</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={overlayOpacity}
+                    onChange={(e) => setOverlayOpacity(Number(e.target.value))}
+                    className="h-2 w-48 min-w-[8rem] accent-primary"
+                  />
+                  <span className="text-sm text-muted-foreground tabular-nums">
+                    {Math.round(overlayOpacity * 100)}%
+                  </span>
+                </label>
+              </>
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                Sub overlay unavailable until alignment and compare workspace load.
+              </span>
+            )}
+
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                checked={showChangesOnly}
+                onChange={(e) => setShowChangesOnly(e.target.checked)}
+                className="rounded border-border text-primary focus:ring-primary"
+              />
+              Show changes only
+            </label>
+
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                checked={showInspectionStatuses}
+                onChange={(e) => setShowInspectionStatuses(e.target.checked)}
+                className="rounded border-border text-primary focus:ring-primary"
+              />
+              Show inspection statuses
+            </label>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 border-t border-border pt-3 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Diff overlay legend</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm bg-amber-500" aria-hidden />
+              Changed
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm bg-green-600" aria-hidden />
+              Passed
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm bg-red-600" aria-hidden />
+              Failed
+            </span>
+          </div>
         </div>
       ) : null}
 
@@ -230,9 +352,13 @@ export default function DrawingComparisonWorkspace({
           drawing={masterDrawing}
           selectedDiff={selectedDiff}
           comparisonWorkspace={workspace ?? undefined}
-          isLoadingComparisonWorkspace={comparisonEnabled && isComparisonPending}
-          showOverlay={showOverlay}
+          isLoadingComparisonWorkspace={
+            (comparisonEnabled && isComparisonPending) || compareBusy
+          }
+          showOverlay={showAlignedSubOverlay}
           overlayOpacity={overlayOpacity}
+          overlayShowChangesOnly={showChangesOnly}
+          overlayShowInspectionStatuses={showInspectionStatuses}
         />
       </div>
 

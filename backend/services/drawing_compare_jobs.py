@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from api.upload_intent_form import drawing_has_sub_upload_intent
 from models.models import Drawing, JobQueue, Project
 from observability.workflow_logging import log_job_status_transition
-from services.drawing_render_jobs import _resolve_user_id_for_project
+from services.job_input_data import coerce_job_int
 from services.storage import StorageService, get_project_master_drawing
 
 DRAWING_COMPARE_JOB_TYPE = "drawing_compare"
@@ -41,10 +41,13 @@ def _pending_compare_job_for_sub(
     )
     for job in rows:
         data = job.input_data if isinstance(job.input_data, dict) else {}
+        raw_sub = data.get("sub_drawing_id")
+        if raw_sub is None:
+            continue
         try:
-            if int(data.get("sub_drawing_id", -1)) == int(sub_drawing_id):
+            if coerce_job_int(raw_sub, "sub_drawing_id") == int(sub_drawing_id):
                 return job
-        except (TypeError, ValueError):
+        except ValueError:
             continue
     return None
 
@@ -92,6 +95,8 @@ def enqueue_drawing_compare_job(
     project = db.query(Project).filter(Project.id == project_id).first()
     if project is None:
         return None
+
+    from services.drawing_render_jobs import _resolve_user_id_for_project
 
     user_id = _resolve_user_id_for_project(db, project_id)
     storage = StorageService(db)

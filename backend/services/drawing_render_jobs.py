@@ -72,9 +72,7 @@ def enqueue_drawing_render_job(
         job_type=DRAWING_RENDER_JOB_TYPE,
         status="pending",
         input_data={
-            "drawing_id": drawing_id,
-            "storage_key": drawing.storage_key,
-            "upload_intent": drawing.upload_intent,
+            "drawing_id": int(drawing_id),
         },
     )
     db.add(job)

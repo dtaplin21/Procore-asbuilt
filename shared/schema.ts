@@ -223,6 +223,8 @@ export interface DrawingTransform {
   matrix: number[];
   confidence?: number | null;
   meta?: Record<string, unknown> | null;
+  /** 1-based drawing page this transform applies to; default 1 when omitted. */
+  page?: number | null;
 }
 
 export interface DrawingOverlayDrawingSummary {
