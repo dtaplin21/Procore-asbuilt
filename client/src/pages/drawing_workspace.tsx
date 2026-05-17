@@ -129,6 +129,11 @@ export function DrawingWorkspaceBody({
 
   const runCompareSubToMaster = useCallback(
     async (subDrawingId: number) => {
+      console.log("[compare-debug] runCompareSubToMaster start", {
+        projectId,
+        masterDrawingId,
+        subDrawingId,
+      });
       const requestId = beginCompareOperation();
       setCompareLoading(true);
       setCompareError(null);
@@ -138,11 +143,20 @@ export function DrawingWorkspaceBody({
           masterDrawingId,
           subDrawingId,
         });
+        console.log("[compare-debug] runCompareSubToMaster API returned, merging", {
+          requestId,
+          alignmentId: response.alignment?.id,
+        });
         await mergeCompareResponse(response, requestId);
         setSelectedSubDrawingId(subDrawingId);
+        console.log("[compare-debug] runCompareSubToMaster complete", { subDrawingId });
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Failed to compare drawings";
+        console.error("[compare-debug] runCompareSubToMaster error", {
+          message,
+          error,
+        });
         setCompareError(message);
         throw error;
       } finally {
@@ -159,11 +173,19 @@ export function DrawingWorkspaceBody({
 
   const handleConfirmCompare = useCallback(
     async (subDrawingId: number) => {
+      console.log("[compare-debug] handleConfirmCompare (modal Compare clicked)", {
+        subDrawingId,
+      });
       try {
         await runCompareSubToMaster(subDrawingId);
+        console.log("[compare-debug] handleConfirmCompare closing modal");
         setCompareModalOpen(false);
-      } catch {
-        // compareError set in runCompareSubToMaster
+      } catch (e) {
+        console.warn(
+          "[compare-debug] handleConfirmCompare compare failed (see runCompareSubToMaster logs)",
+          e
+        );
+        throw e;
       }
     },
     [runCompareSubToMaster]

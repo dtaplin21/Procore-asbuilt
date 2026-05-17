@@ -42,10 +42,27 @@ export async function compareSubDrawing(
   drawingId: number,
   subDrawingId: number
 ): Promise<DrawingComparisonWorkspaceResponse> {
-  return requestJson<DrawingComparisonWorkspaceResponse>(
-    `/api/projects/${projectId}/drawings/compare/${drawingId}/${subDrawingId}`,
-    { method: "POST" }
-  );
+  const path = `/api/projects/${projectId}/drawings/compare/${drawingId}/${subDrawingId}`;
+  console.log("[compare-debug] POST compare starting", {
+    path,
+    projectId,
+    masterDrawingId: drawingId,
+    subDrawingId,
+  });
+  try {
+    const result = await requestJson<DrawingComparisonWorkspaceResponse>(path, {
+      method: "POST",
+    });
+    console.log("[compare-debug] POST compare succeeded", {
+      alignmentId: result.alignment?.id,
+      diffCount: result.diffs?.length ?? 0,
+      alignmentStatus: result.alignment?.status,
+    });
+    return result;
+  } catch (err) {
+    console.error("[compare-debug] POST compare threw", err);
+    throw err;
+  }
 }
 
 /** POST compare — route master + chosen sub, aligned with backend naming. */

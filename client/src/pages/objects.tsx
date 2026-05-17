@@ -46,6 +46,10 @@ import type { ProjectDrawingsResponse, ProjectDrawingCandidate } from "@/types/d
 import { useDrawingDiffs } from "@/hooks/use-drawing-diffs";
 import { fetchProjectDrawings, projectDrawingsQueryKey } from "@/lib/api/drawings";
 import { fetchMasterDrawing } from "@/lib/api/drawing_workspace";
+import {
+  setLastProjectIdForWorkspaceFallback,
+  setWorkspaceReturnPath,
+} from "@/lib/workspace-return-path";
 
 /**
  * Part 6 (Option A): `/objects?projectId=…&drawingId=…` drives project + master selection.
@@ -276,6 +280,22 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     selectedMasterDrawingId,
     setSearchParams,
   ]);
+
+  /** Keep sidebar Workspace + return path aligned with Objects project / master selection. */
+  useEffect(() => {
+    if (
+      selectedProjectId == null ||
+      selectedMasterDrawingId == null ||
+      selectedProjectId <= 0 ||
+      selectedMasterDrawingId <= 0
+    ) {
+      return;
+    }
+    setWorkspaceReturnPath(
+      `/projects/${selectedProjectId}/drawings/${selectedMasterDrawingId}/workspace`
+    );
+    setLastProjectIdForWorkspaceFallback(selectedProjectId);
+  }, [selectedProjectId, selectedMasterDrawingId]);
 
   const diffs = diffsData?.items ?? [];
 

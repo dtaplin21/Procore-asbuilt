@@ -771,6 +771,11 @@ class DrawingComparisonService:
             master_drawing_id=master_drawing_id,
             sub_drawing_id=sub_drawing_id,
         )
+        logger.info(
+            "[compare-debug] compare: validated drawings master_id=%s sub_id=%s",
+            master_drawing_id,
+            sub_drawing_id,
+        )
 
         # One row per (project, master, sub); reuse the latest alignment instead of inserting duplicates.
         alignment = (
@@ -796,7 +801,17 @@ class DrawingComparisonService:
                 method=method,
                 region_id=None,
             )
-
+            logger.info(
+                "[compare-debug] compare: created alignment id=%s method=%s",
+                cast(int, alignment.id),
+                method,
+            )
+        else:
+            logger.info(
+                "[compare-debug] compare: reusing alignment id=%s status=%s",
+                cast(int, alignment.id),
+                getattr(alignment, "status", ""),
+            )
         if force_recompute:
             transform = None
         else:
@@ -813,13 +828,44 @@ class DrawingComparisonService:
                 transform = None
 
         if transform is None:
+            logger.info(
+                "[compare-debug] compare: running alignment lifecycle alignment_id=%s",
+                cast(int, alignment.id),
+            )
             run_alignment_lifecycle(self.db, alignment, master_drawing, sub_drawing)
             self.storage.db.refresh(alignment)
+            logger.info(
+                "[compare-debug] compare: alignment lifecycle done status=%s has_matrix=%s",
+                getattr(alignment, "status", ""),
+                bool(
+                    getattr(alignment, "transform", None)
+                    and isinstance(getattr(alignment, "transform", None), dict)
+                    and (getattr(alignment, "transform") or {}).get("matrix")
+                ),
+            )
+        else:
+            logger.info(
+                "[compare-debug] compare: skipping alignment compute (reuse transform) alignment_id=%s",
+                cast(int, alignment.id),
+            )
 
         diffs = self.storage.list_drawing_diffs_by_alignment(cast(int, alignment.id))
+        logger.info(
+            "[compare-debug] compare: existing diffs for alignment count=%s force_recompute=%s",
+            len(diffs),
+            force_recompute,
+        )
 
         if force_recompute or not diffs:
+            logger.info(
+                "[compare-debug] compare: invoking run_drawing_diff alignment_id=%s",
+                cast(int, alignment.id),
+            )
             new_diffs = run_drawing_diff(self.db, alignment=alignment)
+            logger.info(
+                "[compare-debug] compare: run_drawing_diff returned count=%s",
+                len(new_diffs) if new_diffs else 0,
+            )
             if new_diffs:
                 diffs = new_diffs
             else:
@@ -848,6 +894,11 @@ class DrawingComparisonService:
             alignment_id=aid,
         )
 
+        logger.info(
+            "[compare-debug] compare: building response alignment_id=%s diff_rows=%s",
+            aid,
+            len(diffs),
+        )
         return DrawingComparisonWorkspaceResponse(
             master_drawing=self._serialize_overlay_drawing(master_drawing),
             sub_drawing=self._serialize_overlay_drawing(sub_drawing),
@@ -1106,11 +1157,28 @@ def run_alignment_lifecycle(
     svc = DrawingComparisonService(db)
     alignment_id = cast(int, alignment.id)
 
+    logger.info(
+        "[compare-debug] run_alignment_lifecycle start alignment_id=%s master=%s sub=%s page=%s",
+        alignment_id,
+        cast(int, master_drawing.id),
+        cast(int, sub_drawing.id),
+        page,
+    )
     storage.update_alignment_status(alignment_id, "processing")
     try:
         transform = svc.compute_alignment_transform(master_drawing, sub_drawing, page=page)
         storage.update_alignment_status(alignment_id, "complete", transform=transform)
+        logger.info(
+            "[compare-debug] run_alignment_lifecycle complete alignment_id=%s transform_type=%s",
+            alignment_id,
+            transform.get("type") if isinstance(transform, dict) else None,
+        )
     except Exception as e:
+        logger.exception(
+            "[compare-debug] run_alignment_lifecycle failed alignment_id=%s: %s",
+            alignment_id,
+            e,
+        )
         storage.update_alignment_status(
             alignment_id, "failed", error_message=str(e)
         )

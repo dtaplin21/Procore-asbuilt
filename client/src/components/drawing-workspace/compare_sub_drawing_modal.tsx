@@ -166,8 +166,25 @@ export default function CompareSubDrawingModal({
 
   const handleConfirm = async () => {
     // Use `== null` so drawing id `0` is still valid; do not use `!selectedDrawingId`.
-    if (isBusy || selectedDrawingId == null) return;
-    await Promise.resolve(onConfirmCompare(selectedDrawingId));
+    if (isBusy || selectedDrawingId == null) {
+      console.log("[compare-debug] handleConfirm skipped", {
+        isBusy,
+        selectedDrawingId,
+      });
+      return;
+    }
+    console.log("[compare-debug] handleConfirm calling parent", {
+      projectId,
+      masterDrawingId,
+      subDrawingId: selectedDrawingId,
+    });
+    try {
+      await Promise.resolve(onConfirmCompare(selectedDrawingId));
+      console.log("[compare-debug] handleConfirm parent resolved");
+    } catch (e) {
+      console.error("[compare-debug] handleConfirm parent rejected", e);
+      throw e;
+    }
   };
 
   async function handleUpload(file: File) {

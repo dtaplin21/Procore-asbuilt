@@ -532,10 +532,17 @@ def run_drawing_diff(
     storage = StorageService(db)
     alignment_id = cast(int, alignment.id)
 
+    logger.info("[compare-debug] run_drawing_diff start alignment_id=%s", alignment_id)
+
     try:
         # Step 1 — Resolve files
         master_path, sub_path, err = _resolve_file_paths(db, alignment)
         if err:
+            logger.warning(
+                "[compare-debug] run_drawing_diff resolve_paths failed alignment_id=%s err=%s",
+                alignment_id,
+                err,
+            )
             logger.warning(
                 "drawing_diff_resolve_failed",
                 extra={"alignment_id": alignment_id, "error": err},
@@ -550,6 +557,13 @@ def run_drawing_diff(
         if master_path is None or sub_path is None:
             raise DrawingDiffPipelineError(message="Pipeline failure", details={"reason": "File paths not resolved"})
 
+        logger.info(
+            "[compare-debug] run_drawing_diff paths OK alignment_id=%s master=%s sub=%s",
+            alignment_id,
+            master_path,
+            sub_path,
+        )
+
         master_id = cast(int, alignment.master_drawing_id)
         sub_id = cast(int, alignment.sub_drawing_id)
         master = db.query(Drawing).filter(Drawing.id == master_id).first()
@@ -560,6 +574,13 @@ def run_drawing_diff(
         page_i = _alignment_page_from_alignment(alignment)
         master_gray = _render_drawing_to_array(db=db, drawing=master, page=page_i)
         sub_gray = _render_drawing_to_array(db=db, drawing=sub, page=page_i)
+        logger.info(
+            "[compare-debug] run_drawing_diff render page=%s alignment_id=%s master_ok=%s sub_ok=%s",
+            page_i,
+            alignment_id,
+            master_gray is not None,
+            sub_gray is not None,
+        )
         if master_gray is None or sub_gray is None:
             render_err = (
                 "Drawing page render failed for diff "
@@ -586,6 +607,11 @@ def run_drawing_diff(
 
         transform = getattr(alignment, "transform", None)
         warped_sub = _warp_sub_raster_into_master(sub_gray, master_gray, transform)
+        logger.info(
+            "[compare-debug] run_drawing_diff warp alignment_id=%s warped_ok=%s",
+            alignment_id,
+            warped_sub is not None,
+        )
         if warped_sub is None:
             logger.warning(
                 "drawing_diff_no_warp_abort",
@@ -599,6 +625,11 @@ def run_drawing_diff(
 
         # Step 3 & 4 — Generate diff regions, score severity
         detected = _generate_and_score_diff(master_gray, warped_sub, page=page_i)
+        logger.info(
+            "[compare-debug] run_drawing_diff detected items alignment_id=%s count=%s",
+            alignment_id,
+            len(detected),
+        )
 
         created: List[DrawingDiff] = []
 

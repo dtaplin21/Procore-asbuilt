@@ -1,5 +1,7 @@
 from typing import Optional
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -13,6 +15,7 @@ from models.schemas import (
 from services.drawing_comparison import DrawingComparisonService, compare_sub_drawing_to_master
 
 router = APIRouter(prefix="/api/projects", tags=["drawing-comparison"])
+logger = logging.getLogger(__name__)
 
 
 def _compare_drawings_or_http(
@@ -24,17 +27,35 @@ def _compare_drawings_or_http(
     force_recompute: bool,
 ) -> DrawingComparisonWorkspaceResponse:
     """Overlay-ready workspace: master/sub summaries, alignment + transform, diffs."""
+    logger.info(
+        "[compare-debug] compare request start project=%s master=%s sub=%s force_recompute=%s",
+        project_id,
+        master_drawing_id,
+        sub_drawing_id,
+        force_recompute,
+    )
     try:
-        return compare_sub_drawing_to_master(
+        result = compare_sub_drawing_to_master(
             db=db,
             project_id=project_id,
             master_drawing_id=master_drawing_id,
             sub_drawing_id=sub_drawing_id,
             force_recompute=force_recompute,
         )
+        logger.info(
+            "[compare-debug] compare request OK alignment_id=%s diff_count=%s",
+            getattr(result.alignment, "id", None),
+            len(result.diffs) if result.diffs else 0,
+        )
+        return result
     except ValueError as e:
+        logger.warning("[compare-debug] compare request ValueError -> 400: %s", e)
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
+        logger.exception(
+            "[compare-debug] compare request failed -> 500: %s",
+            e,
+        )
         raise HTTPException(
             status_code=500, detail=f"Drawing comparison failed: {str(e)}"
         ) from e
