@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
+from errors import AppError
 from models.schemas import (
     DrawingAlignmentHistoryListResponse,
     DrawingCompareRequest,
@@ -16,6 +17,32 @@ from services.drawing_comparison import DrawingComparisonService, compare_sub_dr
 
 router = APIRouter(prefix="/api/projects", tags=["drawing-comparison"])
 logger = logging.getLogger(__name__)
+
+
+def _compare_failure_detail(exc: BaseException) -> str:
+    """
+    Build a non-empty API detail for compare failures.
+
+    ``AppError`` subclasses (e.g. ``DrawingDiffPipelineError``) use a dataclass
+    ``Exception`` pattern where ``str(exc)`` is often empty; use ``.message`` /
+    ``.details`` instead.
+    """
+    prefix = "Drawing comparison failed: "
+    if isinstance(exc, AppError):
+        msg = (exc.message or "").strip()
+        det = exc.details or {}
+        if msg and det:
+            return f"{prefix}{msg} — {det}"
+        if msg:
+            return f"{prefix}{msg}"
+        if det:
+            return f"{prefix}{det}"
+        return f"{prefix}{type(exc).__name__}"
+
+    text = str(exc).strip()
+    if text:
+        return f"{prefix}{text}"
+    return f"{prefix}{type(exc).__name__}: {repr(exc)}"
 
 
 def _compare_drawings_or_http(
@@ -52,12 +79,16 @@ def _compare_drawings_or_http(
         logger.warning("[compare-debug] compare request ValueError -> 400: %s", e)
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
+        extra = f"type={type(e).__name__} repr={repr(e)}"
+        if isinstance(e, AppError):
+            extra += f" app_message={e.message!r} details={e.details!r}"
         logger.exception(
-            "[compare-debug] compare request failed -> 500: %s",
-            e,
+            "[compare-debug] compare request failed -> 500 (%s)",
+            extra,
         )
         raise HTTPException(
-            status_code=500, detail=f"Drawing comparison failed: {str(e)}"
+            status_code=500,
+            detail=_compare_failure_detail(e),
         ) from e
 
 

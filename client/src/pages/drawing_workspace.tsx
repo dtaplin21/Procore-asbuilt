@@ -34,6 +34,10 @@ type DrawingWorkspaceBodyProps = {
   parsedDrawingId: number;
 };
 
+type CompareSubToMasterResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
 export function DrawingWorkspaceBody({
   parsedProjectId,
   parsedDrawingId,
@@ -128,7 +132,7 @@ export function DrawingWorkspaceBody({
   }, [selectedAlignmentId, selectedDiffId, setSelectionQueryParams]);
 
   const runCompareSubToMaster = useCallback(
-    async (subDrawingId: number) => {
+    async (subDrawingId: number): Promise<CompareSubToMasterResult> => {
       console.log("[compare-debug] runCompareSubToMaster start", {
         projectId,
         masterDrawingId,
@@ -150,6 +154,7 @@ export function DrawingWorkspaceBody({
         await mergeCompareResponse(response, requestId);
         setSelectedSubDrawingId(subDrawingId);
         console.log("[compare-debug] runCompareSubToMaster complete", { subDrawingId });
+        return { ok: true };
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Failed to compare drawings";
@@ -158,7 +163,7 @@ export function DrawingWorkspaceBody({
           error,
         });
         setCompareError(message);
-        throw error;
+        return { ok: false, message };
       } finally {
         setCompareLoading(false);
       }
@@ -176,17 +181,16 @@ export function DrawingWorkspaceBody({
       console.log("[compare-debug] handleConfirmCompare (modal Compare clicked)", {
         subDrawingId,
       });
-      try {
-        await runCompareSubToMaster(subDrawingId);
+      const result = await runCompareSubToMaster(subDrawingId);
+      if (result.ok) {
         console.log("[compare-debug] handleConfirmCompare closing modal");
         setCompareModalOpen(false);
-      } catch (e) {
-        console.warn(
-          "[compare-debug] handleConfirmCompare compare failed (see runCompareSubToMaster logs)",
-          e
-        );
-        throw e;
+        return;
       }
+      console.warn(
+        "[compare-debug] handleConfirmCompare compare failed (see runCompareSubToMaster logs)",
+        result.message
+      );
     },
     [runCompareSubToMaster]
   );
@@ -202,7 +206,14 @@ export function DrawingWorkspaceBody({
         );
         return;
       }
-      await runCompareSubToMaster(drawing.id);
+      const result = await runCompareSubToMaster(drawing.id);
+      if (!result.ok) {
+        toast({
+          title: "Drawing comparison failed",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
     },
     [location, projectId, runCompareSubToMaster, setLocation]
   );

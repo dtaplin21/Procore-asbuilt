@@ -178,13 +178,8 @@ export default function CompareSubDrawingModal({
       masterDrawingId,
       subDrawingId: selectedDrawingId,
     });
-    try {
-      await Promise.resolve(onConfirmCompare(selectedDrawingId));
-      console.log("[compare-debug] handleConfirm parent resolved");
-    } catch (e) {
-      console.error("[compare-debug] handleConfirm parent rejected", e);
-      throw e;
-    }
+    await Promise.resolve(onConfirmCompare(selectedDrawingId));
+    console.log("[compare-debug] handleConfirm parent resolved");
   };
 
   async function handleUpload(file: File) {

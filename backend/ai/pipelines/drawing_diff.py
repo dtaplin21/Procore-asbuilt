@@ -215,16 +215,25 @@ def _warp_sub_raster_into_master(
     """
     if cv2 is None or np is None:
         logger.warning(
-            "drawing_diff_warp_skipped",
-            extra={"reason": "opencv_or_numpy_unavailable"},
+            "[compare-debug] drawing_diff_warp_skipped reason=opencv_or_numpy_unavailable",
         )
         return None
     if sub_gray is None or master_gray is None:
+        logger.warning(
+            "[compare-debug] drawing_diff_warp_skipped reason=missing_raster sub_is_none=%s master_is_none=%s",
+            sub_gray is None,
+            master_gray is None,
+        )
         return None
 
     H = _parse_transform_to_homography(transform_raw)
     if H is None:
-        logger.warning("drawing_diff_warp_skipped", extra={"reason": "invalid_homography"})
+        coerced = _coerce_transform_dict(transform_raw)
+        logger.warning(
+            "[compare-debug] drawing_diff_warp_skipped reason=invalid_homography "
+            "transform_keys=%s",
+            list(coerced.keys()) if isinstance(coerced, dict) else None,
+        )
         return None
 
     mh, mw = int(master_gray.shape[0]), int(master_gray.shape[1])
@@ -237,7 +246,11 @@ def _warp_sub_raster_into_master(
             borderMode=cv2.BORDER_REPLICATE,
         )
     except Exception as e:
-        logger.warning("drawing_diff_warp_failed", extra={"reason": str(e)})
+        logger.warning(
+            "[compare-debug] drawing_diff_warp_failed reason=%s type=%s",
+            e,
+            type(e).__name__,
+        )
         return None
     return warped
 
@@ -356,19 +369,28 @@ def _generate_and_score_diff(
     """
     if cv2 is None or np is None:
         logger.warning(
-            "drawing_diff_detect_skipped",
-            extra={"reason": "opencv_or_numpy_unavailable", "page": page},
+            "[compare-debug] drawing_diff_detect_skipped page=%s reason=opencv_or_numpy_unavailable",
+            page,
         )
         return []
 
     m = _diff_ensure_gray_u8(master_gray)
     w = _diff_ensure_gray_u8(warped_sub)
     if m is None or w is None:
+        logger.warning(
+            "[compare-debug] drawing_diff_detect_skipped page=%s reason=gray_convert_failed "
+            "master_ok=%s warped_ok=%s",
+            page,
+            m is not None,
+            w is not None,
+        )
         return []
     if m.shape != w.shape:
         logger.warning(
-            "drawing_diff_detect_skipped",
-            extra={"reason": "shape_mismatch", "page": page, "master": m.shape, "warped": w.shape},
+            "[compare-debug] drawing_diff_detect_skipped page=%s reason=shape_mismatch master=%s warped=%s",
+            page,
+            m.shape,
+            w.shape,
         )
         return []
 
@@ -575,16 +597,32 @@ def run_drawing_diff(
         master_gray = _render_drawing_to_array(db=db, drawing=master, page=page_i)
         sub_gray = _render_drawing_to_array(db=db, drawing=sub, page=page_i)
         logger.info(
-            "[compare-debug] run_drawing_diff render page=%s alignment_id=%s master_ok=%s sub_ok=%s",
+            "[compare-debug] run_drawing_diff render page=%s alignment_id=%s master_ok=%s sub_ok=%s master_shape=%s sub_shape=%s",
             page_i,
             alignment_id,
             master_gray is not None,
             sub_gray is not None,
+            getattr(master_gray, "shape", None),
+            getattr(sub_gray, "shape", None),
         )
         if master_gray is None or sub_gray is None:
             render_err = (
                 "Drawing page render failed for diff "
                 f"(page={page_i}, master_ok={master_gray is not None}, sub_ok={sub_gray is not None})"
+            )
+            m_key = getattr(master, "storage_key", None)
+            s_key = getattr(sub, "storage_key", None)
+            m_status = getattr(master, "processing_status", None)
+            s_status = getattr(sub, "processing_status", None)
+            logger.warning(
+                "[compare-debug] run_drawing_diff render failed alignment_id=%s page=%s "
+                "master_storage_key=%s sub_storage_key=%s master_processing_status=%s sub_processing_status=%s",
+                alignment_id,
+                page_i,
+                m_key,
+                s_key,
+                m_status,
+                s_status,
             )
             logger.warning(
                 "drawing_diff_render_failed",
@@ -613,6 +651,12 @@ def run_drawing_diff(
             warped_sub is not None,
         )
         if warped_sub is None:
+            logger.warning(
+                "[compare-debug] drawing_diff_no_warp_abort alignment_id=%s page=%s "
+                "reason=warp_sub_into_master_unavailable_or_failed",
+                alignment_id,
+                page_i,
+            )
             logger.warning(
                 "drawing_diff_no_warp_abort",
                 extra={
@@ -664,12 +708,20 @@ def run_drawing_diff(
         )
         return created
 
-    except DrawingDiffPipelineError:
+    except DrawingDiffPipelineError as e:
+        logger.warning(
+            "[compare-debug] run_drawing_diff pipeline error alignment_id=%s message=%r details=%r",
+            alignment_id,
+            e.message,
+            e.details,
+        )
         raise
     except Exception as e:
         logger.exception(
-            "drawing_diff_pipeline_failed",
-            extra={"alignment_id": alignment_id},
+            "[compare-debug] run_drawing_diff unexpected failure alignment_id=%s type=%s repr=%s",
+            alignment_id,
+            type(e).__name__,
+            repr(e),
         )
         try:
             storage.update_alignment_status(

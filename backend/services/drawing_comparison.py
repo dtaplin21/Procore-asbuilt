@@ -772,9 +772,14 @@ class DrawingComparisonService:
             sub_drawing_id=sub_drawing_id,
         )
         logger.info(
-            "[compare-debug] compare: validated drawings master_id=%s sub_id=%s",
+            "[compare-debug] compare: validated drawings master_id=%s sub_id=%s "
+            "master_has_key=%s sub_has_key=%s master_status=%s sub_status=%s",
             master_drawing_id,
             sub_drawing_id,
+            bool(getattr(master_drawing, "storage_key", None)),
+            bool(getattr(sub_drawing, "storage_key", None)),
+            getattr(master_drawing, "processing_status", None),
+            getattr(sub_drawing, "processing_status", None),
         )
 
         # One row per (project, master, sub); reuse the latest alignment instead of inserting duplicates.
@@ -861,7 +866,16 @@ class DrawingComparisonService:
                 "[compare-debug] compare: invoking run_drawing_diff alignment_id=%s",
                 cast(int, alignment.id),
             )
-            new_diffs = run_drawing_diff(self.db, alignment=alignment)
+            try:
+                new_diffs = run_drawing_diff(self.db, alignment=alignment)
+            except Exception as e:
+                logger.exception(
+                    "[compare-debug] compare: run_drawing_diff raised alignment_id=%s type=%s repr=%s",
+                    cast(int, alignment.id),
+                    type(e).__name__,
+                    repr(e),
+                )
+                raise
             logger.info(
                 "[compare-debug] compare: run_drawing_diff returned count=%s",
                 len(new_diffs) if new_diffs else 0,
@@ -1175,9 +1189,10 @@ def run_alignment_lifecycle(
         )
     except Exception as e:
         logger.exception(
-            "[compare-debug] run_alignment_lifecycle failed alignment_id=%s: %s",
+            "[compare-debug] run_alignment_lifecycle failed alignment_id=%s type=%s repr=%s",
             alignment_id,
-            e,
+            type(e).__name__,
+            repr(e),
         )
         storage.update_alignment_status(
             alignment_id, "failed", error_message=str(e)
