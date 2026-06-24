@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, cast
 
 from api.dependencies import get_db
-from services.drawing_comparison import serialize_drawing_for_workspace
+from services.drawing_workspace import drawing_file_api_path, serialize_drawing_for_workspace
 from services.drawing_render_jobs import enqueue_drawing_render_job
 from services.storage import StorageService
 from models.schemas import (

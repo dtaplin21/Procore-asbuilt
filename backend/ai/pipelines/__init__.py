@@ -1,5 +1,5 @@
-# AI pipelines package
+"""AI pipeline entry points."""
 
-from ai.pipelines.drawing_diff import run_drawing_diff
+from ai.pipelines.inspection_mapping import run_inspection_mapping
 
-__all__ = ["run_drawing_diff"]
+__all__ = ["run_inspection_mapping"]

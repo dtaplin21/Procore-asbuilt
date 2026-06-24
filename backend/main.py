@@ -25,8 +25,6 @@ from api.routes import (
     evidence,
     evidence_records,
     drawing_alignment,
-    drawing_diffs,
-    drawing_comparison,
     drawing_progress,
     inspection_reviews,
 )
@@ -40,8 +38,7 @@ from sqlalchemy.exc import SQLAlchemyError
 configure_logging()
 
 tags_metadata = [
-    {"name": "drawing-diffs", "description": "Compute and fetch drawing diffs for a master drawing."},
-    {"name": "drawing-alignment", "description": "Regions and alignments linking master and sub-drawings."},
+    {"name": "drawing-alignment", "description": "User-defined regions on master drawings."},
     {"name": "projects", "description": "Projects, drawings, and project-scoped resources."},
     {"name": "findings", "description": "Project findings with serialized API rows."},
     {"name": "insights", "description": "AI findings and insights."},
@@ -169,8 +166,6 @@ app.include_router(drawing_files.router)
 app.include_router(evidence.router)
 app.include_router(evidence_records.router)
 app.include_router(drawing_alignment.router)
-app.include_router(drawing_diffs.router)
-app.include_router(drawing_comparison.router)
 app.include_router(drawing_progress.router)
 app.include_router(inspection_reviews.router)
 

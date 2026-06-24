@@ -29,7 +29,6 @@ Application environment::
     DATABASE_DISABLE_SSL_FOR_LOCALHOST  # default true in dev — sslmode=disable for localhost DB (non-TLS Postgres)
     OPENAI_API_KEY              # API host only — required for inspection/GPT features (beta)
     OPENAI_CHAT_MODEL           # optional — defaults to gpt-4o-mini
-    USE_MODEL_ALIGNMENT         # optional — "true" to try learned matcher before ORB (see compute_alignment_transform)
 """
 
 from urllib.parse import urlparse
@@ -76,13 +75,6 @@ class Settings(BaseSettings):
         description="DATABASE_DISABLE_SSL_FOR_LOCALHOST",
     )
 
-    #: When true, try learned matcher first in :meth:`DrawingComparisonService.compute_alignment_transform`;
-    #: on failure or if unavailable, fall back to ORB/homography. Env: ``USE_MODEL_ALIGNMENT=true``.
-    use_model_alignment: bool = Field(
-        default=False,
-        description="USE_MODEL_ALIGNMENT",
-    )
-
     # In some environments (CI, sandboxes), extra env vars may be present.
     # Ignore unknown keys instead of erroring at import time.
     model_config = SettingsConfigDict(
@@ -104,13 +96,6 @@ class Settings(BaseSettings):
     def _empty_openai_key_to_none(cls, v: object) -> object:
         if isinstance(v, str) and not v.strip():
             return None
-        return v
-
-    @field_validator("use_model_alignment", mode="before")
-    @classmethod
-    def _coerce_use_model_alignment(cls, v: object) -> object:
-        if isinstance(v, str):
-            return v.strip().lower() == "true"
         return v
 
     @field_validator("database_url", mode="before")

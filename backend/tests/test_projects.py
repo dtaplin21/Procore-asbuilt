@@ -14,7 +14,6 @@ namespace rather than relying on the current working directory.
 """
 
 from models.models import Drawing, Project
-from services.drawing_compare_jobs import _drawing_has_sub_upload_intent
 from services.storage import StorageService, get_project_master_drawing
 
 
@@ -77,27 +76,6 @@ def test_create_drawing_always_sets_upload_intent_master(
     assert cast(str | None, row.upload_intent) == "master"
     db_session.refresh(project)
     assert cast(int | None, project.master_drawing_id) == cast(int, drawing.id)
-
-
-def test_drawing_has_sub_upload_intent_only_matches_literal_sub(project: Project) -> None:
-    d_none = Drawing(
-        project_id=cast(int, project.id),
-        source="upload",
-        name="legacy.pdf",
-        storage_key="k",
-        content_type="application/pdf",
-        upload_intent=None,
-    )
-    d_master = Drawing(
-        project_id=cast(int, project.id),
-        source="upload",
-        name="m.pdf",
-        storage_key="k2",
-        content_type="application/pdf",
-        upload_intent="master",
-    )
-    assert _drawing_has_sub_upload_intent(d_none) is False
-    assert _drawing_has_sub_upload_intent(d_master) is False
 
 
 def test_projects_router_upload_always_sets_master(

@@ -689,10 +689,11 @@ class StorageService:
         """
         if method.strip().lower() == "manual":
             status = "complete"
-            from services.drawing_comparison import build_identity_transform
-
             transform = {
-                **build_identity_transform(),
+                "type": "affine",
+                "matrix": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                "confidence": 1.0,
+                "meta": {"note": "Identity transform for MVP overlay behavior"},
                 "page": 1,
                 "residual_error": None,
             }
