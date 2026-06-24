@@ -18,7 +18,6 @@ import {
   useWorkspaceSelectionQueryParams,
 } from "@/hooks/use_workspace_selection_query_params";
 import { toast } from "@/hooks/use-toast";
-import { compareSubDrawingToMaster } from "@/lib/api/drawing_workspace";
 import { fetchProjectDashboardSummary } from "@/lib/api/projects";
 import {
   setLastProjectIdForWorkspaceFallback,
@@ -32,10 +31,6 @@ type DrawingWorkspaceBodyProps = {
   parsedDrawingId: number;
 };
 
-type CompareSubToMasterResult =
-  | { ok: true }
-  | { ok: false; message: string };
-
 export function DrawingWorkspaceBody({
   parsedProjectId,
   parsedDrawingId,
@@ -43,10 +38,9 @@ export function DrawingWorkspaceBody({
   const [location, setLocation] = useLocation();
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [compareLoading, setCompareLoading] = useState(false);
 
   const projectId = parsedProjectId;
-  /** Workspace “master” side of compare — always from route `drawingId`, not from dashboard summary. */
+  /** Route master drawing id — workspace sheet for this URL. */
   const masterDrawingId = parsedDrawingId;
 
   useEffect(() => {
@@ -94,8 +88,6 @@ export function DrawingWorkspaceBody({
     selectDiff,
     reloadWorkspace,
     reloadSelectedDiffs,
-    beginCompareOperation,
-    mergeCompareResponse,
   } = useDrawingWorkspace({
     projectId: parsedProjectId,
     drawingId: parsedDrawingId,
@@ -118,69 +110,19 @@ export function DrawingWorkspaceBody({
     });
   }, [selectedAlignmentId, selectedDiffId, setSelectionQueryParams]);
 
-  const runCompareSubToMaster = useCallback(
-    async (subDrawingId: number): Promise<CompareSubToMasterResult> => {
-      console.log("[compare-debug] runCompareSubToMaster start", {
-        projectId,
-        masterDrawingId,
-        subDrawingId,
-      });
-      const requestId = beginCompareOperation();
-      setCompareLoading(true);
-      try {
-        const response = await compareSubDrawingToMaster({
-          projectId,
-          masterDrawingId,
-          subDrawingId,
-        });
-        console.log("[compare-debug] runCompareSubToMaster API returned, merging", {
-          requestId,
-          alignmentId: response.alignment?.id,
-        });
-        await mergeCompareResponse(response, requestId);
-        console.log("[compare-debug] runCompareSubToMaster complete", { subDrawingId });
-        return { ok: true };
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Failed to compare drawings";
-        console.error("[compare-debug] runCompareSubToMaster error", {
-          message,
-          error,
-        });
-        return { ok: false, message };
-      } finally {
-        setCompareLoading(false);
-      }
-    },
-    [
-      beginCompareOperation,
-      masterDrawingId,
-      mergeCompareResponse,
-      projectId,
-    ]
-  );
-
   const handleUploadSuccess = useCallback(
     async (drawing: DrawingResponse, intent: DrawingUploadIntent) => {
-      if (intent === "master") {
-        const q = location.indexOf("?");
-        const search = q === -1 ? "" : location.slice(q);
-        const nextQuery = stripWorkspaceSelectionFromSearch(search);
-        setLocation(
-          `/projects/${projectId}/drawings/${drawing.id}/workspace${nextQuery}`
-        );
+      if (intent !== "master") {
         return;
       }
-      const result = await runCompareSubToMaster(drawing.id);
-      if (!result.ok) {
-        toast({
-          title: "Drawing comparison failed",
-          description: result.message,
-          variant: "destructive",
-        });
-      }
+      const q = location.indexOf("?");
+      const search = q === -1 ? "" : location.slice(q);
+      const nextQuery = stripWorkspaceSelectionFromSearch(search);
+      setLocation(
+        `/projects/${projectId}/drawings/${drawing.id}/workspace${nextQuery}`
+      );
     },
-    [location, projectId, runCompareSubToMaster, setLocation]
+    [location, projectId, setLocation]
   );
 
   const header = (
@@ -198,15 +140,12 @@ export function DrawingWorkspaceBody({
       onOpenChange={setUploadModalOpen}
       projectId={projectId}
       workspaceMasterDrawingId={masterDrawingId}
+      allowSub={false}
       onUploadSuccess={handleUploadSuccess}
-      isExternallyBusy={compareLoading}
     />
   );
 
-  const sidebarUploadControls = (
-    uploadDisabled: boolean,
-    compareBusy: boolean
-  ) => (
+  const sidebarUploadControls = (uploadDisabled: boolean) => (
     <div className="space-y-2">
       <button
         type="button"
@@ -228,7 +167,6 @@ export function DrawingWorkspaceBody({
         type="button"
         className="inline-flex w-full items-center justify-center rounded-md border border-destructive/40 bg-background px-3 py-2 text-sm font-medium text-destructive shadow-sm hover:bg-destructive/10 disabled:opacity-60"
         onClick={() => setDeleteDialogOpen(true)}
-        disabled={compareBusy}
         data-testid="workspace-delete-drawing-open"
       >
         <Trash2 className="mr-2 h-4 w-4 shrink-0" aria-hidden />
@@ -260,7 +198,7 @@ export function DrawingWorkspaceBody({
         <DrawingWorkspaceLayout
           header={header}
           viewer={<WorkspaceLoadingState />}
-          sidebar={sidebarUploadControls(true, false)}
+          sidebar={sidebarUploadControls(true)}
         />
 
         {uploadModal}
@@ -280,7 +218,7 @@ export function DrawingWorkspaceBody({
               onRetry={() => void reloadWorkspace()}
             />
           }
-          sidebar={sidebarUploadControls(false, false)}
+          sidebar={sidebarUploadControls(false)}
         />
 
         {uploadModal}
@@ -295,17 +233,13 @@ export function DrawingWorkspaceBody({
         header={header}
         viewer={
           <DrawingComparisonWorkspace
-            projectId={parsedProjectId}
-            masterDrawingId={masterDrawingId}
             masterDrawing={masterDrawing}
-            selectedAlignment={selectedAlignment}
             selectedDiff={selectedDiff}
-            compareBusy={compareLoading}
           />
         }
         sidebar={
           <>
-            {sidebarUploadControls(compareLoading, compareLoading)}
+            {sidebarUploadControls(false)}
 
             <AlignmentsPanel
               projectId={projectId}
