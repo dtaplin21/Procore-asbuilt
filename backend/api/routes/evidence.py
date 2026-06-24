@@ -1,19 +1,152 @@
 from typing import List, Optional, Any, cast
 import json
+import logging
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Depends
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db, get_idempotency_key
-from models.models import EvidenceRecord, Project
-from models.schemas import EvidenceRecordResponse, EvidenceListResponse
-from services.storage import StorageService
+from ai.pipelines.inspection_mapping import DocumentEvidenceInput, map_document_to_overlays
+from models.models import EvidenceRecord, InspectionRun, Project
+from models.schemas import (
+    EvidenceRecordResponse,
+    EvidenceListResponse,
+    InspectionRunEvidenceUploadResponse,
+)
+from services.evidence_file_storage import UnsupportedEvidenceFileType, save_upload
 from services.file_storage import get_file_path, read_and_validate_upload, save_upload_from_bytes, sha256_bytes
 from services.idempotency import begin_idempotent_operation, finish_idempotent_operation
+from services.overlay_storage import create_drawing_overlays, flag_unresolved_evidence
+from services.region_index_loader import build_region_index
+from services.storage import StorageService
 from fastapi.responses import FileResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["evidence"])
 
+
+def _try_visual_registration(file_path: str, master_drawing_id: str):
+    """Placeholder for Case A (alignment) registration — returns None until wired."""
+    return None
+
+
+def _maybe_trigger_run_completion(db: Session, run: InspectionRun) -> None:
+    """Extension point (PR3 §3.3): update run status when evidence pipeline completes."""
+    # Intentionally left as a no-op until run-completion rules are defined centrally.
+    _ = (db, run)
+
+
+@router.post(
+    "/api/projects/{project_id}/inspections/runs/{inspection_run_id}/evidence",
+    response_model=InspectionRunEvidenceUploadResponse,
+)
+async def upload_inspection_run_evidence(
+    project_id: int,
+    inspection_run_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> InspectionRunEvidenceUploadResponse:
+    """Upload evidence against an inspection run and map it onto the master drawing."""
+    storage = StorageService(db)
+    if storage.get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    run = storage.get_inspection_run(project_id, inspection_run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Inspection run not found")
+
+    master_drawing_id = cast(int, run.master_drawing_id)
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Missing filename")
+
+    file_bytes, content_type, original_name = read_and_validate_upload(file, category="evidence")
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    try:
+        saved = save_upload(
+            original_name,
+            file_bytes,
+            project_id=project_id,
+            content_type=content_type,
+        )
+    except UnsupportedEvidenceFileType as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    evidence = storage.create_evidence_record(
+        project_id=project_id,
+        type="inspection_doc",
+        trade=None,
+        spec_section=None,
+        title=original_name,
+        storage_key=saved.storage_key,
+        content_type=saved.content_type,
+        text_content=None,
+        meta={"inspectionRunId": inspection_run_id},
+    )
+    evidence_id = cast(int, evidence.id)
+
+    if getattr(run, "evidence_id", None) is None:
+        setattr(run, "evidence_id", evidence_id)
+        db.commit()
+        db.refresh(run)
+
+    region_load = build_region_index(db, master_drawing_id)
+    registration = _try_visual_registration(str(saved.file_path), str(master_drawing_id))
+
+    evidence_input = DocumentEvidenceInput(
+        evidence_id=str(evidence_id),
+        inspection_run_id=str(inspection_run_id),
+        master_drawing_id=str(master_drawing_id),
+        file_path=str(saved.file_path),
+        region_index=region_load.regions,
+        registration_transform=registration,
+    )
+
+    try:
+        overlays, unresolved = map_document_to_overlays(evidence_input)
+    except Exception:
+        logger.exception(
+            "map_document_to_overlays failed for evidence_id=%s run_id=%s drawing_id=%s",
+            evidence_id,
+            inspection_run_id,
+            master_drawing_id,
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Could not process the uploaded evidence file. It may be "
+                "corrupted, password-protected, or an unsupported format."
+            ),
+        ) from None
+
+    saved_overlays = create_drawing_overlays(db, overlays) if overlays else []
+    if unresolved:
+        flag_unresolved_evidence(
+            db,
+            unresolved,
+            evidence_id=evidence_id,
+            project_id=project_id,
+        )
+
+    if region_load.untagged_region_count > 0:
+        logger.info(
+            "Drawing %s has %d untagged regions — tag with inspection_type_tags/location_tags.",
+            master_drawing_id,
+            region_load.untagged_region_count,
+        )
+
+    _maybe_trigger_run_completion(db, run)
+
+    return InspectionRunEvidenceUploadResponse(
+        evidence_id=evidence_id,
+        overlays_created=len(saved_overlays),
+        unresolved_count=len(unresolved),
+        untagged_region_count=region_load.untagged_region_count,
+        overlay_ids=[cast(int, overlay.id) for overlay in saved_overlays],
+    )
 
 
 @router.post("/api/projects/{project_id}/evidence", response_model=EvidenceRecordResponse)

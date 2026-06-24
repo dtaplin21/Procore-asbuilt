@@ -1,5 +1,5 @@
 # models/database.py
-from sqlalchemy import CheckConstraint, Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Float, JSON, UniqueConstraint, Index, text
+from sqlalchemy import CheckConstraint, Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Float, JSON, UniqueConstraint, Index, text, Date
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
@@ -326,6 +326,11 @@ class Drawing(Base):
     regions = relationship("DrawingRegion", back_populates="master_drawing", cascade="all, delete-orphan")
     overlays = relationship("DrawingOverlay", back_populates="master_drawing", cascade="all, delete-orphan")
     inspection_runs = relationship("InspectionRun", back_populates="master_drawing", cascade="all, delete-orphan")
+    unresolved_evidence = relationship(
+        "UnresolvedEvidence",
+        back_populates="master_drawing",
+        cascade="all, delete-orphan",
+    )
     findings = relationship("Finding", back_populates="drawing")
 
 
@@ -509,6 +514,11 @@ class InspectionRun(Base):
     evidence = relationship("EvidenceRecord", back_populates="inspection_runs")
     results = relationship("InspectionResult", back_populates="inspection_run", cascade="all, delete-orphan")
     overlays = relationship("DrawingOverlay", back_populates="inspection_run", passive_deletes=True)
+    unresolved_evidence = relationship(
+        "UnresolvedEvidence",
+        back_populates="inspection_run",
+        cascade="all, delete-orphan",
+    )
     inspection_reviews = relationship(
         "DrawingInspectionReview",
         back_populates="inspection_run",
@@ -545,7 +555,14 @@ class InspectionResult(Base):
 
 
 class DrawingOverlay(Base):
-    """Overlay geometry on a master drawing; always tied to an inspection run."""
+    """Overlay on a master drawing from the inspection-mapping pipeline.
+
+    ``created_at`` is when the record was uploaded/created in this system
+    (``uploaded_at`` in refactor docs). ``inspection_date`` is when the
+    inspection was performed per the source document (nullable until
+    date extraction is wired).
+    """
+
     __tablename__ = "drawing_overlays"
     __table_args__ = (
         CheckConstraint(
@@ -560,6 +577,7 @@ class DrawingOverlay(Base):
         Index("ix_drawing_overlays_inspection_run_id", "inspection_run_id"),
         Index("ix_drawing_overlays_status", "status"),
         Index("ix_drawing_overlays_master_drawing_id_created_at", "master_drawing_id", "created_at"),
+        Index("ix_drawing_overlays_inspection_date", "inspection_date"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -578,6 +596,12 @@ class DrawingOverlay(Base):
     geometry = Column(JSON, nullable=False)
     status = Column(String, nullable=False, server_default="unknown")  # pass | fail | unknown
 
+    label = Column(String(length=255), nullable=True)
+    severity = Column(String(length=32), nullable=True)  # high | medium | info
+    confidence_label = Column(String(length=64), nullable=True)
+    inspection_date = Column(Date, nullable=True)
+    tags_json = Column(JSON, nullable=True)
+
     meta = Column(JSON, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
 
@@ -589,6 +613,40 @@ class DrawingOverlay(Base):
         back_populates="overlay",
         passive_deletes=True,
     )
+
+
+class UnresolvedEvidence(Base):
+    """Evidence map_document_to_overlays() could not place on the master drawing."""
+
+    __tablename__ = "unresolved_evidence"
+
+    id = Column(Integer, primary_key=True, index=True)
+    evidence_id = Column(
+        Integer,
+        ForeignKey("evidence_records.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    inspection_run_id = Column(
+        Integer,
+        ForeignKey("inspection_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    master_drawing_id = Column(
+        Integer,
+        ForeignKey("drawings.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    reason = Column(Text, nullable=False)
+    extracted_terms_json = Column(JSON, nullable=False)
+    resolved_by_human = Column(Boolean, nullable=False, server_default=text("false"))
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+    evidence = relationship("EvidenceRecord", back_populates="unresolved_placements")
+    inspection_run = relationship("InspectionRun", back_populates="unresolved_evidence")
+    master_drawing = relationship("Drawing", back_populates="unresolved_evidence")
 
 
 # Evidence Records (specs, inspection docs, etc.)
@@ -627,6 +685,11 @@ class EvidenceRecord(Base):
     # Relationships
     project = relationship("Project", back_populates="evidence_records")
     inspection_runs = relationship("InspectionRun", back_populates="evidence")
+    unresolved_placements = relationship(
+        "UnresolvedEvidence",
+        back_populates="evidence",
+        cascade="all, delete-orphan",
+    )
 
 
 class EvidenceDrawingLink(Base):

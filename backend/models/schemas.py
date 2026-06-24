@@ -8,7 +8,7 @@ against the redesigned data model.
 # models/schemas.py
 from pydantic import AliasChoices, BaseModel, EmailStr, Field, ConfigDict, field_validator, model_validator
 from typing import Optional, List, Literal, Any, Dict
-from datetime import datetime
+from datetime import datetime, date
 
 # User Schemas
 class UserBase(BaseModel):
@@ -1202,10 +1202,15 @@ class DrawingOverlayResponse(BaseModel):
     diff_id: Optional[int] = None
     geometry: dict  # OverlayGeometry structure (validated on create)
     status: str
+    label: Optional[str] = None
+    severity: Optional[str] = None
+    confidence_label: Optional[str] = Field(default=None, serialization_alias="confidenceLabel")
+    inspection_date: Optional[date] = Field(default=None, serialization_alias="inspectionDate")
+    tags_json: Optional[dict] = Field(default=None, serialization_alias="tagsJson")
     meta: Optional[dict] = None
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class InspectionRunListResponse(BaseModel):
@@ -1214,6 +1219,14 @@ class InspectionRunListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class InspectionRunEvidenceUploadResponse(BaseModel):
+    evidence_id: int
+    overlays_created: int
+    unresolved_count: int
+    untagged_region_count: int
+    overlay_ids: List[int]
 
 
 # Job Queue Schemas

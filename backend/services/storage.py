@@ -1181,6 +1181,11 @@ class StorageService:
         meta: Optional[Dict[str, Any]] = None,
         *,
         inspection_run_id: int,
+        label: Optional[str] = None,
+        severity: Optional[str] = None,
+        confidence_label: Optional[str] = None,
+        inspection_date: Optional[Any] = None,
+        tags_json: Optional[Dict[str, Any]] = None,
         idempotency_key: Optional[str] = None,
     ) -> DrawingOverlay:
         """Create overlay scoped to an inspection run."""
@@ -1190,6 +1195,11 @@ class StorageService:
             geometry=geometry,
             status=status,
             meta=meta,
+            label=label,
+            severity=severity,
+            confidence_label=confidence_label,
+            inspection_date=inspection_date,
+            tags_json=tags_json,
         )
         self.db.add(overlay)
         try:

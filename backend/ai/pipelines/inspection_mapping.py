@@ -39,7 +39,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from pathlib import Path
 from sqlalchemy.orm import Session
 from typing import Any, Dict, List, Optional, cast
@@ -139,6 +139,7 @@ class DrawingOverlayRecord:
     severity: str
     tags: NormalizedEvidenceTags
     created_at: datetime
+    inspection_date: date | None = None
 
 
 _CATEGORY_TO_TAGS_FIELD: dict[VocabCategory, str] = {

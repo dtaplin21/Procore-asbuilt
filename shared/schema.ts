@@ -536,6 +536,11 @@ export interface DrawingOverlay {
   diff_id: number | null;
   geometry: Record<string, unknown>;
   status: string;
+  label?: string | null;
+  severity?: string | null;
+  confidenceLabel?: string | null;
+  inspectionDate?: string | null;
+  tagsJson?: Record<string, unknown> | null;
   meta: Record<string, unknown> | null;
   created_at: string;
 }
@@ -682,6 +687,11 @@ export interface DrawingOverlay {
   diff_id: number | null;
   geometry: Record<string, unknown>;
   status: string;
+  label?: string | null;
+  severity?: string | null;
+  confidenceLabel?: string | null;
+  inspectionDate?: string | null;
+  tagsJson?: Record<string, unknown> | null;
   meta: Record<string, unknown> | null;
   created_at: string;
 }
