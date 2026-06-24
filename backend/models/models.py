@@ -361,6 +361,13 @@ class DrawingRendition(Base):
 
 
 class DrawingRegion(Base):
+    """User-defined region on a master drawing (geometry + lookup tags).
+
+    ``inspection_type_tags`` and ``location_tags`` are read by
+    ``services.region_index_loader`` to build the ``MasterRegion`` index
+    that ``drawing_location_resolver`` matches uploaded evidence against.
+    """
+
     __tablename__ = "drawing_regions"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -373,11 +380,14 @@ class DrawingRegion(Base):
     label = Column(String(length=255), nullable=False)
     page = Column(Integer, nullable=False, default=1)
     geometry = Column(JSON, nullable=False)  # normalized 0-1; rect or polygon
+    # Inspection type(s) for this region, e.g. ["Underground Fire Water Rough In"].
+    # Array because a region can be relevant to more than one type over a project.
     inspection_type_tags = Column(
         ARRAY(String),
         nullable=True,
         server_default=text("'{}'::text[]"),
     )
+    # Place name(s) for this region, e.g. ["Utility MR", "Level 2"].
     location_tags = Column(
         ARRAY(String),
         nullable=True,

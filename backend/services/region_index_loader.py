@@ -1,14 +1,18 @@
-"""Build MasterRegion index entries from persisted drawing_regions rows.
+"""Build the list[MasterRegion] that drawing_location_resolver.py matches against.
 
-Case B reference lookup in drawing_location_resolver.py matches uploaded
-evidence vocabulary terms against inspection_type_tags and location_tags
-on each region. Geometry is converted to a fractional BoundingBox for
-bbox_on_master (normalized 0-1, same coordinate space as region geometry).
+Reads from the drawing_regions table (inspection_type_tags and location_tags
+columns — migration a3f9c1d8e2b4, model in models.models.DrawingRegion).
+
+Intended caller pattern (evidence upload / document pipeline):
+
+    result = build_region_index(db_session, master_drawing_id)
+    evidence = DocumentEvidenceInput(..., region_index=result.regions)
 """
 
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Any, Sequence
 
 from sqlalchemy.orm import Session
@@ -18,6 +22,23 @@ from ai.pipelines.drawing_location_resolver import MasterRegion
 from models.models import DrawingRegion
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class RegionIndexLoadResult:
+    """Resolved MasterRegion list plus diagnostics for callers and admin views."""
+
+    regions: list[MasterRegion]
+    total_region_count: int
+    untagged_region_count: int
+
+    @property
+    def has_any_taggable_regions(self) -> bool:
+        return self.total_region_count > 0
+
+    @property
+    def has_any_usable_regions(self) -> bool:
+        return len(self.regions) > 0
 
 
 def _normalize_tag_list(raw: Any) -> tuple[str, ...]:
@@ -41,13 +62,14 @@ def _normalize_tag_list(raw: Any) -> tuple[str, ...]:
     return tuple(out)
 
 
-def geometry_to_bounding_box(geometry: dict[str, Any]) -> BoundingBox | None:
-    """Convert normalized drawing_regions geometry to a fractional bbox.
+def _is_untagged(row: DrawingRegion) -> bool:
+    type_tags = getattr(row, "inspection_type_tags", None) or []
+    location_tags = getattr(row, "location_tags", None) or []
+    return not type_tags and not location_tags
 
-    Region geometry is stored normalized 0-1 (rect or polygon). We use
-    page_width/page_height of 1 so BoundingBox.to_fractional() returns
-    the same coordinates.
-    """
+
+def geometry_to_bounding_box(geometry: dict[str, Any]) -> BoundingBox | None:
+    """Convert normalized drawing_regions geometry to a fractional bbox."""
     if not isinstance(geometry, dict):
         return None
 
@@ -134,7 +156,7 @@ def drawing_region_to_master_region(region: DrawingRegion) -> MasterRegion | Non
 def regions_to_master_index(
     regions: Sequence[DrawingRegion],
 ) -> list[MasterRegion]:
-    """Convert persisted regions to the in-memory index used by Case B lookup."""
+    """Convert persisted regions to MasterRegion entries (skips invalid geometry)."""
     out: list[MasterRegion] = []
     for region in regions:
         mapped = drawing_region_to_master_region(region)
@@ -143,15 +165,53 @@ def regions_to_master_index(
     return out
 
 
-def load_master_regions(
+def build_region_index(
     db: Session,
-    master_drawing_id: int,
-) -> list[MasterRegion]:
-    """Load all regions for a master drawing and build the resolver index."""
-    rows = (
+    drawing_id: int | str,
+    *,
+    include_untagged: bool = False,
+) -> RegionIndexLoadResult:
+    """Load regions for a master drawing into the resolver's MasterRegion shape.
+
+    By default, untagged regions (no inspection_type_tags and no location_tags)
+    are excluded from ``regions`` but counted in ``untagged_region_count``.
+    Pass ``include_untagged=True`` to include every mappable region regardless
+    of tag state (e.g. Case A alignment overlap or admin/debug views).
+    """
+    master_drawing_id = int(drawing_id)
+    rows: list[DrawingRegion] = (
         db.query(DrawingRegion)
         .filter(DrawingRegion.master_drawing_id == master_drawing_id)
         .order_by(DrawingRegion.id.asc())
         .all()
     )
-    return regions_to_master_index(rows)
+
+    total = len(rows)
+    untagged_rows = [row for row in rows if _is_untagged(row)]
+
+    if include_untagged:
+        candidate_rows = rows
+    else:
+        candidate_rows = [row for row in rows if row not in untagged_rows]
+
+    regions = regions_to_master_index(candidate_rows)
+
+    return RegionIndexLoadResult(
+        regions=regions,
+        total_region_count=total,
+        untagged_region_count=len(untagged_rows),
+    )
+
+
+def load_master_regions(
+    db: Session,
+    master_drawing_id: int,
+    *,
+    include_untagged: bool = False,
+) -> list[MasterRegion]:
+    """Convenience wrapper returning only the MasterRegion list."""
+    return build_region_index(
+        db,
+        master_drawing_id,
+        include_untagged=include_untagged,
+    ).regions
