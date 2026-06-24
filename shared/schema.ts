@@ -247,7 +247,14 @@ export interface DrawingAlignmentOverlayResponse extends DrawingAlignmentPersist
   error_message?: string | null;
 }
 
-/** Part 6 — comparison coverage KPI (dashboard + workspace). */
+/** Part 6 — master inspection coverage KPI (dashboard). */
+export interface ProjectInspectionCoverageMetric {
+  inspectedCount: number;
+  totalMastersCount: number;
+  label: string;
+}
+
+/** @deprecated Compare workspace removed; use {@link ProjectInspectionCoverageMetric}. */
 export interface ProjectComparisonProgressMetric {
   compared_count: number;
   total_relevant_count: number;
@@ -600,11 +607,11 @@ export interface CurrentDrawingSummary {
 export type CurrentDrawing = CurrentDrawingSummary;
 
 /**
- * Part 6 — dashboard KPI metrics (`comparison_progress`, `high_severity_diff_risk`).
+ * Part 6 — dashboard KPI metrics (`inspectionCoverage`, `high_severity_diff_risk`).
  * The same endpoint also returns count fields; keep them required so they match the API.
  */
 export interface ProjectSummaryKpis {
-  comparison_progress?: ProjectComparisonProgressMetric | null;
+  inspectionCoverage?: ProjectInspectionCoverageMetric | null;
   high_severity_diff_risk?: DiffRiskMetric | null;
   total_findings: number;
   open_findings: number;

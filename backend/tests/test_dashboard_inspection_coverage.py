@@ -58,6 +58,33 @@ def test_count_drawings_with_inspection_run_requires_complete_status(
     assert storage.count_drawings_with_inspection_run(pid) == 1
 
 
+def test_count_drawings_with_inspection_run_scoped_to_master(
+    db_session,
+    project,
+) -> None:
+    storage = StorageService(db_session)
+    pid = cast(int, project.id)
+    master = storage.create_drawing(
+        pid,
+        source="upload",
+        name="master.pdf",
+        storage_key=f"drawings/test/{pid}/master.pdf",
+        content_type="application/pdf",
+    )
+    master_id = cast(int, master.id)
+    run = storage.create_inspection_run(
+        project_id=pid,
+        master_drawing_id=master_id,
+    )
+    row = db_session.query(InspectionRun).filter(InspectionRun.id == run.id).first()
+    assert row is not None
+    row.status = "complete"  # type: ignore[assignment]
+    db_session.commit()
+
+    assert storage.count_drawings_with_inspection_run(pid, master_drawing_id=master_id) == 1
+    assert storage.count_drawings_with_inspection_run(pid, master_drawing_id=999999) == 0
+
+
 def test_get_project_inspection_coverage_label(db_session, project) -> None:
     pid = cast(int, project.id)
     empty = get_project_inspection_coverage(db_session, pid)

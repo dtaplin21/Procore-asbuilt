@@ -7,7 +7,7 @@ import type {
 import { apiRequest, readApiError, requestJson, resolveFetchUrl } from "@/lib/api/http";
 
 export type FetchProjectDashboardSummaryOptions = {
-  /** Scopes comparison KPIs to this master drawing (query `currentDrawingId`). */
+  /** Optional workspace master for `current_drawing` context (query `currentDrawingId`). */
   currentDrawingId?: number;
   /** Passed as `user_id` for Procore company context on the dashboard. */
   userId?: string | null;
@@ -16,8 +16,8 @@ export type FetchProjectDashboardSummaryOptions = {
 /**
  * GET /api/projects/{project_id}/dashboard/summary
  *
- * When `currentDrawingId` is set, the backend scopes comparison progress to that master
- * and returns `current_drawing` in the payload when the id belongs to the project.
+ * KPIs include project-scoped inspection coverage (`inspectionCoverage`) derived from
+ * complete rows in `inspection_runs`, not sub-drawing compare counts.
  */
 export async function fetchProjectDashboardSummary(
   projectId: number,

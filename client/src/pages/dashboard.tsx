@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import type { DrawingResponse, InsightListResponse } from "@shared/schema";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   AlertTriangle,
   Sparkles,
@@ -9,6 +9,7 @@ import {
   FolderOpen,
   FileStack,
   ClipboardList,
+  ShieldCheck,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import {
   buildWorkspaceUrlWithFinding,
 } from "@/lib/workspace-links";
 import { fetchProjectDashboardSummary } from "@/lib/api/projects";
+import { formatInspectionCoverageKpi } from "@/lib/dashboard/inspection-coverage-kpi";
 import { resolveFetchUrl } from "@/lib/api/http";
 import { UploadDrawingModal } from "@/components/drawing-workspace/UploadDrawingModal";
 
@@ -92,6 +94,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
   const [location, setLocation] = useLocation();
   const isInsightsView = location === "/insights";
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   // Selected project context (scopes the dashboard structurally)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() =>
@@ -209,10 +212,18 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
 
   const summary = projectSummary;
 
-  const handleDashboardUploadSuccess = (drawing: DrawingResponse) => {
+  const inspectionCoverageKpi = useMemo(
+    () => formatInspectionCoverageKpi(projectSummary?.kpis?.inspectionCoverage),
+    [projectSummary?.kpis?.inspectionCoverage]
+  );
+
+  const handleDashboardUploadSuccess = async (drawing: DrawingResponse) => {
     if (!selectedProjectId) return;
     const pid = Number(selectedProjectId);
     if (!Number.isFinite(pid)) return;
+    await queryClient.invalidateQueries({
+      queryKey: ["project-dashboard-summary"],
+    });
     setLocation(
       buildWorkspaceUrl({ projectId: pid, masterDrawingId: drawing.id })
     );
@@ -301,8 +312,8 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
       {selectedProjectId && !isInsightsView && (
         projectSummaryLoading ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {[1, 2, 3, 4, 5].map((i) => (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
                 <Card key={i}>
                   <CardContent className="p-4">
                     <Skeleton className="h-4 w-20 mb-2" />
@@ -314,7 +325,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <StatCard
                 title="Total Findings"
                 value={projectSummary?.kpis?.total_findings ?? 0}
@@ -341,6 +352,13 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
                     Manage drawings
                   </Link>
                 }
+              />
+              <StatCard
+                title="Inspection coverage"
+                value={inspectionCoverageKpi.value}
+                subtitle={inspectionCoverageKpi.subtitle}
+                icon={ShieldCheck}
+                variant="info"
               />
               <StatCard
                 title="Evidence"

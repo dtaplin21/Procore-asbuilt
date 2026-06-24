@@ -139,8 +139,6 @@ class StorageService:
         **Fallback** (legacy or missing FK): the row with
         ``upload_intent == 'master'`` (never truthy checks—only the literal ``"master"``),
         newest by ``updated_at`` then ``id`` so multiple intent rows are not ambiguous.
-
-        Use this for auto-compare against the project master when a sub upload completes.
         """
         project = self.get_project(project_id)
         if project is None:
@@ -253,6 +251,10 @@ class StorageService:
             },
         }
 
+    # ------------------------------------------------------------------
+    # Inspection coverage counters (dashboard KPIs; backed by inspection_runs)
+    # ------------------------------------------------------------------
+
     def count_project_master_drawings(self, project_id: int) -> int:
         """Count master drawings for inspection coverage (canonical FK or upload_intent)."""
         project = self.get_project(project_id)
@@ -271,18 +273,26 @@ class StorageService:
             or 0
         )
 
-    def count_drawings_with_inspection_run(self, project_id: int) -> int:
-        """Distinct master drawings with at least one complete inspection run."""
-        return int(
-            self.db.query(func.count(distinct(InspectionRun.master_drawing_id)))
-            .filter(
-                InspectionRun.project_id == project_id,
-                InspectionRun.status == "complete",
-            )
-            .scalar()
-            or 0
+    def count_drawings_with_inspection_run(
+        self,
+        project_id: int,
+        *,
+        master_drawing_id: int | None = None,
+    ) -> int:
+        """
+        Distinct master drawings in ``project_id`` with at least one complete row in
+        ``inspection_runs`` (``status == 'complete'``).
+
+        When ``master_drawing_id`` is set, returns ``0`` or ``1`` for that sheet only.
+        """
+        q = self.db.query(func.count(distinct(InspectionRun.master_drawing_id))).filter(
+            InspectionRun.project_id == project_id,
+            InspectionRun.status == "complete",
         )
-    
+        if master_drawing_id is not None:
+            q = q.filter(InspectionRun.master_drawing_id == master_drawing_id)
+        return int(q.scalar() or 0)
+
     def get_project_jobs(
         self,
         project_id: int,
