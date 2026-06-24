@@ -1,15 +1,14 @@
-import type { DrawingDiff } from "@/types/drawing_workspace";
-import type { ResolvedOverlayRegion, ViewerSize } from "@/lib/drawing-overlays/overlay-types";
+import type { OverlayRegion, ResolvedOverlayRegion, ViewerSize } from "@/lib/drawing-overlays/overlay-types";
 import { resolveOverlayRegion } from "@/lib/drawing-overlays/geometry";
 import {
-  includeRegionWhenChangesOnly,
-  regionOverlayTone,
+  includeOverlayWhenChangesOnly,
+  overlayRegionTone,
   type OverlayInspectionTone,
 } from "@/lib/drawing-overlays/inspection_overlay";
 import DiffOverlayShape from "@/components/drawing-workspace/diff_overlay_shape";
 
 type Props = {
-  diff: DrawingDiff | null;
+  regions: OverlayRegion[];
   viewerSize: ViewerSize;
   /** When true, only regions that are still "changed" (or not yet reviewed) are drawn. */
   showChangesOnly?: boolean;
@@ -18,29 +17,31 @@ type Props = {
 };
 
 export default function DrawingOverlayLayer({
-  diff,
+  regions,
   viewerSize,
   showChangesOnly = false,
   showInspectionStatuses = true,
 }: Props) {
-  if (!diff || !diff.diffRegions?.length) {
+  if (!regions.length) {
     return null;
   }
 
   const prepared: Array<{
+    key: string;
     resolved: ResolvedOverlayRegion;
     inspectionTone: OverlayInspectionTone;
   }> = [];
 
-  for (const region of diff.diffRegions) {
-    if (!includeRegionWhenChangesOnly(region, diff, showChangesOnly)) {
+  for (const region of regions) {
+    if (!includeOverlayWhenChangesOnly(region, showChangesOnly)) {
       continue;
     }
-    const resolved = resolveOverlayRegion(region);
+    const resolved = resolveOverlayRegion(region.shape);
     if (!resolved) continue;
     prepared.push({
+      key: `${region.kind}-${region.id}`,
       resolved,
-      inspectionTone: regionOverlayTone(region, diff, showInspectionStatuses),
+      inspectionTone: overlayRegionTone(region, showInspectionStatuses),
     });
   }
 
@@ -58,7 +59,7 @@ export default function DrawingOverlayLayer({
     >
       {prepared.map((item, index) => (
         <DiffOverlayShape
-          key={`${diff.id}-${index}`}
+          key={item.key}
           region={item.resolved}
           viewerSize={viewerSize}
           selected

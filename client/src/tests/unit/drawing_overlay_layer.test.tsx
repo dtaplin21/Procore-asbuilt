@@ -1,32 +1,33 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import DrawingOverlayLayer from "@/components/drawing-workspace/drawing_overlay_layer";
-import type { DrawingDiff } from "@/types/drawing_workspace";
+import type { OverlayRegion } from "@/lib/drawing-overlays/overlay-types";
+
+function rectRegion(id: number): OverlayRegion {
+  return {
+    id,
+    kind: "diff",
+    sourceId: 2,
+    label: null,
+    severity: "medium",
+    bbox: { x: 0.1, y: 0.2, width: 0.25, height: 0.15 },
+    shape: {
+      shapeType: "rect",
+      rect: {
+        x: 0.1,
+        y: 0.2,
+        width: 0.25,
+        height: 0.15,
+      },
+    },
+  };
+}
 
 describe("DrawingOverlayLayer", () => {
-  it("renders rectangle overlays for selected diff regions", () => {
-    const diff: DrawingDiff = {
-      id: 1,
-      alignmentId: 2,
-      summary: "Test diff",
-      severity: "medium",
-      createdAt: null,
-      diffRegions: [
-        {
-          shapeType: "rect",
-          rect: {
-            x: 0.1,
-            y: 0.2,
-            width: 0.25,
-            height: 0.15,
-          },
-        },
-      ],
-    };
-
+  it("renders rectangle overlays for overlay regions", () => {
     render(
       <DrawingOverlayLayer
-        diff={diff}
+        regions={[rectRegion(1)]}
         viewerSize={{ width: 1000, height: 800 }}
       />
     );
@@ -36,14 +37,15 @@ describe("DrawingOverlayLayer", () => {
   });
 
   it("renders polygon overlays", () => {
-    const diff: DrawingDiff = {
-      id: 1,
-      alignmentId: 2,
-      summary: "Test polygon diff",
-      severity: "medium",
-      createdAt: null,
-      diffRegions: [
-        {
+    const regions: OverlayRegion[] = [
+      {
+        id: 1,
+        kind: "inspection",
+        sourceId: 5,
+        label: "Zone",
+        severity: "low",
+        bbox: { x: 0.1, y: 0.1, width: 0.1, height: 0.15 },
+        shape: {
           shapeType: "polygon",
           points: [
             { x: 0.1, y: 0.2 },
@@ -51,12 +53,13 @@ describe("DrawingOverlayLayer", () => {
             { x: 0.15, y: 0.35 },
           ],
         },
-      ],
-    };
+        reviewBadge: "passed",
+      },
+    ];
 
     render(
       <DrawingOverlayLayer
-        diff={diff}
+        regions={regions}
         viewerSize={{ width: 1000, height: 800 }}
       />
     );
@@ -64,10 +67,10 @@ describe("DrawingOverlayLayer", () => {
     expect(screen.getByTestId("diff-overlay-polygon-0")).toBeInTheDocument();
   });
 
-  it("renders nothing when diff is null", () => {
+  it("renders nothing when regions is empty", () => {
     const { container } = render(
       <DrawingOverlayLayer
-        diff={null}
+        regions={[]}
         viewerSize={{ width: 1000, height: 800 }}
       />
     );

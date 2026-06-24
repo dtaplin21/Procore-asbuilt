@@ -8,10 +8,9 @@
  *
  * **Value:** Full client path to restore, including query string when needed:
  * - Path: `/projects/:projectId/drawings/:drawingId/workspace`
- * - Query: workspace selection uses `alignmentId` and `diffId`
- *   (see `client/src/hooks/use_workspace_selection_query_params.ts`). Other keys (e.g. dashboard
- *   `projectId`, insight `findingId`) may appear; preserve the full `location`
- *   string from wouter when saving so nothing is dropped unintentionally.
+ * - Query: other keys (e.g. dashboard `projectId`, insight `findingId`) may appear;
+ *   preserve the full `location` string from wouter when saving so nothing is dropped
+ *   unintentionally. Legacy `alignmentId` / `diffId` params are ignored by the workspace UI.
  */
 
 export const WORKSPACE_RETURN_PATH_STORAGE_KEY = "qcqa:lastDrawingWorkspace";
@@ -51,7 +50,7 @@ export function getWorkspaceReturnPath(): string | null {
   }
 }
 
-/** Persist path like `/projects/2/drawings/3/workspace` or with `?alignmentId=1&diffId=2`. */
+/** Persist path like `/projects/2/drawings/3/workspace` (query string preserved when present). */
 export function setWorkspaceReturnPath(fullPath: string): void {
   const s = safeSessionStorage();
   if (!s) return;

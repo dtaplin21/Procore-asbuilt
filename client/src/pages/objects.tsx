@@ -528,10 +528,8 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
             ) : (
               <div className="relative">
                 <DrawingViewer
+                  projectId={selectedProjectId ? Number(selectedProjectId) : null}
                   drawing={masterWorkspaceQuery.data ?? null}
-                  selectedDiff={null}
-                  showOverlay={false}
-                  overlayOpacity={1}
                 />
                 {objects && objects.length > 0 && (
                   <div className="pointer-events-none absolute inset-0 z-[4] p-4">

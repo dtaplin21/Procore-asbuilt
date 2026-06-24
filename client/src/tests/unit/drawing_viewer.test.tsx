@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import type { ReactElement } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import DrawingViewer from "@/components/drawing-workspace/drawing_viewer";
-import type {
-  DrawingDiff,
-  DrawingWorkspaceDrawing,
-} from "@/types/drawing_workspace";
+import DrawingViewer from "@/components/drawings/DrawingViewer";
+import type { DrawingWorkspaceDrawing } from "@/types/drawing_workspace";
+import { getQueryFn } from "@/lib/queryClient";
 
 beforeAll(() => {
   class ResizeObserverMock {
@@ -16,21 +16,41 @@ beforeAll(() => {
   vi.stubGlobal("ResizeObserver", ResizeObserverMock);
 });
 
+function renderViewer(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        queryFn: async (ctx) => {
+          const key = ctx.queryKey[0];
+          if (typeof key === "string" && key.includes("/overlays")) {
+            return [];
+          }
+          return getQueryFn({ on401: "throw" })(ctx);
+        },
+      },
+    },
+  });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
+
+const readyDrawing: DrawingWorkspaceDrawing = {
+  id: 10,
+  projectId: 1,
+  name: "Master Drawing",
+  fileUrl: "/api/projects/1/drawings/10/pages/1/image",
+  sourceFileUrl: "/api/projects/1/drawings/10/pages/1/image",
+  pageCount: 1,
+  activePage: 1,
+  processingStatus: "ready",
+  source: "master",
+};
+
 describe("DrawingViewer", () => {
   it("renders image viewer for drawing file url", () => {
-    const drawing: DrawingWorkspaceDrawing = {
-      id: 10,
-      projectId: 1,
-      name: "Master Drawing",
-      fileUrl: "/test-image.png",
-      sourceFileUrl: "/api/projects/1/drawings/10/file",
-      pageCount: 1,
-      activePage: 1,
-      processingStatus: "ready",
-      source: "master",
-    };
-
-    render(<DrawingViewer drawing={drawing} selectedDiff={null} />);
+    renderViewer(
+      <DrawingViewer projectId={1} drawing={readyDrawing} />
+    );
 
     expect(screen.getByTestId("drawing-viewer-image")).toBeInTheDocument();
   });
@@ -48,45 +68,18 @@ describe("DrawingViewer", () => {
       source: "master",
     } as DrawingWorkspaceDrawing;
 
-    render(<DrawingViewer drawing={drawing} selectedDiff={null} />);
+    renderViewer(
+      <DrawingViewer projectId={1} drawing={drawing} />
+    );
 
     expect(screen.getByText("Drawing file unavailable")).toBeInTheDocument();
   });
 
-  it("accepts a selected diff without crashing", () => {
-    const drawing: DrawingWorkspaceDrawing = {
-      id: 10,
-      projectId: 1,
-      name: "Master Drawing",
-      fileUrl: "/test-image.png",
-      sourceFileUrl: "/api/projects/1/drawings/10/file",
-      pageCount: 1,
-      activePage: 1,
-      processingStatus: "ready",
-      source: "master",
-    };
+  it("shows overlay region count in header", async () => {
+    renderViewer(
+      <DrawingViewer projectId={1} drawing={readyDrawing} />
+    );
 
-    const diff: DrawingDiff = {
-      id: 1,
-      alignmentId: 2,
-      summary: "Selected diff",
-      severity: "medium",
-      createdAt: null,
-      diffRegions: [
-        {
-          shapeType: "rect",
-          rect: {
-            x: 0.1,
-            y: 0.2,
-            width: 0.3,
-            height: 0.15,
-          },
-        },
-      ],
-    };
-
-    render(<DrawingViewer drawing={drawing} selectedDiff={diff} />);
-
-    expect(screen.getByText(/Selected diff #1/)).toBeInTheDocument();
+    expect(await screen.findByText("0 overlay region(s)")).toBeInTheDocument();
   });
 });

@@ -4,7 +4,7 @@ import { FileImage } from "lucide-react";
 import { Link, useLocation, useParams } from "wouter";
 import type { DashboardSummaryResponse } from "@shared/schema";
 
-import type { ProjectDrawingsResponse } from "@/types/drawing_workspace";
+import type { ProjectDrawingCandidate, ProjectDrawingsResponse } from "@/types/drawing_workspace";
 import { UploadDrawingModal } from "@/components/drawing-workspace/UploadDrawingModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +27,10 @@ function pathWithPreservedSearch(pathWithOptionalQuery: string): string {
   return pathWithOptionalQuery.includes("?")
     ? `${pathWithOptionalQuery}&${preserved.slice(1)}`
     : `${pathWithOptionalQuery}${preserved}`;
+}
+
+function isMasterDrawingCandidate(drawing: ProjectDrawingCandidate): boolean {
+  return drawing.uploadIntent === "master" || drawing.uploadIntent == null;
 }
 
 export default function DrawingPickerPage() {
@@ -121,7 +125,7 @@ export default function DrawingPickerPage() {
     );
   }
 
-  const list = drawingsPayload?.drawings ?? [];
+  const list = (drawingsPayload?.drawings ?? []).filter(isMasterDrawingCandidate);
 
   const uploadModal = (
     <UploadDrawingModal

@@ -3,40 +3,25 @@ import type { WorkspaceLinkMetadata } from "@shared/schema";
 export type WorkspaceLinkInput = {
   projectId: number;
   masterDrawingId: number;
+  /** Legacy compare selection — ignored when building workspace URLs (PR1). */
   alignmentId?: number | null;
+  /** Legacy compare selection — ignored when building workspace URLs (PR1). */
   diffId?: number | null;
 };
 
+/** Master workspace route only; does not deep-link into removed compare UI state. */
 export function buildWorkspaceUrl({
   projectId,
   masterDrawingId,
-  alignmentId,
-  diffId,
 }: WorkspaceLinkInput): string {
-  const params = new URLSearchParams();
-
-  if (alignmentId != null) {
-    params.set("alignmentId", String(alignmentId));
-  }
-
-  if (diffId != null) {
-    params.set("diffId", String(diffId));
-  }
-
-  const query = params.toString();
-
-  return `/projects/${projectId}/drawings/${masterDrawingId}/workspace${
-    query ? `?${query}` : ""
-  }`;
+  return `/projects/${projectId}/drawings/${masterDrawingId}/workspace`;
 }
 
-/** Map API workspace metadata into {@link buildWorkspaceUrl}. */
+/** Map API workspace metadata into {@link buildWorkspaceUrl}. Compare selection fields are dropped. */
 export function buildWorkspaceUrlFromMetadata(meta: WorkspaceLinkMetadata): string {
   return buildWorkspaceUrl({
     projectId: meta.projectId,
     masterDrawingId: meta.masterDrawingId,
-    alignmentId: meta.alignmentId,
-    diffId: meta.diffId,
   });
 }
 
@@ -51,8 +36,6 @@ export function buildWorkspaceUrlWithFinding(
   const base = buildWorkspaceUrl({
     projectId: input.projectId,
     masterDrawingId: input.masterDrawingId,
-    alignmentId: input.alignmentId,
-    diffId: input.diffId,
   });
   if (findingId == null || String(findingId) === "") {
     return base;

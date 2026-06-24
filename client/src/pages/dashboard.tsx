@@ -47,46 +47,6 @@ function setProjectIdInUrl(projectId: string | null) {
   window.history.replaceState({}, "", url.toString());
 }
 
-/** Dashboard KPI nested objects may be snake_case or camelCase (FastAPI aliases). */
-function readComparisonProgressFromKpis(
-  kpis: unknown
-): { compared_count: number; total_relevant_count: number; label: string } | null {
-  if (!kpis || typeof kpis !== "object") return null;
-  const k = kpis as Record<string, unknown>;
-  const raw = k.comparison_progress ?? k.comparisonProgress;
-  if (!raw || typeof raw !== "object") return null;
-  const o = raw as Record<string, unknown>;
-  const compared =
-    (typeof o.compared_count === "number" ? o.compared_count : undefined) ??
-    (typeof o.comparedCount === "number" ? o.comparedCount : undefined);
-  const total =
-    (typeof o.total_relevant_count === "number" ? o.total_relevant_count : undefined) ??
-    (typeof o.totalRelevantCount === "number" ? o.totalRelevantCount : undefined);
-  const label = typeof o.label === "string" ? o.label : "";
-  if (compared === undefined || total === undefined) return null;
-  return { compared_count: compared, total_relevant_count: total, label };
-}
-
-function readHighSeverityRiskFromKpis(
-  kpis: unknown
-): { unresolved_high_severity_count: number; label: string } | null {
-  if (!kpis || typeof kpis !== "object") return null;
-  const k = kpis as Record<string, unknown>;
-  const raw = k.high_severity_diff_risk ?? k.highSeverityDiffRisk;
-  if (!raw || typeof raw !== "object") return null;
-  const o = raw as Record<string, unknown>;
-  const count =
-    (typeof o.unresolved_high_severity_count === "number"
-      ? o.unresolved_high_severity_count
-      : undefined) ??
-    (typeof o.unresolvedHighSeverityCount === "number"
-      ? o.unresolvedHighSeverityCount
-      : undefined);
-  const label = typeof o.label === "string" ? o.label : "";
-  if (count === undefined) return null;
-  return { unresolved_high_severity_count: count, label };
-}
-
 function readMasterDrawingIdFromSummary(
   summary: DashboardSummary | undefined | null
 ): number | undefined {
@@ -249,8 +209,6 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
   }, [projects, selectedProjectId]);
 
   const summary = projectSummary;
-  const comparisonProgress = readComparisonProgressFromKpis(summary?.kpis);
-  const highSeverityRisk = readHighSeverityRiskFromKpis(summary?.kpis);
 
   const handleDashboardUploadSuccess = (
     drawing: DrawingResponse,
@@ -277,7 +235,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
           </h1>
           <p className="text-muted-foreground">
             {isInsightsView
-              ? "AI findings and drawing comparison context"
+              ? "AI findings and inspection context"
               : "Quality control overview and AI insights"}
           </p>
           {selectedProjectName && (
@@ -347,15 +305,6 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
       {selectedProjectId && !isInsightsView && (
         projectSummaryLoading ? (
           <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              {[1, 2].map((i) => (
-                <div key={i} className="rounded-lg border border-border p-4">
-                  <Skeleton className="h-4 w-32 mb-2" />
-                  <Skeleton className="h-8 w-24 mt-2" />
-                  <Skeleton className="h-3 w-full max-w-sm mt-2" />
-                </div>
-              ))}
-            </div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               {[1, 2, 3, 4, 5].map((i) => (
                 <Card key={i}>
@@ -369,32 +318,6 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-lg border border-border border-l-4 border-l-primary bg-card p-4 shadow-sm">
-                <div className="text-sm text-muted-foreground">Comparison progress</div>
-                <div className="mt-2 text-2xl font-semibold">
-                  {comparisonProgress
-                    ? `${comparisonProgress.compared_count} / ${comparisonProgress.total_relevant_count}`
-                    : "—"}
-                </div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  {comparisonProgress?.label ?? "Comparison progress unavailable."}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-border border-l-4 border-l-primary/70 bg-card p-4 shadow-sm">
-                <div className="text-sm text-muted-foreground">High-severity diff risk</div>
-                <div className="mt-2 text-2xl font-semibold">
-                  {highSeverityRisk !== null
-                    ? highSeverityRisk.unresolved_high_severity_count
-                    : "—"}
-                </div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  {highSeverityRisk?.label ?? "Risk metric unavailable."}
-                </div>
-              </div>
-            </div>
-
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <StatCard
                 title="Total Findings"

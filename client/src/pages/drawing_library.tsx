@@ -95,7 +95,9 @@ export default function DrawingLibraryPage() {
     );
   }
 
-  const list = drawingsPayload?.drawings ?? [];
+  const list = (drawingsPayload?.drawings ?? []).filter(
+    (drawing) => drawing.uploadIntent === "master" || drawing.uploadIntent == null
+  );
 
   return (
     <div className="p-4 max-w-5xl mx-auto">
@@ -112,7 +114,7 @@ export default function DrawingLibraryPage() {
             Manage drawings
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Project {projectId} • All sheets in this project. Canonical master is
+            Project {projectId} • Master sheets in this project. Canonical master is
             labeled; open a row to go to the workspace.
           </p>
         </div>

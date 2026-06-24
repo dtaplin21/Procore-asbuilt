@@ -52,7 +52,7 @@ function impactLines(summary: DrawingDeleteSummaryResponse) {
 }
 
 const STATIC_IMPACT_COPY =
-  "This removes the uploaded file and related comparison data from the project. Findings keep their records but may lose the link to this sheet.";
+  "This removes the uploaded file and related workspace data from the project. Findings keep their records but may lose the link to this sheet.";
 
 function drawingConfirmationLabel(d: DrawingRow): string {
   const t = d.name.trim();

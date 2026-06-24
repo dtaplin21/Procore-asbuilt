@@ -3,16 +3,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import DrawingOverlayLayer from "@/components/drawing-workspace/drawing_overlay_layer";
 import PanZoomContainer from "@/components/drawing-workspace/pan_zoom_container";
 import WorkspaceEmptyState from "@/components/drawing-workspace/workspace_empty_state";
-import AlignedSubOverlay from "@/components/drawings/AlignedSubOverlay";
-import { isAlignmentOverlayUsable } from "@/lib/drawing-alignment/is_alignment_overlay_usable";
-import { computeComparisonRenderBox } from "@/lib/drawing-viewer/comparison-layout";
+import { useDrawingOverlays } from "@/hooks/use-inspection-runs";
 import { useResizeObserver } from "@/hooks/use_resize_observer";
-import type {
-  DrawingAlignmentTransformResponse,
-  DrawingComparisonWorkspaceResponse,
-  DrawingDiff,
-  DrawingWorkspaceDrawing,
-} from "@/types/drawing_workspace";
+import { toOverlayRegions } from "@/lib/drawing-overlays/inspection_overlay";
+import type { DrawingWorkspaceDrawing } from "@/types/drawing_workspace";
 
 import { apiUrl } from "@/lib/api/base_url";
 
@@ -36,12 +30,7 @@ function messageForDrawingImageLoadFailure(relativeUrl: string): string {
 
 type Props = {
   drawing: DrawingWorkspaceDrawing | null;
-  selectedDiff: DrawingDiff | null;
-  /** Compare POST payload — when set, master/sub URLs come from the same response. */
-  comparisonWorkspace?: DrawingComparisonWorkspaceResponse | null;
-  isLoadingComparisonWorkspace?: boolean;
-  showOverlay: boolean;
-  overlayOpacity: number;
+  projectId?: number | null;
   /** Diff SVG: only unresolved / "changed" regions. */
   overlayShowChangesOnly?: boolean;
   /** Diff SVG: color by passed/failed/changed; when false, use a single highlight tone. */
@@ -50,139 +39,56 @@ type Props = {
 
 export default function DrawingViewer({
   drawing,
-  selectedDiff,
-  comparisonWorkspace,
-  isLoadingComparisonWorkspace,
-  showOverlay,
-  overlayOpacity,
+  projectId: projectIdProp,
   overlayShowChangesOnly = false,
   overlayShowInspectionStatuses = true,
 }: Props) {
-  /** Shared width probe for comparison layout (max-w-[1200px] row). */
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const layoutSize = useResizeObserver(layoutRef);
+  const masterImgRef = useRef<HTMLImageElement | null>(null);
 
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
-  /** Master intrinsic pixels — used with available width to size one shared render box. */
-  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
-  /** Sub intrinsic pixels — required to map alignment from natural space into the shared render box. */
-  const [subNaturalSize, setSubNaturalSize] = useState<{ w: number; h: number } | null>(null);
-  /** Fixed CSS px box for master + sub + diff overlay (same for all layers). */
-  const [comparisonStackBox, setComparisonStackBox] = useState<{
-    width: number;
-    height: number;
-  } | null>(null);
 
-  const masterSrcRaw =
-    comparisonWorkspace?.masterDrawing.fileUrl ?? drawing?.fileUrl;
-  const masterName = comparisonWorkspace?.masterDrawing.name ?? drawing?.name;
-  const subSrcRaw = comparisonWorkspace?.subDrawing.fileUrl ?? null;
-  const masterImgRef = useRef<HTMLImageElement | null>(null);
+  const resolvedProjectId = projectIdProp ?? drawing?.projectId ?? null;
+  const projectIdStr =
+    resolvedProjectId != null && Number.isFinite(resolvedProjectId)
+      ? String(resolvedProjectId)
+      : null;
+  const drawingIdStr =
+    drawing?.id != null && Number.isFinite(drawing.id) ? String(drawing.id) : null;
 
-  /** Master URL changed: full reset. Do not reset master load state when only sub URL updates (cached master may not refire onLoad). */
+  const { data: overlays = [], isLoading: overlaysLoading } = useDrawingOverlays(
+    projectIdStr,
+    drawingIdStr
+  );
+  const regions = useMemo(() => toOverlayRegions(overlays), [overlays]);
+
+  const masterSrcRaw = drawing?.fileUrl ?? null;
+
   useEffect(() => {
     setImageLoaded(false);
     setImageError(null);
-    setNaturalSize(null);
-    setComparisonStackBox(null);
-    setSubNaturalSize(null);
   }, [masterSrcRaw]);
 
-  /** Sub-only change: remeasure sub overlay; keep master dimensions and imageLoaded. */
-  useEffect(() => {
-    setSubNaturalSize(null);
-  }, [subSrcRaw]);
-
-  /**
-   * After DOM updates, if the master img is already decoded (memory/disk cache), `load` may not fire.
-   * Sync loaded dimensions so the overlay can clear without relying on a second onLoad.
-   */
   useLayoutEffect(() => {
-    if (isLoadingComparisonWorkspace) return;
     const img = masterImgRef.current;
     if (!img || !masterSrcRaw) return;
     if (img.complete && img.naturalWidth > 0) {
-      setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
       setImageLoaded(true);
     }
-  }, [masterSrcRaw, isLoadingComparisonWorkspace]);
-
-  /** Recompute the comparison box when the row width changes (resize) or natural size updates. */
-  useEffect(() => {
-    if (!comparisonWorkspace || !naturalSize) return;
-    if (layoutSize.width <= 0) return;
-    const box = computeComparisonRenderBox(
-      naturalSize.w,
-      naturalSize.h,
-      layoutSize.width
-    );
-    if (box.width > 0 && box.height > 0) {
-      setComparisonStackBox(box);
-    }
-  }, [comparisonWorkspace, naturalSize, layoutSize.width]);
-
-  const alignmentTransform: DrawingAlignmentTransformResponse | null =
-    comparisonWorkspace?.alignment?.transform ?? null;
-
-  const alignmentOverlayUsable = useMemo(
-    () => isAlignmentOverlayUsable(comparisonWorkspace),
-    [comparisonWorkspace]
-  );
-
-  const viewerSize = useMemo(() => {
-    if (comparisonWorkspace && comparisonStackBox) {
-      return {
-        width: comparisonStackBox.width,
-        height: comparisonStackBox.height,
-      };
-    }
-    return {
-      width: layoutSize.width,
-      height: layoutSize.height,
-    };
-  }, [comparisonWorkspace, comparisonStackBox, layoutSize.width, layoutSize.height]);
+  }, [masterSrcRaw]);
 
   const canRenderOverlay = useMemo(() => {
-    if (comparisonWorkspace && !comparisonStackBox) return false;
     return (
-      imageLoaded && viewerSize.width > 0 && viewerSize.height > 0
+      !overlaysLoading &&
+      imageLoaded &&
+      layoutSize.width > 0 &&
+      layoutSize.height > 0
     );
-  }, [
-    comparisonWorkspace,
-    comparisonStackBox,
-    imageLoaded,
-    viewerSize.width,
-    viewerSize.height,
-  ]);
+  }, [overlaysLoading, imageLoaded, layoutSize.width, layoutSize.height]);
 
-  const showSubOverlay = Boolean(
-    showOverlay &&
-      comparisonWorkspace &&
-      alignmentOverlayUsable &&
-      alignmentTransform &&
-      canRenderOverlay &&
-      comparisonStackBox
-  );
-
-  const onComparisonMasterLoad = useCallback(
-    (e: React.SyntheticEvent<HTMLImageElement>) => {
-      const img = e.currentTarget;
-      setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
-      setImageLoaded(true);
-    },
-    []
-  );
-
-  const onComparisonSubLoad = useCallback(
-    (e: React.SyntheticEvent<HTMLImageElement>) => {
-      const img = e.currentTarget;
-      setSubNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
-    },
-    []
-  );
-
-  const onLegacyMasterLoad = useCallback(() => {
+  const onMasterLoad = useCallback(() => {
     setImageLoaded(true);
   }, []);
 
@@ -247,8 +153,7 @@ export default function DrawingViewer({
     );
   }
 
-  const legacyPdfEmbed =
-    !comparisonWorkspace && legacyMasterUsesPdfEmbed(drawing);
+  const legacyPdfEmbed = legacyMasterUsesPdfEmbed(drawing);
 
   return (
     <div className="flex min-h-[70vh] w-full flex-1 flex-col overflow-hidden rounded-xl border bg-white">
@@ -256,122 +161,37 @@ export default function DrawingViewer({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">{drawing.name}</h2>
-            <p className="text-sm text-slate-500">
-              Drawing #{drawing.id}
-              {selectedDiff ? ` • Selected diff #${selectedDiff.id}` : ""}
-            </p>
+            <p className="text-sm text-slate-500">Drawing #{drawing.id}</p>
           </div>
 
           <div className="text-right text-xs text-slate-500">
             <div>Source: {drawing.source || "unspecified"}</div>
-            <div>{selectedDiff?.diffRegions?.length ?? 0} highlighted region(s)</div>
+            <div>
+              {overlaysLoading
+                ? "Loading overlays…"
+                : `${regions.length} overlay region(s)`}
+            </div>
           </div>
         </div>
       </div>
 
       <div className="flex w-full flex-1 flex-col min-h-[min(28rem,70vh)]">
         <PanZoomContainer>
-        <div
-          ref={layoutRef}
-          className="relative inline-block w-full max-w-[1200px]"
-          data-testid="drawing-viewer-stage"
-        >
-          {isLoadingComparisonWorkspace ? (
-            <div className="flex min-h-[240px] min-w-[320px] items-center justify-center rounded-md border border-border bg-muted/40 text-sm text-muted-foreground">
-              Loading comparison workspace…
-            </div>
-          ) : null}
+          <div
+            ref={layoutRef}
+            className="relative inline-block w-full max-w-[1200px]"
+            data-testid="drawing-viewer-stage"
+          >
+            {!imageLoaded && !imageError && !legacyPdfEmbed ? (
+              <div className="absolute inset-0 z-10 flex min-h-[240px] min-w-[320px] items-center justify-center rounded bg-card/80 text-sm text-muted-foreground">
+                Loading drawing image...
+              </div>
+            ) : null}
 
-          {!isLoadingComparisonWorkspace &&
-          !imageLoaded &&
-          !imageError &&
-          !legacyPdfEmbed ? (
-            <div className="absolute inset-0 z-10 flex min-h-[240px] min-w-[320px] items-center justify-center rounded bg-card/80 text-sm text-muted-foreground">
-              Loading drawing image...
-            </div>
-          ) : null}
-
-          {!isLoadingComparisonWorkspace && imageError ? (
-            <div className="flex min-h-[400px] min-w-[600px] items-center justify-center rounded-md border border-red-200 bg-red-50 p-6 text-sm text-red-800">
-              {imageError}
-            </div>
-          ) : null}
-
-          {!isLoadingComparisonWorkspace && !imageError ? (
-            comparisonWorkspace ? (
-              <>
-                {!alignmentOverlayUsable ? (
-                  <div className="mb-2 rounded-md border border-primary/30 bg-primary-soft px-3 py-2 text-sm text-foreground">
-                    Overlay unavailable for this alignment.
-                  </div>
-                ) : null}
-                <div
-                  className="relative mx-auto overflow-hidden rounded-lg border bg-black/5"
-                  style={
-                    comparisonStackBox
-                      ? {
-                          width: comparisonStackBox.width,
-                          height: comparisonStackBox.height,
-                        }
-                      : { minHeight: 240 }
-                  }
-                >
-                  <img
-                  ref={masterImgRef}
-                  src={masterSrcRaw ? apiUrl(masterSrcRaw) : ""}
-                  alt={masterName ?? "Master drawing"}
-                  className={
-                    comparisonStackBox
-                      ? "absolute inset-0 z-0 h-full w-full select-none object-contain"
-                      : "relative z-0 block h-auto w-full max-h-[80vh] select-none"
-                  }
-                  onLoad={onComparisonMasterLoad}
-                  onError={() => {
-                    setImageError(
-                      messageForDrawingImageLoadFailure(masterSrcRaw ?? "")
-                    );
-                  }}
-                  data-testid="drawing-viewer-image"
-                  draggable={false}
-                />
-
-                {showSubOverlay && alignmentTransform ? (
-                  <AlignedSubOverlay
-                    src={
-                      comparisonWorkspace.subDrawing.fileUrl
-                        ? apiUrl(comparisonWorkspace.subDrawing.fileUrl)
-                        : ""
-                    }
-                    alt={comparisonWorkspace.subDrawing.name}
-                    transform={alignmentTransform}
-                    opacity={overlayOpacity}
-                    masterNatural={naturalSize}
-                    subNatural={subNaturalSize}
-                    renderBox={
-                      comparisonStackBox
-                        ? {
-                            w: comparisonStackBox.width,
-                            h: comparisonStackBox.height,
-                          }
-                        : null
-                    }
-                    onLoad={onComparisonSubLoad}
-                  />
-                ) : null}
-
-                {canRenderOverlay ? (
-                  <DrawingOverlayLayer
-                    diff={selectedDiff}
-                    viewerSize={{
-                      width: viewerSize.width,
-                      height: viewerSize.height,
-                    }}
-                    showChangesOnly={overlayShowChangesOnly}
-                    showInspectionStatuses={overlayShowInspectionStatuses}
-                  />
-                ) : null}
-                </div>
-              </>
+            {imageError ? (
+              <div className="flex min-h-[400px] min-w-[600px] items-center justify-center rounded-md border border-red-200 bg-red-50 p-6 text-sm text-red-800">
+                {imageError}
+              </div>
             ) : legacyPdfEmbed ? (
               <iframe
                 title={drawing.name}
@@ -386,7 +206,7 @@ export default function DrawingViewer({
                   src={drawing.fileUrl ? apiUrl(drawing.fileUrl) : ""}
                   alt={drawing.name}
                   className="relative z-0 block max-h-[80vh] max-w-[1200px] select-none rounded"
-                  onLoad={onLegacyMasterLoad}
+                  onLoad={onMasterLoad}
                   onError={() => {
                     setImageError(
                       messageForDrawingImageLoadFailure(drawing.fileUrl ?? "")
@@ -396,9 +216,9 @@ export default function DrawingViewer({
                   draggable={false}
                 />
 
-                {canRenderOverlay ? (
+                {canRenderOverlay && regions.length > 0 ? (
                   <DrawingOverlayLayer
-                    diff={selectedDiff}
+                    regions={regions}
                     viewerSize={{
                       width: layoutSize.width,
                       height: layoutSize.height,
@@ -408,10 +228,9 @@ export default function DrawingViewer({
                   />
                 ) : null}
               </>
-            )
-          ) : null}
-        </div>
-      </PanZoomContainer>
+            )}
+          </div>
+        </PanZoomContainer>
       </div>
     </div>
   );

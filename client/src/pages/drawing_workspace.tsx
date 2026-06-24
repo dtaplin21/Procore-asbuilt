@@ -4,8 +4,6 @@ import { Trash2 } from "lucide-react";
 import { useLocation, useParams, Link } from "wouter";
 import type { DrawingResponse } from "@shared/schema";
 
-import AlignmentsPanel from "@/components/drawing-workspace/alignments_panel";
-import DiffTimelinePanel from "@/components/drawing-workspace/diff_timeline_panel";
 import { UploadDrawingModal } from "@/components/drawing-workspace/UploadDrawingModal";
 import { DeleteDrawingDialog } from "@/components/drawings/DeleteDrawingDialog";
 import DrawingComparisonWorkspace from "@/components/drawings/DrawingComparisonWorkspace";
@@ -13,10 +11,6 @@ import DrawingWorkspaceLayout from "@/components/drawing-workspace/drawing_works
 import WorkspaceErrorState from "@/components/drawing-workspace/workspace_error_state";
 import WorkspaceLoadingState from "@/components/drawing-workspace/workspace_loading_state";
 import { useDrawingWorkspace } from "@/hooks/use_drawing_workspace";
-import {
-  stripWorkspaceSelectionFromSearch,
-  useWorkspaceSelectionQueryParams,
-} from "@/hooks/use_workspace_selection_query_params";
 import { toast } from "@/hooks/use-toast";
 import { fetchProjectDashboardSummary } from "@/lib/api/projects";
 import {
@@ -50,12 +44,6 @@ export function DrawingWorkspaceBody({
     setLastProjectIdForWorkspaceFallback(parsedProjectId);
   }, [location, parsedProjectId, parsedDrawingId]);
 
-  const {
-    alignmentIdFromUrl,
-    diffIdFromUrl,
-    setSelectionQueryParams,
-  } = useWorkspaceSelectionQueryParams();
-
   /** UX-only label (`current_drawing.name`); optional. Do not use summary ids for `masterDrawingId` (avoid circularity). */
   const summaryQuery = useQuery({
     queryKey: [
@@ -74,25 +62,12 @@ export function DrawingWorkspaceBody({
 
   const {
     masterDrawing,
-    alignments,
-    selectedAlignmentId,
-    selectedDiffId,
     workspaceLoading,
-    diffsLoading,
     workspaceError,
-    diffsError,
-    selectedDiffs,
-    selectedAlignment,
-    selectedDiff,
-    selectAlignment,
-    selectDiff,
     reloadWorkspace,
-    reloadSelectedDiffs,
   } = useDrawingWorkspace({
     projectId: parsedProjectId,
     drawingId: parsedDrawingId,
-    initialAlignmentId: alignmentIdFromUrl,
-    initialDiffId: diffIdFromUrl,
   });
 
   const routeDrawingForDelete = useMemo(() => {
@@ -103,26 +78,14 @@ export function DrawingWorkspaceBody({
     return { id: parsedDrawingId, name };
   }, [masterDrawing, parsedDrawingId, currentDrawingName]);
 
-  useEffect(() => {
-    setSelectionQueryParams({
-      alignmentId: selectedAlignmentId,
-      diffId: selectedDiffId,
-    });
-  }, [selectedAlignmentId, selectedDiffId, setSelectionQueryParams]);
-
   const handleUploadSuccess = useCallback(
     async (drawing: DrawingResponse, intent: DrawingUploadIntent) => {
       if (intent !== "master") {
         return;
       }
-      const q = location.indexOf("?");
-      const search = q === -1 ? "" : location.slice(q);
-      const nextQuery = stripWorkspaceSelectionFromSearch(search);
-      setLocation(
-        `/projects/${projectId}/drawings/${drawing.id}/workspace${nextQuery}`
-      );
+      setLocation(`/projects/${projectId}/drawings/${drawing.id}/workspace`);
     },
-    [location, projectId, setLocation]
+    [projectId, setLocation]
   );
 
   const header = (
@@ -233,34 +196,11 @@ export function DrawingWorkspaceBody({
         header={header}
         viewer={
           <DrawingComparisonWorkspace
+            projectId={projectId}
             masterDrawing={masterDrawing}
-            selectedDiff={selectedDiff}
           />
         }
-        sidebar={
-          <>
-            {sidebarUploadControls(false)}
-
-            <AlignmentsPanel
-              projectId={projectId}
-              masterDrawingId={masterDrawingId}
-              alignments={alignments}
-              selectedAlignmentId={selectedAlignmentId}
-              loading={workspaceLoading}
-              onSelectAlignment={selectAlignment}
-              onRerunComplete={() => void reloadSelectedDiffs()}
-            />
-
-            <DiffTimelinePanel
-              diffs={selectedDiffs}
-              selectedDiffId={selectedDiffId}
-              loading={diffsLoading}
-              error={diffsError}
-              onSelectDiff={selectDiff}
-              onRetry={() => void reloadSelectedDiffs()}
-            />
-          </>
-        }
+        sidebar={sidebarUploadControls(false)}
       />
 
       {uploadModal}
