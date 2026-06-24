@@ -328,13 +328,6 @@ class DrawingResponse(BaseModel):
     file_url: Optional[str] = None
     content_type: Optional[str] = None
     page_count: Optional[int] = None
-    upload_intent: Literal["master", "sub"] | None = Field(
-        default=None,
-        description=(
-            "Set from multipart when the client sends master/sub. NULL on legacy rows. "
-            "Triggers such as auto-compare must use equality (== 'sub'), not truthy checks."
-        ),
-    )
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -1020,10 +1013,11 @@ class DrawingDiffHistoryListResponse(BaseModel):
 
 
 class InspectionReviewSubmit(BaseModel):
-    """Mark an alignment (or a specific drawing region on that master) passed or failed."""
+    """Mark an inspection run (optionally a region or overlay) passed or failed."""
 
     outcome: Literal["passed", "failed"]
     region_id: Optional[int] = Field(default=None, serialization_alias="regionId")
+    overlay_id: Optional[int] = Field(default=None, serialization_alias="overlayId")
     notes: Optional[str] = None
     reviewer_user_id: Optional[int] = Field(default=None, serialization_alias="reviewerUserId")
 
@@ -1032,10 +1026,8 @@ class InspectionReviewSubmit(BaseModel):
 
 class DrawingInspectionReviewResponse(BaseModel):
     id: int
-    alignment_id: Optional[int] = Field(default=None, serialization_alias="alignmentId")
-    inspection_run_id: Optional[int] = Field(
-        default=None, serialization_alias="inspectionRunId"
-    )
+    inspection_run_id: int = Field(..., serialization_alias="inspectionRunId")
+    overlay_id: Optional[int] = Field(default=None, serialization_alias="overlayId")
     region_id: Optional[int] = Field(default=None, serialization_alias="regionId")
     status: str
     reviewer_user_id: Optional[int] = Field(default=None, serialization_alias="reviewerUserId")

@@ -1,16 +1,14 @@
 """
 Dashboard and cross-project metrics.
 
-Inspection coverage and diff-risk counts live here so StorageService and routes stay
-thin and definitions stay consistent.
+Inspection coverage KPIs live here so StorageService and routes stay thin.
 """
 
 from __future__ import annotations
 
-from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session
 
-from models.models import Drawing, DrawingAlignment, DrawingDiff, InspectionRun, Project
+from models.models import Drawing
 
 
 def get_current_drawing_for_project(
@@ -37,10 +35,8 @@ def get_project_inspection_coverage(db: Session, project_id: int) -> dict:
     """
     Master inspection coverage for dashboard KPIs.
 
-    * ``total_masters_count`` — canonical master on the project (``projects.master_drawing_id``)
-      when set, otherwise drawings with ``upload_intent == \"master\"``.
-    * ``inspected_count`` — distinct master drawings with at least one **complete**
-      inspection run (queued/processing runs are excluded so the label stays truthful).
+    * ``total_masters_count`` — ``1`` when ``projects.master_drawing_id`` is set, else ``0``.
+    * ``inspected_count`` — distinct masters with at least one **complete** inspection run.
     """
     from services.storage import StorageService
 
@@ -63,60 +59,17 @@ def get_project_inspection_coverage(db: Session, project_id: int) -> dict:
     }
 
 
-def get_project_unresolved_high_severity_diff_metric(db: Session, project_id: int) -> dict:
-    """
-    Project-scoped unresolved high/critical diffs (``resolved`` is false on ``drawing_diffs``).
-    Severity uses the same rule as the DB check: ``high`` and ``critical``.
-    """
-    count = (
-        db.query(func.count(DrawingDiff.id))
-        .join(DrawingAlignment, DrawingDiff.alignment_id == DrawingAlignment.id)
-        .filter(
-            DrawingAlignment.project_id == project_id,
-            DrawingDiff.severity.in_(["high", "critical"]),
-            DrawingDiff.resolved.is_(False),
-        )
-        .scalar()
-        or 0
-    )
-    return {
-        "unresolved_high_severity_count": int(count),
-        "label": (
-            "Unresolved high or critical diffs (severity high/critical; resolved=false on diff)"
-        ),
-    }
-
-
 def get_unresolved_high_severity_diff_metric(db: Session) -> dict:
-    """
-    All unresolved high/critical diffs for drawings in **active** projects.
-
-    ``drawing_diffs`` has no ``project_id``; we join alignment → master drawing → project.
-    """
-    count = (
-        db.query(func.count(DrawingDiff.id))
-        .join(DrawingAlignment, DrawingAlignment.id == DrawingDiff.alignment_id)
-        .join(Drawing, Drawing.id == DrawingAlignment.master_drawing_id)
-        .join(Project, Project.id == Drawing.project_id)
-        .filter(
-            Project.status == "active",
-            DrawingDiff.severity.in_(["high", "critical"]),
-            DrawingDiff.resolved.is_(False),
-        )
-        .scalar()
-        or 0
-    )
+    """Deprecated compare KPI — compare stack removed; always returns zero."""
+    _ = db
     return {
-        "unresolved_high_severity_count": int(count),
-        "label": (
-            f"{count} unresolved high or critical diffs across your active projects."
-        ),
+        "unresolved_high_severity_count": 0,
+        "label": "Compare diffs removed; no unresolved diff risk metric.",
     }
 
 
 __all__ = [
     "get_current_drawing_for_project",
     "get_project_inspection_coverage",
-    "get_project_unresolved_high_severity_diff_metric",
     "get_unresolved_high_severity_diff_metric",
 ]

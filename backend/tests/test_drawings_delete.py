@@ -34,7 +34,6 @@ def test_delete_drawing_removes_row_evidence_links_and_clears_master(
         name="sub.pdf",
         storage_key=f"drawings/test/{pid}/sub_del.pdf",
         content_type="application/pdf",
-        upload_intent="sub",
     )
     db_session.add(sub)
     db_session.commit()

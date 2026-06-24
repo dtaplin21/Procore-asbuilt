@@ -55,7 +55,7 @@ def test_dashboard_summary_includes_master_drawing_id(
     assert data["masterDrawing"]["name"] == "master.pdf"
 
 
-def test_create_drawing_always_sets_upload_intent_master(
+def test_create_drawing_sets_project_master_drawing_id(
     db_session, project: Project
 ) -> None:
     storage = StorageService(db_session)
@@ -67,21 +67,14 @@ def test_create_drawing_always_sets_upload_intent_master(
         storage_key=f"drawings/test/{pid}/sheet.pdf",
         content_type="application/pdf",
     )
-    row = (
-        db_session.query(Drawing)
-        .filter(Drawing.id == cast(int, drawing.id))
-        .first()
-    )
-    assert row is not None
-    assert cast(str | None, row.upload_intent) == "master"
     db_session.refresh(project)
     assert cast(int | None, project.master_drawing_id) == cast(int, drawing.id)
 
 
-def test_projects_router_upload_always_sets_master(
+def test_projects_router_upload_sets_canonical_master(
     client: TestClient, db_session, project: Project
 ) -> None:
-    """POST /api/projects/{id}/drawings always creates a master drawing (upload_intent ignored)."""
+    """POST /api/projects/{id}/drawings sets projects.master_drawing_id."""
     pid = cast(int, project.id)
     pdf = _minimal_pdf_bytes()
     files = {"file": ("sub_sheet.pdf", io.BytesIO(pdf), "application/pdf")}
@@ -89,7 +82,6 @@ def test_projects_router_upload_always_sets_master(
     response = client.post(f"/api/projects/{pid}/drawings", files=files, data=data)
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body.get("upload_intent") == "master"
     db_session.refresh(project)
     assert cast(int | None, project.master_drawing_id) == body["id"]
 
@@ -117,10 +109,10 @@ def test_get_project_master_drawing_prefers_project_master_drawing_id(
     assert got_fn is not None and cast(int, got_fn.id) == cast(int, master.id)
 
 
-def test_get_project_master_drawing_fallback_newest_upload_intent_master(
+def test_get_project_master_drawing_returns_none_without_canonical_fk(
     db_session, project: Project
 ) -> None:
-    """When FK is unset, use ``upload_intent == 'master'`` (newest ``updated_at``)."""
+    """When ``master_drawing_id`` is unset, there is no canonical master."""
     pid = cast(int, project.id)
     older = Drawing(
         project_id=pid,
@@ -128,26 +120,13 @@ def test_get_project_master_drawing_fallback_newest_upload_intent_master(
         name="old-sheet.pdf",
         storage_key=f"drawings/test/{pid}/old.pdf",
         content_type="application/pdf",
-        upload_intent=None,
         processing_status="pending",
         updated_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
     )
-    newer = Drawing(
-        project_id=pid,
-        source="upload",
-        name="new-master.pdf",
-        storage_key=f"drawings/test/{pid}/new.pdf",
-        content_type="application/pdf",
-        upload_intent="master",
-        processing_status="pending",
-        updated_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
-    )
-    db_session.add_all([older, newer])
+    db_session.add(older)
     db_session.commit()
     db_session.refresh(project)
     assert project.master_drawing_id is None
 
     storage = StorageService(db_session)
-    got = storage.get_project_master_drawing(pid)
-    assert got is not None
-    assert cast(int, got.id) == cast(int, newer.id)
+    assert storage.get_project_master_drawing(pid) is None

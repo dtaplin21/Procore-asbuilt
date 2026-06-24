@@ -30,51 +30,34 @@ def _resolve_master_drawing_id(finding: Finding) -> int | None:
     master_id = getattr(finding, "drawing_id", None)
     if master_id is not None:
         return cast(int, master_id)
-    diff_id = getattr(finding, "drawing_diff_id", None)
-    if diff_id is None:
-        return None
-    diff = getattr(finding, "drawing_diff", None)
-    if diff is None:
-        return None
-    alignment = getattr(diff, "alignment", None)
-    if alignment is None:
-        return None
-    return cast(int | None, getattr(alignment, "master_drawing_id", None))
+    return None
 
 
 def _find_overlay_for_finding(db: Session, finding: Finding) -> DrawingOverlay | None:
-    """Locate the overlay row tied to this finding (meta.finding_id or legacy diff_id)."""
+    """Locate the overlay row tied to this finding via ``meta.finding_id``."""
     finding_id = cast(int, finding.id)
     master_id = _resolve_master_drawing_id(finding)
+    if master_id is None:
+        return None
 
-    if master_id is not None:
-        overlays = (
-            db.query(DrawingOverlay)
-            .filter(DrawingOverlay.master_drawing_id == master_id)
-            .order_by(DrawingOverlay.id.desc())
-            .all()
-        )
-        for overlay in overlays:
-            meta = getattr(overlay, "meta", None)
-            if not isinstance(meta, dict):
-                continue
-            candidate = meta.get("finding_id")
-            if candidate is None:
-                continue
-            try:
-                if int(candidate) == finding_id:
-                    return overlay
-            except (TypeError, ValueError):
-                continue
-
-    diff_id = getattr(finding, "drawing_diff_id", None)
-    if diff_id is not None:
-        return (
-            db.query(DrawingOverlay)
-            .filter(DrawingOverlay.diff_id == diff_id)
-            .order_by(DrawingOverlay.id.desc())
-            .first()
-        )
+    overlays = (
+        db.query(DrawingOverlay)
+        .filter(DrawingOverlay.master_drawing_id == master_id)
+        .order_by(DrawingOverlay.id.desc())
+        .all()
+    )
+    for overlay in overlays:
+        meta = getattr(overlay, "meta", None)
+        if not isinstance(meta, dict):
+            continue
+        candidate = meta.get("finding_id")
+        if candidate is None:
+            continue
+        try:
+            if int(candidate) == finding_id:
+                return overlay
+        except (TypeError, ValueError):
+            continue
     return None
 
 

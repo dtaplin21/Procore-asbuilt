@@ -24,7 +24,6 @@ def test_build_finding_link_resolves_overlay_and_inspection_run(
         name="master.pdf",
         storage_key=None,
         content_type="application/pdf",
-        upload_intent="master",
     )
     db_session.add(master)
     db_session.commit()
@@ -103,7 +102,6 @@ def test_findings_api_serializes_run_overlay_workspace_link(
         name="sheet-a.pdf",
         storage_key=None,
         content_type="application/pdf",
-        upload_intent="master",
     )
     db_session.add(master)
     db_session.commit()

@@ -97,7 +97,6 @@ async def upload_drawing(
     response = DrawingResponse.model_validate(drawing)
     response_data = response.model_dump(mode="json")
     response_data["file_url"] = f"/api/projects/{project_id}/drawings/{cast(int, drawing.id)}/file"
-    response_data["upload_intent"] = drawing.upload_intent
 
     enqueue_drawing_render_job(db, project_id, cast(int, drawing.id))
 
@@ -241,14 +240,13 @@ def list_drawing_overlays(
     project_id: int,
     drawing_id: int,
     inspection_run_id: Optional[int] = Query(None, description="Filter by inspection run"),
-    diff_id: Optional[int] = Query(None, description="Filter by diff"),
     db: Session = Depends(get_db),
 ) -> List[DrawingOverlayResponse]:
     """
     GET /api/projects/{project_id}/drawings/{drawing_id}/overlays
 
     List overlays for a drawing (master drawing). Sorted by created_at desc.
-    Optional filters: inspection_run_id, diff_id.
+    Optional filter: inspection_run_id.
     """
     service = StorageService(db)
     drawing = service.get_drawing(project_id, drawing_id)
@@ -258,6 +256,5 @@ def list_drawing_overlays(
     overlays = service.list_drawing_overlays(
         master_drawing_id=drawing_id,
         inspection_run_id=inspection_run_id,
-        diff_id=diff_id,
     )
     return [DrawingOverlayResponse.model_validate(o) for o in overlays]

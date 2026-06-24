@@ -66,9 +66,7 @@ from models.models import (
     JobQueue,
     Drawing,
     DrawingRegion,
-    DrawingAlignment,
     DrawingInspectionReview,
-    DrawingDiff,
     DrawingRendition,
     EvidenceRecord,
     EvidenceDrawingLink,
@@ -135,10 +133,6 @@ class StorageService:
 
         **Primary:** ``projects.master_drawing_id`` when set, scoped with
         :meth:`get_drawing` so a stale FK returns ``None``.
-
-        **Fallback** (legacy or missing FK): the row with
-        ``upload_intent == 'master'`` (never truthy checks—only the literal ``"master"``),
-        newest by ``updated_at`` then ``id`` so multiple intent rows are not ambiguous.
         """
         project = self.get_project(project_id)
         if project is None:
@@ -148,15 +142,7 @@ class StorageService:
         if mid is not None:
             return self.get_drawing(project_id, int(mid))
 
-        return (
-            self.db.query(Drawing)
-            .filter(
-                Drawing.project_id == project_id,
-                Drawing.upload_intent == "master",
-            )
-            .order_by(Drawing.updated_at.desc(), Drawing.id.desc())
-            .first()
-        )
+        return None
 
     def get_project_dashboard_summary(
         self,
@@ -256,22 +242,11 @@ class StorageService:
     # ------------------------------------------------------------------
 
     def count_project_master_drawings(self, project_id: int) -> int:
-        """Count master drawings for inspection coverage (canonical FK or upload_intent)."""
+        """Count master drawings for inspection coverage (``projects.master_drawing_id``)."""
         project = self.get_project(project_id)
         if project is None:
             return 0
-        canonical_id = getattr(project, "master_drawing_id", None)
-        if canonical_id is not None:
-            return 1
-        return int(
-            self.db.query(func.count(Drawing.id))
-            .filter(
-                Drawing.project_id == project_id,
-                Drawing.upload_intent == "master",
-            )
-            .scalar()
-            or 0
-        )
+        return 1 if getattr(project, "master_drawing_id", None) is not None else 0
 
     def count_drawings_with_inspection_run(
         self,
@@ -314,11 +289,7 @@ class StorageService:
     # ------------------------------------------------------------------
 
     def set_project_master(self, project_id: int, drawing_id: int) -> None:
-        """Declare the canonical master sheet for a project.
-
-        Sets ``project.master_drawing_id`` and marks the chosen drawing ``upload_intent='master'``.
-        Clears ``upload_intent`` on any prior master row (does not mark prior uploads as sub).
-        """
+        """Declare the canonical master sheet for a project via ``projects.master_drawing_id``."""
         project = self.get_project(project_id)
         if project is None:
             raise ValueError(f"Project {project_id} not found")
@@ -330,17 +301,6 @@ class StorageService:
                 f"Drawing {drawing_id} belongs to project {drawing.project_id}, not {project_id}"
             )
 
-        (
-            self.db.query(Drawing)
-            .filter(
-                Drawing.project_id == project_id,
-                Drawing.upload_intent == "master",
-                Drawing.id != drawing_id,
-            )
-            .update({Drawing.upload_intent: None}, synchronize_session=False)
-        )
-
-        drawing.upload_intent = "master"  # type: ignore[assignment]
         project.master_drawing_id = drawing_id  # type: ignore[assignment]
 
     def _project_has_no_canonical_master(self, project_id: int) -> bool:
@@ -359,14 +319,6 @@ class StorageService:
         page_count: Optional[int] = None,
     ) -> Drawing:
         """Persist a new drawing row and set it as the project canonical master."""
-        (
-            self.db.query(Drawing)
-            .filter(
-                Drawing.project_id == project_id,
-                Drawing.upload_intent == "master",
-            )
-            .update({Drawing.upload_intent: None}, synchronize_session=False)
-        )
         drawing = Drawing(
             project_id=project_id,
             source=source,
@@ -374,7 +326,6 @@ class StorageService:
             storage_key=storage_key,
             content_type=content_type,
             page_count=page_count,
-            upload_intent="master",
         )
         self.db.add(drawing)
         try:
@@ -441,20 +392,6 @@ class StorageService:
     def _drawing_deletion_impact_counts(
         self, project_id: int, drawing_id: int
     ) -> DrawingDeletionImpact:
-        alignment_filter = (
-            DrawingAlignment.project_id == project_id,
-            or_(
-                DrawingAlignment.master_drawing_id == drawing_id,
-                DrawingAlignment.sub_drawing_id == drawing_id,
-            ),
-        )
-        alignments_count = self.db.query(DrawingAlignment).filter(*alignment_filter).count()
-        diffs_count = (
-            self.db.query(DrawingDiff)
-            .join(DrawingAlignment, DrawingDiff.alignment_id == DrawingAlignment.id)
-            .filter(*alignment_filter)
-            .count()
-        )
         regions_count = (
             self.db.query(DrawingRegion)
             .filter(DrawingRegion.master_drawing_id == drawing_id)
@@ -482,8 +419,8 @@ class StorageService:
             .count()
         )
         return DrawingDeletionImpact(
-            alignments_count=alignments_count,
-            diffs_count=diffs_count,
+            alignments_count=0,
+            diffs_count=0,
             regions_count=regions_count,
             overlays_count=overlays_count,
             findings_with_drawing_count=findings_with_drawing_count,
@@ -705,256 +642,6 @@ class StorageService:
         )
 
     # ------------------------------------------------------------------
-    # Drawing Alignments (Phase 2)
-    # ------------------------------------------------------------------
-
-    def create_drawing_alignment(
-        self,
-        master_drawing_id: int,
-        sub_drawing_id: int,
-        method: str,
-        *,
-        region_id: Optional[int] = None,
-    ) -> DrawingAlignment:
-        """
-        Create alignment row. Lifecycle status:
-        - manual: complete immediately with identity transform
-        - feature_match | vision: queued (caller runs pipeline -> processing -> complete/failed)
-        """
-        if method.strip().lower() == "manual":
-            status = "complete"
-            transform = {
-                "type": "affine",
-                "matrix": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-                "confidence": 1.0,
-                "meta": {"note": "Identity transform for MVP overlay behavior"},
-                "page": 1,
-                "residual_error": None,
-            }
-        else:
-            status = "queued"
-            transform = None
-
-        master = (
-            self.db.query(Drawing)
-            .filter(Drawing.id == master_drawing_id)
-            .first()
-        )
-        if master is None:
-            raise ValueError(f"Master drawing {master_drawing_id} not found")
-        sub = self.db.query(Drawing).filter(Drawing.id == sub_drawing_id).first()
-        if sub is None:
-            raise ValueError(f"Sub drawing {sub_drawing_id} not found")
-        sub_project_id = cast(int, sub.project_id)
-        master_project_id = cast(int, master.project_id)
-        if sub_project_id != master_project_id:
-            raise ValueError(
-                "Master and sub drawings must belong to the same project"
-            )
-
-        alignment = DrawingAlignment(
-            project_id=master_project_id,
-            master_drawing_id=master_drawing_id,
-            sub_drawing_id=sub_drawing_id,
-            region_id=region_id,
-            method=method,
-            status=status,
-            transform=transform,
-        )
-        self.db.add(alignment)
-        try:
-            self.db.commit()
-        except SQLAlchemyError:
-            self.db.rollback()
-            raise
-        self.db.refresh(alignment)
-        return alignment
-
-    def create_drawing_alignment_with_transform(
-        self,
-        project_id: int,
-        master_drawing_id: int,
-        sub_drawing_id: int,
-        transform_matrix: Dict[str, Any],
-        alignment_status: str = "manual_mvp",
-        *,
-        region_id: Optional[int] = None,
-    ) -> DrawingAlignment:
-        """
-        Create alignment with explicit transform and status.
-        project_id is used for validation (drawings must belong to project).
-        Maps transform_matrix -> transform, alignment_status -> status.
-        """
-        if self.get_drawing(project_id, master_drawing_id) is None:
-            raise ValueError(f"Master drawing {master_drawing_id} not found in project")
-        if self.get_drawing(project_id, sub_drawing_id) is None:
-            raise ValueError(f"Sub drawing {sub_drawing_id} not found in project")
-
-        method = "manual"
-        alignment = DrawingAlignment(
-            project_id=project_id,
-            master_drawing_id=master_drawing_id,
-            sub_drawing_id=sub_drawing_id,
-            region_id=region_id,
-            method=method,
-            status=alignment_status,
-            transform=transform_matrix,
-        )
-        self.db.add(alignment)
-        try:
-            self.db.commit()
-        except SQLAlchemyError:
-            self.db.rollback()
-            raise
-        self.db.refresh(alignment)
-        return alignment
-
-    def list_drawing_alignments(
-        self,
-        master_drawing_id: int,
-        *,
-        limit: int = 50,
-        offset: int = 0,
-    ) -> tuple[List[DrawingAlignment], int]:
-        """List alignments for a master drawing with pagination. Returns (items, total)."""
-        base = (
-            self.db.query(DrawingAlignment)
-            .filter(DrawingAlignment.master_drawing_id == master_drawing_id)
-            .order_by(DrawingAlignment.created_at.desc(), DrawingAlignment.id.desc())
-        )
-        total = base.count()
-        items = base.limit(limit).offset(offset).all()
-        return items, total
-
-    def get_drawing_alignment_by_id(
-        self,
-        project_id: int,
-        master_drawing_id: int,
-        alignment_id: int,
-    ) -> Optional[DrawingAlignment]:
-        """
-        Fetch alignment with project validation.
-        Ensures: alignment exists, belongs to correct project, belongs to correct master drawing.
-        """
-        alignment = (
-            self.db.query(DrawingAlignment)
-            .filter(
-                DrawingAlignment.id == alignment_id,
-                DrawingAlignment.master_drawing_id == master_drawing_id,
-                DrawingAlignment.project_id == project_id,
-            )
-            .first()
-        )
-        if alignment is None:
-            return None
-        if self.get_drawing(project_id, master_drawing_id) is None:
-            return None
-        return alignment
-
-    def get_alignment(self, alignment_id: int) -> Optional[DrawingAlignment]:
-        return (
-            self.db.query(DrawingAlignment)
-            .filter(DrawingAlignment.id == alignment_id)
-            .first()
-        )
-
-    def get_alignment_by_drawing_pair(
-        self,
-        master_drawing_id: int,
-        sub_drawing_id: int,
-        project_id: Optional[int] = None,
-    ) -> Optional[DrawingAlignment]:
-        """
-        Get alignment for a master/sub drawing pair.
-        If project_id is provided, validates master drawing belongs to project.
-        """
-        base = (
-            self.db.query(DrawingAlignment)
-            .filter(
-                DrawingAlignment.master_drawing_id == master_drawing_id,
-                DrawingAlignment.sub_drawing_id == sub_drawing_id,
-            )
-        )
-        if project_id is not None:
-            base = base.join(Drawing, DrawingAlignment.master_drawing_id == Drawing.id).filter(
-                Drawing.project_id == project_id
-            )
-        return (
-            base.order_by(DrawingAlignment.updated_at.desc(), DrawingAlignment.id.desc())
-            .first()
-        )
-
-    def list_alignments_by_master_drawing(
-        self,
-        project_id: int,
-        master_drawing_id: int,
-    ):
-        """List alignments for a master drawing, sorted by created_at desc (history view)."""
-        return (
-            self.db.query(DrawingAlignment)
-            .join(Drawing, DrawingAlignment.master_drawing_id == Drawing.id)
-            .options(
-                joinedload(DrawingAlignment.master_drawing),
-                joinedload(DrawingAlignment.sub_drawing),
-            )
-            .filter(
-                Drawing.project_id == project_id,
-                DrawingAlignment.master_drawing_id == master_drawing_id,
-            )
-            .order_by(DrawingAlignment.created_at.desc())
-            .all()
-        )
-
-    def get_reusable_alignment(
-        self,
-        master_drawing_id: int,
-        sub_drawing_id: int,
-    ) -> Optional[DrawingAlignment]:
-        """
-        Return alignment with a valid transform if one exists.
-        Reusable = status complete and transform present with matrix.
-        """
-        alignment = self.get_alignment_by_drawing_pair(
-            master_drawing_id=master_drawing_id,
-            sub_drawing_id=sub_drawing_id,
-        )
-        if alignment is None:
-            return None
-        transform = getattr(alignment, "transform", None)
-        if not transform or not transform.get("matrix"):
-            return None
-        status = getattr(alignment, "status", "")
-        if status != "complete":
-            return None
-        return alignment
-
-    def update_alignment_status(
-        self,
-        alignment_id: int,
-        status: str,
-        *,
-        transform: Optional[Dict[str, Any]] = None,
-        error_message: Optional[str] = None,
-    ) -> Optional[DrawingAlignment]:
-        alignment = self.db.query(DrawingAlignment).filter(DrawingAlignment.id == alignment_id).first()
-        if alignment is None:
-            return None
-
-        setattr(alignment, "status", status)
-        if transform is not None:
-            setattr(alignment, "transform", transform)
-        if error_message is not None:
-            setattr(alignment, "error_message", error_message)
-
-        try:
-            self.db.commit()
-        except SQLAlchemyError:
-            self.db.rollback()
-            raise
-        self.db.refresh(alignment)
-        return alignment
-
-    # ------------------------------------------------------------------
     # Drawing inspection reviews (human pass / fail)
     # ------------------------------------------------------------------
 
@@ -963,34 +650,16 @@ class StorageService:
         *,
         project_id: int,
         outcome: Literal["passed", "failed"],
-        alignment_id: Optional[int] = None,
-        inspection_run_id: Optional[int] = None,
+        inspection_run_id: int,
         region_id: Optional[int] = None,
+        overlay_id: Optional[int] = None,
         notes: Optional[str] = None,
         reviewer_user_id: Optional[int] = None,
     ) -> DrawingInspectionReview:
-        if (alignment_id is None) == (inspection_run_id is None):
-            raise ValueError("Exactly one of alignment_id or inspection_run_id is required")
-
-        master_drawing_id: int
-        if alignment_id is not None:
-            alignment = (
-                self.db.query(DrawingAlignment)
-                .filter(
-                    DrawingAlignment.id == alignment_id,
-                    DrawingAlignment.project_id == project_id,
-                )
-                .first()
-            )
-            if alignment is None:
-                raise ValueError("Alignment not found for this project")
-            master_drawing_id = cast(int, alignment.master_drawing_id)
-        else:
-            assert inspection_run_id is not None
-            run = self.get_inspection_run(project_id, inspection_run_id)
-            if run is None:
-                raise ValueError("Inspection run not found for this project")
-            master_drawing_id = cast(int, run.master_drawing_id)
+        run = self.get_inspection_run(project_id, inspection_run_id)
+        if run is None:
+            raise ValueError("Inspection run not found for this project")
+        master_drawing_id = cast(int, run.master_drawing_id)
 
         if region_id is not None:
             region = (
@@ -1003,13 +672,26 @@ class StorageService:
             if cast(int, region.master_drawing_id) != master_drawing_id:
                 raise ValueError("Region does not belong to this review's master drawing")
 
+        if overlay_id is not None:
+            overlay = (
+                self.db.query(DrawingOverlay)
+                .filter(DrawingOverlay.id == overlay_id)
+                .first()
+            )
+            if overlay is None:
+                raise ValueError("Drawing overlay not found")
+            if cast(int, overlay.master_drawing_id) != master_drawing_id:
+                raise ValueError("Overlay does not belong to this review's master drawing")
+            if cast(int, overlay.inspection_run_id) != inspection_run_id:
+                raise ValueError("Overlay does not belong to this inspection run")
+
         now = datetime.now(timezone.utc)
         status = "passed" if outcome == "passed" else "failed"
         passed_at = now if outcome == "passed" else None
 
         row = DrawingInspectionReview(
-            alignment_id=alignment_id,
             inspection_run_id=inspection_run_id,
+            overlay_id=overlay_id,
             region_id=region_id,
             status=status,
             reviewer_user_id=reviewer_user_id,
@@ -1029,28 +711,8 @@ class StorageService:
         self,
         *,
         project_id: int,
-        alignment_id: Optional[int] = None,
-        inspection_run_id: Optional[int] = None,
+        inspection_run_id: int,
     ) -> List[DrawingInspectionReview]:
-        if (alignment_id is None) == (inspection_run_id is None):
-            raise ValueError("Exactly one of alignment_id or inspection_run_id is required")
-
-        if alignment_id is not None:
-            return (
-                self.db.query(DrawingInspectionReview)
-                .join(
-                    DrawingAlignment,
-                    DrawingInspectionReview.alignment_id == DrawingAlignment.id,
-                )
-                .filter(
-                    DrawingAlignment.id == alignment_id,
-                    DrawingAlignment.project_id == project_id,
-                )
-                .order_by(DrawingInspectionReview.id.desc())
-                .all()
-            )
-
-        assert inspection_run_id is not None
         return (
             self.db.query(DrawingInspectionReview)
             .join(
@@ -1064,175 +726,6 @@ class StorageService:
             .order_by(DrawingInspectionReview.id.desc())
             .all()
         )
-
-    # ------------------------------------------------------------------
-    # Drawing Diffs
-    # ------------------------------------------------------------------
-
-    def create_drawing_diff(
-        self,
-        alignment_id: int,
-        *,
-        summary: str,
-        severity: str,
-        diff_regions: List[Dict[str, Any]],
-        finding_id: Optional[int] = None,
-        change_details: Optional[Dict[str, Any]] = None,
-        semantic_summary: Optional[Dict[str, Any]] = None,
-    ) -> DrawingDiff:
-        diff = DrawingDiff(
-            alignment_id=alignment_id,
-            finding_id=finding_id,
-            summary=summary,
-            severity=severity,
-            diff_regions=diff_regions,
-            change_details=change_details,
-            semantic_summary=semantic_summary,
-        )
-        self.db.add(diff)
-        try:
-            self.db.commit()
-        except SQLAlchemyError:
-            self.db.rollback()
-            raise
-        self.db.refresh(diff)
-        return diff
-
-    def list_drawing_diffs(
-        self,
-        master_drawing_id: int,
-        *,
-        alignment_id: Optional[int] = None,
-        limit: int = 50,
-        offset: int = 0,
-    ) -> tuple[List[DrawingDiff], int]:
-        """
-        List diffs for a master drawing, optionally filtered by alignment.
-        Sorted by created_at desc. Returns (items, total).
-        """
-        base = (
-            self.db.query(DrawingDiff)
-            .join(DrawingAlignment, DrawingDiff.alignment_id == DrawingAlignment.id)
-            .filter(DrawingAlignment.master_drawing_id == master_drawing_id)
-        )
-        if alignment_id is not None:
-            base = base.filter(DrawingDiff.alignment_id == alignment_id)
-        total = base.count()
-        items = (
-            base.order_by(DrawingDiff.created_at.desc(), DrawingDiff.id.desc())
-            .limit(limit)
-            .offset(offset)
-            .all()
-        )
-        return items, total
-
-    def list_drawing_diffs_by_alignment(self, alignment_id: int) -> List[DrawingDiff]:
-        return (
-            self.db.query(DrawingDiff)
-            .filter(DrawingDiff.alignment_id == alignment_id)
-            .order_by(DrawingDiff.created_at.asc())
-            .all()
-        )
-
-    def list_diffs_for_master_drawing(
-        self,
-        project_id: int,
-        master_drawing_id: int,
-        alignment_id: int | None = None,
-    ):
-        """List diffs for a master drawing, optionally filtered by alignment. Ensures diffs belong to the given project."""
-        query = (
-            self.db.query(DrawingDiff)
-            .join(DrawingAlignment, DrawingDiff.alignment_id == DrawingAlignment.id)
-            .join(Drawing, DrawingAlignment.master_drawing_id == Drawing.id)
-            .filter(
-                Drawing.project_id == project_id,
-                DrawingAlignment.master_drawing_id == master_drawing_id,
-            )
-        )
-
-        if alignment_id is not None:
-            query = query.filter(DrawingAlignment.id == alignment_id)
-
-        return query.order_by(DrawingDiff.created_at.desc()).all()
-
-    def get_drawing_diff(self, diff_id: int) -> Optional[DrawingDiff]:
-        return (
-            self.db.query(DrawingDiff)
-            .filter(DrawingDiff.id == diff_id)
-            .first()
-        )
-
-    SEVERITY_ORDER = {"low": 1, "medium": 2, "high": 3, "critical": 4}
-
-    def create_finding_for_diff(
-        self,
-        diff: DrawingDiff,
-        *,
-        severity_threshold: str = "high",
-        finding_type: str = "deviation",
-        idempotency_key: Optional[str] = None,
-    ) -> Optional[Finding]:
-        """
-        When diff severity exceeds threshold, create a Finding and attach finding_id to diff.
-        Returns the Finding if created, else None.
-        Finding fields: type="deviation", title="Mismatch on {drawing.name}", description=summary,
-        affected_items=region labels, project_id=master drawing project.
-        """
-        diff_severity = cast(str, diff.severity)
-        sev_rank = self.SEVERITY_ORDER.get(diff_severity, 0)
-        thresh_rank = self.SEVERITY_ORDER.get(severity_threshold, 3)  # default "high"
-        if sev_rank < thresh_rank:
-            return None
-
-        alignment = self.db.query(DrawingAlignment).filter(
-            DrawingAlignment.id == diff.alignment_id,
-        ).first()
-        if alignment is None:
-            return None
-        master = self.db.query(Drawing).filter(
-            Drawing.id == cast(int, alignment.master_drawing_id),
-        ).first()
-        if master is None:
-            return None
-        project_id = cast(int, master.project_id)
-        drawing_name = getattr(master, "name", "drawing") or "drawing"
-
-        # Extract region labels from diff_regions for affected_items
-        regions = diff.diff_regions if isinstance(diff.diff_regions, list) else []
-        affected_items = [
-            r.get("label") for r in regions
-            if isinstance(r, dict) and r.get("label")
-        ]
-
-        master_drawing_id = cast(int, master.id)
-        finding = Finding(
-            project_id=project_id,
-            drawing_id=master_drawing_id,
-            type=finding_type,
-            severity=diff_severity,
-            title=f"Mismatch on {drawing_name}",
-            description=diff.summary,
-            affected_items=affected_items,
-        )
-        self.db.add(finding)
-        try:
-            self.db.flush()  # get finding.id
-            setattr(diff, "finding_id", cast(int, finding.id))
-            self.db.commit()
-        except SQLAlchemyError:
-            self.db.rollback()
-            raise
-        self.db.refresh(finding)
-        self.db.refresh(diff)
-        log_finding_created(
-            project_id=cast(int, finding.project_id),
-            finding_id=cast(int, finding.id),
-            evidence_ids=None,
-            finding_type=cast(str, finding.type),
-            severity=cast(str, finding.severity),
-        )
-        return finding
 
     def create_finding(
         self,
@@ -1683,17 +1176,13 @@ class StorageService:
         status: str,
         meta: Optional[Dict[str, Any]] = None,
         *,
-        inspection_run_id: Optional[int] = None,
-        diff_id: Optional[int] = None,
+        inspection_run_id: int,
         idempotency_key: Optional[str] = None,
     ) -> DrawingOverlay:
-        """Create overlay. Exactly one of inspection_run_id or diff_id must be set (DB constraint)."""
-        if (inspection_run_id is None) == (diff_id is None):
-            raise ValueError("Exactly one of inspection_run_id or diff_id must be set")
+        """Create overlay scoped to an inspection run."""
         overlay = DrawingOverlay(
             master_drawing_id=master_drawing_id,
             inspection_run_id=inspection_run_id,
-            diff_id=diff_id,
             geometry=geometry,
             status=status,
             meta=meta,
@@ -1712,7 +1201,6 @@ class StorageService:
         master_drawing_id: int,
         *,
         inspection_run_id: Optional[int] = None,
-        diff_id: Optional[int] = None,
     ) -> List[DrawingOverlay]:
         q = (
             self.db.query(DrawingOverlay)
@@ -1720,8 +1208,6 @@ class StorageService:
         )
         if inspection_run_id is not None:
             q = q.filter(DrawingOverlay.inspection_run_id == inspection_run_id)
-        if diff_id is not None:
-            q = q.filter(DrawingOverlay.diff_id == diff_id)
         return (
             q.order_by(DrawingOverlay.created_at.desc(), DrawingOverlay.id.desc())
             .all()
@@ -1748,18 +1234,13 @@ class StorageService:
         """
         Return Findings associated with an inspection run.
 
-        Looks for finding_id stored in overlay meta or linked via drawing diffs.
+        Looks for ``finding_id`` stored in overlay ``meta``.
         Optionally accept pre-fetched overlays to avoid duplicate queries.
         """
         overlay_records = list(overlays) if overlays is not None else self.list_overlays_for_inspection_run(inspection_run_id)
         finding_ids: Set[int] = set()
 
-        diff_ids: Set[int] = set()
         for overlay in overlay_records:
-            diff_id = getattr(overlay, "diff_id", None)
-            if isinstance(diff_id, int):
-                diff_ids.add(diff_id)
-
             meta = getattr(overlay, "meta", None)
             if isinstance(meta, dict):
                 candidate = meta.get("finding_id")
@@ -1772,16 +1253,6 @@ class StorageService:
                         candidate_int = None
                     if candidate_int is not None:
                         finding_ids.add(candidate_int)
-
-        if diff_ids:
-            diff_rows = (
-                self.db.query(DrawingDiff.id, DrawingDiff.finding_id)
-                .filter(DrawingDiff.id.in_(diff_ids))
-                .all()
-            )
-            for diff_id, linked_finding_id in diff_rows:
-                if linked_finding_id is not None:
-                    finding_ids.add(int(linked_finding_id))
 
         if not finding_ids:
             return []
@@ -1856,10 +1327,7 @@ class StorageService:
         base = q.order_by(Finding.created_at.desc(), Finding.id.desc())
         total = base.count()
         items = (
-            base.options(
-                joinedload(Finding.drawing_diff).joinedload(DrawingDiff.alignment),
-            )
-            .limit(limit)
+            base.limit(limit)
             .offset(offset)
             .all()
         )
@@ -1873,9 +1341,6 @@ class StorageService:
         """List findings for a project (dashboard). Use get_insights for paginated insights page."""
         q = (
             self.db.query(Finding)
-            .options(
-                joinedload(Finding.drawing_diff).joinedload(DrawingDiff.alignment),
-            )
             .filter(Finding.project_id == project_id)
         )
         q = q.order_by(Finding.created_at.desc(), Finding.id.desc())

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from sqlalchemy.orm import Session
@@ -136,9 +136,9 @@ def test_create_and_list_review_for_inspection_run(
         notes="Looks good",
     )
 
-    assert row.alignment_id is None
-    assert cast(int, row.inspection_run_id) == run_id
-    assert row.status == "passed"
+    assert row is not None
+    assert cast(int | None, row.inspection_run_id) == run_id
+    assert cast(str, row.status) == "passed"
 
     rows = storage.list_drawing_inspection_reviews(
         project_id=project_id,
@@ -171,10 +171,11 @@ def test_create_review_rejects_wrong_project_run(
         )
 
 
-def test_create_review_requires_exactly_one_scope(db: Session, project: Project) -> None:
+def test_create_review_requires_inspection_run_id(db: Session, project: Project) -> None:
     storage = StorageService(db)
-    with pytest.raises(ValueError, match="Exactly one"):
-        storage.create_drawing_inspection_review(
-            project_id=cast(int, project.id),
-            outcome="passed",
-        )
+    incomplete_kwargs: Any = {
+        "project_id": cast(int, project.id),
+        "outcome": "passed",
+    }
+    with pytest.raises(TypeError):
+        storage.create_drawing_inspection_review(**incomplete_kwargs)

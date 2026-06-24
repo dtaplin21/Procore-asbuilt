@@ -1,24 +1,368 @@
 """
-Inspection mapping pipeline.
+Evidence -> regions -> drawing_overlays.
 
-Extracts inspection outcomes from evidence docs, maps areas onto the master drawing,
-and creates overlays + inspection results.
+This is the pipeline referenced throughout the drawing-workspace refactor
+plan (PR2 / PR3): it takes evidence submitted against an inspection run
+(photos, field notes, PDFs with extracted text, etc.), maps that evidence
+onto regions on the master drawing, and produces DrawingOverlay records
+that the frontend renders via useDrawingOverlays / DrawingViewer.
+
+Two entry points are exposed:
+
+  - map_evidence_to_overlay(EvidenceInput): the original text-only path,
+    for evidence that's already plain text with a known bbox (e.g. a
+    manually-typed field note pinned by hand to a location). Confidence-
+    scored vocabulary tags only; no document parsing or location
+    resolution.
+
+  - map_document_to_overlays(DocumentEvidenceInput): the full pipeline —
+    takes an actual uploaded file (PDF / image / photo), runs it through
+    document_text_extraction -> positioned_term_extractor ->
+    drawing_location_resolver, and produces one DrawingOverlayRecord per
+    resolved location, with NO location guessed: documents that don't
+    resolve come back tagged UNRESOLVED for human follow-up rather than
+    silently dropped or mis-placed.
+
+  - run_inspection_mapping(db, run): the persisted DB-backed job that
+    classifies inspection type, extracts outcomes, and writes overlay rows.
+
+The overlay-record helpers are illustrative — they show the extraction/
+resolution integration points and the shape of the resulting records. The
+real OCR backend (document_text_extraction.py) and the visual-registration
+algorithm that produces a RegistrationTransform are separate integration
+points — see those modules' docstrings for the adapter seams.
 """
 
 from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from sqlalchemy.orm import Session
 from typing import Any, Dict, List, Optional, cast
 
+from ai.pipelines.document_text_extraction import ExtractedDocument, extract_document
+from ai.pipelines.drawing_location_resolver import (
+    MasterRegion,
+    RegistrationTransform,
+    ResolutionMethod,
+    ResolvedLocation,
+    resolve_locations_per_term,
+)
+from ai.pipelines.positioned_term_extractor import PositionedTerm, extract_positioned_terms
+from ai.pipelines.term_extractor import (
+    ExtractedTerm,
+    extract_by_category,
+    extract_terms,
+    overall_confidence_label,
+)
 from models.models import Drawing, DrawingRegion, EvidenceRecord, InspectionRun, Finding
 from services.file_storage import get_file_path
+from services.inspection_vocabulary import VocabCategory
 from services.storage import StorageService
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Illustrative overlay mapping (text + document paths)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class EvidenceInput:
+    """Raw evidence submitted against an inspection run, prior to mapping."""
+
+    evidence_id: str
+    inspection_run_id: str
+    drawing_id: str
+    note_text: str
+    bbox: tuple[float, float, float, float] | None = None
+
+
+@dataclass
+class NormalizedEvidenceTags:
+    """Controlled-vocabulary tags extracted from evidence text."""
+
+    inspection_types: list[str] = field(default_factory=list)
+    inspection_statuses: list[str] = field(default_factory=list)
+    locations: list[str] = field(default_factory=list)
+    trades: list[str] = field(default_factory=list)
+    sheet_identifiers: list[str] = field(default_factory=list)
+    field_conditions: list[str] = field(default_factory=list)
+    actions: list[str] = field(default_factory=list)
+    markup_terms: list[str] = field(default_factory=list)
+    raw_terms: list[ExtractedTerm] = field(default_factory=list)
+    confidence_label: str = "Low Confidence"
+
+    def to_dict(self) -> dict:
+        return {
+            "inspectionTypes": self.inspection_types,
+            "inspectionStatuses": self.inspection_statuses,
+            "locations": self.locations,
+            "trades": self.trades,
+            "sheetIdentifiers": self.sheet_identifiers,
+            "fieldConditions": self.field_conditions,
+            "actions": self.actions,
+            "markupTerms": self.markup_terms,
+            "confidenceLabel": self.confidence_label,
+        }
+
+
+@dataclass
+class DrawingOverlayRecord:
+    """Shape mirrors DrawingOverlay plus normalized vocabulary tags."""
+
+    id: str
+    drawing_id: str
+    inspection_run_id: str
+    bbox: tuple[float, float, float, float] | None
+    label: str
+    severity: str
+    tags: NormalizedEvidenceTags
+    created_at: datetime
+
+
+_CATEGORY_TO_TAGS_FIELD: dict[VocabCategory, str] = {
+    VocabCategory.INSPECTION_TYPE: "inspection_types",
+    VocabCategory.INSPECTION_STATUS: "inspection_statuses",
+    VocabCategory.LOCATION_TERM: "locations",
+    VocabCategory.TRADE_TERM: "trades",
+    VocabCategory.SHEET_IDENTIFIER: "sheet_identifiers",
+    VocabCategory.FIELD_CONDITION_TERM: "field_conditions",
+    VocabCategory.INSPECTION_ACTION_TERM: "actions",
+    VocabCategory.MARKUP_TERM: "markup_terms",
+}
+
+
+def normalize_evidence_text(note_text: str) -> NormalizedEvidenceTags:
+    """Run evidence free text through the controlled-vocabulary extractor."""
+    terms = extract_terms(note_text)
+    grouped = extract_by_category(note_text)
+
+    tags = NormalizedEvidenceTags(raw_terms=terms)
+    for category, field_name in _CATEGORY_TO_TAGS_FIELD.items():
+        canonicals = [t.canonical for t in grouped.get(category.value, [])]
+        deduped = list(dict.fromkeys(canonicals))
+        setattr(tags, field_name, deduped)
+
+    tags.confidence_label = overall_confidence_label(terms)
+    return tags
+
+
+def _severity_from_tags(tags: NormalizedEvidenceTags) -> str:
+    high_severity_terms = {"Rejected", "Failed", "Repair", "Replace", "Correct"}
+    if any(t in high_severity_terms for t in tags.inspection_statuses):
+        return "high"
+    if any(t in high_severity_terms for t in tags.field_conditions):
+        return "high"
+    if "Deferred" in tags.inspection_statuses or "Pending" in tags.inspection_statuses:
+        return "medium"
+    return "info"
+
+
+def map_evidence_to_overlay(evidence: EvidenceInput) -> DrawingOverlayRecord:
+    """Map a single text evidence item onto a DrawingOverlay record."""
+    tags = normalize_evidence_text(evidence.note_text)
+    severity = _severity_from_tags(tags)
+
+    label = tags.inspection_types[0] if tags.inspection_types else "Inspection finding"
+    if tags.locations:
+        label = f"{label} — {tags.locations[0]}"
+
+    return DrawingOverlayRecord(
+        id=f"overlay_{evidence.evidence_id}",
+        drawing_id=evidence.drawing_id,
+        inspection_run_id=evidence.inspection_run_id,
+        bbox=evidence.bbox,
+        label=label,
+        severity=severity,
+        tags=tags,
+        created_at=datetime.now(timezone.utc),
+    )
+
+
+def map_evidence_batch_to_overlays(
+    evidence_items: list[EvidenceInput],
+) -> list[DrawingOverlayRecord]:
+    return [map_evidence_to_overlay(item) for item in evidence_items]
+
+
+@dataclass
+class DocumentEvidenceInput:
+    evidence_id: str
+    inspection_run_id: str
+    master_drawing_id: str
+    file_path: str
+    region_index: list[MasterRegion] = field(default_factory=list)
+    master_sheet_identifier: str | None = None
+    registration_transform: RegistrationTransform | None = None
+
+
+@dataclass
+class UnresolvedEvidenceRecord:
+    evidence_id: str
+    inspection_run_id: str
+    master_drawing_id: str
+    reason: str
+    extracted_terms: list[PositionedTerm]
+
+    def to_dict(self) -> dict:
+        return {
+            "evidenceId": self.evidence_id,
+            "inspectionRunId": self.inspection_run_id,
+            "masterDrawingId": self.master_drawing_id,
+            "reason": self.reason,
+            "extractedTerms": [t.to_dict() for t in self.extracted_terms],
+        }
+
+
+def _tags_from_positioned_terms(terms: list[PositionedTerm]) -> NormalizedEvidenceTags:
+    plain_terms = [pt.term for pt in terms]
+    tags = NormalizedEvidenceTags(raw_terms=plain_terms)
+    for category, field_name in _CATEGORY_TO_TAGS_FIELD.items():
+        canonicals = [
+            pt.term.canonical for pt in terms if pt.term.category == category
+        ]
+        deduped = list(dict.fromkeys(canonicals))
+        setattr(tags, field_name, deduped)
+    tags.confidence_label = overall_confidence_label(plain_terms)
+    return tags
+
+
+def _build_overlay_record(
+    evidence: DocumentEvidenceInput,
+    terms: list[PositionedTerm],
+    bbox_fractional: tuple[float, float, float, float],
+    representative: ResolvedLocation,
+) -> DrawingOverlayRecord:
+    tags = _tags_from_positioned_terms(terms)
+    severity = _severity_from_tags(tags)
+
+    label = tags.inspection_types[0] if tags.inspection_types else "Inspection finding"
+    if representative.matched_region and representative.matched_region.location_labels:
+        label = f"{label} — {representative.matched_region.location_labels[0]}"
+    elif tags.locations:
+        label = f"{label} — {tags.locations[0]}"
+
+    region_suffix = (
+        representative.matched_region.region_id
+        if representative.matched_region
+        else "unmatched"
+    )
+    return DrawingOverlayRecord(
+        id=f"overlay_{evidence.evidence_id}_{region_suffix}",
+        drawing_id=representative.master_drawing_id,
+        inspection_run_id=evidence.inspection_run_id,
+        bbox=bbox_fractional,
+        label=label,
+        severity=severity,
+        tags=tags,
+        created_at=datetime.now(timezone.utc),
+    )
+
+
+def map_document_to_overlays(
+    evidence: DocumentEvidenceInput,
+) -> tuple[list[DrawingOverlayRecord], list[UnresolvedEvidenceRecord]]:
+    """Full document pipeline: extract, match vocabulary, resolve locations."""
+    document: ExtractedDocument = extract_document(evidence.file_path)
+    positioned_terms = extract_positioned_terms(document)
+
+    if not positioned_terms:
+        return [], [
+            UnresolvedEvidenceRecord(
+                evidence_id=evidence.evidence_id,
+                inspection_run_id=evidence.inspection_run_id,
+                master_drawing_id=evidence.master_drawing_id,
+                reason=(
+                    "No controlled-vocabulary terms found in the document "
+                    "(extraction/OCR may have failed, or the document "
+                    "genuinely contains no recognizable inspection "
+                    "terminology)."
+                ),
+                extracted_terms=[],
+            )
+        ]
+
+    resolved_pairs = resolve_locations_per_term(
+        document_terms=positioned_terms,
+        master_drawing_id=evidence.master_drawing_id,
+        region_index=evidence.region_index,
+        master_sheet_identifier=evidence.master_sheet_identifier,
+        registration_transform=evidence.registration_transform,
+    )
+
+    unresolved_terms: list[PositionedTerm] = []
+    unresolved_reason: str | None = None
+    resolved_terms: list[tuple[PositionedTerm, ResolvedLocation]] = []
+
+    for term, resolved in resolved_pairs:
+        if resolved.method == ResolutionMethod.UNRESOLVED or resolved.bbox_fractional is None:
+            unresolved_terms.append(term)
+            unresolved_reason = resolved.notes or unresolved_reason
+        else:
+            resolved_terms.append((term, resolved))
+
+    unresolved: list[UnresolvedEvidenceRecord] = []
+    if unresolved_terms:
+        unresolved.append(
+            UnresolvedEvidenceRecord(
+                evidence_id=evidence.evidence_id,
+                inspection_run_id=evidence.inspection_run_id,
+                master_drawing_id=evidence.master_drawing_id,
+                reason=unresolved_reason or "Could not resolve a location.",
+                extracted_terms=unresolved_terms,
+            )
+        )
+
+    overlays: list[DrawingOverlayRecord] = []
+    if resolved_terms:
+        method = resolved_terms[0][1].method
+
+        if method == ResolutionMethod.ALIGNMENT:
+            all_terms = [t for t, _ in resolved_terms]
+            boxes = [r.bbox_fractional for _, r in resolved_terms if r.bbox_fractional]
+            x0 = min(b[0] for b in boxes)
+            y0 = min(b[1] for b in boxes)
+            x1 = max(b[2] for b in boxes)
+            y1 = max(b[3] for b in boxes)
+            representative = next(
+                (r for _, r in resolved_terms if r.matched_region),
+                resolved_terms[0][1],
+            )
+            overlays.append(
+                _build_overlay_record(
+                    evidence, all_terms, (x0, y0, x1, y1), representative
+                )
+            )
+        else:
+            groups: dict[str | None, list[tuple[PositionedTerm, ResolvedLocation]]] = {}
+            for term, resolved in resolved_terms:
+                region_key = (
+                    resolved.matched_region.region_id
+                    if resolved.matched_region
+                    else None
+                )
+                groups.setdefault(region_key, []).append((term, resolved))
+
+            for group in groups.values():
+                group_terms = [t for t, _ in group]
+                representative = group[0][1]
+                bbox = representative.bbox_fractional
+                if bbox is None:
+                    continue
+                overlays.append(
+                    _build_overlay_record(evidence, group_terms, bbox, representative)
+                )
+
+    return overlays, unresolved
+
+
+# ---------------------------------------------------------------------------
+# Persisted inspection-run pipeline (DB-backed job)
+# ---------------------------------------------------------------------------
 
 # Known inspection types (for lookup + LLM output constraint)
 OUTCOMES = ("pass", "fail", "mixed", "unknown")
@@ -429,6 +773,34 @@ def _extract_and_persist_outcomes(
 
 
 # ---------------------------------------------------------------------------
+# Step 3b — Extract controlled-vocabulary tags from evidence text
+# ---------------------------------------------------------------------------
+
+
+def _extract_vocabulary_tags(ctx: Dict[str, Any]) -> list[ExtractedTerm]:
+    """Parse evidence text_content for canonical inspection vocabulary."""
+    evidence = ctx.get("evidence")
+    if evidence is None:
+        return []
+
+    text = getattr(evidence, "text_content", None) or ""
+    if not str(text).strip():
+        return []
+
+    return extract_terms(str(text))
+
+
+def _vocabulary_meta(terms: list[ExtractedTerm]) -> Dict[str, Any]:
+    """Serialize extracted terms for overlay meta."""
+    if not terms:
+        return {}
+    return {
+        "vocabulary_terms": [t.to_dict() for t in terms],
+        "vocabulary_confidence": overall_confidence_label(terms),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Step 4 — Map Areas to Master Drawing Coordinates
 # ---------------------------------------------------------------------------
 
@@ -533,10 +905,15 @@ def _map_and_persist_overlays(
     if status not in ("pass", "fail", "unknown"):
         status = "unknown"
 
+    vocabulary_terms = ctx.get("vocabulary_terms") or []
+    vocab_meta = _vocabulary_meta(vocabulary_terms)
+
     geometries_and_meta = _resolve_region_geometries(db, master_drawing_id, evidence)
     storage = StorageService(db)
     overlays: List[Any] = []
     for geometry, meta in geometries_and_meta:
+        if vocab_meta:
+            meta = {**meta, **vocab_meta}
         overlay = storage.create_drawing_overlay(
             master_drawing_id,
             geometry,
@@ -610,6 +987,11 @@ def run_inspection_mapping(db: Session, run: InspectionRun) -> Dict[str, Any]:
 
         result = _extract_and_persist_outcomes(db, ctx)
         ctx["inspection_result"] = result
+
+        vocabulary_terms = _extract_vocabulary_tags(ctx)
+        ctx["vocabulary_terms"] = vocabulary_terms
+        if vocabulary_terms:
+            ctx["confidence"] = min(t.confidence_score for t in vocabulary_terms)
 
         overlays = _map_and_persist_overlays(db, ctx)
         ctx["drawing_overlays"] = overlays

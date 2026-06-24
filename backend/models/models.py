@@ -227,28 +227,9 @@ class Finding(Base):
         nullable=True,
         index=True,
     )
-    drawing_diff_id = Column(
-        Integer,
-        ForeignKey("drawing_diffs.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-
     # Relationships
     project = relationship("Project", back_populates="findings")
     drawing = relationship("Drawing", back_populates="findings")
-    drawing_diff = relationship(
-        "DrawingDiff",
-        foreign_keys=[drawing_diff_id],
-    )
-    # Diffs that reference this finding (via drawing_diffs.finding_id). Distinct from
-    # `drawing_diff` (this row's optional pointer to one diff via findings.drawing_diff_id).
-    drawing_diffs = relationship(
-        "DrawingDiff",
-        back_populates="finding",
-        foreign_keys="[DrawingDiff.finding_id]",
-        passive_deletes=True,
-    )
 
     @property
     def workspace_link(self):
@@ -321,9 +302,6 @@ class Drawing(Base):
     file_url = Column(String, nullable=True)  # API endpoint for download
     content_type = Column(String, nullable=True)  # 'application/pdf', 'image/png', etc.
     page_count = Column(Integer, nullable=True)  # for PDFs
-    # 'master' | 'sub' | NULL (legacy). Auto-compare must gate on ==
-    # getattr(..., "upload_intent", None) == "sub", not truthiness.
-    upload_intent = Column(String(16), nullable=True)
 
     # Rendition processing metadata
     original_filename = Column(String, nullable=True)
@@ -346,18 +324,6 @@ class Drawing(Base):
     )
     regions = relationship("DrawingRegion", back_populates="master_drawing", cascade="all, delete-orphan")
     overlays = relationship("DrawingOverlay", back_populates="master_drawing", cascade="all, delete-orphan")
-    alignments_as_master = relationship(
-        "DrawingAlignment",
-        foreign_keys="DrawingAlignment.master_drawing_id",
-        back_populates="master_drawing",
-        cascade="all, delete-orphan",
-    )
-    alignments_as_sub = relationship(
-        "DrawingAlignment",
-        foreign_keys="DrawingAlignment.sub_drawing_id",
-        back_populates="sub_drawing",
-        cascade="all, delete-orphan",
-    )
     inspection_runs = relationship("InspectionRun", back_populates="master_drawing", cascade="all, delete-orphan")
     findings = relationship("Finding", back_populates="drawing")
 
@@ -416,70 +382,11 @@ class DrawingRegion(Base):
 
     # Relationships
     master_drawing = relationship("Drawing", back_populates="regions")
-    alignments = relationship("DrawingAlignment", back_populates="region")
     inspection_reviews = relationship("DrawingInspectionReview", back_populates="region")
 
 
-class DrawingAlignment(Base):
-    __tablename__ = "drawing_alignments"
-
-    id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
-    master_drawing_id = Column(
-        Integer,
-        ForeignKey("drawings.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    sub_drawing_id = Column(
-        Integer,
-        ForeignKey("drawings.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    region_id = Column(
-        Integer,
-        ForeignKey("drawing_regions.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    method = Column(String(length=50), nullable=False)  # manual | feature_match | vision
-    transform = Column(JSON, nullable=True)  # homography/affine + confidence
-    status = Column(String(length=50), nullable=False)  # queued | processing | complete | failed
-    error_message = Column(Text, nullable=True)
-
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-    )
-
-    # Relationships
-    master_drawing = relationship(
-        "Drawing",
-        foreign_keys=[master_drawing_id],
-        back_populates="alignments_as_master",
-    )
-    sub_drawing = relationship(
-        "Drawing",
-        foreign_keys=[sub_drawing_id],
-        back_populates="alignments_as_sub",
-    )
-    region = relationship("DrawingRegion", back_populates="alignments")
-    drawing_diffs = relationship("DrawingDiff", back_populates="alignment", cascade="all, delete-orphan")
-    inspection_reviews = relationship(
-        "DrawingInspectionReview",
-        back_populates="alignment",
-        cascade="all, delete-orphan",
-    )
-
-
 class DrawingInspectionReview(Base):
-    """Human review outcome scoped to an alignment **or** an inspection run.
-
-    Exactly one of ``alignment_id`` or ``inspection_run_id`` must be set (legacy compare
-    vs inspection overlay workflow). Optional ``region_id`` narrows to a drawing region
-    on the scoped master sheet.
+    """Human review outcome scoped to an inspection run (optionally a region or overlay).
 
     ``status``: ``pending`` | ``passed`` | ``failed`` | ``passed_auto`` | ``passed_human``.
     """
@@ -491,21 +398,21 @@ class DrawingInspectionReview(Base):
             name="ck_drawing_inspection_reviews_status",
         ),
         CheckConstraint(
-            "(alignment_id is not null)::int + (inspection_run_id is not null)::int = 1",
-            name="ck_drawing_inspection_reviews_scope",
+            "inspection_run_id IS NOT NULL",
+            name="ck_drawing_inspection_reviews_run_required",
         ),
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    alignment_id = Column(
-        Integer,
-        ForeignKey("drawing_alignments.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
-    )
     inspection_run_id = Column(
         Integer,
         ForeignKey("inspection_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    overlay_id = Column(
+        Integer,
+        ForeignKey("drawing_overlays.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -525,51 +432,9 @@ class DrawingInspectionReview(Base):
     notes = Column(Text, nullable=True)
     passed_at = Column(DateTime, nullable=True)
 
-    alignment = relationship("DrawingAlignment", back_populates="inspection_reviews")
     inspection_run = relationship("InspectionRun", back_populates="inspection_reviews")
+    overlay = relationship("DrawingOverlay", back_populates="inspection_reviews")
     region = relationship("DrawingRegion", back_populates="inspection_reviews")
-
-
-class DrawingDiff(Base):
-    """Diff analysis between master and sub drawing; optionally linked to a finding.
-
-    ``diff_regions`` holds normalized geometry. ``change_details`` holds structured
-    detector / pipeline metadata (JSON). ``semantic_summary`` holds optional semantic
-    narrative (JSON), e.g. LLM output or normalized text bullets — same meta pattern.
-    """
-    __tablename__ = "drawing_diffs"
-
-    id = Column(Integer, primary_key=True, index=True)
-    alignment_id = Column(
-        Integer,
-        ForeignKey("drawing_alignments.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    finding_id = Column(
-        Integer,
-        ForeignKey("findings.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-    summary = Column(String, nullable=False)
-    severity = Column(String, nullable=False, index=True)  # low | medium | high | critical
-    diff_regions = Column(JSON, nullable=False)  # list of normalized region objects
-    # Structured semantic / detector metadata (MVP JSON); geometry remains in diff_regions.
-    change_details = Column(JSON, nullable=True)
-    semantic_summary = Column(JSON, nullable=True)
-    resolved = Column(Boolean, nullable=False, default=False)
-
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
-
-    # Relationships
-    alignment = relationship("DrawingAlignment", back_populates="drawing_diffs")
-    finding = relationship(
-        "Finding",
-        back_populates="drawing_diffs",
-        foreign_keys=[finding_id],
-    )
-    overlays = relationship("DrawingOverlay", back_populates="diff", passive_deletes=True)
 
 
 # Inspection runs (AI extraction from evidence docs)
@@ -659,7 +524,7 @@ class InspectionResult(Base):
 
 
 class DrawingOverlay(Base):
-    """Overlay geometry on a master drawing; sourced from either an inspection run or a drawing diff."""
+    """Overlay geometry on a master drawing; always tied to an inspection run."""
     __tablename__ = "drawing_overlays"
     __table_args__ = (
         CheckConstraint(
@@ -667,12 +532,11 @@ class DrawingOverlay(Base):
             name="ck_drawing_overlays_status",
         ),
         CheckConstraint(
-            "(inspection_run_id is not null)::int + (diff_id is not null)::int = 1",
-            name="ck_drawing_overlays_exactly_one_source",
+            "inspection_run_id IS NOT NULL",
+            name="ck_drawing_overlays_inspection_run_required",
         ),
         Index("ix_drawing_overlays_master_drawing_id", "master_drawing_id"),
         Index("ix_drawing_overlays_inspection_run_id", "inspection_run_id"),
-        Index("ix_drawing_overlays_diff_id", "diff_id"),
         Index("ix_drawing_overlays_status", "status"),
         Index("ix_drawing_overlays_master_drawing_id_created_at", "master_drawing_id", "created_at"),
     )
@@ -686,13 +550,8 @@ class DrawingOverlay(Base):
     )
     inspection_run_id = Column(
         Integer,
-        ForeignKey("inspection_runs.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    diff_id = Column(
-        Integer,
-        ForeignKey("drawing_diffs.id", ondelete="SET NULL"),
-        nullable=True,
+        ForeignKey("inspection_runs.id", ondelete="CASCADE"),
+        nullable=False,
     )
 
     geometry = Column(JSON, nullable=False)
@@ -704,7 +563,11 @@ class DrawingOverlay(Base):
     # Relationships
     master_drawing = relationship("Drawing", back_populates="overlays")
     inspection_run = relationship("InspectionRun", back_populates="overlays")
-    diff = relationship("DrawingDiff", back_populates="overlays")
+    inspection_reviews = relationship(
+        "DrawingInspectionReview",
+        back_populates="overlay",
+        passive_deletes=True,
+    )
 
 
 # Evidence Records (specs, inspection docs, etc.)
