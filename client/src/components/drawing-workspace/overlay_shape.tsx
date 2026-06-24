@@ -14,11 +14,12 @@ type Props = {
   viewerSize: ViewerSize;
   selected?: boolean;
   index: number;
-  /** Inspection tone; `neutral` draws a single highlight when statuses are hidden. */
+  /** Pass/fail/changed tone, or `neutral` when status coloring is hidden. */
   inspectionTone: OverlayInspectionTone;
 };
 
-export default function DiffOverlayShape({
+/** SVG rect/polygon for one normalized overlay region (master drawing space). */
+export default function OverlayShape({
   region,
   viewerSize,
   selected = false,
@@ -41,7 +42,7 @@ export default function DiffOverlayShape({
         strokeWidth={strokeWidth}
         rx={4}
         ry={4}
-        data-testid={`diff-overlay-rect-${index}`}
+        data-testid={`overlay-rect-${index}`}
       />
     );
   }
@@ -55,7 +56,7 @@ export default function DiffOverlayShape({
       fill={fill}
       stroke={stroke}
       strokeWidth={strokeWidth}
-      data-testid={`diff-overlay-polygon-${index}`}
+      data-testid={`overlay-polygon-${index}`}
     />
   );
 }

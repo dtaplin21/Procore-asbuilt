@@ -124,6 +124,27 @@ describe("overlay region tone helpers", () => {
     expect(overlayRegionTone(region, false)).toBe("neutral");
   });
 
+  it("maps severity to tone when review badge is absent", () => {
+    const regions = toOverlayRegions([
+      makeOverlay({
+        id: 9,
+        status: "unknown",
+        geometry: {
+          page: 1,
+          type: "rect",
+          x: 0,
+          y: 0,
+          width: 0.1,
+          height: 0.1,
+        },
+      }),
+    ]);
+    regions[0].reviewBadge = undefined;
+    regions[0].shape.reviewBadge = undefined;
+    regions[0].severity = "high";
+    expect(overlayRegionTone(regions[0], true)).toBe("failed");
+  });
+
   it("filters out passed regions when showChangesOnly is true", () => {
     const [region] = toOverlayRegions([makeOverlay({ id: 1, status: "pass" })]);
     expect(includeOverlayWhenChangesOnly(region, true)).toBe(false);

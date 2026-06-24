@@ -33,7 +33,7 @@ describe("DrawingOverlayLayer", () => {
     );
 
     expect(screen.getByTestId("drawing-overlay-layer")).toBeInTheDocument();
-    expect(screen.getByTestId("diff-overlay-rect-0")).toBeInTheDocument();
+    expect(screen.getByTestId("overlay-rect-0")).toBeInTheDocument();
   });
 
   it("renders polygon overlays", () => {
@@ -64,7 +64,7 @@ describe("DrawingOverlayLayer", () => {
       />
     );
 
-    expect(screen.getByTestId("diff-overlay-polygon-0")).toBeInTheDocument();
+    expect(screen.getByTestId("overlay-polygon-0")).toBeInTheDocument();
   });
 
   it("renders nothing when regions is empty", () => {

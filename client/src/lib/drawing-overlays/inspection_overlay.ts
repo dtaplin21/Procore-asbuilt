@@ -1,7 +1,6 @@
 import type { DrawingOverlay } from "@shared/schema";
 
 import type {
-  DrawingDiff,
   DrawingDiffRegion,
   NormalizedPoint,
   NormalizedRect,
@@ -292,7 +291,18 @@ export function overlayRegionTone(
   if (badge === "passed" || badge === "failed" || badge === "changed") {
     return badge;
   }
-  return region.kind === "inspection" ? "changed" : "changed";
+  return toneFromSeverity(region.severity);
+}
+
+function toneFromSeverity(severity: string): OverlayInspectionTone {
+  const normalized = severity.trim().toLowerCase();
+  if (normalized === "high" || normalized === "critical") {
+    return "failed";
+  }
+  if (normalized === "low" || normalized === "info") {
+    return "passed";
+  }
+  return "changed";
 }
 
 export function includeOverlayWhenChangesOnly(
@@ -303,32 +313,5 @@ export function includeOverlayWhenChangesOnly(
     return true;
   }
   const badge = region.reviewBadge ?? region.shape.reviewBadge;
-  return badge == null || badge === "changed";
-}
-
-export function regionOverlayTone(
-  region: DrawingDiffRegion,
-  diff: DrawingDiff,
-  showInspectionStatuses: boolean
-): OverlayInspectionTone {
-  if (!showInspectionStatuses) {
-    return "neutral";
-  }
-  const badge = region.reviewBadge ?? diff.reviewBadge ?? null;
-  if (badge === "passed" || badge === "failed" || badge === "changed") {
-    return badge;
-  }
-  return "changed";
-}
-
-export function includeRegionWhenChangesOnly(
-  region: DrawingDiffRegion,
-  diff: DrawingDiff,
-  showChangesOnly: boolean
-): boolean {
-  if (!showChangesOnly) {
-    return true;
-  }
-  const badge = region.reviewBadge ?? diff.reviewBadge;
   return badge == null || badge === "changed";
 }

@@ -5,9 +5,10 @@ import {
   overlayRegionTone,
   type OverlayInspectionTone,
 } from "@/lib/drawing-overlays/inspection_overlay";
-import DiffOverlayShape from "@/components/drawing-workspace/diff_overlay_shape";
+import OverlayShape from "@/components/drawing-workspace/overlay_shape";
 
 type Props = {
+  /** Normalized regions in master drawing space (no alignment warp). */
   regions: OverlayRegion[];
   viewerSize: ViewerSize;
   /** When true, only regions that are still "changed" (or not yet reviewed) are drawn. */
@@ -58,7 +59,7 @@ export default function DrawingOverlayLayer({
       data-testid="drawing-overlay-layer"
     >
       {prepared.map((item, index) => (
-        <DiffOverlayShape
+        <OverlayShape
           key={item.key}
           region={item.resolved}
           viewerSize={viewerSize}
