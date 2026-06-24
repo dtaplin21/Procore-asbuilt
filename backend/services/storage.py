@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from datetime import datetime, timezone
 from shutil import rmtree
-from sqlalchemy import func, or_
+from sqlalchemy import distinct, func, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
@@ -83,7 +83,7 @@ from services.procore_connection_store import get_active_connection
 from services.evidence_linking import replace_evidence_drawing_links
 from services.dashboard import (
     get_current_drawing_for_project,
-    get_project_comparison_progress,
+    get_project_inspection_coverage,
     get_unresolved_high_severity_diff_metric,
 )
 
@@ -182,10 +182,6 @@ class StorageService:
         current_drawing_row = get_current_drawing_for_project(
             self.db, project_id, current_drawing_id
         )
-        kpi_scoped_master_id = (
-            cast(int, current_drawing_row.id) if current_drawing_row else None
-        )
-
         canonical_master_id = getattr(project, "master_drawing_id", None)
         canonical_master_id_int = (
             cast(int, canonical_master_id) if canonical_master_id is not None else None
@@ -210,9 +206,7 @@ class StorageService:
         evidence_count = self.db.query(EvidenceRecord).filter(EvidenceRecord.project_id == project_id).count()
         inspections_count = self.db.query(InspectionRun).filter(InspectionRun.project_id == project_id).count()
 
-        comparison_progress = get_project_comparison_progress(
-            self.db, project_id, master_drawing_id=kpi_scoped_master_id
-        )
+        inspection_coverage = get_project_inspection_coverage(self.db, project_id)
         high_severity = get_unresolved_high_severity_diff_metric(self.db)
 
         # NOTE: Return datetimes as datetime objects. If the route uses a Pydantic response_model
@@ -254,10 +248,40 @@ class StorageService:
                 "drawings_count": drawings_count,
                 "evidence_count": evidence_count,
                 "inspections_count": inspections_count,
-                "comparison_progress": comparison_progress,
+                "inspection_coverage": inspection_coverage,
                 "high_severity_diff_risk": high_severity,
             },
         }
+
+    def count_project_master_drawings(self, project_id: int) -> int:
+        """Count master drawings for inspection coverage (canonical FK or upload_intent)."""
+        project = self.get_project(project_id)
+        if project is None:
+            return 0
+        canonical_id = getattr(project, "master_drawing_id", None)
+        if canonical_id is not None:
+            return 1
+        return int(
+            self.db.query(func.count(Drawing.id))
+            .filter(
+                Drawing.project_id == project_id,
+                Drawing.upload_intent == "master",
+            )
+            .scalar()
+            or 0
+        )
+
+    def count_drawings_with_inspection_run(self, project_id: int) -> int:
+        """Distinct master drawings with at least one complete inspection run."""
+        return int(
+            self.db.query(func.count(distinct(InspectionRun.master_drawing_id)))
+            .filter(
+                InspectionRun.project_id == project_id,
+                InspectionRun.status == "complete",
+            )
+            .scalar()
+            or 0
+        )
     
     def get_project_jobs(
         self,

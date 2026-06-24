@@ -121,11 +121,11 @@ class CurrentDrawingSummary(BaseModel):
     updated_at: datetime
 
 
-class ProjectComparisonProgressMetric(BaseModel):
-    """Backend-owned comparison coverage (dashboard + workspace stay aligned)."""
+class ProjectInspectionCoverageMetric(BaseModel):
+    """Backend-owned master inspection coverage (dashboard KPI)."""
 
-    compared_count: int = Field(..., serialization_alias="comparedCount")
-    total_relevant_count: int = Field(..., serialization_alias="totalRelevantCount")
+    inspected_count: int = Field(..., serialization_alias="inspectedCount")
+    total_masters_count: int = Field(..., serialization_alias="totalMastersCount")
     label: str
 
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
@@ -149,7 +149,10 @@ class ProjectSummaryKpis(BaseModel):
     drawings_count: int = 0
     evidence_count: int = 0
     inspections_count: int = 0
-    comparison_progress: Optional[ProjectComparisonProgressMetric] = None
+    inspection_coverage: Optional[ProjectInspectionCoverageMetric] = Field(
+        default=None,
+        serialization_alias="inspectionCoverage",
+    )
     high_severity_diff_risk: Optional[DiffRiskMetric] = None
 
 
@@ -870,10 +873,10 @@ class DrawingComparisonWorkspaceResponse(BaseModel):
     sub_drawing: DrawingOverlayDrawingSummary = Field(..., serialization_alias="subDrawing")
     alignment: DrawingAlignmentOverlayResponse
     diffs: List[DrawingDiffResponse] = Field(default_factory=list)
-    comparison_progress: Optional[ProjectComparisonProgressMetric] = Field(
+    inspection_coverage: Optional[ProjectInspectionCoverageMetric] = Field(
         default=None,
-        serialization_alias="comparisonProgress",
-        description="Master-scoped comparison coverage; same semantics as dashboard KPIs where applicable.",
+        serialization_alias="inspectionCoverage",
+        description="Master inspection coverage; same semantics as dashboard KPIs.",
     )
     high_severity_diff_risk: Optional[DiffRiskMetric] = Field(
         default=None,

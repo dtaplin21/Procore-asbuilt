@@ -61,7 +61,7 @@ async def get_project_dashboard_summary(
     current_drawing_id: Optional[int] = Query(
         None,
         alias="currentDrawingId",
-        description="Optional master drawing id to scope comparison progress KPIs.",
+        description="Optional master drawing id for workspace context in the summary payload.",
     ),
     db: Session = Depends(get_db),
 ):
@@ -72,9 +72,9 @@ async def get_project_dashboard_summary(
       :class:`~services.storage.StorageService.get_project_dashboard_summary`
       so that the service can return an active Procore company context if the
       user has an active connection.
-    * ``currentDrawingId`` optionally selects a master drawing; comparison progress
-      is scoped to that master when valid for this project. High-severity diff risk
-      is global across active projects.
+    * ``currentDrawingId`` optionally selects a master drawing for ``current_drawing`` in
+      the response. Inspection coverage KPIs are project-scoped (canonical master +
+      complete inspection runs). High-severity diff risk is global across active projects.
 
     The storage method will return an empty dict if the project does not
     exist; we translate that into an HTTP 404 so clients can react

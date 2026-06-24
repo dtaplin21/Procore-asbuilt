@@ -1,8 +1,8 @@
 """
 Dashboard and cross-project metrics.
 
-All comparison / diff-risk counts live here so StorageService and routes stay thin
-and definitions stay consistent.
+Inspection coverage and diff-risk counts live here so StorageService and routes stay
+thin and definitions stay consistent.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from __future__ import annotations
 from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session
 
-from models.models import Drawing, DrawingAlignment, DrawingDiff, Project
+from models.models import Drawing, DrawingAlignment, DrawingDiff, InspectionRun, Project
 
 
 def get_current_drawing_for_project(
@@ -33,59 +33,32 @@ def get_current_drawing_for_project(
     )
 
 
-def get_project_comparison_progress(
-    db: Session,
-    project_id: int,
-    master_drawing_id: int | None = None,
-) -> dict:
+def get_project_inspection_coverage(db: Session, project_id: int) -> dict:
     """
-    Compared = distinct sub drawings that have at least one **complete** alignment
-    (``DrawingAlignment.status == \"complete\"``). Only complete is counted so the
-    label stays truthful (queued/processing are not "compared" yet).
+    Master inspection coverage for dashboard KPIs.
 
-    * Project scope (``master_drawing_id`` is None): all drawings in the project
-      are the relevant pool; compared = distinct subs with a complete alignment in
-      this project.
-    * Master scope: relevant pool = drawings in the project except this master;
-      compared = distinct subs with a complete alignment **for this master**.
+    * ``total_masters_count`` — canonical master on the project (``projects.master_drawing_id``)
+      when set, otherwise drawings with ``upload_intent == \"master\"``.
+    * ``inspected_count`` — distinct master drawings with at least one **complete**
+      inspection run (queued/processing runs are excluded so the label stays truthful).
     """
-    relevant_query = db.query(func.count(Drawing.id)).filter(
-        Drawing.project_id == project_id,
-    )
-    if master_drawing_id is not None:
-        relevant_query = relevant_query.filter(Drawing.id != master_drawing_id)
-    total_relevant_count = int(relevant_query.scalar() or 0)
+    from services.storage import StorageService
 
-    compared_query = (
-        db.query(func.count(distinct(DrawingAlignment.sub_drawing_id)))
-        .join(Drawing, Drawing.id == DrawingAlignment.sub_drawing_id)
-        .filter(
-            Drawing.project_id == project_id,
-            DrawingAlignment.project_id == project_id,
-            DrawingAlignment.status == "complete",
-        )
-    )
-    if master_drawing_id is not None:
-        compared_query = compared_query.filter(
-            DrawingAlignment.master_drawing_id == master_drawing_id,
-        )
+    storage = StorageService(db)
+    total_masters_count = storage.count_project_master_drawings(project_id)
+    inspected_count = storage.count_drawings_with_inspection_run(project_id)
 
-    compared_count = int(compared_query.scalar() or 0)
-
-    if master_drawing_id is not None:
+    if total_masters_count > 0:
         label = (
-            f"{compared_count} of {total_relevant_count} relevant sub drawings have been "
-            f"compared for this master."
+            f"{inspected_count} of {total_masters_count} master drawing(s) have been "
+            f"inspected for this project."
         )
     else:
-        label = (
-            f"{compared_count} of {total_relevant_count} relevant sub drawings have been "
-            f"compared for this project."
-        )
+        label = "Upload a master drawing to start inspection coverage tracking."
 
     return {
-        "compared_count": compared_count,
-        "total_relevant_count": total_relevant_count,
+        "inspected_count": inspected_count,
+        "total_masters_count": total_masters_count,
         "label": label,
     }
 
@@ -143,7 +116,7 @@ def get_unresolved_high_severity_diff_metric(db: Session) -> dict:
 
 __all__ = [
     "get_current_drawing_for_project",
-    "get_project_comparison_progress",
+    "get_project_inspection_coverage",
     "get_project_unresolved_high_severity_diff_metric",
     "get_unresolved_high_severity_diff_metric",
 ]
