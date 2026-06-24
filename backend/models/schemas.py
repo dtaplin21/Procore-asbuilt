@@ -586,6 +586,8 @@ class DrawingRegionCreate(BaseModel):
     label: str
     page: int = 1
     geometry: dict  # rect or polygon, all coords normalized 0-1
+    inspection_type_tags: List[str] = Field(default_factory=list)
+    location_tags: List[str] = Field(default_factory=list)
 
     @field_validator("geometry")
     @classmethod
@@ -620,8 +622,15 @@ class DrawingRegionResponse(BaseModel):
     label: str
     page: int
     geometry: dict
+    inspection_type_tags: List[str] = Field(default_factory=list)
+    location_tags: List[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("inspection_type_tags", "location_tags", mode="before")
+    @classmethod
+    def _coerce_null_tags(cls, value: Any) -> List[str]:
+        return value if value is not None else []
 
     class Config:
         from_attributes = True

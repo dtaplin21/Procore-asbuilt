@@ -26,11 +26,12 @@ Two entry points are exposed:
   - run_inspection_mapping(db, run): the persisted DB-backed job that
     classifies inspection type, extracts outcomes, and writes overlay rows.
 
-The overlay-record helpers are illustrative — they show the extraction/
-resolution integration points and the shape of the resulting records. The
-real OCR backend (document_text_extraction.py) and the visual-registration
-algorithm that produces a RegistrationTransform are separate integration
-points — see those modules' docstrings for the adapter seams.
+This module is illustrative for the overlay-record helpers — it shows the
+extraction/resolution integration points and the shape of the resulting
+records. The real OCR backend (document_text_extraction.py) and the
+visual-registration algorithm that produces a RegistrationTransform are
+separate, out-of-scope integration points — see those modules' docstrings
+for the adapter seams.
 """
 
 from __future__ import annotations
@@ -54,7 +55,6 @@ from ai.pipelines.drawing_location_resolver import (
 from ai.pipelines.positioned_term_extractor import PositionedTerm, extract_positioned_terms
 from ai.pipelines.term_extractor import (
     ExtractedTerm,
-    extract_by_category,
     extract_terms,
     overall_confidence_label,
 )
@@ -64,6 +64,15 @@ from services.inspection_vocabulary import VocabCategory
 from services.storage import StorageService
 
 logger = logging.getLogger(__name__)
+
+# Categories used for overlay tag extraction and location resolution.
+# Sheet identifiers remain extractable elsewhere but are excluded here.
+_RESOLUTION_VOCAB_CATEGORIES: tuple[VocabCategory, ...] = tuple(
+    category
+    for category in VocabCategory
+    if category
+    not in (VocabCategory.SHEET_IDENTIFIER, VocabCategory.CONFIDENCE_LABEL)
+)
 
 # ---------------------------------------------------------------------------
 # Illustrative overlay mapping (text + document paths)
@@ -78,18 +87,23 @@ class EvidenceInput:
     inspection_run_id: str
     drawing_id: str
     note_text: str
+    # bbox of the region this evidence was captured against, if already
+    # known (e.g. from a photo's pinned location on the master drawing).
+    # If None, region inference is out of scope for this module.
     bbox: tuple[float, float, float, float] | None = None
 
 
 @dataclass
 class NormalizedEvidenceTags:
-    """Controlled-vocabulary tags extracted from evidence text."""
+    """The result of running evidence text through the vocabulary
+    extractor — what used to be unstructured note text, now classified
+    into the controlled taxonomy categories.
+    """
 
     inspection_types: list[str] = field(default_factory=list)
     inspection_statuses: list[str] = field(default_factory=list)
     locations: list[str] = field(default_factory=list)
     trades: list[str] = field(default_factory=list)
-    sheet_identifiers: list[str] = field(default_factory=list)
     field_conditions: list[str] = field(default_factory=list)
     actions: list[str] = field(default_factory=list)
     markup_terms: list[str] = field(default_factory=list)
@@ -102,7 +116,6 @@ class NormalizedEvidenceTags:
             "inspectionStatuses": self.inspection_statuses,
             "locations": self.locations,
             "trades": self.trades,
-            "sheetIdentifiers": self.sheet_identifiers,
             "fieldConditions": self.field_conditions,
             "actions": self.actions,
             "markupTerms": self.markup_terms,
@@ -112,7 +125,11 @@ class NormalizedEvidenceTags:
 
 @dataclass
 class DrawingOverlayRecord:
-    """Shape mirrors DrawingOverlay plus normalized vocabulary tags."""
+    """Shape mirrors the DrawingOverlay model from the refactor plan
+    (backend/models/models.py) — inspection_run_id is required per the
+    PR7 schema cleanup (the diff_id branch of the old XOR constraint is
+    gone), plus the normalized vocabulary tags this module adds.
+    """
 
     id: str
     drawing_id: str
@@ -129,7 +146,6 @@ _CATEGORY_TO_TAGS_FIELD: dict[VocabCategory, str] = {
     VocabCategory.INSPECTION_STATUS: "inspection_statuses",
     VocabCategory.LOCATION_TERM: "locations",
     VocabCategory.TRADE_TERM: "trades",
-    VocabCategory.SHEET_IDENTIFIER: "sheet_identifiers",
     VocabCategory.FIELD_CONDITION_TERM: "field_conditions",
     VocabCategory.INSPECTION_ACTION_TERM: "actions",
     VocabCategory.MARKUP_TERM: "markup_terms",
@@ -137,9 +153,14 @@ _CATEGORY_TO_TAGS_FIELD: dict[VocabCategory, str] = {
 
 
 def normalize_evidence_text(note_text: str) -> NormalizedEvidenceTags:
-    """Run evidence free text through the controlled-vocabulary extractor."""
-    terms = extract_terms(note_text)
-    grouped = extract_by_category(note_text)
+    """The integration point: run evidence free text through the
+    controlled-vocabulary extractor and bucket results into the
+    NormalizedEvidenceTags shape consumed by overlay/finding construction.
+    """
+    terms = extract_terms(note_text, categories=_RESOLUTION_VOCAB_CATEGORIES)
+    grouped: dict[str, list[ExtractedTerm]] = {}
+    for term in terms:
+        grouped.setdefault(term.category.value, []).append(term)
 
     tags = NormalizedEvidenceTags(raw_terms=terms)
     for category, field_name in _CATEGORY_TO_TAGS_FIELD.items():
@@ -152,6 +173,10 @@ def normalize_evidence_text(note_text: str) -> NormalizedEvidenceTags:
 
 
 def _severity_from_tags(tags: NormalizedEvidenceTags) -> str:
+    """Best-effort severity classification from normalized field-condition
+    and status tags. Deliberately conservative: anything implying rework
+    (Reject / Repair / Replace / Correct) outranks a plain "Pending".
+    """
     high_severity_terms = {"Rejected", "Failed", "Repair", "Replace", "Correct"}
     if any(t in high_severity_terms for t in tags.inspection_statuses):
         return "high"
@@ -163,7 +188,13 @@ def _severity_from_tags(tags: NormalizedEvidenceTags) -> str:
 
 
 def map_evidence_to_overlay(evidence: EvidenceInput) -> DrawingOverlayRecord:
-    """Map a single text evidence item onto a DrawingOverlay record."""
+    """Map a single piece of evidence onto a DrawingOverlay record.
+
+    This is the function PR2/PR3 wires the evidence-upload flow into
+    (see client/src/hooks/use-inspection-runs.ts on the frontend, and
+    backend/api/routes/evidence.py, which should call this — or an async
+    job wrapping it — on evidence submission).
+    """
     tags = normalize_evidence_text(evidence.note_text)
     severity = _severity_from_tags(tags)
 
@@ -186,22 +217,46 @@ def map_evidence_to_overlay(evidence: EvidenceInput) -> DrawingOverlayRecord:
 def map_evidence_batch_to_overlays(
     evidence_items: list[EvidenceInput],
 ) -> list[DrawingOverlayRecord]:
+    """Batch entry point — used when an inspection run closes out with
+    multiple pieces of evidence at once.
+    """
     return [map_evidence_to_overlay(item) for item in evidence_items]
+
+
+# ---------------------------------------------------------------------------
+# Document pipeline — PDFs, images, photos
+# ---------------------------------------------------------------------------
 
 
 @dataclass
 class DocumentEvidenceInput:
+    """Raw evidence submitted as an actual file (PDF, scanned PDF, photo)
+    against an inspection run. This is the input to the full pipeline:
+    extract_document -> extract_positioned_terms -> resolve_locations_per_term
+    -> DrawingOverlayRecord.
+    """
+
     evidence_id: str
     inspection_run_id: str
     master_drawing_id: str
     file_path: str
+    # The master drawing's own region index, used for Case B (reference
+    # lookup, matched by inspection type + location) and to annotate
+    # Case A (alignment) results.
     region_index: list[MasterRegion] = field(default_factory=list)
-    master_sheet_identifier: str | None = None
+    # Result of a prior visual-registration attempt (this document against
+    # the master), if one was run. None if not attempted or it failed.
     registration_transform: RegistrationTransform | None = None
 
 
 @dataclass
 class UnresolvedEvidenceRecord:
+    """What gets returned for a piece of document evidence that could not
+    be placed on the master drawing — reported explicitly so a human can
+    fix the region index or retry registration, rather than the evidence
+    silently vanishing.
+    """
+
     evidence_id: str
     inspection_run_id: str
     master_drawing_id: str
@@ -218,57 +273,43 @@ class UnresolvedEvidenceRecord:
         }
 
 
-def _tags_from_positioned_terms(terms: list[PositionedTerm]) -> NormalizedEvidenceTags:
-    plain_terms = [pt.term for pt in terms]
-    tags = NormalizedEvidenceTags(raw_terms=plain_terms)
+def _tags_from_positioned_terms(
+    terms: list[PositionedTerm],
+) -> NormalizedEvidenceTags:
+    """Same bucketing as normalize_evidence_text(), but starting from
+    already-extracted PositionedTerm instead of re-running extraction on
+    a plain string. Keeps document and text paths sharing one tag shape.
+    """
+    bucket_terms = [pt.term for pt in terms if pt.term.category in _CATEGORY_TO_TAGS_FIELD]
+    tags = NormalizedEvidenceTags(raw_terms=bucket_terms)
     for category, field_name in _CATEGORY_TO_TAGS_FIELD.items():
         canonicals = [
             pt.term.canonical for pt in terms if pt.term.category == category
         ]
         deduped = list(dict.fromkeys(canonicals))
         setattr(tags, field_name, deduped)
-    tags.confidence_label = overall_confidence_label(plain_terms)
+    tags.confidence_label = overall_confidence_label(bucket_terms)
     return tags
-
-
-def _build_overlay_record(
-    evidence: DocumentEvidenceInput,
-    terms: list[PositionedTerm],
-    bbox_fractional: tuple[float, float, float, float],
-    representative: ResolvedLocation,
-) -> DrawingOverlayRecord:
-    tags = _tags_from_positioned_terms(terms)
-    severity = _severity_from_tags(tags)
-
-    label = tags.inspection_types[0] if tags.inspection_types else "Inspection finding"
-    if representative.matched_region and representative.matched_region.location_labels:
-        label = f"{label} — {representative.matched_region.location_labels[0]}"
-    elif tags.locations:
-        label = f"{label} — {tags.locations[0]}"
-
-    region_suffix = (
-        representative.matched_region.region_id
-        if representative.matched_region
-        else "unmatched"
-    )
-    return DrawingOverlayRecord(
-        id=f"overlay_{evidence.evidence_id}_{region_suffix}",
-        drawing_id=representative.master_drawing_id,
-        inspection_run_id=evidence.inspection_run_id,
-        bbox=bbox_fractional,
-        label=label,
-        severity=severity,
-        tags=tags,
-        created_at=datetime.now(timezone.utc),
-    )
 
 
 def map_document_to_overlays(
     evidence: DocumentEvidenceInput,
 ) -> tuple[list[DrawingOverlayRecord], list[UnresolvedEvidenceRecord]]:
-    """Full document pipeline: extract, match vocabulary, resolve locations."""
+    """Full pipeline entry point for an uploaded document (PDF, scanned
+    PDF, or photo): extract text, find vocabulary terms with positions,
+    resolve each to a location on the master drawing, and produce overlay
+    records.
+
+    Returns (overlays, unresolved) rather than raising on partial
+    failure: a single multi-page document can have some terms resolve and
+    others not, and a caller (e.g. backend/api/routes/evidence.py) needs
+    both lists to create overlays for what worked and flag what didn't,
+    rather than losing the whole submission to one bad reference.
+    """
     document: ExtractedDocument = extract_document(evidence.file_path)
-    positioned_terms = extract_positioned_terms(document)
+    positioned_terms = extract_positioned_terms(
+        document, categories=_RESOLUTION_VOCAB_CATEGORIES
+    )
 
     if not positioned_terms:
         return [], [
@@ -287,11 +328,10 @@ def map_document_to_overlays(
         ]
 
     resolved_pairs = resolve_locations_per_term(
-        document_terms=positioned_terms,
-        master_drawing_id=evidence.master_drawing_id,
-        region_index=evidence.region_index,
-        master_sheet_identifier=evidence.master_sheet_identifier,
-        registration_transform=evidence.registration_transform,
+        positioned_terms,
+        evidence.master_drawing_id,
+        evidence.region_index,
+        evidence.registration_transform,
     )
 
     unresolved_terms: list[PositionedTerm] = []
@@ -307,6 +347,10 @@ def map_document_to_overlays(
 
     unresolved: list[UnresolvedEvidenceRecord] = []
     if unresolved_terms:
+        # One record for the whole document's unresolved terms, not one
+        # per term — a failed reference lookup is a single finding-level
+        # problem ("this document's location couldn't be placed"), not N
+        # separate problems.
         unresolved.append(
             UnresolvedEvidenceRecord(
                 evidence_id=evidence.evidence_id,
@@ -322,6 +366,9 @@ def map_document_to_overlays(
         method = resolved_terms[0][1].method
 
         if method == ResolutionMethod.ALIGNMENT:
+            # One photo/page = one piece of evidence = one overlay. Union
+            # every resolved term's box into a single location, rather
+            # than one overlay per recognized word.
             all_terms = [t for t, _ in resolved_terms]
             boxes = [r.bbox_fractional for _, r in resolved_terms if r.bbox_fractional]
             x0 = min(b[0] for b in boxes)
@@ -338,6 +385,9 @@ def map_document_to_overlays(
                 )
             )
         else:
+            # REFERENCE_LOOKUP: group by which master region each term
+            # resolved to, so a document naming two different type+
+            # location combinations produces two overlays.
             groups: dict[str | None, list[tuple[PositionedTerm, ResolvedLocation]]] = {}
             for term, resolved in resolved_terms:
                 region_key = (
@@ -347,7 +397,7 @@ def map_document_to_overlays(
                 )
                 groups.setdefault(region_key, []).append((term, resolved))
 
-            for group in groups.values():
+            for region_key, group in groups.items():
                 group_terms = [t for t, _ in group]
                 representative = group[0][1]
                 bbox = representative.bbox_fractional
@@ -358,6 +408,37 @@ def map_document_to_overlays(
                 )
 
     return overlays, unresolved
+
+
+def _build_overlay_record(
+    evidence: DocumentEvidenceInput,
+    terms: list[PositionedTerm],
+    bbox_fractional: tuple[float, float, float, float],
+    representative: ResolvedLocation,
+) -> DrawingOverlayRecord:
+    """Shared overlay-construction step used by both the alignment and
+    reference-lookup branches of map_document_to_overlays, so label/
+    severity logic lives in exactly one place.
+    """
+    tags = _tags_from_positioned_terms(terms)
+    severity = _severity_from_tags(tags)
+
+    label = tags.inspection_types[0] if tags.inspection_types else "Inspection finding"
+    if representative.matched_region and representative.matched_region.location_labels:
+        label = f"{label} — {representative.matched_region.location_labels[0]}"
+    elif tags.locations:
+        label = f"{label} — {tags.locations[0]}"
+
+    return DrawingOverlayRecord(
+        id=f"overlay_{evidence.evidence_id}_{representative.matched_region.region_id if representative.matched_region else 'unmatched'}",
+        drawing_id=representative.master_drawing_id,
+        inspection_run_id=evidence.inspection_run_id,
+        bbox=bbox_fractional,
+        label=label,
+        severity=severity,
+        tags=tags,
+        created_at=datetime.now(timezone.utc),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -787,7 +868,7 @@ def _extract_vocabulary_tags(ctx: Dict[str, Any]) -> list[ExtractedTerm]:
     if not str(text).strip():
         return []
 
-    return extract_terms(str(text))
+    return extract_terms(str(text), categories=_RESOLUTION_VOCAB_CATEGORIES)
 
 
 def _vocabulary_meta(terms: list[ExtractedTerm]) -> Dict[str, Any]:

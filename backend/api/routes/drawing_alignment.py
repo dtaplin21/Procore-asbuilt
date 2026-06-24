@@ -69,6 +69,8 @@ def create_drawing_region(
         "master_drawing_id": master_drawing_id,
         "label": body.label,
         "page": body.page,
+        "inspection_type_tags": body.inspection_type_tags,
+        "location_tags": body.location_tags,
     }
     scope = f"drawing_region:{master_drawing_id}:{body.label}:{body.page}"
 
@@ -101,6 +103,8 @@ def create_drawing_region(
         label=body.label,
         page=body.page,
         geometry=body.geometry,
+        inspection_type_tags=body.inspection_type_tags,
+        location_tags=body.location_tags,
     )
     response = DrawingRegionResponse.model_validate(region)
     finish_idempotent_operation(

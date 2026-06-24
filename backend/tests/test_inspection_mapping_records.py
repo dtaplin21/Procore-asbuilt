@@ -13,7 +13,7 @@ from ai.pipelines.document_text_extraction import (
     PositionedWord,
     SourceFormat,
 )
-from ai.pipelines.drawing_location_resolver import MasterRegion, RegistrationTransform
+from ai.pipelines.drawing_location_resolver import MasterRegion
 from ai.pipelines.inspection_mapping import (
     DocumentEvidenceInput,
     EvidenceInput,
@@ -78,6 +78,31 @@ def _positioned_term(
     )
 
 
+def _master_region(
+    region_id: str,
+    frac: tuple[float, float, float, float],
+    *,
+    inspection_types: tuple[str, ...] = (),
+    location_labels: tuple[str, ...] = (),
+) -> MasterRegion:
+    x0, y0, x1, y1 = frac
+    page_w, page_h = 612.0, 792.0
+    return MasterRegion(
+        region_id=region_id,
+        master_drawing_id="dwg-1",
+        inspection_types=inspection_types,
+        location_labels=location_labels,
+        bbox_on_master=BoundingBox(
+            x=x0 * page_w,
+            y=y0 * page_h,
+            width=(x1 - x0) * page_w,
+            height=(y1 - y0) * page_h,
+            page_width=page_w,
+            page_height=page_h,
+        ),
+    )
+
+
 @pytest.fixture
 def fake_document_pipeline() -> Iterator[None]:
     document = ExtractedDocument(
@@ -97,7 +122,8 @@ def fake_document_pipeline() -> Iterator[None]:
         ],
     )
     positioned = [
-        _positioned_term("U1.C4.31", VocabCategory.SHEET_IDENTIFIER, x=60.0),
+        _positioned_term("Rough In", VocabCategory.INSPECTION_TYPE, x=10.0),
+        _positioned_term("Utility MR", VocabCategory.LOCATION_TERM, x=60.0),
     ]
     with (
         patch(
@@ -120,11 +146,11 @@ def test_map_document_to_overlays_reference_lookup(fake_document_pipeline: None)
             master_drawing_id="dwg-1",
             file_path="/evidence/native-report.pdf",
             region_index=[
-                MasterRegion(
-                    region_id="zone-a",
-                    bbox_fractional=(0.1, 0.2, 0.4, 0.5),
-                    sheet_identifiers=("U1.C4.31",),
-                    location_labels=("Zone A",),
+                _master_region(
+                    "zone-a",
+                    (0.1, 0.2, 0.4, 0.5),
+                    location_labels=("Utility MR",),
+                    inspection_types=("Rough In",),
                 )
             ],
         )

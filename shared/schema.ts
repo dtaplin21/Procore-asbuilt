@@ -142,6 +142,8 @@ export interface DrawingRegionCreate {
   label: string;
   page?: number;
   geometry: DrawingRegionGeometry;
+  inspection_type_tags?: string[];
+  location_tags?: string[];
 }
 
 export interface DrawingRegionResponse {
@@ -150,6 +152,8 @@ export interface DrawingRegionResponse {
   label: string;
   page: number;
   geometry: DrawingRegionGeometry;
+  inspection_type_tags: string[];
+  location_tags: string[];
   created_at: string;
   updated_at: string;
 }

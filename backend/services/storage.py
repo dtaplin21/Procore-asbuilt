@@ -603,12 +603,16 @@ class StorageService:
         label: str,
         page: int = 1,
         geometry: Dict[str, Any],
+        inspection_type_tags: Optional[List[str]] = None,
+        location_tags: Optional[List[str]] = None,
     ) -> DrawingRegion:
         region = DrawingRegion(
             master_drawing_id=master_drawing_id,
             label=label,
             page=page,
             geometry=geometry,
+            inspection_type_tags=inspection_type_tags or [],
+            location_tags=location_tags or [],
         )
         self.db.add(region)
         try:

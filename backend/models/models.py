@@ -1,5 +1,6 @@
 # models/database.py
 from sqlalchemy import CheckConstraint, Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Float, JSON, UniqueConstraint, Index, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -372,6 +373,16 @@ class DrawingRegion(Base):
     label = Column(String(length=255), nullable=False)
     page = Column(Integer, nullable=False, default=1)
     geometry = Column(JSON, nullable=False)  # normalized 0-1; rect or polygon
+    inspection_type_tags = Column(
+        ARRAY(String),
+        nullable=True,
+        server_default=text("'{}'::text[]"),
+    )
+    location_tags = Column(
+        ARRAY(String),
+        nullable=True,
+        server_default=text("'{}'::text[]"),
+    )
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
