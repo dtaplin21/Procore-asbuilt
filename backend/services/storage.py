@@ -1129,29 +1129,6 @@ class StorageService:
             .first()
         )
 
-    def count_compared_sub_drawings_for_master(self, project_id: int, master_drawing_id: int) -> int:
-        """Distinct sub drawings with a completed alignment for this master (see dashboard metrics)."""
-        return int(
-            get_project_comparison_progress(
-                self.db, project_id, master_drawing_id=master_drawing_id
-            )["compared_count"]
-        )
-
-    def count_open_high_severity_diffs_for_master(self, project_id: int, master_drawing_id: int) -> int:
-        """High/critical diffs that are still unresolved on the diff record (resolved=false)."""
-        result = (
-            self.db.query(func.count(DrawingDiff.id))
-            .join(DrawingAlignment, DrawingDiff.alignment_id == DrawingAlignment.id)
-            .filter(
-                DrawingAlignment.project_id == project_id,
-                DrawingAlignment.master_drawing_id == master_drawing_id,
-                DrawingDiff.severity.in_(["high", "critical"]),
-                DrawingDiff.resolved.is_(False),
-            )
-            .scalar()
-        )
-        return int(result or 0)
-
     SEVERITY_ORDER = {"low": 1, "medium": 2, "high": 3, "critical": 4}
 
     def create_finding_for_diff(

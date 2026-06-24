@@ -3,25 +3,38 @@ import type { WorkspaceLinkMetadata } from "@shared/schema";
 export type WorkspaceLinkInput = {
   projectId: number;
   masterDrawingId: number;
-  /** Legacy compare selection — ignored when building workspace URLs (PR1). */
-  alignmentId?: number | null;
-  /** Legacy compare selection — ignored when building workspace URLs (PR1). */
-  diffId?: number | null;
+  inspectionRunId?: number | null;
+  overlayId?: number | null;
 };
 
-/** Master workspace route only; does not deep-link into removed compare UI state. */
+/** Master workspace route with optional inspection run + overlay selection. */
 export function buildWorkspaceUrl({
   projectId,
   masterDrawingId,
+  inspectionRunId,
+  overlayId,
 }: WorkspaceLinkInput): string {
-  return `/projects/${projectId}/drawings/${masterDrawingId}/workspace`;
+  const base = `/projects/${projectId}/drawings/${masterDrawingId}/workspace`;
+  const params: string[] = [];
+  if (inspectionRunId != null) {
+    params.push(`run=${encodeURIComponent(String(inspectionRunId))}`);
+  }
+  if (overlayId != null) {
+    params.push(`overlay=${encodeURIComponent(String(overlayId))}`);
+  }
+  if (params.length === 0) {
+    return base;
+  }
+  return `${base}?${params.join("&")}`;
 }
 
-/** Map API workspace metadata into {@link buildWorkspaceUrl}. Compare selection fields are dropped. */
+/** Map API workspace metadata into {@link buildWorkspaceUrl}. */
 export function buildWorkspaceUrlFromMetadata(meta: WorkspaceLinkMetadata): string {
   return buildWorkspaceUrl({
     projectId: meta.projectId,
     masterDrawingId: meta.masterDrawingId,
+    inspectionRunId: meta.inspectionRunId,
+    overlayId: meta.overlayId,
   });
 }
 
@@ -36,6 +49,9 @@ export function buildWorkspaceUrlWithFinding(
   const base = buildWorkspaceUrl({
     projectId: input.projectId,
     masterDrawingId: input.masterDrawingId,
+    inspectionRunId:
+      "inspectionRunId" in input ? input.inspectionRunId : undefined,
+    overlayId: "overlayId" in input ? input.overlayId : undefined,
   });
   if (findingId == null || String(findingId) === "") {
     return base;

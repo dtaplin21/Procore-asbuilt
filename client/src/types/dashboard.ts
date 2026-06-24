@@ -1,8 +1,8 @@
 export type WorkspaceLink = {
   projectId: number;
   masterDrawingId: number;
-  alignmentId?: number | null;
-  diffId?: number | null;
+  inspectionRunId?: number | null;
+  overlayId?: number | null;
 };
 
 export type FindingItem = {

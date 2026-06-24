@@ -175,8 +175,11 @@ class DashboardSummaryResponse(BaseModel):
 class WorkspaceLinkMetadata(BaseModel):
     project_id: int = Field(..., serialization_alias="projectId")
     master_drawing_id: int = Field(..., serialization_alias="masterDrawingId")
-    alignment_id: Optional[int] = Field(default=None, serialization_alias="alignmentId")
-    diff_id: Optional[int] = Field(default=None, serialization_alias="diffId")
+    inspection_run_id: Optional[int] = Field(
+        default=None,
+        serialization_alias="inspectionRunId",
+    )
+    overlay_id: Optional[int] = Field(default=None, serialization_alias="overlayId")
 
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 
@@ -307,14 +310,6 @@ class DrawingProgressSummary(BaseModel):
     """Reusable progress snapshot for workspace and dashboard (per master drawing)."""
 
     master_drawing_id: int = Field(..., serialization_alias="masterDrawingId")
-    compared_sub_drawings_count: int = Field(
-        ...,
-        serialization_alias="comparedSubDrawingsCount",
-    )
-    open_high_severity_diffs_count: int = Field(
-        ...,
-        serialization_alias="openHighSeverityDiffsCount",
-    )
 
     class Config:
         populate_by_name = True

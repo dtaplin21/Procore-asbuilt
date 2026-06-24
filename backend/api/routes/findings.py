@@ -15,7 +15,7 @@ def list_project_findings(
     limit: int | None = Query(5),
     db: Session = Depends(get_db),
 ):
-    """List findings for a project with serialized rows (includes workspaceLink when diff-backed)."""
+    """List findings for a project with serialized rows (includes workspaceLink when drawable)."""
     storage = StorageService(db)
     if storage.get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="Project not found")

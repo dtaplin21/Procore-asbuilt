@@ -364,8 +364,8 @@ export type InsertDrawingObject = Omit<DrawingObject, "id">;
 export interface WorkspaceLinkMetadata {
   projectId: number;
   masterDrawingId: number;
-  alignmentId?: number;
-  diffId?: number;
+  inspectionRunId?: number | null;
+  overlayId?: number | null;
 }
 
 export interface AIInsight {
