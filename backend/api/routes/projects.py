@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 import logging
 
@@ -7,10 +7,6 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, cast
 
 from api.dependencies import get_db
-from api.upload_intent_form import (
-    UPLOAD_INTENT_OPENAPI_DESCRIPTION,
-    parse_upload_intent_form_fields,
-)
 from services.drawing_comparison import serialize_drawing_for_workspace
 from services.drawing_render_jobs import enqueue_drawing_render_job
 from services.storage import StorageService
@@ -118,34 +114,19 @@ def get_project_jobs(
 async def upload_project_drawing(
     project_id: int,
     file: UploadFile = File(...),
-    upload_intent: str | None = Form(default=None, description=UPLOAD_INTENT_OPENAPI_DESCRIPTION),
-    uploadIntent: str | None = Form(
-        default=None,
-        description="camelCase alias of upload_intent; prefer upload_intent when both are sent",
-    ),
     db: Session = Depends(get_db),
 ):
     """Upload a drawing file for a project.
 
-    - Validates file type and size; saves file to disk; creates DB row.
-    - Multipart ``upload_intent`` / ``uploadIntent`` behavior is documented on those fields (OpenAPI).
+    Validates file type and size, saves to disk, creates a DB row, and sets it as master.
     """
     # Verify project exists
     proj = db.query(Project).filter(Project.id == project_id).first()
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    try:
-        upload_intent_for_create = parse_upload_intent_form_fields(
-            upload_intent, uploadIntent
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    # Persist file via helper (validates size/type and writes to disk)
     storage_key, content_type, original_name = save_upload(file, project_id, category="drawings")
 
-    # Create drawing record via service layer
     service = StorageService(db)
     drawing = service.create_drawing(
         project_id=project_id,
@@ -154,7 +135,6 @@ async def upload_project_drawing(
         storage_key=storage_key,
         content_type=content_type,
         page_count=None,
-        upload_intent=upload_intent_for_create,
     )
     
     # Set file_url to point to the /file route (will be implemented in next step)
@@ -164,7 +144,6 @@ async def upload_project_drawing(
 
     # Enqueue async render job for PDF/image rendition generation
     enqueue_drawing_render_job(db, project_id, cast(int, drawing.id))
-    # Compare jobs: see services.drawing_rendering (notify after renditions ready).
 
     return DrawingResponse.model_validate(drawing)
 

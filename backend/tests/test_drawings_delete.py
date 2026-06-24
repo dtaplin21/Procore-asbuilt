@@ -27,20 +27,22 @@ def test_delete_drawing_removes_row_evidence_links_and_clears_master(
         name="master.pdf",
         storage_key=f"drawings/test/{pid}/master_del.pdf",
         content_type="application/pdf",
-        upload_intent="master",
     )
-    sub = storage.create_drawing(
-        pid,
+    sub = Drawing(
+        project_id=pid,
         source="upload",
         name="sub.pdf",
         storage_key=f"drawings/test/{pid}/sub_del.pdf",
         content_type="application/pdf",
         upload_intent="sub",
     )
+    db_session.add(sub)
+    db_session.commit()
+    db_session.refresh(sub)
     mid = cast(int, master.id)
     sid = cast(int, sub.id)
     db_session.refresh(project)
-    assert project.master_drawing_id == mid
+    assert cast(int | None, project.master_drawing_id) == mid
 
     evidence = EvidenceRecord(
         project_id=pid,

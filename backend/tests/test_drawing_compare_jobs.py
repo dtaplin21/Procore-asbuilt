@@ -25,6 +25,27 @@ def _minimal_pdf_bytes() -> bytes:
     return out
 
 
+def _insert_legacy_sub_drawing(
+    db_session: Session,
+    project_id: int,
+    *,
+    name: str,
+    storage_key: str,
+) -> Drawing:
+    drawing = Drawing(
+        project_id=project_id,
+        source="upload",
+        name=name,
+        storage_key=storage_key,
+        content_type="application/pdf",
+        upload_intent="sub",
+    )
+    db_session.add(drawing)
+    db_session.commit()
+    db_session.refresh(drawing)
+    return drawing
+
+
 def test_enqueue_compare_returns_none_when_sub_id_is_master_row(
     db_session: Session, project: Project
 ) -> None:
@@ -36,7 +57,6 @@ def test_enqueue_compare_returns_none_when_sub_id_is_master_row(
         name="m.pdf",
         storage_key=f"drawings/test/{pid}/m.pdf",
         content_type="application/pdf",
-        upload_intent="master",
     )
     assert (
         enqueue_drawing_compare_job(
@@ -49,16 +69,13 @@ def test_enqueue_compare_returns_none_when_sub_id_is_master_row(
 def test_enqueue_compare_returns_none_without_canonical_master(
     db_session: Session, project: Project
 ) -> None:
-    """Sole explicit sub upload does not set master; no fallback master row → no enqueue."""
-    storage = StorageService(db_session)
+    """Legacy sub row with no project master FK → no enqueue."""
     pid = cast(int, project.id)
-    sub = storage.create_drawing(
+    sub = _insert_legacy_sub_drawing(
+        db_session,
         pid,
-        source="upload",
         name="s.pdf",
         storage_key=f"drawings/test/{pid}/s.pdf",
-        content_type="application/pdf",
-        upload_intent="sub",
     )
     db_session.refresh(project)
     assert project.master_drawing_id is None
@@ -81,15 +98,12 @@ def test_enqueue_compare_returns_none_when_renditions_not_ready(
         name="m.pdf",
         storage_key=f"drawings/test/{pid}/m2.pdf",
         content_type="application/pdf",
-        upload_intent="master",
     )
-    sub = storage.create_drawing(
+    sub = _insert_legacy_sub_drawing(
+        db_session,
         pid,
-        source="upload",
         name="s2.pdf",
         storage_key=f"drawings/test/{pid}/s2.pdf",
-        content_type="application/pdf",
-        upload_intent="sub",
     )
     assert (
         enqueue_drawing_compare_job(
@@ -117,33 +131,30 @@ def test_enqueue_compare_creates_job_when_renditions_ready(
     storage = StorageService(db_session)
     pid = cast(int, project.id)
     pdf = _minimal_pdf_bytes()
-    for name, key_suffix, intent in (
-        ("m.pdf", "mrend.pdf", "master"),
-        ("s.pdf", "srend.pdf", "sub"),
+    for name, key_suffix in (
+        ("m.pdf", "mrend.pdf"),
+        ("s.pdf", "srend.pdf"),
     ):
         path = f"drawings/test/{pid}/{key_suffix}"
         abs_path = UPLOAD_ROOT / path
         abs_path.parent.mkdir(parents=True, exist_ok=True)
         abs_path.write_bytes(pdf)
-        storage.create_drawing(
-            pid,
-            source="upload",
-            name=name,
-            storage_key=path,
-            content_type="application/pdf",
-            upload_intent="sub" if intent == "sub" else "master",
-        )
 
-    drawings = (
-        db_session.query(Drawing)
-        .filter(Drawing.project_id == pid)
-        .order_by(Drawing.id.asc())
-        .all()
+    master_d = storage.create_drawing(
+        pid,
+        source="upload",
+        name="m.pdf",
+        storage_key=f"drawings/test/{pid}/mrend.pdf",
+        content_type="application/pdf",
     )
-    assert len(drawings) == 2
-    master_d, sub_d = drawings[0], drawings[1]
-    assert master_d.upload_intent == "master"
-    assert sub_d.upload_intent == "sub"
+    sub_d = _insert_legacy_sub_drawing(
+        db_session,
+        pid,
+        name="s.pdf",
+        storage_key=f"drawings/test/{pid}/srend.pdf",
+    )
+    assert cast(str | None, master_d.upload_intent) == "master"
+    assert cast(str | None, sub_d.upload_intent) == "sub"
 
     render = DrawingRenderingService(db_session)
     render.render_drawing_pages(cast(int, master_d.id))
@@ -178,30 +189,25 @@ def test_enqueue_compare_idempotent_pending(
     storage = StorageService(db_session)
     pid = cast(int, project.id)
     pdf = _minimal_pdf_bytes()
-    for name, key_suffix, intent in (
-        ("m.pdf", "midem.pdf", "master"),
-        ("s.pdf", "sidem.pdf", "sub"),
-    ):
+    for key_suffix in ("midem.pdf", "sidem.pdf"):
         path = f"drawings/test/{pid}/{key_suffix}"
         abs_path = UPLOAD_ROOT / path
         abs_path.parent.mkdir(parents=True, exist_ok=True)
         abs_path.write_bytes(pdf)
-        storage.create_drawing(
-            pid,
-            source="upload",
-            name=name,
-            storage_key=path,
-            content_type="application/pdf",
-            upload_intent="sub" if intent == "sub" else "master",
-        )
 
-    drawings = (
-        db_session.query(Drawing)
-        .filter(Drawing.project_id == pid)
-        .order_by(Drawing.id.asc())
-        .all()
+    master_d = storage.create_drawing(
+        pid,
+        source="upload",
+        name="m.pdf",
+        storage_key=f"drawings/test/{pid}/midem.pdf",
+        content_type="application/pdf",
     )
-    master_d, sub_d = drawings[0], drawings[1]
+    sub_d = _insert_legacy_sub_drawing(
+        db_session,
+        pid,
+        name="s.pdf",
+        storage_key=f"drawings/test/{pid}/sidem.pdf",
+    )
     render = DrawingRenderingService(db_session)
     render.render_drawing_pages(cast(int, master_d.id))
     render.render_drawing_pages(cast(int, sub_d.id))
@@ -213,16 +219,16 @@ def test_enqueue_compare_idempotent_pending(
         db_session, project_id=pid, sub_drawing_id=cast(int, sub_d.id)
     )
     assert j1 is not None and j2 is not None
-    assert j1.id == j2.id
+    assert cast(int, j1.id) == cast(int, j2.id)
 
 
-def test_notify_after_sub_render_then_master_enqueues_compare(
+def test_render_complete_does_not_auto_enqueue_compare(
     db_session: Session, project: Project, company
 ) -> None:
-    """Sub completes first (no job); master completes and fans out to subs."""
+    """Upload/render path no longer chains into drawing_compare (PR 4.3)."""
     from models.models import User, UserCompany
 
-    user = User(email=f"compare-fanout-{project.id}@example.com")
+    user = User(email=f"compare-nchain-{project.id}@example.com")
     db_session.add(user)
     db_session.flush()
     db_session.add(
@@ -233,32 +239,29 @@ def test_notify_after_sub_render_then_master_enqueues_compare(
     storage = StorageService(db_session)
     pid = cast(int, project.id)
     pdf = _minimal_pdf_bytes()
-    for name, key_suffix, intent in (
-        ("m.pdf", "mfan.pdf", "master"),
-        ("s.pdf", "sfan.pdf", "sub"),
-    ):
+    for key_suffix in ("mfan.pdf", "sfan.pdf"):
         path = f"drawings/test/{pid}/{key_suffix}"
         abs_path = UPLOAD_ROOT / path
         abs_path.parent.mkdir(parents=True, exist_ok=True)
         abs_path.write_bytes(pdf)
-        storage.create_drawing(
-            pid,
-            source="upload",
-            name=name,
-            storage_key=path,
-            content_type="application/pdf",
-            upload_intent="sub" if intent == "sub" else "master",
-        )
 
-    drawings = (
-        db_session.query(Drawing)
-        .filter(Drawing.project_id == pid)
-        .order_by(Drawing.id.asc())
-        .all()
+    master_d = storage.create_drawing(
+        pid,
+        source="upload",
+        name="m.pdf",
+        storage_key=f"drawings/test/{pid}/mfan.pdf",
+        content_type="application/pdf",
     )
-    master_d, sub_d = drawings[0], drawings[1]
+    sub_d = _insert_legacy_sub_drawing(
+        db_session,
+        pid,
+        name="s.pdf",
+        storage_key=f"drawings/test/{pid}/sfan.pdf",
+    )
     render = DrawingRenderingService(db_session)
     render.render_drawing_pages(cast(int, sub_d.id))
+    render.render_drawing_pages(cast(int, master_d.id))
+
     assert (
         db_session.query(JobQueue)
         .filter(
@@ -268,17 +271,3 @@ def test_notify_after_sub_render_then_master_enqueues_compare(
         .count()
         == 0
     )
-
-    render.render_drawing_pages(cast(int, master_d.id))
-
-    job = (
-        db_session.query(JobQueue)
-        .filter(
-            JobQueue.project_id == pid,
-            JobQueue.job_type == DRAWING_COMPARE_JOB_TYPE,
-        )
-        .first()
-    )
-    assert job is not None
-    data = cast(dict, job.input_data)
-    assert data["sub_drawing_id"] == sub_d.id

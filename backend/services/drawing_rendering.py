@@ -13,7 +13,6 @@ from typing import Optional, cast
 import fitz  # PyMuPDF
 
 from database import SessionLocal
-from services.drawing_compare_jobs import notify_drawing_render_complete
 from services.storage import (
     StorageService,
     build_drawing_render_storage_key,
@@ -80,8 +79,6 @@ class DrawingRenderingService:
                 error=str(exc),
             )
             raise
-        else:
-            notify_drawing_render_complete(self.storage.db, drawing_id)
 
     def _render_pdf(
         self, project_id: int, drawing_id: int, source_path: Path

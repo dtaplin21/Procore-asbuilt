@@ -17,12 +17,12 @@ from sqlalchemy.orm import Session
 
 from database import SessionLocal
 from models.models import JobQueue
+from observability.workflow_logging import log_job_status_transition
 from services.job_input_data import coerce_job_int
 from services.drawing_compare_jobs import DRAWING_COMPARE_JOB_TYPE
 from services.drawing_comparison import compare_sub_drawing_to_master
 from services.drawing_render_jobs import (
     DRAWING_RENDER_JOB_TYPE,
-    chain_compare_after_drawing_render,
     process_drawing_render_job,
 )
 
@@ -136,15 +136,6 @@ async def process_one_job() -> bool:
 
         try:
             await handle_job(job)
-            # Compare queue: after render succeeds, chain from worker (fresh DB session).
-            if cast(str, job.job_type) == DRAWING_RENDER_JOB_TYPE:
-                input_data = cast(dict[str, Any] | None, job.input_data) or {}
-                raw_drawing_id = input_data.get("drawing_id")
-                if raw_drawing_id is not None:
-                    await asyncio.to_thread(
-                        chain_compare_after_drawing_render,
-                        coerce_job_int(raw_drawing_id, "drawing_id"),
-                    )
             previous_status = cast(str | None, job.status)
             _mark_job_completed(db, job_id)
             log_job_status_transition(

@@ -12,7 +12,6 @@ from typing import Optional, cast
 
 from sqlalchemy.orm import Session
 
-from database import SessionLocal
 from models.models import Drawing, JobQueue, Project, User, UserCompany
 from observability.workflow_logging import log_job_status_transition
 from services.drawing_rendering import run_render_drawing_job
@@ -85,32 +84,6 @@ def enqueue_drawing_render_job(
         previous_status=previous_status,
     )
     return job
-
-
-def chain_compare_after_drawing_render(drawing_id: int) -> None:
-    """
-    After a drawing_render job succeeds, queue compare for explicit sub uploads.
-
-    Uses ``upload_intent == "sub"`` only (not truthy checks). Loads a fresh
-    ``Drawing`` row by id. Master fan-out remains in
-    ``notify_drawing_render_complete`` (render pipeline).
-    """
-    from services.drawing_compare_jobs import enqueue_drawing_compare_job
-
-    db = SessionLocal()
-    try:
-        drawing = db.query(Drawing).filter(Drawing.id == drawing_id).first()
-        if drawing is None:
-            return
-        if drawing.upload_intent != "sub":
-            return
-        enqueue_drawing_compare_job(
-            db,
-            project_id=cast(int, drawing.project_id),
-            sub_drawing_id=drawing_id,
-        )
-    finally:
-        db.close()
 
 
 async def process_drawing_render_job(drawing_id: int) -> None:

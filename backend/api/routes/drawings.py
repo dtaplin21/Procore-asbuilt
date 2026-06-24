@@ -1,13 +1,9 @@
 from typing import List, Optional, cast
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db, get_idempotency_key
-from api.upload_intent_form import (
-    UPLOAD_INTENT_OPENAPI_DESCRIPTION,
-    parse_upload_intent_form_fields,
-)
 from models.models import Drawing
 from models.schemas import (
     DrawingOverlayResponse,
@@ -41,44 +37,25 @@ router = APIRouter(tags=["drawings"])
 async def upload_drawing(
     project_id: int,
     file: UploadFile = File(...),
-    upload_intent: str | None = Form(default=None, description=UPLOAD_INTENT_OPENAPI_DESCRIPTION),
-    uploadIntent: str | None = Form(
-        default=None,
-        description="camelCase alias of upload_intent; prefer upload_intent when both are sent",
-    ),
     idempotency_key: str = Depends(get_idempotency_key),
     db: Session = Depends(get_db),
 ) -> DrawingResponse:
     """
     POST /api/projects/{project_id}/drawings
 
-    Upload a drawing file and persist metadata. Behavior matches ``POST /api/projects/{id}/drawings``
-    (projects router) for ``upload_intent`` — see OpenAPI form field description.
-    Idempotency fingerprint includes normalized ``upload_intent`` so master vs sub vs omitted cannot collide.
+    Upload a drawing file and persist metadata. Every upload becomes the project master sheet.
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
-
-    try:
-        upload_intent_for_create = parse_upload_intent_form_fields(
-            upload_intent, uploadIntent
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    normalized_upload_intent = upload_intent_for_create
 
     file_bytes, content_type, original_name = read_and_validate_upload(file, category="drawings")
     checksum = sha256_bytes(file_bytes)
     source = "upload"
 
-    # Must include normalized_upload_intent: same bytes + same Idempotency-Key would otherwise
-    # hash identically for master vs sub and return the wrong cached DrawingResponse.
     request_fingerprint = {
         "project_id": project_id,
         "checksum": checksum,
         "source": source,
-        "upload_intent": normalized_upload_intent,
     }
     scope = f"drawing_upload:{project_id}:{checksum}:{source}"
 
@@ -115,19 +92,14 @@ async def upload_drawing(
         storage_key=storage_key,
         content_type=content_type,
         page_count=None,
-        upload_intent=upload_intent_for_create,
     )
 
     response = DrawingResponse.model_validate(drawing)
     response_data = response.model_dump(mode="json")
     response_data["file_url"] = f"/api/projects/{project_id}/drawings/{cast(int, drawing.id)}/file"
-    # Explicit for idempotency cache + clarity (also present on model_dump from ORM).
     response_data["upload_intent"] = drawing.upload_intent
 
-    # Enqueue async render job for PDF/image rendition generation
     enqueue_drawing_render_job(db, project_id, cast(int, drawing.id))
-    # drawing_compare jobs are enqueued from notify_drawing_render_complete() in the
-    # render pipeline once page-1 renditions exist (sub and/or master completion).
 
     finish_idempotent_operation(
         db,

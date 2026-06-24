@@ -635,10 +635,10 @@ def test_list_diffs_raises_when_master_not_found(
 # ---------------------------------------------------------------------------
 
 
-def test_upload_master_twice_demotes_first_and_updates_project_fk(
+def test_upload_twice_updates_project_fk_without_demoting_prior(
     db: Session, project: Project
 ) -> None:
-    """Second master upload sets project FK to the new row and marks prior master as sub."""
+    """Each upload is master; project FK moves to the newest row; prior master intent is cleared (not sub)."""
     storage = StorageService(db)
     pid = cast(int, project.id)
     first = storage.create_drawing(
@@ -647,11 +647,10 @@ def test_upload_master_twice_demotes_first_and_updates_project_fk(
         name="first-master.pdf",
         storage_key=f"drawings/test/{pid}/first.pdf",
         content_type="application/pdf",
-        upload_intent="master",
     )
     db.refresh(project)
-    assert project.master_drawing_id == first.id
-    assert first.upload_intent == "master"
+    assert cast(int | None, project.master_drawing_id) == cast(int, first.id)
+    assert cast(str | None, first.upload_intent) == "master"
 
     second = storage.create_drawing(
         pid,
@@ -659,11 +658,10 @@ def test_upload_master_twice_demotes_first_and_updates_project_fk(
         name="second-master.pdf",
         storage_key=f"drawings/test/{pid}/second.pdf",
         content_type="application/pdf",
-        upload_intent="master",
     )
     db.refresh(project)
     db.refresh(first)
     db.refresh(second)
-    assert project.master_drawing_id == second.id
-    assert second.upload_intent == "master"
-    assert first.upload_intent == "sub"
+    assert cast(int | None, project.master_drawing_id) == cast(int, second.id)
+    assert cast(str | None, second.upload_intent) == "master"
+    assert first.upload_intent is None

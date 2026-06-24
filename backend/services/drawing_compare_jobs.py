@@ -16,13 +16,17 @@ from typing import Optional, cast
 
 from sqlalchemy.orm import Session
 
-from api.upload_intent_form import drawing_has_sub_upload_intent
 from models.models import Drawing, JobQueue, Project
 from observability.workflow_logging import log_job_status_transition
 from services.job_input_data import coerce_job_int
 from services.storage import StorageService, get_project_master_drawing
 
 DRAWING_COMPARE_JOB_TYPE = "drawing_compare"
+
+
+def _drawing_has_sub_upload_intent(drawing: object) -> bool:
+    """Legacy rows only — new uploads are always master."""
+    return getattr(drawing, "upload_intent", None) == "sub"
 
 
 def _pending_compare_job_for_sub(
@@ -77,7 +81,7 @@ def enqueue_drawing_compare_job(
         .filter(Drawing.id == sub_drawing_id, Drawing.project_id == project_id)
         .first()
     )
-    if sub is None or not drawing_has_sub_upload_intent(sub):
+    if sub is None or not _drawing_has_sub_upload_intent(sub):
         return None
 
     master = get_project_master_drawing(db, project_id)
@@ -147,7 +151,7 @@ def notify_drawing_render_complete(db: Session, drawing_id: int) -> None:
         return
     pid = cast(int, drawing.project_id)
 
-    if drawing_has_sub_upload_intent(drawing):
+    if _drawing_has_sub_upload_intent(drawing):
         enqueue_drawing_compare_job(
             db, project_id=pid, sub_drawing_id=drawing_id
         )

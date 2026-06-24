@@ -282,14 +282,8 @@ class StorageService:
     def set_project_master(self, project_id: int, drawing_id: int) -> None:
         """Declare the canonical master sheet for a project.
 
-        Loads ``Project`` and ``Drawing`` (by id). Raises if the drawing is missing or
-        ``drawing.project_id != project_id``. Sets ``project.master_drawing_id = drawing_id``,
-        bulk-updates all other drawings in that project to ``upload_intent = 'sub'``, then sets
-        the chosen drawing to ``upload_intent = 'master'``.
-
-        Does not ``commit``. :meth:`create_drawing` uses ``flush`` → this method → ``commit`` in
-        one transaction when ``upload_intent == 'master'`` or when intent is omitted and the project
-        has no ``master_drawing_id`` yet (auto-first-master).
+        Sets ``project.master_drawing_id`` and marks the chosen drawing ``upload_intent='master'``.
+        Clears ``upload_intent`` on any prior master row (does not mark prior uploads as sub).
         """
         project = self.get_project(project_id)
         if project is None:
@@ -302,13 +296,18 @@ class StorageService:
                 f"Drawing {drawing_id} belongs to project {drawing.project_id}, not {project_id}"
             )
 
-        self.db.query(Drawing).filter(
-            Drawing.project_id == project_id,
-            Drawing.id != drawing_id,
-        ).update({"upload_intent": "sub"}, synchronize_session=False)
+        (
+            self.db.query(Drawing)
+            .filter(
+                Drawing.project_id == project_id,
+                Drawing.upload_intent == "master",
+                Drawing.id != drawing_id,
+            )
+            .update({Drawing.upload_intent: None}, synchronize_session=False)
+        )
 
-        drawing.upload_intent = "master"
-        project.master_drawing_id = drawing_id
+        drawing.upload_intent = "master"  # type: ignore[assignment]
+        project.master_drawing_id = drawing_id  # type: ignore[assignment]
 
     def _project_has_no_canonical_master(self, project_id: int) -> bool:
         """True if the project exists and ``master_drawing_id`` is not set."""
@@ -324,34 +323,16 @@ class StorageService:
         storage_key: str,
         content_type: str,
         page_count: Optional[int] = None,
-        upload_intent: Literal["master", "sub"] | None = None,
     ) -> Drawing:
-        """Persist a new drawing row.
-
-        Calls :meth:`set_project_master` after ``flush`` when:
-
-        - ``upload_intent == 'master'``, or
-        - ``upload_intent`` is omitted and the project has no ``master_drawing_id`` yet
-          (auto-first-master onboarding).
-
-        Then ``commit`` (single transaction). An explicit ``sub`` upload never changes project master.
-
-        Downstream jobs (e.g. auto-compare) should only run when
-        ``getattr(drawing, "upload_intent", None) == "sub"`` — never a truthy check,
-        because this field is nullable for legacy rows.
-        """
-        replacing_canonical_master = upload_intent == "master" and not self._project_has_no_canonical_master(
-            project_id
+        """Persist a new drawing row and set it as the project canonical master."""
+        (
+            self.db.query(Drawing)
+            .filter(
+                Drawing.project_id == project_id,
+                Drawing.upload_intent == "master",
+            )
+            .update({Drawing.upload_intent: None}, synchronize_session=False)
         )
-        # Partial unique index: only one row per project may have upload_intent='master' at flush time.
-        # When user uploads a new master while a canonical master exists, insert as 'sub' first, then
-        # :meth:`set_project_master` promotes this row and demotes the rest.
-        row_upload_intent: Literal["master", "sub"] | None
-        if replacing_canonical_master:
-            row_upload_intent = "sub"
-        else:
-            row_upload_intent = upload_intent
-
         drawing = Drawing(
             project_id=project_id,
             source=source,
@@ -359,17 +340,12 @@ class StorageService:
             storage_key=storage_key,
             content_type=content_type,
             page_count=page_count,
-            upload_intent=row_upload_intent,
+            upload_intent="master",
         )
         self.db.add(drawing)
         try:
             self.db.flush()
-            promote_to_project_master = upload_intent == "master" or (
-                upload_intent is None
-                and self._project_has_no_canonical_master(project_id)
-            )
-            if promote_to_project_master:
-                self.set_project_master(project_id, cast(int, drawing.id))
+            self.set_project_master(project_id, cast(int, drawing.id))
             self.db.commit()
         except SQLAlchemyError:
             self.db.rollback()
@@ -973,13 +949,13 @@ class StorageService:
             )
             if alignment is None:
                 raise ValueError("Alignment not found for this project")
-            master_drawing_id = int(alignment.master_drawing_id)
+            master_drawing_id = cast(int, alignment.master_drawing_id)
         else:
             assert inspection_run_id is not None
             run = self.get_inspection_run(project_id, inspection_run_id)
             if run is None:
                 raise ValueError("Inspection run not found for this project")
-            master_drawing_id = int(run.master_drawing_id)
+            master_drawing_id = cast(int, run.master_drawing_id)
 
         if region_id is not None:
             region = (
@@ -989,7 +965,7 @@ class StorageService:
             )
             if region is None:
                 raise ValueError("Drawing region not found")
-            if int(region.master_drawing_id) != master_drawing_id:
+            if cast(int, region.master_drawing_id) != master_drawing_id:
                 raise ValueError("Region does not belong to this review's master drawing")
 
         now = datetime.now(timezone.utc)

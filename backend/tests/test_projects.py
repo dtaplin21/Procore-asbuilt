@@ -4,7 +4,6 @@ from typing import cast
 from datetime import datetime, timezone
 
 import fitz
-import pytest
 from fastapi.testclient import TestClient
 
 """Basic API tests for project-related endpoints.
@@ -14,11 +13,8 @@ most reliable way in a pytest environment is to import via the package
 namespace rather than relying on the current working directory.
 """
 
-from api.upload_intent_form import (
-    drawing_has_sub_upload_intent,
-    parse_upload_intent_form_fields,
-)
 from models.models import Drawing, Project
+from services.drawing_compare_jobs import _drawing_has_sub_upload_intent
 from services.storage import StorageService, get_project_master_drawing
 
 
@@ -50,7 +46,6 @@ def test_dashboard_summary_includes_master_drawing_id(
         name="master.pdf",
         storage_key=f"drawings/test/{pid}/master.pdf",
         content_type="application/pdf",
-        upload_intent="master",
     )
     response = client.get(f"/api/projects/{pid}/dashboard/summary")
     assert response.status_code == 200
@@ -61,19 +56,17 @@ def test_dashboard_summary_includes_master_drawing_id(
     assert data["masterDrawing"]["name"] == "master.pdf"
 
 
-def test_storage_create_drawing_persists_upload_intent_sub(
+def test_create_drawing_always_sets_upload_intent_master(
     db_session, project: Project
 ) -> None:
-    """Explicit sub intent is stored on the drawing row (nullable for legacy)."""
     storage = StorageService(db_session)
     pid = cast(int, project.id)
     drawing = storage.create_drawing(
         pid,
         source="upload",
-        name="sub.pdf",
-        storage_key=f"drawings/test/{pid}/sub.pdf",
+        name="sheet.pdf",
+        storage_key=f"drawings/test/{pid}/sheet.pdf",
         content_type="application/pdf",
-        upload_intent="sub",
     )
     row = (
         db_session.query(Drawing)
@@ -81,8 +74,9 @@ def test_storage_create_drawing_persists_upload_intent_sub(
         .first()
     )
     assert row is not None
-    assert row.upload_intent == "sub"
-    assert drawing_has_sub_upload_intent(row) is True
+    assert cast(str | None, row.upload_intent) == "master"
+    db_session.refresh(project)
+    assert cast(int | None, project.master_drawing_id) == cast(int, drawing.id)
 
 
 def test_drawing_has_sub_upload_intent_only_matches_literal_sub(project: Project) -> None:
@@ -102,26 +96,14 @@ def test_drawing_has_sub_upload_intent_only_matches_literal_sub(project: Project
         content_type="application/pdf",
         upload_intent="master",
     )
-    assert drawing_has_sub_upload_intent(d_none) is False
-    assert drawing_has_sub_upload_intent(d_master) is False
+    assert _drawing_has_sub_upload_intent(d_none) is False
+    assert _drawing_has_sub_upload_intent(d_master) is False
 
 
-def test_parse_upload_intent_form_fields_literal_union() -> None:
-    assert parse_upload_intent_form_fields("master", None) == "master"
-    assert parse_upload_intent_form_fields(None, "sub") == "sub"
-    assert parse_upload_intent_form_fields(None, None) is None
-    assert parse_upload_intent_form_fields("", "") is None
-
-
-def test_parse_upload_intent_form_fields_rejects_unknown() -> None:
-    with pytest.raises(ValueError, match="master, sub"):
-        parse_upload_intent_form_fields("primary", None)
-
-
-def test_projects_router_upload_persists_upload_intent_sub(
-    client: TestClient, project: Project
+def test_projects_router_upload_always_sets_master(
+    client: TestClient, db_session, project: Project
 ) -> None:
-    """POST /api/projects/{id}/drawings with upload_intent=sub persists sub."""
+    """POST /api/projects/{id}/drawings always creates a master drawing (upload_intent ignored)."""
     pid = cast(int, project.id)
     pdf = _minimal_pdf_bytes()
     files = {"file": ("sub_sheet.pdf", io.BytesIO(pdf), "application/pdf")}
@@ -129,7 +111,9 @@ def test_projects_router_upload_persists_upload_intent_sub(
     response = client.post(f"/api/projects/{pid}/drawings", files=files, data=data)
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body.get("upload_intent") == "sub"
+    assert body.get("upload_intent") == "master"
+    db_session.refresh(project)
+    assert cast(int | None, project.master_drawing_id) == body["id"]
 
 
 def test_get_project_master_drawing_prefers_project_master_drawing_id(
@@ -144,10 +128,9 @@ def test_get_project_master_drawing_prefers_project_master_drawing_id(
         name="master.pdf",
         storage_key=f"drawings/test/{pid}/m1.pdf",
         content_type="application/pdf",
-        upload_intent="master",
     )
     db_session.refresh(project)
-    assert project.master_drawing_id == master.id
+    assert cast(int | None, project.master_drawing_id) == cast(int, master.id)
 
     got = storage.get_project_master_drawing(pid)
     assert got is not None and cast(int, got.id) == cast(int, master.id)
@@ -164,10 +147,10 @@ def test_get_project_master_drawing_fallback_newest_upload_intent_master(
     older = Drawing(
         project_id=pid,
         source="upload",
-        name="old-master.pdf",
+        name="old-sheet.pdf",
         storage_key=f"drawings/test/{pid}/old.pdf",
         content_type="application/pdf",
-        upload_intent="master",
+        upload_intent=None,
         processing_status="pending",
         updated_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
     )
