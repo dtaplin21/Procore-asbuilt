@@ -5,8 +5,6 @@ import { useLocation, useParams, Link } from "wouter";
 import type { DrawingResponse } from "@shared/schema";
 
 import AlignmentsPanel from "@/components/drawing-workspace/alignments_panel";
-import CompareSubDrawingButton from "@/components/drawing-workspace/compare_sub_drawing_button";
-import CompareSubDrawingModal from "@/components/drawing-workspace/compare_sub_drawing_modal";
 import DiffTimelinePanel from "@/components/drawing-workspace/diff_timeline_panel";
 import { UploadDrawingModal } from "@/components/drawing-workspace/UploadDrawingModal";
 import { DeleteDrawingDialog } from "@/components/drawings/DeleteDrawingDialog";
@@ -43,12 +41,9 @@ export function DrawingWorkspaceBody({
   parsedDrawingId,
 }: DrawingWorkspaceBodyProps) {
   const [location, setLocation] = useLocation();
-  const [compareModalOpen, setCompareModalOpen] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedSubDrawingId, setSelectedSubDrawingId] = useState<number | null>(null);
   const [compareLoading, setCompareLoading] = useState(false);
-  const [compareError, setCompareError] = useState<string | null>(null);
 
   const projectId = parsedProjectId;
   /** Workspace “master” side of compare — always from route `drawingId`, not from dashboard summary. */
@@ -60,10 +55,6 @@ export function DrawingWorkspaceBody({
     setWorkspaceReturnPath(path);
     setLastProjectIdForWorkspaceFallback(parsedProjectId);
   }, [location, parsedProjectId, parsedDrawingId]);
-
-  useEffect(() => {
-    setSelectedSubDrawingId(null);
-  }, [parsedProjectId, parsedDrawingId]);
 
   const {
     alignmentIdFromUrl,
@@ -86,10 +77,6 @@ export function DrawingWorkspaceBody({
 
   const currentDrawingName =
     summaryQuery.data?.current_drawing?.name ?? null;
-
-  const openCompareModal = () => {
-    setCompareModalOpen(true);
-  };
 
   const {
     masterDrawing,
@@ -140,7 +127,6 @@ export function DrawingWorkspaceBody({
       });
       const requestId = beginCompareOperation();
       setCompareLoading(true);
-      setCompareError(null);
       try {
         const response = await compareSubDrawingToMaster({
           projectId,
@@ -152,7 +138,6 @@ export function DrawingWorkspaceBody({
           alignmentId: response.alignment?.id,
         });
         await mergeCompareResponse(response, requestId);
-        setSelectedSubDrawingId(subDrawingId);
         console.log("[compare-debug] runCompareSubToMaster complete", { subDrawingId });
         return { ok: true };
       } catch (error) {
@@ -162,7 +147,6 @@ export function DrawingWorkspaceBody({
           message,
           error,
         });
-        setCompareError(message);
         return { ok: false, message };
       } finally {
         setCompareLoading(false);
@@ -174,25 +158,6 @@ export function DrawingWorkspaceBody({
       mergeCompareResponse,
       projectId,
     ]
-  );
-
-  const handleConfirmCompare = useCallback(
-    async (subDrawingId: number) => {
-      console.log("[compare-debug] handleConfirmCompare (modal Compare clicked)", {
-        subDrawingId,
-      });
-      const result = await runCompareSubToMaster(subDrawingId);
-      if (result.ok) {
-        console.log("[compare-debug] handleConfirmCompare closing modal");
-        setCompareModalOpen(false);
-        return;
-      }
-      console.warn(
-        "[compare-debug] handleConfirmCompare compare failed (see runCompareSubToMaster logs)",
-        result.message
-      );
-    },
-    [runCompareSubToMaster]
   );
 
   const handleUploadSuccess = useCallback(
@@ -227,21 +192,6 @@ export function DrawingWorkspaceBody({
     </div>
   );
 
-  const compareModal = (
-    <CompareSubDrawingModal
-      open={compareModalOpen}
-      onOpenChange={setCompareModalOpen}
-      projectId={projectId}
-      masterDrawingId={masterDrawingId}
-      currentDrawingName={currentDrawingName}
-      selectedDrawingId={selectedSubDrawingId}
-      onSelectSubDrawing={(drawingId) => setSelectedSubDrawingId(drawingId)}
-      compareLoading={compareLoading}
-      compareError={compareError}
-      onConfirmCompare={handleConfirmCompare}
-    />
-  );
-
   const uploadModal = (
     <UploadDrawingModal
       open={uploadModalOpen}
@@ -258,7 +208,6 @@ export function DrawingWorkspaceBody({
     compareBusy: boolean
   ) => (
     <div className="space-y-2">
-      <CompareSubDrawingButton onClick={openCompareModal} disabled={uploadDisabled} />
       <button
         type="button"
         className="inline-flex w-full items-center justify-center rounded-md border border-primary bg-background px-3 py-2 text-sm font-medium text-primary shadow-sm hover:bg-primary-soft disabled:opacity-60"
@@ -314,7 +263,6 @@ export function DrawingWorkspaceBody({
           sidebar={sidebarUploadControls(true, false)}
         />
 
-        {compareModal}
         {uploadModal}
         {deleteDrawingDialog}
       </>
@@ -335,7 +283,6 @@ export function DrawingWorkspaceBody({
           sidebar={sidebarUploadControls(false, false)}
         />
 
-        {compareModal}
         {uploadModal}
         {deleteDrawingDialog}
       </>
@@ -382,7 +329,6 @@ export function DrawingWorkspaceBody({
         }
       />
 
-      {compareModal}
       {uploadModal}
       {deleteDrawingDialog}
     </>
