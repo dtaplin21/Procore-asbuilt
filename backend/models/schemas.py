@@ -1034,7 +1034,10 @@ class InspectionReviewSubmit(BaseModel):
 
 class DrawingInspectionReviewResponse(BaseModel):
     id: int
-    alignment_id: int = Field(serialization_alias="alignmentId")
+    alignment_id: Optional[int] = Field(default=None, serialization_alias="alignmentId")
+    inspection_run_id: Optional[int] = Field(
+        default=None, serialization_alias="inspectionRunId"
+    )
     region_id: Optional[int] = Field(default=None, serialization_alias="regionId")
     status: str
     reviewer_user_id: Optional[int] = Field(default=None, serialization_alias="reviewerUserId")

@@ -4,6 +4,7 @@ import { Trash2 } from "lucide-react";
 import { useLocation, useParams, Link } from "wouter";
 import type { DrawingResponse } from "@shared/schema";
 
+import InspectionRunsPanel from "@/components/drawing-workspace/inspection_runs_panel";
 import { UploadDrawingModal } from "@/components/drawing-workspace/UploadDrawingModal";
 import { DeleteDrawingDialog } from "@/components/drawings/DeleteDrawingDialog";
 import DrawingComparisonWorkspace from "@/components/drawings/DrawingComparisonWorkspace";
@@ -32,6 +33,9 @@ export function DrawingWorkspaceBody({
   const [location, setLocation] = useLocation();
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedInspectionRunId, setSelectedInspectionRunId] = useState<number | null>(
+    null
+  );
 
   const projectId = parsedProjectId;
   /** Route master drawing id — workspace sheet for this URL. */
@@ -138,6 +142,18 @@ export function DrawingWorkspaceBody({
     </div>
   );
 
+  const sidebarContent = (uploadDisabled: boolean) => (
+    <>
+      {sidebarUploadControls(uploadDisabled)}
+      <InspectionRunsPanel
+        projectId={projectId}
+        masterDrawingId={masterDrawingId}
+        selectedRunId={selectedInspectionRunId}
+        onSelectRun={setSelectedInspectionRunId}
+      />
+    </>
+  );
+
   const deleteDrawingDialog = (
     <DeleteDrawingDialog
       projectId={projectId}
@@ -161,7 +177,7 @@ export function DrawingWorkspaceBody({
         <DrawingWorkspaceLayout
           header={header}
           viewer={<WorkspaceLoadingState />}
-          sidebar={sidebarUploadControls(true)}
+          sidebar={sidebarContent(true)}
         />
 
         {uploadModal}
@@ -181,7 +197,7 @@ export function DrawingWorkspaceBody({
               onRetry={() => void reloadWorkspace()}
             />
           }
-          sidebar={sidebarUploadControls(false)}
+          sidebar={sidebarContent(false)}
         />
 
         {uploadModal}
@@ -200,7 +216,7 @@ export function DrawingWorkspaceBody({
             masterDrawing={masterDrawing}
           />
         }
-        sidebar={sidebarUploadControls(false)}
+        sidebar={sidebarContent(false)}
       />
 
       {uploadModal}

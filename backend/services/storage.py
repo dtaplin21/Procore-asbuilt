@@ -951,22 +951,35 @@ class StorageService:
         self,
         *,
         project_id: int,
-        alignment_id: int,
         outcome: Literal["passed", "failed"],
+        alignment_id: Optional[int] = None,
+        inspection_run_id: Optional[int] = None,
         region_id: Optional[int] = None,
         notes: Optional[str] = None,
         reviewer_user_id: Optional[int] = None,
     ) -> DrawingInspectionReview:
-        alignment = (
-            self.db.query(DrawingAlignment)
-            .filter(
-                DrawingAlignment.id == alignment_id,
-                DrawingAlignment.project_id == project_id,
+        if (alignment_id is None) == (inspection_run_id is None):
+            raise ValueError("Exactly one of alignment_id or inspection_run_id is required")
+
+        master_drawing_id: int
+        if alignment_id is not None:
+            alignment = (
+                self.db.query(DrawingAlignment)
+                .filter(
+                    DrawingAlignment.id == alignment_id,
+                    DrawingAlignment.project_id == project_id,
+                )
+                .first()
             )
-            .first()
-        )
-        if alignment is None:
-            raise ValueError("Alignment not found for this project")
+            if alignment is None:
+                raise ValueError("Alignment not found for this project")
+            master_drawing_id = int(alignment.master_drawing_id)
+        else:
+            assert inspection_run_id is not None
+            run = self.get_inspection_run(project_id, inspection_run_id)
+            if run is None:
+                raise ValueError("Inspection run not found for this project")
+            master_drawing_id = int(run.master_drawing_id)
 
         if region_id is not None:
             region = (
@@ -976,8 +989,8 @@ class StorageService:
             )
             if region is None:
                 raise ValueError("Drawing region not found")
-            if int(region.master_drawing_id) != int(alignment.master_drawing_id):
-                raise ValueError("Region does not belong to this alignment's master drawing")
+            if int(region.master_drawing_id) != master_drawing_id:
+                raise ValueError("Region does not belong to this review's master drawing")
 
         now = datetime.now(timezone.utc)
         status = "passed" if outcome == "passed" else "failed"
@@ -985,6 +998,7 @@ class StorageService:
 
         row = DrawingInspectionReview(
             alignment_id=alignment_id,
+            inspection_run_id=inspection_run_id,
             region_id=region_id,
             status=status,
             reviewer_user_id=reviewer_user_id,
@@ -1004,17 +1018,37 @@ class StorageService:
         self,
         *,
         project_id: int,
-        alignment_id: int,
+        alignment_id: Optional[int] = None,
+        inspection_run_id: Optional[int] = None,
     ) -> List[DrawingInspectionReview]:
+        if (alignment_id is None) == (inspection_run_id is None):
+            raise ValueError("Exactly one of alignment_id or inspection_run_id is required")
+
+        if alignment_id is not None:
+            return (
+                self.db.query(DrawingInspectionReview)
+                .join(
+                    DrawingAlignment,
+                    DrawingInspectionReview.alignment_id == DrawingAlignment.id,
+                )
+                .filter(
+                    DrawingAlignment.id == alignment_id,
+                    DrawingAlignment.project_id == project_id,
+                )
+                .order_by(DrawingInspectionReview.id.desc())
+                .all()
+            )
+
+        assert inspection_run_id is not None
         return (
             self.db.query(DrawingInspectionReview)
             .join(
-                DrawingAlignment,
-                DrawingInspectionReview.alignment_id == DrawingAlignment.id,
+                InspectionRun,
+                DrawingInspectionReview.inspection_run_id == InspectionRun.id,
             )
             .filter(
-                DrawingAlignment.id == alignment_id,
-                DrawingAlignment.project_id == project_id,
+                InspectionRun.id == inspection_run_id,
+                InspectionRun.project_id == project_id,
             )
             .order_by(DrawingInspectionReview.id.desc())
             .all()

@@ -46,7 +46,7 @@ tags_metadata = [
     {"name": "findings", "description": "Project findings with serialized API rows."},
     {"name": "insights", "description": "AI findings and insights."},
     {"name": "evidence", "description": "Document evidence (specs, inspection docs)."},
-    {"name": "inspection-reviews", "description": "Human pass/fail reviews for drawing alignments and regions."},
+    {"name": "inspection-reviews", "description": "Human pass/fail reviews scoped to alignments or inspection runs (optional region)."},
     {"name": "drawing-progress", "description": "Per-master drawing comparison coverage and severity counts."},
 ]
 

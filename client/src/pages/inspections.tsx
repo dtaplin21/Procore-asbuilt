@@ -1,24 +1,14 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { 
-  ClipboardCheck, 
-  Search, 
-  Filter, 
-  Plus, 
-  Clock,
-  User,
-  MapPin,
-  CheckCircle,
-  XCircle,
-  Camera,
-  AlertTriangle,
-  CalendarDays
-} from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Link, useLocation } from "wouter";
+import { useQuery, type Query } from "@tanstack/react-query";
+import { ClipboardCheck, Filter, Loader2, Search } from "lucide-react";
+
+import InspectionRunRow from "@/components/drawing-workspace/inspection_run_row";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -26,355 +16,263 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useInspectionRuns } from "@/hooks/use-inspection-runs";
+import { buildDrawingPickerUrl, buildWorkspaceUrl } from "@/lib/workspace-links";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { StatusBadge } from "@/components/status-badge";
-import type { Inspection } from "@shared/schema";
+  setLastProjectIdForWorkspaceFallback,
+  setWorkspaceReturnPath,
+} from "@/lib/workspace-return-path";
+import type { InspectionRunListResponse, ProjectListResponse } from "@shared/schema";
+
+const ACTIVE_RUN_STATUSES = new Set(["queued", "processing"]);
+
+function pollWhileRunsActive(
+  query: Query<InspectionRunListResponse, Error>
+): number | false {
+  const items = query.state.data?.items ?? [];
+  return items.some((run) => ACTIVE_RUN_STATUSES.has(run.status.toLowerCase()))
+    ? 3000
+    : false;
+}
 
 export default function Inspections() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [, setLocation] = useLocation();
+
+  const projectIdFromUrlRaw = searchParams.get("projectId");
+  const projectIdFromUrl =
+    projectIdFromUrlRaw !== null && Number.isFinite(Number(projectIdFromUrlRaw))
+      ? Number(projectIdFromUrlRaw)
+      : null;
+
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedInspection, setSelectedInspection] = useState<Inspection | null>(null);
 
-  const { data: inspections, isLoading } = useQuery<Inspection[]>({
-    queryKey: ["/api/inspections"],
+  useEffect(() => {
+    if (projectIdFromUrl !== null) {
+      setSelectedProjectId(projectIdFromUrl);
+    }
+  }, [projectIdFromUrl]);
+
+  const { data: projectsData, isLoading: projectsLoading } = useQuery<ProjectListResponse>({
+    queryKey: ["/api/projects"],
   });
 
-  const filteredInspections = inspections?.filter((inspection) => {
-    const matchesSearch = 
-      inspection.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inspection.number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inspection.location.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === "all" || inspection.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
+  const projects = projectsData?.items ?? [];
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
+  useEffect(() => {
+    if (projectIdFromUrl !== null) return;
+    if (projectsLoading) return;
+    if (projects.length !== 1) return;
+    if (selectedProjectId !== null) return;
+    const id = projects[0].id;
+    setSelectedProjectId(id);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("projectId", String(id));
+      return next;
     });
+  }, [projectIdFromUrl, projectsLoading, projects, selectedProjectId, setSearchParams]);
+
+  function handleProjectChange(nextProjectId: number | null) {
+    setSelectedProjectId(nextProjectId);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (nextProjectId === null) next.delete("projectId");
+      else next.set("projectId", String(nextProjectId));
+      return next;
+    });
+  }
+
+  const statusParam =
+    statusFilter === "all" ? null : statusFilter;
+
+  const {
+    data: runsData,
+    isLoading: runsLoading,
+    isError: runsError,
+  } = useInspectionRuns(
+    selectedProjectId,
+    { status: statusParam },
+    { refetchInterval: pollWhileRunsActive }
+  );
+
+  const runs = runsData?.items ?? [];
+
+  const filteredRuns = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return runs;
+    return runs.filter((run) => {
+      const haystack = [
+        String(run.id),
+        run.inspection_type ?? "",
+        run.status,
+        run.evidence_id != null ? String(run.evidence_id) : "",
+        run.master_drawing_id != null ? String(run.master_drawing_id) : "",
+        run.error_message ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [runs, searchQuery]);
+
+  const openRunInWorkspace = (runId: number) => {
+    if (selectedProjectId == null) return;
+    const run = runs.find((item) => item.id === runId);
+    if (!run) return;
+    const path = buildWorkspaceUrl({
+      projectId: selectedProjectId,
+      masterDrawingId: run.master_drawing_id,
+    });
+    setWorkspaceReturnPath(path);
+    setLastProjectIdForWorkspaceFallback(selectedProjectId);
+    setLocation(path);
   };
 
-  const getChecklistProgress = (checklist: Inspection["checklist"]) => {
-    const total = checklist.length;
-    const completed = checklist.filter(item => item.passed !== null).length;
-    const passed = checklist.filter(item => item.passed === true).length;
-    return { total, completed, passed, percentage: total > 0 ? Math.round((completed / total) * 100) : 0 };
-  };
+  const newInspectionHref =
+    selectedProjectId != null
+      ? buildDrawingPickerUrl(selectedProjectId)
+      : "/";
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="mx-auto max-w-5xl space-y-6 p-6">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-page-title">
-            <ClipboardCheck className="w-6 h-6 text-muted-foreground" />
+          <h1
+            className="flex items-center gap-2 text-2xl font-bold"
+            data-testid="text-page-title"
+          >
+            <ClipboardCheck className="h-6 w-6 text-muted-foreground" />
             Inspections
           </h1>
-          <p className="text-muted-foreground">Field inspection tracking and AI verification</p>
+          <p className="text-muted-foreground">
+            AI inspection runs from uploaded evidence — open a run in the drawing workspace to
+            review overlays.
+          </p>
         </div>
-        <Button data-testid="button-new-inspection">
-          <Plus className="w-4 h-4 mr-2" />
-          Schedule Inspection
+        <Button asChild disabled={selectedProjectId == null} data-testid="button-new-inspection">
+          <Link href={newInspectionHref}>Open drawing workspace</Link>
         </Button>
       </div>
 
-      {/* Filters */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <CardContent className="grid gap-4 p-4 sm:grid-cols-3">
+          <div className="grid gap-2 sm:col-span-1">
+            <Label htmlFor="inspections-project-select">Project</Label>
+            <Select
+              value={selectedProjectId != null ? String(selectedProjectId) : "none"}
+              onValueChange={(value) => {
+                handleProjectChange(value === "none" ? null : Number(value));
+              }}
+              disabled={projectsLoading}
+            >
+              <SelectTrigger id="inspections-project-select" data-testid="inspections-project-select">
+                <SelectValue placeholder="Select a project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Select a project</SelectItem>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={String(project.id)}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-2 sm:col-span-1">
+            <Label htmlFor="inspections-search">Search</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search by title, number, or location..."
+                id="inspections-search"
+                placeholder="Search runs…"
                 className="pl-9"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                disabled={selectedProjectId == null}
                 data-testid="input-search-inspections"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-48" data-testid="select-status-filter">
-                <Filter className="w-4 h-4 mr-2" />
+          </div>
+
+          <div className="grid gap-2 sm:col-span-1">
+            <Label htmlFor="inspections-status-filter">Status</Label>
+            <Select
+              value={statusFilter}
+              onValueChange={setStatusFilter}
+              disabled={selectedProjectId == null}
+            >
+              <SelectTrigger id="inspections-status-filter" data-testid="select-status-filter">
+                <Filter className="mr-2 h-4 w-4" />
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="scheduled">Scheduled</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="passed">Passed</SelectItem>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="queued">Queued</SelectItem>
+                <SelectItem value="processing">Processing</SelectItem>
+                <SelectItem value="complete">Complete</SelectItem>
                 <SelectItem value="failed">Failed</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Inspections Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <Skeleton className="h-5 w-48 mb-2" />
-                <Skeleton className="h-4 w-32 mb-4" />
-                <Skeleton className="h-2 w-full mb-2" />
-                <Skeleton className="h-4 w-24" />
-              </CardContent>
-            </Card>
+      {selectedProjectId == null ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <ClipboardCheck className="mx-auto mb-4 h-12 w-12 opacity-50" />
+            <p className="text-lg font-medium">Select a project</p>
+            <p className="text-sm">Inspection runs are listed per project.</p>
+          </CardContent>
+        </Card>
+      ) : runsLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-md" />
           ))}
         </div>
-      ) : filteredInspections && filteredInspections.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredInspections.map((inspection) => {
-            const progress = getChecklistProgress(inspection.checklist);
-            
-            return (
-              <Card 
-                key={inspection.id}
-                className={`cursor-pointer hover-elevate active-elevate-2 transition-all ${
-                  inspection.status === "failed" ? "border-foreground/30" : ""
-                }`}
-                onClick={() => setSelectedInspection(inspection)}
-                data-testid={`card-inspection-${inspection.id}`}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div className={`p-2 rounded-lg ${
-                      inspection.status === "passed" ? "bg-primary/10" :
-                      inspection.status === "failed" ? "bg-foreground/10" :
-                      inspection.status === "in_progress" ? "bg-primary/10" :
-                      inspection.status === "scheduled" ? "bg-primary/10" :
-                      "bg-foreground/10"
-                    }`}>
-                      {inspection.status === "passed" ? (
-                        <CheckCircle className="w-5 h-5 text-primary" />
-                      ) : inspection.status === "failed" ? (
-                        <XCircle className="w-5 h-5 text-foreground" />
-                      ) : inspection.status === "in_progress" ? (
-                        <ClipboardCheck className="w-5 h-5 text-primary" />
-                      ) : (
-                        <CalendarDays className="w-5 h-5 text-primary" />
-                      )}
-                    </div>
-                    <StatusBadge status={inspection.status} />
-                  </div>
-                  
-                  <div className="mb-3">
-                    <span className="font-mono text-xs text-muted-foreground">{inspection.number}</span>
-                    <h3 className="font-semibold mt-1">{inspection.title}</h3>
-                    <p className="text-sm text-muted-foreground">{inspection.type}</p>
-                  </div>
-                  
-                  <div className="space-y-2 text-sm text-muted-foreground mb-4">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-3.5 h-3.5" />
-                      <span className="truncate">{inspection.location}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <User className="w-3.5 h-3.5" />
-                      <span>{inspection.inspector}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{formatDate(inspection.scheduledDate)}</span>
-                    </div>
-                  </div>
-                  
-                  {inspection.checklist.length > 0 && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Checklist Progress</span>
-                        <span className="font-medium">{progress.completed}/{progress.total}</span>
-                      </div>
-                      <Progress value={progress.percentage} className="h-1.5" />
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center gap-2 mt-3 pt-3 border-t">
-                    {inspection.photos.length > 0 && (
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Camera className="w-3.5 h-3.5" />
-                        {inspection.photos.length} photos
-                      </span>
-                    )}
-                    {inspection.aiFindings.length > 0 && (
-                      <span className="text-xs text-primary flex items-center gap-1">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        {inspection.aiFindings.length} AI findings
-                      </span>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      ) : (
+      ) : runsError ? (
         <Card>
-          <CardContent className="text-center py-12 text-muted-foreground">
-            <ClipboardCheck className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium">No inspections found</p>
+          <CardContent className="py-8 text-center text-destructive">
+            Could not load inspection runs for this project.
+          </CardContent>
+        </Card>
+      ) : filteredRuns.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <ClipboardCheck className="mx-auto mb-4 h-12 w-12 opacity-50" />
+            <p className="text-lg font-medium">No inspection runs found</p>
             <p className="text-sm">
-              {searchQuery || statusFilter !== "all" 
-                ? "Try adjusting your search or filters" 
-                : "Schedule your first inspection to get started"}
+              {searchQuery || statusFilter !== "all"
+                ? "Try adjusting your search or filters"
+                : "Upload evidence in the drawing workspace to start an inspection run"}
             </p>
           </CardContent>
         </Card>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {filteredRuns.map((run) => (
+            <InspectionRunRow
+              key={run.id}
+              run={run}
+              onSelect={openRunInWorkspace}
+            />
+          ))}
+        </ul>
       )}
 
-      {/* Inspection Detail Dialog */}
-      <Dialog open={!!selectedInspection} onOpenChange={() => setSelectedInspection(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          {selectedInspection && (
-            <>
-              <DialogHeader>
-                <div className="flex items-start gap-3 mb-2">
-                  <span className="font-mono text-sm text-muted-foreground">{selectedInspection.number}</span>
-                  <StatusBadge status={selectedInspection.status} />
-                </div>
-                <DialogTitle className="text-xl">{selectedInspection.title}</DialogTitle>
-                <DialogDescription>{selectedInspection.type}</DialogDescription>
-              </DialogHeader>
-              
-              <div className="space-y-4 mt-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Location</h4>
-                    <p className="text-sm flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
-                      {selectedInspection.location}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Inspector</h4>
-                    <p className="text-sm flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      {selectedInspection.inspector}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Scheduled</h4>
-                    <p className="text-sm flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      {formatDate(selectedInspection.scheduledDate)}
-                    </p>
-                  </div>
-                  {selectedInspection.completedDate && (
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground mb-1">Completed</h4>
-                      <p className="text-sm flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4" />
-                        {formatDate(selectedInspection.completedDate)}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                
-                {selectedInspection.checklist.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Checklist</h4>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {selectedInspection.checklist.map((item) => (
-                        <div 
-                          key={item.id}
-                          className={`flex items-start gap-3 p-2 rounded-lg ${
-                            item.passed === true ? "bg-primary/5" :
-                            item.passed === false ? "bg-foreground/5" :
-                            "bg-muted/30"
-                          }`}
-                        >
-                          {item.passed === true ? (
-                            <CheckCircle className="w-4 h-4 text-primary mt-0.5" />
-                          ) : item.passed === false ? (
-                            <XCircle className="w-4 h-4 text-foreground mt-0.5" />
-                          ) : (
-                            <div className="w-4 h-4 rounded-full border-2 border-muted-foreground/30 mt-0.5" />
-                          )}
-                          <div className="flex-1">
-                            <p className="text-sm">{item.item}</p>
-                            {item.notes && (
-                              <p className="text-xs text-muted-foreground mt-1">{item.notes}</p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {selectedInspection.aiFindings.length > 0 && (
-                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                    <h4 className="text-sm font-medium flex items-center gap-2 mb-2 text-primary">
-                      <AlertTriangle className="w-4 h-4" />
-                      AI Findings
-                    </h4>
-                    <ul className="space-y-1">
-                      {selectedInspection.aiFindings.map((finding, i) => (
-                        <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                          <span className="text-primary">•</span>
-                          {finding}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                
-                {selectedInspection.notes && (
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Notes</h4>
-                    <p className="text-sm bg-muted/50 p-3 rounded-lg">{selectedInspection.notes}</p>
-                  </div>
-                )}
-                
-                {selectedInspection.photos.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                      <Camera className="w-4 h-4" />
-                      Photos ({selectedInspection.photos.length})
-                    </h4>
-                    <div className="grid grid-cols-4 gap-2">
-                      {selectedInspection.photos.slice(0, 4).map((photo, i) => (
-                        <div key={i} className="aspect-square rounded-lg bg-muted flex items-center justify-center">
-                          <Camera className="w-6 h-6 text-muted-foreground" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                <div className="flex items-center justify-end gap-2 pt-4 border-t">
-                  <Button variant="outline" onClick={() => setSelectedInspection(null)}>
-                    Close
-                  </Button>
-                  {selectedInspection.status === "scheduled" && (
-                    <Button data-testid="button-start-inspection">
-                      Start Inspection
-                    </Button>
-                  )}
-                  {selectedInspection.status === "in_progress" && (
-                    <Button data-testid="button-complete-inspection">
-                      Complete Inspection
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      {selectedProjectId != null &&
+      runs.some((run) => ACTIVE_RUN_STATUSES.has(run.status.toLowerCase())) ? (
+        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Refreshing while runs are queued or processing…
+        </p>
+      ) : null}
     </div>
   );
 }

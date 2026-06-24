@@ -491,7 +491,11 @@ class DrawingAlignment(Base):
 
 
 class DrawingInspectionReview(Base):
-    """Review outcome for a drawing alignment; optional scope to a ``DrawingRegion``.
+    """Human review outcome scoped to an alignment **or** an inspection run.
+
+    Exactly one of ``alignment_id`` or ``inspection_run_id`` must be set (legacy compare
+    vs inspection overlay workflow). Optional ``region_id`` narrows to a drawing region
+    on the scoped master sheet.
 
     ``status``: ``pending`` | ``passed`` | ``failed`` | ``passed_auto`` | ``passed_human``.
     """
@@ -502,13 +506,23 @@ class DrawingInspectionReview(Base):
             "status IN ('pending','passed','failed','passed_auto','passed_human')",
             name="ck_drawing_inspection_reviews_status",
         ),
+        CheckConstraint(
+            "(alignment_id is not null)::int + (inspection_run_id is not null)::int = 1",
+            name="ck_drawing_inspection_reviews_scope",
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True)
     alignment_id = Column(
         Integer,
         ForeignKey("drawing_alignments.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    inspection_run_id = Column(
+        Integer,
+        ForeignKey("inspection_runs.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
     region_id = Column(
@@ -528,6 +542,7 @@ class DrawingInspectionReview(Base):
     passed_at = Column(DateTime, nullable=True)
 
     alignment = relationship("DrawingAlignment", back_populates="inspection_reviews")
+    inspection_run = relationship("InspectionRun", back_populates="inspection_reviews")
     region = relationship("DrawingRegion", back_populates="inspection_reviews")
 
 
@@ -624,6 +639,11 @@ class InspectionRun(Base):
     evidence = relationship("EvidenceRecord", back_populates="inspection_runs")
     results = relationship("InspectionResult", back_populates="inspection_run", cascade="all, delete-orphan")
     overlays = relationship("DrawingOverlay", back_populates="inspection_run", passive_deletes=True)
+    inspection_reviews = relationship(
+        "DrawingInspectionReview",
+        back_populates="inspection_run",
+        cascade="all, delete-orphan",
+    )
 
 
 class InspectionResult(Base):

@@ -494,6 +494,29 @@ export interface RunInspectionRequest {
   inspection_type?: string | null;
 }
 
+/** Human pass/fail review — scoped to alignment (legacy) or inspection run. */
+export interface DrawingInspectionReview {
+  id: number;
+  alignment_id: number | null;
+  inspection_run_id: number | null;
+  region_id: number | null;
+  status: string;
+  reviewer_user_id: number | null;
+  notes: string | null;
+  passed_at: string | null;
+}
+
+export interface InspectionReviewSubmit {
+  outcome: "passed" | "failed";
+  region_id?: number | null;
+  notes?: string | null;
+  reviewer_user_id?: number | null;
+}
+
+export interface DrawingInspectionReviewListResponse {
+  items: DrawingInspectionReview[];
+}
+
 // Drawing overlays (inspection or diff geometry on master drawing)
 export interface DrawingOverlay {
   id: number;

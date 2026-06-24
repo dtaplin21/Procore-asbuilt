@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type Query } from "@tanstack/react-query";
 import type {
   InspectionRun,
   InspectionRunListResponse,
@@ -15,7 +15,15 @@ import { resolveFetchUrl } from "@/lib/api/http";
  */
 export function useInspectionRuns(
   projectId: number | null,
-  filters?: { masterDrawingId?: number | null; status?: string | null }
+  filters?: { masterDrawingId?: number | null; status?: string | null },
+  options?: {
+    refetchInterval?:
+      | number
+      | false
+      | ((
+          query: Query<InspectionRunListResponse, Error>
+        ) => number | false | undefined);
+  }
 ) {
   const params = new URLSearchParams();
   if (filters?.masterDrawingId != null) {
@@ -33,6 +41,7 @@ export function useInspectionRuns(
   return useQuery<InspectionRunListResponse>({
     queryKey: [url],
     enabled: !!projectId && !!url,
+    refetchInterval: options?.refetchInterval,
   });
 }
 

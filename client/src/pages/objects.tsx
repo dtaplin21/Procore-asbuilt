@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { 
@@ -43,9 +43,10 @@ import type {
   ProjectListResponse,
 } from "@shared/schema";
 import type { ProjectDrawingsResponse, ProjectDrawingCandidate } from "@/types/drawing_workspace";
-import { useDrawingDiffs } from "@/hooks/use-drawing-diffs";
+import { useDrawingOverlays } from "@/hooks/use-inspection-runs";
 import { fetchProjectDrawings, projectDrawingsQueryKey } from "@/lib/api/drawings";
 import { fetchMasterDrawing } from "@/lib/api/drawing_workspace";
+import { toOverlayRegions } from "@/lib/drawing-overlays/inspection_overlay";
 import {
   setLastProjectIdForWorkspaceFallback,
   setWorkspaceReturnPath,
@@ -205,11 +206,15 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     queryKey: ["/api/objects"],
   });
 
-  const { data: diffsData } = useDrawingDiffs(
-    selectedProjectId,
-    selectedMasterDrawingId,
-    null
+  const overlayProjectId =
+    selectedProjectId != null ? String(selectedProjectId) : null;
+  const overlayDrawingId =
+    selectedMasterDrawingId != null ? String(selectedMasterDrawingId) : null;
+  const { data: overlays = [] } = useDrawingOverlays(
+    overlayProjectId,
+    overlayDrawingId
   );
+  const overlayRegions = useMemo(() => toOverlayRegions(overlays), [overlays]);
 
   useEffect(() => {
     if (selectedProjectId === null || !drawingsQuery.isSuccess) {
@@ -297,14 +302,14 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     setLastProjectIdForWorkspaceFallback(selectedProjectId);
   }, [selectedProjectId, selectedMasterDrawingId]);
 
-  const diffs = diffsData?.items ?? [];
-
   const SEVERITY_RANK = { low: 1, medium: 2, high: 3, critical: 4 } as const;
   const MISMATCH_THRESHOLD = "high" as const;
   const thresholdRank = SEVERITY_RANK[MISMATCH_THRESHOLD];
-  const mismatchCount = diffs.filter(
-    (d) => (SEVERITY_RANK[d.severity as keyof typeof SEVERITY_RANK] ?? 0) >= thresholdRank
-  ).length;
+  const mismatchCount = overlayRegions.filter((region) => {
+    const rank =
+      SEVERITY_RANK[region.severity as keyof typeof SEVERITY_RANK] ?? 0;
+    return rank >= thresholdRank || region.reviewBadge === "failed";
+  }).length;
   const showMismatchBanner = mismatchCount > 0;
 
   const filteredObjects = objects?.filter((obj) => {
@@ -336,7 +341,9 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
           <AlertTitle>Drawing Mismatches Detected</AlertTitle>
           <AlertDescription>
             <span>
-              {mismatchCount} diff{mismatchCount > 1 ? "s" : ""} with severity {MISMATCH_THRESHOLD} or higher.
+              {mismatchCount} inspection overlay
+              {mismatchCount > 1 ? " regions" : " region"} with severity{" "}
+              {MISMATCH_THRESHOLD} or higher (or failed status).
               {" "}
               <Link
                 href="/insights"
@@ -526,40 +533,10 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
                 </p>
               </div>
             ) : (
-              <div className="relative">
-                <DrawingViewer
-                  projectId={selectedProjectId ? Number(selectedProjectId) : null}
-                  drawing={masterWorkspaceQuery.data ?? null}
-                />
-                {objects && objects.length > 0 && (
-                  <div className="pointer-events-none absolute inset-0 z-[4] p-4">
-                    {objects.slice(0, 5).map((obj, i) => (
-                      <Tooltip key={obj.id}>
-                        <TooltipTrigger asChild>
-                          <div
-                            className={`pointer-events-auto absolute flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 transition-transform hover:scale-110 ${
-                              statusConfig[obj.status]?.color || "bg-foreground/30"
-                            } bg-opacity-50`}
-                            style={{
-                              left: `${15 + i * 18}%`,
-                              top: `${20 + i * 12}%`,
-                            }}
-                          >
-                            <span className="text-xs font-bold text-white">{i + 1}</span>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="font-mono text-xs">{obj.objectId}</p>
-                          <p className="text-xs capitalize">{obj.objectType}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {statusConfig[obj.status]?.label}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <DrawingViewer
+                projectId={selectedProjectId}
+                drawing={masterWorkspaceQuery.data ?? null}
+              />
             )}
           </div>
         </CardContent>
