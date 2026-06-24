@@ -10,11 +10,7 @@ import {
 export type UseUploadProjectDrawingResult = {
   uploading: boolean;
   uploadError: string | null;
-  uploadDrawing: (
-    projectId: number,
-    file: File,
-    uploadIntent?: "master" | "sub"
-  ) => Promise<DrawingResponse>;
+  uploadDrawing: (projectId: number, file: File) => Promise<DrawingResponse>;
   /** Clears `uploadError` and `uploading`. Avoid calling mid-flight unless you intend to cancel UI state (see reset race note in hook). */
   reset: () => void;
 };
@@ -30,11 +26,7 @@ export function useUploadProjectDrawing(): UseUploadProjectDrawingResult {
   }, []);
 
   const uploadDrawing = useCallback(
-    async (
-      projectId: number,
-      file: File,
-      uploadIntent?: "master" | "sub"
-    ): Promise<DrawingResponse> => {
+    async (projectId: number, file: File): Promise<DrawingResponse> => {
       if (!(file instanceof File)) {
         const msg = "No file selected for upload";
         setUploadError(msg);
@@ -44,11 +36,7 @@ export function useUploadProjectDrawing(): UseUploadProjectDrawingResult {
       setUploadError(null);
 
       try {
-        const drawing = await uploadProjectDrawing(
-          projectId,
-          file,
-          uploadIntent
-        );
+        const drawing = await uploadProjectDrawing(projectId, file);
         await queryClient.invalidateQueries({
           queryKey: projectDrawingsQueryKey(projectId),
         });

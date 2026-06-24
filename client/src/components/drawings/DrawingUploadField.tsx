@@ -13,13 +13,11 @@ export type DrawingUploadFieldProps = {
   fileInputTestId?: string;
   /** Helper text under the button. */
   description?: string;
-  /** When set, sent as multipart `upload_intent` on the upload request. */
-  uploadIntent?: "master" | "sub";
 };
 
 /**
  * File picker + upload using {@link useUploadProjectDrawing}.
- * Use inside modals (compare sub drawing) or any screen that POSTs to `/api/projects/.../drawings`.
+ * POSTs to `/api/projects/.../drawings` as a master sheet upload.
  */
 export default function DrawingUploadField({
   projectId,
@@ -28,8 +26,7 @@ export default function DrawingUploadField({
   onUploadingChange,
   disabled = false,
   fileInputTestId = "drawing-upload-file-input",
-  description = "PDF or image. The file is added to this project.",
-  uploadIntent,
+  description = "PDF or image. The file is added to this project as a master sheet.",
 }: DrawingUploadFieldProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevProjectIdRef = useRef<number | null>(null);
@@ -75,7 +72,7 @@ export default function DrawingUploadField({
     reset();
     void (async () => {
       try {
-        const drawing = await uploadDrawing(projectId, file, uploadIntent);
+        const drawing = await uploadDrawing(projectId, file);
         await Promise.resolve(onUploaded(drawing));
         reset();
         clearFileInput();

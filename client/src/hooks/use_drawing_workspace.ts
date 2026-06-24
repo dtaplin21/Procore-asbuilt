@@ -11,8 +11,8 @@ import type {
   DrawingAlignmentListItem,
   DrawingComparisonWorkspaceResponse,
   DrawingDiff,
-  DrawingWorkspaceDrawing,
-} from "@/types/drawing_workspace";
+} from "@/types/drawing_compare";
+import type { DrawingWorkspaceDrawing } from "@/types/drawing_workspace";
 
 type UseDrawingWorkspaceArgs = {
   projectId: number;

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import type { DrawingResponse, InsightListResponse } from "@shared/schema";
-import type { DrawingUploadIntent } from "@/components/drawings/DrawingUploadWithIntent";
 import { useQuery } from "@tanstack/react-query";
 import { 
   AlertTriangle,
@@ -210,10 +209,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
 
   const summary = projectSummary;
 
-  const handleDashboardUploadSuccess = (
-    drawing: DrawingResponse,
-    _intent: DrawingUploadIntent
-  ) => {
+  const handleDashboardUploadSuccess = (drawing: DrawingResponse) => {
     if (!selectedProjectId) return;
     const pid = Number(selectedProjectId);
     if (!Number.isFinite(pid)) return;
@@ -544,8 +540,6 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
           onOpenChange={setUploadModalOpen}
           projectId={Number(selectedProjectId)}
           workspaceMasterDrawingId={readMasterDrawingIdFromSummary(summary) ?? null}
-          allowMaster
-          allowSub={false}
           onUploadSuccess={handleDashboardUploadSuccess}
         />
       ) : null}

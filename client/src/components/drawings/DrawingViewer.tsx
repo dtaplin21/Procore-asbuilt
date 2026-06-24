@@ -31,6 +31,8 @@ function messageForDrawingImageLoadFailure(relativeUrl: string): string {
 type Props = {
   drawing: DrawingWorkspaceDrawing | null;
   projectId?: number | null;
+  /** When set, overlays are limited to this inspection run (sidebar selection). */
+  inspectionRunId?: number | null;
   /** Diff SVG: only unresolved / "changed" regions. */
   overlayShowChangesOnly?: boolean;
   /** Diff SVG: color by passed/failed/changed; when false, use a single highlight tone. */
@@ -40,6 +42,7 @@ type Props = {
 export default function DrawingViewer({
   drawing,
   projectId: projectIdProp,
+  inspectionRunId = null,
   overlayShowChangesOnly = false,
   overlayShowInspectionStatuses = true,
 }: Props) {
@@ -60,7 +63,8 @@ export default function DrawingViewer({
 
   const { data: overlays = [], isLoading: overlaysLoading } = useDrawingOverlays(
     projectIdStr,
-    drawingIdStr
+    drawingIdStr,
+    { inspectionRunId }
   );
   const regions = useMemo(() => toOverlayRegions(overlays), [overlays]);
 

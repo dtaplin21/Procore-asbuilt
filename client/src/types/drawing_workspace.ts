@@ -1,5 +1,3 @@
-import type { DrawingAlignmentPersisted, DrawingTransform } from "@shared/schema";
-
 export type DrawingSummary = {
   id: number;
   projectId: number;
@@ -26,11 +24,6 @@ export type DrawingWorkspaceDrawing = {
   source?: string | null;
 };
 
-export type DrawingBasicSummary = {
-  id: number;
-  name: string;
-};
-
 export type ProjectDrawingCandidate = {
   id: number;
   projectId: number;
@@ -39,27 +32,10 @@ export type ProjectDrawingCandidate = {
   fileUrl?: string | null;
   contentType?: string | null;
   pageCount?: number | null;
-  /** Present when API includes it (camelCase); legacy lists may omit. */
-  uploadIntent?: "master" | "sub" | null;
 };
 
 export type ProjectDrawingsResponse = {
   drawings: ProjectDrawingCandidate[];
-};
-
-/** Workspace alignment row from GET alignments — `id` required (see {@link DrawingAlignmentPersisted}). */
-export type DrawingAlignment = DrawingAlignmentPersisted & {
-  projectId: number;
-  masterDrawingId: number;
-  subDrawingId: number;
-  alignmentStatus?: string | null;
-  transformMatrix?: Record<string, unknown> | null;
-  createdAt?: string | null;
-  subDrawing: DrawingBasicSummary;
-};
-
-export type DrawingAlignmentsResponse = {
-  alignments: DrawingAlignment[];
 };
 
 export type NormalizedPoint = {
@@ -74,112 +50,25 @@ export type NormalizedRect = {
   height: number;
 };
 
-/** Compare workspace / inspection UI chrome (amber=changed, green=passed, red=failed). */
+/** Overlay / inspection UI chrome (amber=changed, green=passed, red=failed). */
 export type ReviewBadgeTone = "changed" | "passed" | "failed";
 
+/** Normalized geometry for inspection overlays (rect or polygon). */
 export type DrawingDiffRegion = {
   id?: string | number;
   page?: number | null;
-
-  /**
-   * Supported shapes:
-   * - rect: uses rect
-   * - polygon: uses points
-   */
   shapeType?: "rect" | "polygon" | null;
-
   rect?: NormalizedRect | null;
   points?: NormalizedPoint[] | null;
-
-  /**
-   * Backward-compatible support if backend still sends bbox.
-   * We convert bbox -> rect in the viewer layer.
-   */
   bbox?: {
     x: number;
     y: number;
     width: number;
     height: number;
   } | null;
-
   changeType?: string | null;
   note?: string | null;
   reviewBadge?: ReviewBadgeTone | null;
-};
-
-export type DrawingDiff = {
-  id: number;
-  alignmentId: number;
-  summary?: string | null;
-  severity?: string | null;
-  resolved?: boolean;
-  /** Structured semantic / detector metadata (optional); geometry is in diffRegions. */
-  changeDetails?: Record<string, unknown> | null;
-  /** Optional JSON semantic narrative (e.g. LLM). */
-  semanticSummary?: Record<string, unknown> | null;
-  /** Inspection review tone (alignment-level for this diff row). */
-  reviewBadge?: ReviewBadgeTone | null;
-  createdAt?: string | null;
-  diffRegions: DrawingDiffRegion[];
-};
-
-/** Minimal drawing row for overlay/compare responses (URL + type + pages). */
-export type DrawingOverlayDrawingSummary = {
-  id: number;
-  name: string;
-  fileUrl: string;
-  contentType?: string | null;
-  pageCount?: number | null;
-};
-
-/** Same as `@shared/schema` `DrawingTransform` — compare/list payloads use this shape. */
-export type DrawingAlignmentTransformResponse = DrawingTransform;
-
-/**
- * Alignment + structured transform for workspace overlay (POST compare).
- * `transform` is null when alignment failed or is incomplete (matches backend optional transform).
- * `id` is always present for persisted alignments — use for rerun (see {@link DrawingAlignmentPersisted}).
- */
-export type DrawingAlignmentOverlayResponse = DrawingAlignmentPersisted & {
-  method: string;
-  status: string;
-  alignmentStatus?: string | null;
-  subDrawing: DrawingBasicSummary;
-  createdAt?: string | null;
-  transform: DrawingAlignmentTransformResponse | null;
-  errorMessage?: string | null;
-};
-
-/** Union of workspace alignment rows; both extend {@link DrawingAlignmentPersisted} (`id` required). */
-export type DrawingAlignmentListItem = DrawingAlignment | DrawingAlignmentOverlayResponse;
-
-/** Backend-owned comparison metric (same semantics as dashboard where applicable). */
-export type ProjectComparisonProgressMetric = {
-  comparedCount: number;
-  totalRelevantCount: number;
-  label: string;
-};
-
-/** Project-scoped high/critical unresolved diff count (workspace badge; dashboard may use global). */
-export type DiffRiskMetric = {
-  unresolvedHighSeverityCount: number;
-  label: string;
-};
-
-/** Response from POST compare — workspace-ready payload */
-export type DrawingComparisonWorkspaceResponse = {
-  masterDrawing: DrawingOverlayDrawingSummary;
-  subDrawing: DrawingOverlayDrawingSummary;
-  alignment: DrawingAlignmentOverlayResponse;
-  diffs: DrawingDiff[];
-  comparisonProgress?: ProjectComparisonProgressMetric | null;
-  highSeverityDiffRisk?: DiffRiskMetric | null;
-  /** Sheet-scoped inspection review tone for workspace header/summary. */
-  reviewBadge?: ReviewBadgeTone | null;
-};
-
-export type DrawingDiffsResponse = {
-  diffs: DrawingDiff[];
 };
 
 export type DrawingResponse = DrawingSummary;

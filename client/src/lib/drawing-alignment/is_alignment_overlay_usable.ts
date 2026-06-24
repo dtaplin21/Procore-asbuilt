@@ -1,4 +1,4 @@
-import type { DrawingComparisonWorkspaceResponse } from "@/types/drawing_workspace";
+import type { DrawingComparisonWorkspaceResponse } from "@/types/drawing_compare";
 
 /** True when compare workspace alignment is safe to use for the sub overlay (status + transform matrix). */
 export function isAlignmentOverlayUsable(

@@ -1,57 +1,41 @@
 import { useCallback, useState } from "react";
 import type { DrawingResponse } from "@shared/schema";
 
-import {
-  DrawingUploadWithIntent,
-  type DrawingUploadIntent,
-} from "@/components/drawings/DrawingUploadWithIntent";
-
-export type { DrawingUploadIntent };
+import { DrawingUpload } from "@/components/drawings/DrawingUpload";
 
 export type UploadDrawingModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: number;
-  /** Current workspace master; required for sub uploads in workspace flows. */
+  /** Current workspace master; used for replace-master confirmation copy. */
   workspaceMasterDrawingId?: number | null;
-  allowMaster?: boolean;
-  allowSub?: boolean;
   title?: string;
   description?: string;
   masterWarningText?: string;
-  subDisabledReason?: string;
-  /**
-   * After a successful file upload. Use for navigation (master) or compare (sub).
-   * If this throws (e.g. compare failed), the modal stays open.
-   */
-  onUploadSuccess?: (
-    drawing: DrawingResponse,
-    intent: DrawingUploadIntent
-  ) => void | Promise<void>;
+  replaceConfirmMessage?: string;
+  onUploadSuccess?: (drawing: DrawingResponse) => void | Promise<void>;
   /** If true (default), closes the dialog after `onUploadSuccess` resolves. */
   closeOnSuccess?: boolean;
-  /** Extra busy state (e.g. workspace compare in progress after sub upload). */
+  /** Extra busy state (e.g. navigation in progress). */
   isExternallyBusy?: boolean;
 };
 
 const defaultTitle = "Upload drawing";
 const defaultDescription =
-  "Choose whether this file is a master (workspace sheet) or a sub to compare, then select a file.";
+  "Select a PDF or image. The file is added to this project as a master sheet.";
 
 /**
- * Modal shell around {@link DrawingUploadWithIntent} with workflow callbacks for the drawing workspace and related screens.
+ * Modal shell around {@link DrawingUpload} for the drawing workspace and related screens.
  */
 export function UploadDrawingModal({
   open,
   onOpenChange,
   projectId,
   workspaceMasterDrawingId = null,
-  allowMaster = true,
-  allowSub = true,
   title = defaultTitle,
   description = defaultDescription,
   masterWarningText,
-  subDisabledReason,
+  replaceConfirmMessage,
   onUploadSuccess,
   closeOnSuccess = true,
   isExternallyBusy = false,
@@ -66,14 +50,14 @@ export function UploadDrawingModal({
   }, [isBusy, onOpenChange]);
 
   const handleComplete = useCallback(
-    async (drawing: DrawingResponse, intent: DrawingUploadIntent) => {
+    async (drawing: DrawingResponse) => {
       try {
-        await onUploadSuccess?.(drawing, intent);
+        await onUploadSuccess?.(drawing);
         if (closeOnSuccess) {
           onOpenChange(false);
         }
       } catch {
-        // Keep open: parent may have shown compare/workspace error
+        // Keep open: parent may have shown an error
       }
     },
     [onUploadSuccess, closeOnSuccess, onOpenChange]
@@ -123,16 +107,14 @@ export function UploadDrawingModal({
         </div>
 
         <div className="p-5">
-          <DrawingUploadWithIntent
+          <DrawingUpload
             key={`${projectId}-${workspaceMasterDrawingId ?? "no-master"}`}
             projectId={projectId}
             workspaceMasterDrawingId={workspaceMasterDrawingId}
-            allowMaster={allowMaster}
-            allowSub={allowSub}
             onComplete={handleComplete}
             onUploadingChange={setUploading}
             masterWarningText={masterWarningText}
-            subDisabledReason={subDisabledReason}
+            replaceConfirmMessage={replaceConfirmMessage}
           />
         </div>
       </div>

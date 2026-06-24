@@ -1,7 +1,7 @@
 import type {
   DrawingAlignmentListItem,
   DrawingAlignmentTransformResponse,
-} from "@/types/drawing_workspace";
+} from "@/types/drawing_compare";
 
 function isTransformType(
   v: unknown

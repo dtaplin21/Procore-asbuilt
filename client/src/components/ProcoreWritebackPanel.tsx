@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -72,12 +72,18 @@ export function ProcoreWritebackPanel({
   const [writebackError, setWritebackError] = useState<string | null>(null);
   const [commitConfirmOpen, setCommitConfirmOpen] = useState(false);
 
+  // Same query key as InspectionRunsPanel (no status param) — filter complete runs client-side.
   const { data: runsData, isLoading: runsLoading } = useInspectionRuns(projectId, {
     masterDrawingId: masterDrawingId ?? null,
-    status: "complete",
   });
 
-  const runs = runsData?.items ?? [];
+  const runs = useMemo(
+    () =>
+      (runsData?.items ?? []).filter(
+        (run) => run.status.toLowerCase() === "complete"
+      ),
+    [runsData]
+  );
   const isDisabled = !projectId || !procoreUserId;
   const selectedRun = runs.find((r) => r.id === selectedInspectionRunId);
   const isSelectedRunComplete = selectedRun?.status === "complete";

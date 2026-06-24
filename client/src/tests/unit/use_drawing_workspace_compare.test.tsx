@@ -4,8 +4,9 @@ import { compareSubDrawingToMaster } from "@/lib/api/drawing_workspace";
 import { useDrawingWorkspace } from "@/hooks/use_drawing_workspace";
 import type {
   DrawingAlignment,
-  DrawingWorkspaceDrawing,
-} from "@/types/drawing_workspace";
+  DrawingComparisonWorkspaceResponse,
+} from "@/types/drawing_compare";
+import type { DrawingWorkspaceDrawing } from "@/types/drawing_workspace";
 
 const mocks = vi.hoisted(() => ({
   fetchMasterDrawing: vi.fn(),

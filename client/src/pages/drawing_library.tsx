@@ -95,9 +95,7 @@ export default function DrawingLibraryPage() {
     );
   }
 
-  const list = (drawingsPayload?.drawings ?? []).filter(
-    (drawing) => drawing.uploadIntent === "master" || drawing.uploadIntent == null
-  );
+  const list = drawingsPayload?.drawings ?? [];
 
   return (
     <div className="p-4 max-w-5xl mx-auto">

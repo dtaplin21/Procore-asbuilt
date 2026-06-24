@@ -183,9 +183,7 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     setSearchParams,
   ]);
 
-  const masterDrawingOptions = drawings.filter(
-    (drawing) => drawing.uploadIntent === "master" || drawing.uploadIntent == null
-  );
+  const masterDrawingOptions = drawings;
 
   const masterWorkspaceQuery = useQuery({
     queryKey: [
@@ -222,9 +220,7 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     }
 
     const rowList = drawingsQuery.data?.drawings ?? [];
-    const masters = rowList.filter(
-      (d) => d.uploadIntent === "master" || d.uploadIntent == null
-    );
+    const masters = rowList;
     if (masters.length === 0) {
       return;
     }

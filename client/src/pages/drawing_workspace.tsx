@@ -18,7 +18,6 @@ import {
   setLastProjectIdForWorkspaceFallback,
   setWorkspaceReturnPath,
 } from "@/lib/workspace-return-path";
-import type { DrawingUploadIntent } from "@/components/drawings/DrawingUploadWithIntent";
 import type { WorkspaceRouteParams } from "@/types/drawing_workspace";
 
 type DrawingWorkspaceBodyProps = {
@@ -83,10 +82,7 @@ export function DrawingWorkspaceBody({
   }, [masterDrawing, parsedDrawingId, currentDrawingName]);
 
   const handleUploadSuccess = useCallback(
-    async (drawing: DrawingResponse, intent: DrawingUploadIntent) => {
-      if (intent !== "master") {
-        return;
-      }
+    (drawing: DrawingResponse) => {
       setLocation(`/projects/${projectId}/drawings/${drawing.id}/workspace`);
     },
     [projectId, setLocation]
@@ -107,7 +103,6 @@ export function DrawingWorkspaceBody({
       onOpenChange={setUploadModalOpen}
       projectId={projectId}
       workspaceMasterDrawingId={masterDrawingId}
-      allowSub={false}
       onUploadSuccess={handleUploadSuccess}
     />
   );
@@ -214,6 +209,7 @@ export function DrawingWorkspaceBody({
           <DrawingComparisonWorkspace
             projectId={projectId}
             masterDrawing={masterDrawing}
+            selectedInspectionRunId={selectedInspectionRunId}
           />
         }
         sidebar={sidebarContent(false)}

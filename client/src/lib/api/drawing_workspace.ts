@@ -2,8 +2,8 @@ import type {
   DrawingAlignmentsResponse,
   DrawingComparisonWorkspaceResponse,
   DrawingDiffsResponse,
-  DrawingWorkspaceDrawing,
-} from "@/types/drawing_workspace";
+} from "@/types/drawing_compare";
+import type { DrawingWorkspaceDrawing } from "@/types/drawing_workspace";
 
 import { requestJson } from "@/lib/api/http";
 

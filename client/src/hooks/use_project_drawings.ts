@@ -1,7 +1,5 @@
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  coerceDrawingIdForApi,
   fetchProjectDrawings,
   projectDrawingsQueryKey,
 } from "@/lib/api/drawings";
@@ -12,8 +10,6 @@ import type {
 
 type UseProjectDrawingsArgs = {
   projectId: number;
-  /** Master / left drawing to omit from the sub list — must match `drawing.id` numerically (parse route params before passing). */
-  masterDrawingId: number;
   enabled?: boolean;
 };
 
@@ -24,9 +20,9 @@ type UseProjectDrawingsResult = {
   reload: () => Promise<void>;
 };
 
+/** Lists all project drawings (master-only upload model). */
 export function useProjectDrawings({
   projectId,
-  masterDrawingId,
   enabled = true,
 }: UseProjectDrawingsArgs): UseProjectDrawingsResult {
   const {
@@ -40,16 +36,7 @@ export function useProjectDrawings({
     enabled: enabled && Number.isFinite(projectId) && projectId > 0,
   });
 
-  const drawings = useMemo(() => {
-    const list = data?.drawings ?? [];
-    let normalizedMaster: number;
-    try {
-      normalizedMaster = coerceDrawingIdForApi(masterDrawingId);
-    } catch {
-      return list;
-    }
-    return list.filter((drawing) => drawing.id !== normalizedMaster);
-  }, [data, masterDrawingId]);
+  const drawings = data?.drawings ?? [];
 
   const error =
     queryError instanceof Error

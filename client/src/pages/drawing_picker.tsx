@@ -29,10 +29,6 @@ function pathWithPreservedSearch(pathWithOptionalQuery: string): string {
     : `${pathWithOptionalQuery}${preserved}`;
 }
 
-function isMasterDrawingCandidate(drawing: ProjectDrawingCandidate): boolean {
-  return drawing.uploadIntent === "master" || drawing.uploadIntent == null;
-}
-
 export default function DrawingPickerPage() {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [, setLocation] = useLocation();
@@ -125,15 +121,13 @@ export default function DrawingPickerPage() {
     );
   }
 
-  const list = (drawingsPayload?.drawings ?? []).filter(isMasterDrawingCandidate);
+  const list = drawingsPayload?.drawings ?? [];
 
   const uploadModal = (
     <UploadDrawingModal
       open={uploadModalOpen}
       onOpenChange={setUploadModalOpen}
       projectId={parsedProjectId}
-      allowMaster
-      allowSub={false}
       onUploadSuccess={(drawing) => {
         setLocation(
           pathWithPreservedSearch(

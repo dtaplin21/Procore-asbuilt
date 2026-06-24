@@ -6,6 +6,7 @@ import type { DrawingWorkspaceDrawing } from "@/types/drawing_workspace";
 type Props = {
   projectId: number;
   masterDrawing: DrawingWorkspaceDrawing | null;
+  selectedInspectionRunId?: number | null;
 };
 
 /**
@@ -14,6 +15,7 @@ type Props = {
 export default function DrawingComparisonWorkspace({
   projectId,
   masterDrawing,
+  selectedInspectionRunId = null,
 }: Props) {
   const [showChangesOnly, setShowChangesOnly] = useState(false);
   const [showInspectionStatuses, setShowInspectionStatuses] = useState(true);
@@ -64,6 +66,7 @@ export default function DrawingComparisonWorkspace({
         <DrawingViewer
           projectId={projectId}
           drawing={masterDrawing}
+          inspectionRunId={selectedInspectionRunId}
           overlayShowChangesOnly={showChangesOnly}
           overlayShowInspectionStatuses={showInspectionStatuses}
         />
