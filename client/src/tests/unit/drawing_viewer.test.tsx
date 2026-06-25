@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import DrawingViewer from "@/components/drawings/DrawingViewer";
+import type { DrawingOverlay } from "@shared/schema";
 import type { DrawingWorkspaceDrawing } from "@/types/drawing_workspace";
 import { getQueryFn } from "@/lib/queryClient";
 
@@ -81,5 +82,38 @@ describe("DrawingViewer", () => {
     );
 
     expect(await screen.findByText("0 overlay region(s)")).toBeInTheDocument();
+  });
+
+  it("uses parent-supplied overlays without refetching", async () => {
+    const parentOverlays = [
+      {
+        id: 1,
+        master_drawing_id: 10,
+        inspection_run_id: 5,
+        diff_id: null,
+        geometry: {
+          type: "rect",
+          x: 0.1,
+          y: 0.1,
+          width: 0.2,
+          height: 0.2,
+        },
+        status: "fail",
+        created_at: "2025-01-01T00:00:00Z",
+        meta: null,
+      },
+    ] satisfies DrawingOverlay[];
+
+    renderViewer(
+      <DrawingViewer
+        projectId={1}
+        drawing={readyDrawing}
+        inspectionRunId={5}
+        overlays={parentOverlays}
+        overlaysLoading={false}
+      />
+    );
+
+    expect(await screen.findByText("1 overlay region(s)")).toBeInTheDocument();
   });
 });

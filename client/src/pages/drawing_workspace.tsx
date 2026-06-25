@@ -14,6 +14,7 @@ import WorkspaceLoadingState from "@/components/drawing-workspace/workspace_load
 import { useDrawingWorkspace } from "@/hooks/use_drawing_workspace";
 import { toast } from "@/hooks/use-toast";
 import { fetchProjectDashboardSummary } from "@/lib/api/projects";
+import { objectsPagePath, workspacePathToObjectsUrl } from "@/lib/objectsRoute";
 import {
   setLastProjectIdForWorkspaceFallback,
   setWorkspaceReturnPath,
@@ -83,7 +84,7 @@ export function DrawingWorkspaceBody({
 
   const handleUploadSuccess = useCallback(
     (drawing: DrawingResponse) => {
-      setLocation(`/projects/${projectId}/drawings/${drawing.id}/workspace`);
+      setLocation(objectsPagePath(String(projectId), String(drawing.id)));
     },
     [projectId, setLocation]
   );
@@ -223,26 +224,32 @@ export function DrawingWorkspaceBody({
 
 export default function DrawingWorkspacePage() {
   const { projectId, drawingId } = useParams<WorkspaceRouteParams>();
+  const [location, setLocation] = useLocation();
 
   const parsedProjectId = Number(projectId);
   const parsedDrawingId = Number(drawingId);
 
-  const idsAreValid = useMemo(() => {
-    return Number.isFinite(parsedProjectId) && Number.isFinite(parsedDrawingId);
-  }, [parsedProjectId, parsedDrawingId]);
+  useEffect(() => {
+    const q = location.indexOf("?");
+    const pathname = q === -1 ? location : location.slice(0, q);
+    const search = q === -1 ? "" : location.slice(q);
 
-  if (!idsAreValid) {
-    return (
-      <div className="p-4">
-        <WorkspaceErrorState message="Invalid project or drawing id." />
-      </div>
-    );
-  }
+    const fromPath = workspacePathToObjectsUrl(pathname, search);
+    if (fromPath) {
+      setLocation(fromPath, { replace: true });
+      return;
+    }
 
-  return (
-    <DrawingWorkspaceBody
-      parsedProjectId={parsedProjectId}
-      parsedDrawingId={parsedDrawingId}
-    />
-  );
+    if (Number.isFinite(parsedProjectId) && Number.isFinite(parsedDrawingId)) {
+      setLocation(
+        objectsPagePath(String(parsedProjectId), String(parsedDrawingId)),
+        { replace: true },
+      );
+      return;
+    }
+
+    setLocation("/objects", { replace: true });
+  }, [location, parsedProjectId, parsedDrawingId, setLocation]);
+
+  return null;
 }

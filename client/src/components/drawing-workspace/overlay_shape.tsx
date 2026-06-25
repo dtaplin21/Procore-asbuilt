@@ -14,6 +14,7 @@ type Props = {
   viewerSize: ViewerSize;
   selected?: boolean;
   index: number;
+  regionId?: number | string;
   /** Pass/fail/changed tone, or `neutral` when status coloring is hidden. */
   inspectionTone: OverlayInspectionTone;
   label?: string | null;
@@ -25,6 +26,7 @@ export default function OverlayShape({
   viewerSize,
   selected = false,
   index,
+  regionId,
   inspectionTone,
   label = null,
 }: Props) {
@@ -40,7 +42,11 @@ export default function OverlayShape({
     const rect = normalizedRectToPixels(region.rect, viewerSize);
 
     return (
-      <g data-testid={`overlay-group-${index}`}>
+      <g
+        data-testid={`overlay-group-${index}`}
+        data-overlay-id={regionId != null ? String(regionId) : undefined}
+        data-focused={selected ? "true" : "false"}
+      >
         <rect
           x={rect.x}
           y={rect.y}

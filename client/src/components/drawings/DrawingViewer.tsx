@@ -6,6 +6,7 @@ import WorkspaceEmptyState from "@/components/drawing-workspace/workspace_empty_
 import { useDrawingOverlays } from "@/hooks/use-inspection-runs";
 import { useResizeObserver } from "@/hooks/use_resize_observer";
 import { toOverlayRegions } from "@/lib/drawing-overlays/inspection_overlay";
+import type { DrawingOverlay } from "@shared/schema";
 import type { DrawingWorkspaceDrawing } from "@/types/drawing_workspace";
 
 import { apiUrl } from "@/lib/api/base_url";
@@ -31,8 +32,14 @@ function messageForDrawingImageLoadFailure(relativeUrl: string): string {
 type Props = {
   drawing: DrawingWorkspaceDrawing | null;
   projectId?: number | null;
-  /** When set, overlays are limited to this inspection run (sidebar selection). */
+  /** When set, overlays are limited to this inspection run (e.g. Objects `?run=`). */
   inspectionRunId?: number | null;
+  /** When provided, skips internal overlay fetch (parent owns the query). */
+  overlays?: DrawingOverlay[];
+  /** Loading state when `overlays` is supplied by the parent. */
+  overlaysLoading?: boolean;
+  /** Highlight one overlay by id (`?overlay=` on Objects). */
+  focusedOverlayId?: string | null;
   /** Diff SVG: only unresolved / "changed" regions. */
   overlayShowChangesOnly?: boolean;
   /** Diff SVG: color by passed/failed/changed; when false, use a single highlight tone. */
@@ -43,6 +50,9 @@ export default function DrawingViewer({
   drawing,
   projectId: projectIdProp,
   inspectionRunId = null,
+  overlays: overlaysProp,
+  overlaysLoading: overlaysLoadingProp,
+  focusedOverlayId = null,
   overlayShowChangesOnly = false,
   overlayShowInspectionStatuses = true,
 }: Props) {
@@ -61,11 +71,21 @@ export default function DrawingViewer({
   const drawingIdStr =
     drawing?.id != null && Number.isFinite(drawing.id) ? String(drawing.id) : null;
 
-  const { data: overlays = [], isLoading: overlaysLoading } = useDrawingOverlays({
-    projectId: projectIdStr ?? undefined,
-    drawingId: drawingIdStr ?? undefined,
-    runId: inspectionRunId != null ? String(inspectionRunId) : null,
-  });
+  const overlaysControlled = overlaysProp !== undefined;
+
+  const { data: fetchedOverlays = [], isLoading: fetchedOverlaysLoading } =
+    useDrawingOverlays({
+      projectId: projectIdStr ?? undefined,
+      drawingId: drawingIdStr ?? undefined,
+      runId: inspectionRunId != null ? String(inspectionRunId) : null,
+      enabled: !overlaysControlled,
+    });
+
+  const overlays = overlaysControlled ? overlaysProp : fetchedOverlays;
+  const overlaysLoading = overlaysControlled
+    ? (overlaysLoadingProp ?? false)
+    : fetchedOverlaysLoading;
+
   const regions = useMemo(() => toOverlayRegions(overlays), [overlays]);
 
   const masterSrcRaw = drawing?.fileUrl ?? null;
@@ -227,6 +247,7 @@ export default function DrawingViewer({
                       width: layoutSize.width,
                       height: layoutSize.height,
                     }}
+                    focusedOverlayId={focusedOverlayId}
                     showChangesOnly={overlayShowChangesOnly}
                     showInspectionStatuses={overlayShowInspectionStatuses}
                   />

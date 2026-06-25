@@ -23,8 +23,10 @@ import {
 } from "@/components/ui/sidebar";
 import { ProcoreStatus } from "@/components/procore-status";
 import {
+  getObjectsSidebarNav,
   getWorkspaceSidebarNav,
   subscribeWorkspaceStorage,
+  type ObjectsSidebarNav,
   type WorkspaceSidebarNav,
 } from "@/lib/workspace-return-path";
 import type { ProcoreConnection } from "@shared/schema";
@@ -39,11 +41,6 @@ const mainNavItems = [
     title: "Inspections",
     url: "/inspections",
     icon: ClipboardCheck,
-  },
-  {
-    title: "Objects",
-    url: "/objects",
-    icon: Layers,
   },
 ];
 
@@ -65,12 +62,16 @@ function workspaceRoutePathOnly(loc: string): string {
   return q === -1 ? loc : loc.slice(0, q);
 }
 
-/** Active when current route matches this row's href (path only); picker href also matches workspaces under that project. */
-function isWorkspaceNavActive(location: string, nav: WorkspaceSidebarNav): boolean {
+function isObjectsNavActive(location: string): boolean {
+  return workspaceRoutePathOnly(location) === "/objects";
+}
+
+/** Active when on Objects or the remembered drawing return path. */
+function isDrawingViewerNavActive(location: string, nav: WorkspaceSidebarNav): boolean {
   if (nav.disabled) return false;
   const locPath = workspaceRoutePathOnly(location);
   const hrefPath = workspaceRoutePathOnly(nav.href);
-  if (hrefPath.startsWith("/objects")) {
+  if (locPath === "/objects" || hrefPath.startsWith("/objects")) {
     return locPath === "/objects";
   }
   if (hrefPath.includes("/workspace")) {
@@ -84,15 +85,25 @@ function isWorkspaceNavActive(location: string, nav: WorkspaceSidebarNav): boole
 export function AppSidebar({ procoreConnection, onProcoreSync }: AppSidebarProps) {
   const [location] = useLocation();
 
-  const workspaceNavJson = useSyncExternalStore(
+  const sidebarNavJson = useSyncExternalStore(
     subscribeWorkspaceStorage,
-    () => JSON.stringify(getWorkspaceSidebarNav()),
-    () => JSON.stringify(getWorkspaceSidebarNav())
+    () =>
+      JSON.stringify({
+        workspace: getWorkspaceSidebarNav(),
+        objects: getObjectsSidebarNav(),
+      }),
+    () =>
+      JSON.stringify({
+        workspace: getWorkspaceSidebarNav(),
+        objects: getObjectsSidebarNav(),
+      })
   );
 
-  const workspaceNav = JSON.parse(workspaceNavJson) as WorkspaceSidebarNav;
+  const { workspace: workspaceNav, objects: objectsNav } = JSON.parse(
+    sidebarNavJson
+  ) as { workspace: WorkspaceSidebarNav; objects: ObjectsSidebarNav };
 
-  const workspaceActive = isWorkspaceNavActive(location, workspaceNav);
+  const drawingViewerActive = isDrawingViewerNavActive(location, workspaceNav);
 
   return (
     <Sidebar>
@@ -129,26 +140,38 @@ export function AppSidebar({ procoreConnection, onProcoreSync }: AppSidebarProps
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-              <SidebarMenuItem key="workspace">
+              <SidebarMenuItem key="objects">
+                <SidebarMenuButton
+                  asChild
+                  isActive={isObjectsNavActive(location)}
+                  tooltip={objectsNav.tooltip}
+                >
+                  <Link href={objectsNav.href} data-testid="nav-objects">
+                    <Layers className="w-4 h-4" />
+                    <span>Objects</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem key="drawing-viewer">
                 {workspaceNav.disabled ? (
                   <SidebarMenuButton
                     disabled
                     isActive={false}
                     tooltip={workspaceNav.tooltip}
-                    data-testid="nav-workspace"
+                    data-testid="nav-drawing-viewer"
                   >
                     <DraftingCompass className="w-4 h-4" />
-                    <span>Workspace</span>
+                    <span>Drawing viewer</span>
                   </SidebarMenuButton>
                 ) : (
                   <SidebarMenuButton
                     asChild
-                    isActive={workspaceActive}
+                    isActive={drawingViewerActive}
                     tooltip={workspaceNav.tooltip}
                   >
-                    <Link href={workspaceNav.href} data-testid="nav-workspace">
+                    <Link href={workspaceNav.href} data-testid="nav-drawing-viewer">
                       <DraftingCompass className="w-4 h-4" />
-                      <span>Workspace</span>
+                      <span>Drawing viewer</span>
                     </Link>
                   </SidebarMenuButton>
                 )}

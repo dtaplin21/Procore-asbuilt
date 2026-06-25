@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useQuery, type Query } from "@tanstack/react-query";
 import { ClipboardCheck, Loader2 } from "lucide-react";
 import type {
+  DrawingOverlay,
   EvidenceListResponse,
   InspectionRun,
   InspectionRunListResponse,
@@ -34,6 +35,11 @@ export type InspectionRunsPanelProps = {
   masterDrawingId: number;
   selectedRunId?: number | null;
   onSelectRun?: (runId: number | null) => void;
+  /** When provided, skips internal overlay fetch (parent owns the query). */
+  overlays?: DrawingOverlay[];
+  overlaysLoading?: boolean;
+  focusedOverlayId?: string | null;
+  onFocusOverlay?: (overlayId: string | null) => void;
 };
 
 const ACTIVE_RUN_STATUSES = new Set(["queued", "processing"]);
@@ -52,6 +58,10 @@ export default function InspectionRunsPanel({
   masterDrawingId,
   selectedRunId = null,
   onSelectRun,
+  overlays: overlaysProp,
+  overlaysLoading: overlaysLoadingProp,
+  focusedOverlayId = null,
+  onFocusOverlay,
 }: InspectionRunsPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedEvidenceId, setSelectedEvidenceId] = useState<number | null>(null);
@@ -82,11 +92,20 @@ export default function InspectionRunsPanel({
   const uploadBusy = uploadPending || createRunPending;
   const runDisabled = runPending || hasActiveRun || uploadBusy;
 
-  const { data: overlays = [], isLoading: overlaysLoading } = useDrawingOverlays({
-    projectId: String(projectId),
-    drawingId: String(masterDrawingId),
-    runId: selectedRunId != null ? String(selectedRunId) : null,
-  });
+  const overlaysControlled = overlaysProp !== undefined;
+
+  const { data: fetchedOverlays = [], isLoading: fetchedOverlaysLoading } =
+    useDrawingOverlays({
+      projectId: String(projectId),
+      drawingId: String(masterDrawingId),
+      runId: selectedRunId != null ? String(selectedRunId) : null,
+      enabled: !overlaysControlled,
+    });
+
+  const overlays = overlaysControlled ? overlaysProp : fetchedOverlays;
+  const overlaysLoading = overlaysControlled
+    ? (overlaysLoadingProp ?? false)
+    : fetchedOverlaysLoading;
 
   const overlayItems = useMemo(
     () => overlays.map((overlay) => formatOverlayListItem(overlay)),
@@ -331,22 +350,47 @@ export default function InspectionRunsPanel({
             </p>
           ) : (
             <ul className="space-y-2" data-testid="inspection-run-overlay-list">
-              {overlayItems.map((item, index) => (
-                <li
-                  key={overlays[index]?.id ?? index}
-                  className="rounded border border-border bg-background px-2 py-1.5"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
-                      <p className="text-xs text-muted-foreground">{item.subtitle}</p>
-                    </div>
-                    <Badge variant="outline" className="shrink-0 capitalize">
-                      {item.status}
-                    </Badge>
-                  </div>
-                </li>
-              ))}
+              {overlayItems.map((item, index) => {
+                const overlayId = overlays[index]?.id;
+                const overlayKey =
+                  overlayId != null ? String(overlayId) : String(index);
+                const isFocused =
+                  focusedOverlayId != null &&
+                  overlayId != null &&
+                  String(overlayId) === String(focusedOverlayId);
+
+                return (
+                  <li key={overlayKey}>
+                    <button
+                      type="button"
+                      className={`w-full rounded border px-2 py-1.5 text-left transition-colors ${
+                        isFocused
+                          ? "border-primary bg-primary-soft"
+                          : "border-border bg-background hover:bg-muted/40"
+                      }`}
+                      data-testid={`inspection-overlay-item-${overlayKey}`}
+                      onClick={() => {
+                        if (overlayId == null) return;
+                        onFocusOverlay?.(
+                          isFocused ? null : String(overlayId),
+                        );
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {item.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{item.subtitle}</p>
+                        </div>
+                        <Badge variant="outline" className="shrink-0 capitalize">
+                          {item.status}
+                        </Badge>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

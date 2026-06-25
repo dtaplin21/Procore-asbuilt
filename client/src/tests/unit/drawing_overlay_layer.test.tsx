@@ -77,4 +77,23 @@ describe("DrawingOverlayLayer", () => {
 
     expect(container.firstChild).toBeNull();
   });
+
+  it("emphasizes only the focused overlay when focusedOverlayId is set", () => {
+    render(
+      <DrawingOverlayLayer
+        regions={[rectRegion(10), rectRegion(20)]}
+        viewerSize={{ width: 1000, height: 800 }}
+        focusedOverlayId="20"
+      />,
+    );
+
+    expect(screen.getByTestId("overlay-group-0")).toHaveAttribute(
+      "data-focused",
+      "false",
+    );
+    expect(screen.getByTestId("overlay-group-1")).toHaveAttribute(
+      "data-focused",
+      "true",
+    );
+  });
 });

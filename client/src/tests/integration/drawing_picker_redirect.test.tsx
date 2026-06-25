@@ -78,12 +78,12 @@ describe("DrawingPickerPage — canonical master redirect", () => {
     vi.unstubAllGlobals();
   });
 
-  it("calls setLocation with workspace URL when API returns masterDrawingId", async () => {
+  it("calls setLocation with Objects URL when API returns masterDrawingId", async () => {
     mockFetchSummary.mockResolvedValue(makeSummary(42));
     renderPicker();
 
     await waitFor(() => {
-      expect(setLocation).toHaveBeenCalledWith("/projects/7/drawings/42/workspace");
+      expect(setLocation).toHaveBeenCalledWith("/objects?projectId=7&drawingId=42");
     });
   });
 

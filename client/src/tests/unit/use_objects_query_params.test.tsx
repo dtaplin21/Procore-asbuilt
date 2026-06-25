@@ -71,4 +71,22 @@ describe("useObjectsQueryParams", () => {
     expect(result.current.runId).toBeUndefined();
     expect(result.current.overlayId).toBeUndefined();
   });
+
+  it("setOverlay updates overlay param and clears on null", () => {
+    const { result } = renderHook(() => useObjectsQueryParams(), {
+      wrapper: createWrapper("/objects?projectId=2&drawingId=8&run=15"),
+    });
+
+    act(() => {
+      result.current.setOverlay("42");
+    });
+
+    expect(result.current.overlayId).toBe("42");
+
+    act(() => {
+      result.current.setOverlay(null);
+    });
+
+    expect(result.current.overlayId).toBeUndefined();
+  });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Layers, 
@@ -35,6 +35,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/status-badge";
 import DrawingViewer from "@/components/drawings/DrawingViewer";
+import InspectionRunsPanel from "@/components/drawing-workspace/inspection_runs_panel";
 import { ProcoreWritebackPanel } from "@/components/ProcoreWritebackPanel";
 import type {
   DrawingObject,
@@ -89,6 +90,8 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     overlayId: overlayIdFromUrlRaw,
     setProject,
     setDrawing,
+    setRun,
+    setOverlay,
   } = useObjectsQueryParams();
 
   const projectIdFromUrl = parseNumericParam(projectIdFromUrlRaw);
@@ -196,12 +199,34 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     selectedProjectId != null ? String(selectedProjectId) : null;
   const overlayDrawingId =
     selectedMasterDrawingId != null ? String(selectedMasterDrawingId) : null;
-  const { data: overlays = [] } = useDrawingOverlays({
+
+  const selectedInspectionRunId = useMemo(() => {
+    return parseNumericParam(runIdFromUrlRaw);
+  }, [runIdFromUrlRaw]);
+
+  const {
+    data: overlays = [],
+    isLoading: overlaysLoading,
+  } = useDrawingOverlays({
     projectId: overlayProjectId ?? undefined,
     drawingId: overlayDrawingId ?? undefined,
     runId: runIdFromUrlRaw ?? null,
   });
   const overlayRegions = useMemo(() => toOverlayRegions(overlays), [overlays]);
+
+  const handleSelectInspectionRun = useCallback(
+    (runId: number | null) => {
+      setRun(runId != null ? String(runId) : null);
+    },
+    [setRun],
+  );
+
+  const handleFocusOverlay = useCallback(
+    (overlayId: string | null) => {
+      setOverlay(overlayId);
+    },
+    [setOverlay],
+  );
 
   useEffect(() => {
     if (selectedProjectId === null || !drawingsQuery.isSuccess) {
@@ -494,34 +519,55 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          <div className="relative min-h-[480px] overflow-hidden rounded-lg border bg-muted/30">
-            {!selectedProjectId || !selectedMasterDrawingId ? (
-              <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 border-2 border-dashed border-muted-foreground/25 p-8 text-center text-muted-foreground">
-                <Layers className="h-12 w-12 opacity-50" />
-                <p className="font-medium">Drawing canvas</p>
-                <p className="text-sm">Select a project and master drawing to load the sheet.</p>
-              </div>
-            ) : masterWorkspaceQuery.isPending ? (
-              <div className="flex min-h-[320px] items-center justify-center gap-2 text-muted-foreground">
-                <Loader2 className="h-8 w-8 animate-spin" />
-                <span className="text-sm">Loading drawing…</span>
-              </div>
-            ) : masterWorkspaceQuery.isError ? (
-              <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 p-6 text-center">
-                <AlertTriangle className="h-8 w-8 text-destructive" />
-                <p className="text-sm font-medium">Could not load drawing</p>
-                <p className="text-sm text-muted-foreground">
-                  {masterWorkspaceQuery.error instanceof Error
-                    ? masterWorkspaceQuery.error.message
-                    : "Check the network tab or try another drawing."}
-                </p>
-              </div>
-            ) : (
-              <DrawingViewer
-                projectId={selectedProjectId}
-                drawing={masterWorkspaceQuery.data ?? null}
-              />
-            )}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="relative min-h-[480px] overflow-hidden rounded-lg border bg-muted/30">
+              {!selectedProjectId || !selectedMasterDrawingId ? (
+                <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 border-2 border-dashed border-muted-foreground/25 p-8 text-center text-muted-foreground">
+                  <Layers className="h-12 w-12 opacity-50" />
+                  <p className="font-medium">Drawing canvas</p>
+                  <p className="text-sm">Select a project and master drawing to load the sheet.</p>
+                </div>
+              ) : masterWorkspaceQuery.isPending ? (
+                <div className="flex min-h-[320px] items-center justify-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                  <span className="text-sm">Loading drawing…</span>
+                </div>
+              ) : masterWorkspaceQuery.isError ? (
+                <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 p-6 text-center">
+                  <AlertTriangle className="h-8 w-8 text-destructive" />
+                  <p className="text-sm font-medium">Could not load drawing</p>
+                  <p className="text-sm text-muted-foreground">
+                    {masterWorkspaceQuery.error instanceof Error
+                      ? masterWorkspaceQuery.error.message
+                      : "Check the network tab or try another drawing."}
+                  </p>
+                </div>
+              ) : (
+                <DrawingViewer
+                  projectId={selectedProjectId}
+                  drawing={masterWorkspaceQuery.data ?? null}
+                  inspectionRunId={selectedInspectionRunId}
+                  overlays={overlays}
+                  overlaysLoading={overlaysLoading}
+                  focusedOverlayId={overlayIdFromUrlRaw ?? null}
+                />
+              )}
+            </div>
+
+            {selectedProjectId != null && selectedMasterDrawingId != null ? (
+              <aside className="rounded-lg border border-border bg-card p-4 shadow-sm">
+                <InspectionRunsPanel
+                  projectId={selectedProjectId}
+                  masterDrawingId={selectedMasterDrawingId}
+                  selectedRunId={selectedInspectionRunId}
+                  onSelectRun={handleSelectInspectionRun}
+                  overlays={overlays}
+                  overlaysLoading={overlaysLoading}
+                  focusedOverlayId={overlayIdFromUrlRaw ?? null}
+                  onFocusOverlay={handleFocusOverlay}
+                />
+              </aside>
+            ) : null}
           </div>
         </CardContent>
       </Card>

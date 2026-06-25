@@ -10,7 +10,7 @@
  * server-side state if you want it to persist that broadly).
  */
 
-import { objectsPagePath } from "@/lib/objectsRoute";
+import { objectsPagePath, workspacePathToObjectsUrl } from "@/lib/objectsRoute";
 
 const STORAGE_KEY = "lastDrawingReturnPath";
 
@@ -124,6 +124,52 @@ export type WorkspaceSidebarNav = {
   tooltip: string;
 };
 
+export type ObjectsSidebarNav = {
+  href: string;
+  tooltip: string;
+};
+
+function resolveObjectsHrefFromReturnPath(path: string): string | null {
+  if (path.startsWith("/objects")) {
+    return path;
+  }
+  if (path.startsWith("/projects/") && path.includes("/workspace")) {
+    const q = path.indexOf("?");
+    const pathname = q === -1 ? path : path.slice(0, q);
+    const search = q === -1 ? "" : path.slice(q);
+    return workspacePathToObjectsUrl(pathname, search);
+  }
+  return null;
+}
+
+/**
+ * Smart Objects sidebar link (merge plan Phase 1, Option A):
+ * remembered drawing deep link → last project → bare /objects.
+ */
+export function getObjectsSidebarNav(): ObjectsSidebarNav {
+  const last = getDrawingReturnPath();
+  if (last) {
+    const href = resolveObjectsHrefFromReturnPath(last);
+    if (href) {
+      return {
+        href,
+        tooltip: "Return to last viewed drawing",
+      };
+    }
+  }
+  const pid = getLastProjectIdForWorkspaceFallback();
+  if (pid != null) {
+    return {
+      href: `/objects?projectId=${pid}`,
+      tooltip: "Objects for your last project",
+    };
+  }
+  return {
+    href: "/objects",
+    tooltip: "Drawing viewer and QC/QA objects",
+  };
+}
+
 export function getWorkspaceSidebarNav(): WorkspaceSidebarNav {
   const last = getDrawingReturnPath();
   if (
@@ -134,7 +180,9 @@ export function getWorkspaceSidebarNav(): WorkspaceSidebarNav {
     return {
       href: last,
       disabled: false,
-      tooltip: last.startsWith("/objects") ? "Return to drawing" : "Workspace",
+      tooltip: last.startsWith("/objects")
+        ? "Return to drawing viewer"
+        : "Legacy workspace (redirects to Objects)",
     };
   }
   const pid = getLastProjectIdForWorkspaceFallback();

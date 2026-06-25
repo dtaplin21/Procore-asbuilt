@@ -5,7 +5,7 @@
  * URL contract:
  *   /objects?projectId=2&drawingId=8                       -> master sheet, latest run overlays (or none)
  *   /objects?projectId=2&drawingId=8&run=15                -> sheet + overlays for run 15
- *   /objects?projectId=2&drawingId=8&run=15&overlay=42     -> focus a specific overlay (future)
+ *   /objects?projectId=2&drawingId=8&run=15&overlay=42     -> focus a specific overlay
  *
  * This replaces the old workspace URL pattern
  * (/projects/:id/drawings/:id/workspace) as the canonical destination for
@@ -76,4 +76,29 @@ export function objectsPagePathForRun(params: {
   runId: string;
 }): string {
   return objectsPagePath(params.projectId, params.masterDrawingId, params.runId);
+}
+
+const WORKSPACE_PATH =
+  /^\/projects\/(\d+)\/drawings\/(\d+)\/workspace\/?$/;
+
+/** Legacy workspace path → Objects URL (preserves run, overlay, findingId). */
+export function workspacePathToObjectsUrl(
+  pathname: string,
+  search = "",
+): string | null {
+  const match = pathname.match(WORKSPACE_PATH);
+  if (!match) return null;
+
+  const [, projectId, drawingId] = match;
+  const raw = search.startsWith("?") ? search.slice(1) : search;
+  const params = new URLSearchParams(raw);
+  const runId = params.get("run");
+  const overlayId = params.get("overlay") ?? params.get("findingId");
+
+  return objectsPagePath(
+    projectId,
+    drawingId,
+    runId,
+    overlayId,
+  );
 }

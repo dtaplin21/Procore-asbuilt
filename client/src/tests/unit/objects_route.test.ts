@@ -4,6 +4,7 @@ import {
   objectsPagePath,
   objectsPagePathForRun,
   parseObjectsRouteParams,
+  workspacePathToObjectsUrl,
 } from "@/lib/objectsRoute";
 
 describe("objectsPagePath", () => {
@@ -35,6 +36,36 @@ describe("parseObjectsRouteParams", () => {
       runId: "15",
       overlayId: "42",
     });
+  });
+});
+
+describe("workspacePathToObjectsUrl", () => {
+  it("maps legacy workspace paths to Objects URLs", () => {
+    expect(
+      workspacePathToObjectsUrl("/projects/2/drawings/8/workspace"),
+    ).toBe("/objects?projectId=2&drawingId=8");
+  });
+
+  it("preserves run and overlay query params", () => {
+    expect(
+      workspacePathToObjectsUrl(
+        "/projects/2/drawings/8/workspace",
+        "?run=15&overlay=42",
+      ),
+    ).toBe("/objects?projectId=2&drawingId=8&run=15&overlay=42");
+  });
+
+  it("maps legacy findingId to overlay", () => {
+    expect(
+      workspacePathToObjectsUrl(
+        "/projects/2/drawings/8/workspace",
+        "?findingId=99",
+      ),
+    ).toBe("/objects?projectId=2&drawingId=8&overlay=99");
+  });
+
+  it("returns null for non-workspace paths", () => {
+    expect(workspacePathToObjectsUrl("/objects")).toBeNull();
   });
 });
 

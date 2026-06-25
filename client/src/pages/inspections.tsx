@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { useQuery, type Query } from "@tanstack/react-query";
 import { ClipboardCheck, Filter, Loader2, Search } from "lucide-react";
 
 import InspectionRunRow from "@/components/drawing-workspace/inspection_run_row";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import InspectionUploadForm from "@/components/inspections/inspection_upload_form";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useInspectionRuns } from "@/hooks/use-inspection-runs";
-import { buildDrawingPickerUrl, buildObjectsUrlWithRun } from "@/lib/workspace-links";
+import { buildObjectsUrlWithRun } from "@/lib/workspace-links";
 import {
   setDrawingReturnPath,
   setLastProjectIdForWorkspaceFallback,
@@ -119,7 +119,7 @@ export default function Inspections() {
     });
   }, [runs, searchQuery]);
 
-  const openRunInWorkspace = (runId: number) => {
+  const openRunOnObjects = (runId: number) => {
     if (selectedProjectId == null) return;
     const run = runs.find((item) => item.id === runId);
     if (!run) return;
@@ -137,10 +137,24 @@ export default function Inspections() {
     setLocation(path);
   };
 
-  const newInspectionHref =
-    selectedProjectId != null
-      ? buildDrawingPickerUrl(selectedProjectId)
-      : "/";
+  const handleInspectionUploaded = (result: {
+    runId: string;
+    masterDrawingId: string;
+  }) => {
+    if (selectedProjectId == null) return;
+    const path = buildObjectsUrlWithRun(
+      String(selectedProjectId),
+      result.masterDrawingId,
+      result.runId,
+    );
+    setDrawingReturnPath(
+      String(selectedProjectId),
+      result.masterDrawingId,
+      result.runId,
+    );
+    setLastProjectIdForWorkspaceFallback(selectedProjectId);
+    setLocation(path);
+  };
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
@@ -154,14 +168,25 @@ export default function Inspections() {
             Inspections
           </h1>
           <p className="text-muted-foreground">
-            AI inspection runs from uploaded evidence — open a run in the drawing workspace to
-            review overlays.
+            Upload inspection documents, then review mapped findings on the Objects drawing
+            viewer.
           </p>
         </div>
-        <Button asChild disabled={selectedProjectId == null} data-testid="button-new-inspection">
-          <Link href={newInspectionHref}>Open drawing workspace</Link>
-        </Button>
       </div>
+
+      {selectedProjectId != null ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">New inspection upload</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <InspectionUploadForm
+              projectId={selectedProjectId}
+              onUploaded={handleInspectionUploaded}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardContent className="grid gap-4 p-4 sm:grid-cols-3">
@@ -255,7 +280,7 @@ export default function Inspections() {
             <p className="text-sm">
               {searchQuery || statusFilter !== "all"
                 ? "Try adjusting your search or filters"
-                : "Upload evidence in the drawing workspace to start an inspection run"}
+                : "Upload an inspection document above to start a run"}
             </p>
           </CardContent>
         </Card>
@@ -265,7 +290,7 @@ export default function Inspections() {
             <InspectionRunRow
               key={run.id}
               run={run}
-              onSelect={openRunInWorkspace}
+              onSelect={openRunOnObjects}
             />
           ))}
         </ul>
