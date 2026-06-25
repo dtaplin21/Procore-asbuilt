@@ -118,12 +118,6 @@ export function getLastProjectIdForWorkspaceFallback(): number | null {
   }
 }
 
-export type WorkspaceSidebarNav = {
-  href: string;
-  disabled: boolean;
-  tooltip: string;
-};
-
 export type ObjectsSidebarNav = {
   href: string;
   tooltip: string;
@@ -167,35 +161,5 @@ export function getObjectsSidebarNav(): ObjectsSidebarNav {
   return {
     href: "/objects",
     tooltip: "Drawing viewer and QC/QA objects",
-  };
-}
-
-export function getWorkspaceSidebarNav(): WorkspaceSidebarNav {
-  const last = getDrawingReturnPath();
-  if (
-    last &&
-    (last.startsWith("/objects") ||
-      (last.startsWith("/projects/") && last.includes("/workspace")))
-  ) {
-    return {
-      href: last,
-      disabled: false,
-      tooltip: last.startsWith("/objects")
-        ? "Return to drawing viewer"
-        : "Legacy workspace (redirects to Objects)",
-    };
-  }
-  const pid = getLastProjectIdForWorkspaceFallback();
-  if (pid != null) {
-    return {
-      href: `/projects/${pid}/drawings`,
-      disabled: false,
-      tooltip: "Drawings — open a drawing from the list",
-    };
-  }
-  return {
-    href: "/",
-    disabled: true,
-    tooltip: "Open a drawing from the dashboard or Objects page first.",
   };
 }

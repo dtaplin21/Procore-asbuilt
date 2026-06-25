@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   clearDrawingReturnPath,
   getObjectsSidebarNav,
-  getWorkspaceSidebarNav,
   LAST_PROJECT_ID_STORAGE_KEY,
   setDrawingReturnPath,
   setLastProjectIdForWorkspaceFallback,
@@ -48,21 +47,6 @@ describe("getObjectsSidebarNav", () => {
     expect(getObjectsSidebarNav()).toEqual({
       href: "/objects",
       tooltip: "Drawing viewer and QC/QA objects",
-    });
-  });
-});
-
-describe("getWorkspaceSidebarNav", () => {
-  afterEach(() => {
-    clearSidebarNavStorage();
-  });
-
-  it("returns the remembered Objects URL with drawing viewer tooltip", () => {
-    setDrawingReturnPath("2", "8", "15");
-    expect(getWorkspaceSidebarNav()).toEqual({
-      href: "/objects?projectId=2&drawingId=8&run=15",
-      disabled: false,
-      tooltip: "Return to drawing viewer",
     });
   });
 });

@@ -6,7 +6,6 @@ import {
   Layers,
   Settings,
   Cloud,
-  DraftingCompass,
 } from "lucide-react";
 import {
   Sidebar,
@@ -24,10 +23,8 @@ import {
 import { ProcoreStatus } from "@/components/procore-status";
 import {
   getObjectsSidebarNav,
-  getWorkspaceSidebarNav,
   subscribeWorkspaceStorage,
   type ObjectsSidebarNav,
-  type WorkspaceSidebarNav,
 } from "@/lib/workspace-return-path";
 import type { ProcoreConnection } from "@shared/schema";
 
@@ -66,44 +63,16 @@ function isObjectsNavActive(location: string): boolean {
   return workspaceRoutePathOnly(location) === "/objects";
 }
 
-/** Active when on Objects or the remembered drawing return path. */
-function isDrawingViewerNavActive(location: string, nav: WorkspaceSidebarNav): boolean {
-  if (nav.disabled) return false;
-  const locPath = workspaceRoutePathOnly(location);
-  const hrefPath = workspaceRoutePathOnly(nav.href);
-  if (locPath === "/objects" || hrefPath.startsWith("/objects")) {
-    return locPath === "/objects";
-  }
-  if (hrefPath.includes("/workspace")) {
-    return locPath === hrefPath;
-  }
-  if (locPath === hrefPath) return true;
-  const underDrawings = hrefPath.endsWith("/") ? hrefPath : `${hrefPath}/`;
-  return locPath.startsWith(underDrawings) && locPath.includes("/workspace");
-}
-
 export function AppSidebar({ procoreConnection, onProcoreSync }: AppSidebarProps) {
   const [location] = useLocation();
 
-  const sidebarNavJson = useSyncExternalStore(
+  const objectsNavJson = useSyncExternalStore(
     subscribeWorkspaceStorage,
-    () =>
-      JSON.stringify({
-        workspace: getWorkspaceSidebarNav(),
-        objects: getObjectsSidebarNav(),
-      }),
-    () =>
-      JSON.stringify({
-        workspace: getWorkspaceSidebarNav(),
-        objects: getObjectsSidebarNav(),
-      })
+    () => JSON.stringify(getObjectsSidebarNav()),
+    () => JSON.stringify(getObjectsSidebarNav())
   );
 
-  const { workspace: workspaceNav, objects: objectsNav } = JSON.parse(
-    sidebarNavJson
-  ) as { workspace: WorkspaceSidebarNav; objects: ObjectsSidebarNav };
-
-  const drawingViewerActive = isDrawingViewerNavActive(location, workspaceNav);
+  const objectsNav = JSON.parse(objectsNavJson) as ObjectsSidebarNav;
 
   return (
     <Sidebar>
@@ -151,30 +120,6 @@ export function AppSidebar({ procoreConnection, onProcoreSync }: AppSidebarProps
                     <span>Objects</span>
                   </Link>
                 </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem key="drawing-viewer">
-                {workspaceNav.disabled ? (
-                  <SidebarMenuButton
-                    disabled
-                    isActive={false}
-                    tooltip={workspaceNav.tooltip}
-                    data-testid="nav-drawing-viewer"
-                  >
-                    <DraftingCompass className="w-4 h-4" />
-                    <span>Drawing viewer</span>
-                  </SidebarMenuButton>
-                ) : (
-                  <SidebarMenuButton
-                    asChild
-                    isActive={drawingViewerActive}
-                    tooltip={workspaceNav.tooltip}
-                  >
-                    <Link href={workspaceNav.href} data-testid="nav-drawing-viewer">
-                      <DraftingCompass className="w-4 h-4" />
-                      <span>Drawing viewer</span>
-                    </Link>
-                  </SidebarMenuButton>
-                )}
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
