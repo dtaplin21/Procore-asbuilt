@@ -134,6 +134,8 @@ async def upload_inspection_run_evidence(
     if unresolved:
         flag_unresolved_evidence(db, unresolved)
 
+    storage.update_inspection_run_status(cast(int, run.id), "complete")
+
     if region_load.untagged_region_count > 0:
         logger.info(
             "Drawing %s has %d untagged regions — tag with inspection_type_tags/location_tags.",

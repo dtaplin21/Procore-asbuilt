@@ -1107,6 +1107,7 @@ class InspectionRunCreate(BaseModel):
     master_drawing_id: int
     evidence_id: Optional[int] = None
     inspection_type: Optional[str] = None  # allow override
+    skip_pipeline: bool = False  # when True, only create the run row (document upload follows)
 
 
 class ProcoreWritebackRequest(BaseModel):

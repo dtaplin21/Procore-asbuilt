@@ -1,15 +1,14 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery, type Query } from "@tanstack/react-query";
 import { ClipboardCheck, Loader2 } from "lucide-react";
 import type {
   EvidenceListResponse,
-  EvidenceRecordResponse,
   InspectionRun,
   InspectionRunListResponse,
 } from "@shared/schema";
 
-import EvidenceUploadField from "@/components/drawing-workspace/evidence_upload_field";
 import InspectionRunRow from "@/components/drawing-workspace/inspection_run_row";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,9 +18,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useInspectionRuns, useRunInspection } from "@/hooks/use-inspection-runs";
+import {
+  useCreateInspectionRun,
+  useDrawingOverlays,
+  useInspectionRuns,
+  useRunInspection,
+  useUploadInspectionRunEvidence,
+} from "@/hooks/use-inspection-runs";
 import { toast } from "@/hooks/use-toast";
 import { fetchProjectEvidence, projectEvidenceQueryKey } from "@/lib/api/evidence";
+import { formatOverlayListItem } from "@/lib/drawing-overlays/overlay_display";
 
 export type InspectionRunsPanelProps = {
   projectId: number;
@@ -47,7 +53,9 @@ export default function InspectionRunsPanel({
   selectedRunId = null,
   onSelectRun,
 }: InspectionRunsPanelProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedEvidenceId, setSelectedEvidenceId] = useState<number | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const { data: runsData, isLoading: runsLoading, isError: runsError } =
     useInspectionRuns(projectId, { masterDrawingId }, { refetchInterval: pollWhileRunsActive });
@@ -66,8 +74,24 @@ export default function InspectionRunsPanel({
   const { mutate: runInspection, isPending: runPending } = useRunInspection(
     String(projectId)
   );
+  const { mutateAsync: createRun, isPending: createRunPending } =
+    useCreateInspectionRun(projectId);
+  const { mutateAsync: uploadRunEvidence, isPending: uploadPending } =
+    useUploadInspectionRunEvidence(projectId);
 
-  const runDisabled = runPending || hasActiveRun;
+  const uploadBusy = uploadPending || createRunPending;
+  const runDisabled = runPending || hasActiveRun || uploadBusy;
+
+  const { data: overlays = [], isLoading: overlaysLoading } = useDrawingOverlays(
+    String(projectId),
+    String(masterDrawingId),
+    { inspectionRunId: selectedRunId }
+  );
+
+  const overlayItems = useMemo(
+    () => overlays.map((overlay) => formatOverlayListItem(overlay)),
+    [overlays]
+  );
 
   const evidenceLabelById = useMemo(() => {
     const map = new Map<number, string>();
@@ -106,22 +130,72 @@ export default function InspectionRunsPanel({
     startInspectionRun(selectedEvidenceId);
   };
 
-  const handleEvidenceUploaded = async (evidence: EvidenceRecordResponse) => {
-    setSelectedEvidenceId(evidence.id);
-    toast({
-      title: "Evidence uploaded",
-      description: evidence.title?.trim() || `Evidence ${evidence.id}`,
+  const ensureRunForUpload = async (): Promise<number> => {
+    if (selectedRunId != null) {
+      return selectedRunId;
+    }
+    const run = await createRun({
+      master_drawing_id: masterDrawingId,
+      skip_pipeline: true,
     });
+    return run.id;
+  };
 
-    if (hasActiveRun || runPending) {
+  const handlePickEvidenceFile = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleEvidenceFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (hasActiveRun) {
       toast({
-        title: "Inspection not started",
-        description: "Wait for the current inspection to finish, then run again.",
+        title: "Upload blocked",
+        description: "Wait for the current inspection to finish before uploading.",
+        variant: "destructive",
       });
       return;
     }
 
-    startInspectionRun(evidence.id);
+    setUploadError(null);
+    void (async () => {
+      try {
+        const runId = await ensureRunForUpload();
+        const result = await uploadRunEvidence({
+          inspectionRunId: runId,
+          file,
+          masterDrawingId,
+        });
+
+        onSelectRun?.(runId);
+
+        const parts = [
+          `${result.overlays_created} overlay${result.overlays_created === 1 ? "" : "s"} mapped`,
+        ];
+        if (result.unresolved_count > 0) {
+          parts.push(`${result.unresolved_count} need review`);
+        }
+        if (result.untagged_region_count > 0) {
+          parts.push(`${result.untagged_region_count} untagged region(s) on sheet`);
+        }
+
+        toast({
+          title: "Evidence processed",
+          description: `Run #${runId}: ${parts.join(" · ")}`,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to upload inspection evidence";
+        setUploadError(message);
+        toast({
+          title: "Upload failed",
+          description: message,
+          variant: "destructive",
+        });
+      }
+    })();
   };
 
   return (
@@ -137,6 +211,7 @@ export default function InspectionRunsPanel({
         <Button
           type="button"
           size="sm"
+          variant="outline"
           onClick={handleRunInspection}
           disabled={runDisabled}
           data-testid="inspection-runs-run"
@@ -147,21 +222,45 @@ export default function InspectionRunsPanel({
               Running…
             </>
           ) : (
-            "Run inspection"
+            "Legacy run"
           )}
         </Button>
       </header>
 
-      <EvidenceUploadField
-        projectId={projectId}
-        onUploaded={handleEvidenceUploaded}
-        disabled={runPending}
-        uploadOptions={{ type: "inspection_doc" }}
-      />
+      <div className="space-y-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/pdf,image/*"
+          className="hidden"
+          data-testid="inspection-run-evidence-file-input"
+          aria-label="Upload inspection evidence file"
+          onChange={handleEvidenceFileChange}
+          disabled={uploadBusy || hasActiveRun}
+        />
+        <button
+          type="button"
+          onClick={handlePickEvidenceFile}
+          disabled={uploadBusy || hasActiveRun}
+          data-testid="inspection-run-evidence-upload"
+          className="w-full rounded-md border border-primary bg-background px-3 py-2 text-sm font-medium text-primary hover:bg-primary-soft disabled:opacity-60"
+        >
+          {uploadBusy ? "Processing evidence…" : "Upload inspection evidence…"}
+        </button>
+        <p className="text-xs text-muted-foreground">
+          Maps the document onto this sheet via the inspection pipeline. Select a run first to
+          add another upload to it, or leave unselected to start a new run.
+        </p>
+        {uploadError ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-800">
+            {uploadError}
+          </div>
+        ) : null}
+      </div>
 
       <div className="grid gap-2">
         <Label htmlFor="inspection-evidence-select" className="text-xs text-muted-foreground">
-          Link evidence (optional)
+          Link evidence for legacy run (optional)
         </Label>
         <Select
           value={selectedEvidenceId != null ? String(selectedEvidenceId) : "none"}
@@ -193,7 +292,7 @@ export default function InspectionRunsPanel({
         <p className="text-sm text-destructive">Could not load inspection runs.</p>
       ) : runs.length === 0 ? (
         <p className="text-sm text-muted-foreground py-2">
-          No inspection runs for this sheet yet.
+          No inspection runs for this sheet yet. Upload evidence to create one.
         </p>
       ) : (
         <ul className="flex max-h-[min(24rem,50vh)] flex-col gap-2 overflow-y-auto pr-1">
@@ -209,6 +308,49 @@ export default function InspectionRunsPanel({
           ))}
         </ul>
       )}
+
+      {selectedRunId != null ? (
+        <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Overlays on sheet
+            </p>
+            <span className="text-xs text-muted-foreground">
+              {overlaysLoading ? "Loading…" : `${overlays.length} shown`}
+            </span>
+          </div>
+          {overlaysLoading ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Loading overlays…
+            </div>
+          ) : overlayItems.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No overlays for run #{selectedRunId} yet. Upload evidence to map findings on the
+              drawing.
+            </p>
+          ) : (
+            <ul className="space-y-2" data-testid="inspection-run-overlay-list">
+              {overlayItems.map((item, index) => (
+                <li
+                  key={overlays[index]?.id ?? index}
+                  className="rounded border border-border bg-background px-2 py-1.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
+                      <p className="text-xs text-muted-foreground">{item.subtitle}</p>
+                    </div>
+                    <Badge variant="outline" className="shrink-0 capitalize">
+                      {item.status}
+                    </Badge>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
 
       {selectedRunId != null && evidenceLabelById.size > 0 ? (
         <p className="text-xs text-muted-foreground">

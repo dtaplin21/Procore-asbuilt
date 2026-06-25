@@ -31,6 +31,7 @@ export default function DrawingOverlayLayer({
     key: string;
     resolved: ResolvedOverlayRegion;
     inspectionTone: OverlayInspectionTone;
+    label: string | null;
   }> = [];
 
   for (const region of regions) {
@@ -43,6 +44,7 @@ export default function DrawingOverlayLayer({
       key: `${region.kind}-${region.id}`,
       resolved,
       inspectionTone: overlayRegionTone(region, showInspectionStatuses),
+      label: region.label,
     });
   }
 
@@ -66,6 +68,7 @@ export default function DrawingOverlayLayer({
           selected
           index={index}
           inspectionTone={item.inspectionTone}
+          label={item.label}
         />
       ))}
     </svg>

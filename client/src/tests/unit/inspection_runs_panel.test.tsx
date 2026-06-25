@@ -1,12 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
-import type { EvidenceRecordResponse } from "@shared/schema";
 
 import InspectionRunsPanel from "@/components/drawing-workspace/inspection_runs_panel";
 
 const runMutate = vi.fn();
+const createRunAsync = vi.fn();
+const uploadRunEvidenceAsync = vi.fn();
 
 vi.mock("@/hooks/use-inspection-runs", () => ({
   useInspectionRuns: () => ({
@@ -37,29 +38,31 @@ vi.mock("@/hooks/use-inspection-runs", () => ({
     mutate: runMutate,
     isPending: false,
   }),
-}));
-
-vi.mock("@/components/drawing-workspace/evidence_upload_field", () => ({
-  default: ({
-    onUploaded,
-  }: {
-    onUploaded: (evidence: EvidenceRecordResponse) => void;
-  }) => (
-    <button
-      type="button"
-      data-testid="mock-evidence-upload-success"
-      onClick={() =>
-        onUploaded({
-          id: 99,
-          type: "inspection_doc",
-          title: "Site photo",
-          created_at: "2026-01-01T12:00:00Z",
-        })
-      }
-    >
-      Mock upload
-    </button>
-  ),
+  useCreateInspectionRun: () => ({
+    mutateAsync: createRunAsync,
+    isPending: false,
+  }),
+  useUploadInspectionRunEvidence: () => ({
+    mutateAsync: uploadRunEvidenceAsync,
+    isPending: false,
+  }),
+  useDrawingOverlays: () => ({
+    data: [
+      {
+        id: 42,
+        master_drawing_id: 10,
+        inspection_run_id: 1,
+        diff_id: null,
+        geometry: { type: "rect", x: 0.1, y: 0.1, width: 0.2, height: 0.2, label: "Final — Roof" },
+        status: "fail",
+        label: "Final — Roof",
+        severity: "high",
+        meta: null,
+        created_at: "2026-01-01T12:00:00Z",
+      },
+    ],
+    isLoading: false,
+  }),
 }));
 
 function renderPanel(ui: ReactElement) {
@@ -70,30 +73,81 @@ function renderPanel(ui: ReactElement) {
 }
 
 describe("InspectionRunsPanel", () => {
-  it("renders runs and run inspection control", () => {
+  beforeEach(() => {
+    runMutate.mockClear();
+    createRunAsync.mockReset();
+    uploadRunEvidenceAsync.mockReset();
+    createRunAsync.mockResolvedValue({ id: 7, status: "queued" });
+    uploadRunEvidenceAsync.mockResolvedValue({
+      evidence_id: 99,
+      overlays_created: 1,
+      unresolved_count: 0,
+      untagged_region_count: 0,
+      overlay_ids: [42],
+    });
+  });
+
+  it("renders runs and upload control", () => {
     renderPanel(
-      <InspectionRunsPanel projectId={2} masterDrawingId={10} />
+      <InspectionRunsPanel projectId={2} masterDrawingId={10} selectedRunId={1} />
     );
 
     expect(screen.getByTestId("inspection-runs-panel")).toBeInTheDocument();
-    expect(screen.getByTestId("inspection-runs-run")).toBeInTheDocument();
+    expect(screen.getByTestId("inspection-run-evidence-upload")).toBeInTheDocument();
     expect(screen.getByTestId("inspection-run-row-1")).toBeInTheDocument();
+    expect(screen.getByTestId("inspection-run-overlay-list")).toBeInTheDocument();
+    expect(screen.getByText("Final — Roof")).toBeInTheDocument();
   });
 
-  it("triggers useRunInspection after evidence upload success", () => {
-    runMutate.mockClear();
+  it("uploads evidence to the document pipeline for the selected run", async () => {
+    const onSelectRun = vi.fn();
     renderPanel(
-      <InspectionRunsPanel projectId={2} masterDrawingId={10} />
+      <InspectionRunsPanel
+        projectId={2}
+        masterDrawingId={10}
+        selectedRunId={1}
+        onSelectRun={onSelectRun}
+      />
     );
 
-    fireEvent.click(screen.getByTestId("mock-evidence-upload-success"));
+    const input = screen.getByTestId("inspection-run-evidence-file-input") as HTMLInputElement;
+    const file = new File(["pdf"], "report.pdf", { type: "application/pdf" });
 
-    expect(runMutate).toHaveBeenCalledWith(
-      { master_drawing_id: 10, evidence_id: 99 },
-      expect.objectContaining({
-        onSuccess: expect.any(Function),
-        onError: expect.any(Function),
-      })
-    );
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(uploadRunEvidenceAsync).toHaveBeenCalledWith({
+        inspectionRunId: 1,
+        file,
+        masterDrawingId: 10,
+      });
+    });
+
+    expect(createRunAsync).not.toHaveBeenCalled();
+    expect(onSelectRun).toHaveBeenCalledWith(1);
+  });
+
+  it("creates a deferred run when uploading without a selection", async () => {
+    renderPanel(<InspectionRunsPanel projectId={2} masterDrawingId={10} selectedRunId={null} />);
+
+    const input = screen.getByTestId("inspection-run-evidence-file-input") as HTMLInputElement;
+    const file = new File(["pdf"], "report.pdf", { type: "application/pdf" });
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(createRunAsync).toHaveBeenCalledWith({
+        master_drawing_id: 10,
+        skip_pipeline: true,
+      });
+    });
+
+    await waitFor(() => {
+      expect(uploadRunEvidenceAsync).toHaveBeenCalledWith({
+        inspectionRunId: 7,
+        file,
+        masterDrawingId: 10,
+      });
+    });
   });
 });

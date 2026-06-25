@@ -75,8 +75,12 @@ def create_inspection_run(
         "project_id": project_id,
         "master_drawing_id": body.master_drawing_id,
         "evidence_id": body.evidence_id,
+        "skip_pipeline": body.skip_pipeline,
     }
-    scope = f"inspection_run:{project_id}:{body.master_drawing_id}:{body.evidence_id or 'none'}"
+    scope = (
+        f"inspection_run:{project_id}:{body.master_drawing_id}:"
+        f"{body.evidence_id or 'none'}:{'defer' if body.skip_pipeline else 'run'}"
+    )
 
     try:
         idem_row, should_execute = begin_idempotent_operation(
@@ -112,6 +116,16 @@ def create_inspection_run(
         evidence_id=body.evidence_id,
         inspection_type=body.inspection_type,
     )
+
+    if body.skip_pipeline:
+        response = InspectionRunResponse.model_validate(run)
+        finish_idempotent_operation(
+            db,
+            row_id=cast(int, idem_row.id),
+            response_payload=response.model_dump(mode="json"),
+            resource_reference={"inspection_run_id": cast(int, run.id)},
+        )
+        return response
 
     # MVP: run pipeline synchronously
     result = run_inspection_mapping(db, run)

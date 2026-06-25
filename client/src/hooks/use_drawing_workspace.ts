@@ -1,204 +1,43 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  compareSubDrawingToMaster,
-  fetchAlignmentDiffs,
-  fetchMasterDrawing,
-  fetchMasterDrawingAlignments,
-} from "@/lib/api/drawing_workspace";
-import { drawingComparisonWorkspaceQueryKey } from "@/lib/drawing-comparison-query";
-import { queryClient } from "@/lib/queryClient";
-import type {
-  DrawingAlignmentListItem,
-  DrawingComparisonWorkspaceResponse,
-  DrawingDiff,
-} from "@/types/drawing_compare";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { fetchMasterDrawing } from "@/lib/api/drawing_workspace";
 import type { DrawingWorkspaceDrawing } from "@/types/drawing_workspace";
 
 type UseDrawingWorkspaceArgs = {
   projectId: number;
   drawingId: number;
-  initialAlignmentId?: number | null;
-  initialDiffId?: number | null;
 };
 
 type UseDrawingWorkspaceResult = {
   masterDrawing: DrawingWorkspaceDrawing | null;
-  alignments: DrawingAlignmentListItem[];
-  selectedAlignmentId: number | null;
-  selectedDiffId: number | null;
-  diffsByAlignmentId: Record<number, DrawingDiff[]>;
-
   workspaceLoading: boolean;
-  diffsLoading: boolean;
-
   workspaceError: string | null;
-  diffsError: string | null;
-
-  selectedDiffs: DrawingDiff[];
-  selectedAlignment: DrawingAlignmentListItem | null;
-  selectedDiff: DrawingDiff | null;
-
-  selectAlignment: (alignmentId: number) => Promise<void>;
-  selectDiff: (diffId: number) => void;
-
   reloadWorkspace: () => Promise<void>;
-  reloadSelectedDiffs: () => Promise<void>;
-
-  /** Increment before `compareSubDrawingToMaster` + `mergeCompareResponse` so out-of-order responses are ignored. */
-  beginCompareOperation: () => number;
-
-  mergeCompareResponse: (
-    response: DrawingComparisonWorkspaceResponse,
-    requestId: number
-  ) => Promise<{
-    alignment: DrawingAlignmentListItem;
-    diffs: DrawingDiff[];
-  }>;
 };
 
 export function useDrawingWorkspace({
   projectId,
   drawingId,
-  initialAlignmentId = null,
-  initialDiffId = null,
 }: UseDrawingWorkspaceArgs): UseDrawingWorkspaceResult {
   const [masterDrawing, setMasterDrawing] = useState<DrawingWorkspaceDrawing | null>(null);
-  const [alignments, setAlignments] = useState<DrawingAlignmentListItem[]>([]);
-  const [selectedAlignmentId, setSelectedAlignmentId] = useState<number | null>(null);
-  const [selectedDiffId, setSelectedDiffId] = useState<number | null>(null);
-  const [diffsByAlignmentId, setDiffsByAlignmentId] = useState<Record<number, DrawingDiff[]>>(
-    {}
-  );
-
   const [workspaceLoading, setWorkspaceLoading] = useState(true);
-  const [diffsLoading, setDiffsLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
-  const [diffsError, setDiffsError] = useState<string | null>(null);
 
   const workspaceRequestIdRef = useRef(0);
-  const diffsRequestIdRef = useRef(0);
-  const compareMergeRequestIdRef = useRef(0);
-  const hasAppliedInitialAlignmentRef = useRef(false);
-  const hasAppliedInitialDiffRef = useRef(false);
-  const diffsByAlignmentIdRef = useRef<Record<number, DrawingDiff[]>>({});
-  diffsByAlignmentIdRef.current = diffsByAlignmentId;
-
-  useEffect(() => {
-    hasAppliedInitialAlignmentRef.current = false;
-    hasAppliedInitialDiffRef.current = false;
-  }, [projectId, drawingId]);
-
-  const loadDiffsForAlignment = useCallback(
-    async (alignmentId: number, force = false) => {
-      if (!force && diffsByAlignmentIdRef.current[alignmentId]) {
-        return;
-      }
-
-      const requestId = ++diffsRequestIdRef.current;
-
-      setDiffsLoading(true);
-      setDiffsError(null);
-
-      try {
-        const response = await fetchAlignmentDiffs(projectId, drawingId, alignmentId);
-
-        if (requestId !== diffsRequestIdRef.current) {
-          return;
-        }
-
-        const nextDiffs = response.diffs ?? [];
-
-        setDiffsByAlignmentId((prev) => ({
-          ...prev,
-          [alignmentId]: nextDiffs,
-        }));
-
-        setSelectedDiffId((current) => {
-          if (
-            !hasAppliedInitialDiffRef.current &&
-            initialDiffId != null
-          ) {
-            const matchedInitialDiff = nextDiffs.find(
-              (diff) => diff.id === initialDiffId
-            );
-
-            hasAppliedInitialDiffRef.current = true;
-
-            if (matchedInitialDiff) {
-              return matchedInitialDiff.id;
-            }
-          }
-
-          if (current && nextDiffs.some((diff) => diff.id === current)) {
-            return current;
-          }
-
-          return nextDiffs[0]?.id ?? null;
-        });
-      } catch (error) {
-        if (requestId !== diffsRequestIdRef.current) {
-          return;
-        }
-
-        setDiffsError(error instanceof Error ? error.message : "Failed to load diffs.");
-      } finally {
-        if (requestId === diffsRequestIdRef.current) {
-          setDiffsLoading(false);
-        }
-      }
-    },
-    [projectId, drawingId, initialDiffId]
-  );
 
   const loadWorkspace = useCallback(async () => {
     const requestId = ++workspaceRequestIdRef.current;
 
     setWorkspaceLoading(true);
     setWorkspaceError(null);
-    setDiffsError(null);
 
     try {
-      const [drawingResponse, alignmentsResponse] = await Promise.all([
-        fetchMasterDrawing(projectId, drawingId),
-        fetchMasterDrawingAlignments(projectId, drawingId),
-      ]);
+      const drawingResponse = await fetchMasterDrawing(projectId, drawingId);
 
       if (requestId !== workspaceRequestIdRef.current) {
         return;
       }
 
-      const nextAlignments = alignmentsResponse.alignments ?? [];
-
       setMasterDrawing(drawingResponse);
-      setAlignments(nextAlignments);
-
-      setDiffsByAlignmentId({});
-      setSelectedDiffId(null);
-
-      if (nextAlignments.length > 0) {
-        let nextSelectedAlignment = nextAlignments[0];
-
-        if (
-          !hasAppliedInitialAlignmentRef.current &&
-          initialAlignmentId != null
-        ) {
-          const matchedAlignment = nextAlignments.find(
-            (alignment) => alignment.id === initialAlignmentId
-          );
-
-          if (matchedAlignment) {
-            nextSelectedAlignment = matchedAlignment;
-          }
-
-          hasAppliedInitialAlignmentRef.current = true;
-        }
-
-        setSelectedAlignmentId(nextSelectedAlignment.id);
-
-        await loadDiffsForAlignment(nextSelectedAlignment.id, true);
-      } else {
-        setSelectedAlignmentId(null);
-      }
     } catch (error) {
       if (requestId !== workspaceRequestIdRef.current) {
         return;
@@ -212,7 +51,7 @@ export function useDrawingWorkspace({
         setWorkspaceLoading(false);
       }
     }
-  }, [projectId, drawingId, initialAlignmentId, initialDiffId, loadDiffsForAlignment]);
+  }, [projectId, drawingId]);
 
   useEffect(() => {
     void loadWorkspace();
@@ -238,158 +77,14 @@ export function useDrawingWorkspace({
     return () => clearInterval(timer);
   }, [masterDrawing, projectId, drawingId, workspaceLoading]);
 
-  const selectAlignment = useCallback(
-    async (alignmentId: number) => {
-      setSelectedAlignmentId(alignmentId);
-      setSelectedDiffId(null);
-      setDiffsError(null);
-      await loadDiffsForAlignment(alignmentId);
-    },
-    [loadDiffsForAlignment]
-  );
-
-  const selectDiff = useCallback((diffId: number) => {
-    setSelectedDiffId(diffId);
-  }, []);
-
   const reloadWorkspace = useCallback(async () => {
     await loadWorkspace();
   }, [loadWorkspace]);
 
-  const reloadSelectedDiffs = useCallback(async () => {
-    if (selectedAlignmentId == null) return;
-    await loadDiffsForAlignment(selectedAlignmentId, true);
-  }, [selectedAlignmentId, loadDiffsForAlignment]);
-
-  const mergeAlignmentIntoList = useCallback(
-    (incomingAlignment: DrawingAlignmentListItem) => {
-      setAlignments((prev) => {
-        const existingIndex = prev.findIndex(
-          (item) => item.id === incomingAlignment.id
-        );
-
-        if (existingIndex === -1) {
-          return [incomingAlignment, ...prev];
-        }
-
-        const next = [...prev];
-        next[existingIndex] = incomingAlignment;
-
-        next.sort((a, b) => {
-          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return bTime - aTime;
-        });
-
-        return next;
-      });
-    },
-    []
-  );
-
-  const storeDiffsForAlignment = useCallback(
-    (alignmentId: number, diffs: DrawingDiff[]) => {
-      setDiffsByAlignmentId((prev) => ({
-        ...prev,
-        [alignmentId]: diffs,
-      }));
-    },
-    []
-  );
-
-  const beginCompareOperation = useCallback(() => {
-    return ++compareMergeRequestIdRef.current;
-  }, []);
-
-  const mergeCompareResponse = useCallback(
-    async (response: DrawingComparisonWorkspaceResponse, requestId: number) => {
-      const subDrawingId = response.subDrawing.id;
-
-      queryClient.setQueryData<DrawingComparisonWorkspaceResponse>(
-        drawingComparisonWorkspaceQueryKey(projectId, drawingId, subDrawingId),
-        response
-      );
-
-      const incomingAlignment = response.alignment;
-      const incomingDiffs = response.diffs ?? [];
-
-      const sortedDiffs = [...incomingDiffs].sort((a, b) => {
-        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return bTime - aTime;
-      });
-
-      if (requestId !== compareMergeRequestIdRef.current) {
-        return { alignment: incomingAlignment, diffs: sortedDiffs };
-      }
-
-      mergeAlignmentIntoList(incomingAlignment);
-      storeDiffsForAlignment(incomingAlignment.id, sortedDiffs);
-
-      setSelectedAlignmentId(incomingAlignment.id);
-
-      const latestDiff = sortedDiffs[0] ?? null;
-      setSelectedDiffId(latestDiff?.id ?? null);
-
-      setDiffsError(null);
-
-      if (response.masterDrawing) {
-        try {
-          const refreshed = await fetchMasterDrawing(projectId, drawingId);
-          if (requestId !== compareMergeRequestIdRef.current) {
-            return { alignment: incomingAlignment, diffs: sortedDiffs };
-          }
-          setMasterDrawing(refreshed);
-        } catch {
-          /* keep existing master */
-        }
-      }
-
-      return {
-        alignment: incomingAlignment,
-        diffs: sortedDiffs,
-      };
-    },
-    [projectId, drawingId, mergeAlignmentIntoList, storeDiffsForAlignment]
-  );
-
-  const selectedDiffs = useMemo(() => {
-    if (selectedAlignmentId == null) return [];
-    return diffsByAlignmentId[selectedAlignmentId] ?? [];
-  }, [selectedAlignmentId, diffsByAlignmentId]);
-
-  const selectedAlignment = useMemo(() => {
-    return alignments.find((alignment) => alignment.id === selectedAlignmentId) ?? null;
-  }, [alignments, selectedAlignmentId]);
-
-  const selectedDiff = useMemo(() => {
-    return selectedDiffs.find((diff) => diff.id === selectedDiffId) ?? null;
-  }, [selectedDiffs, selectedDiffId]);
-
   return {
     masterDrawing,
-    alignments,
-    selectedAlignmentId,
-    selectedDiffId,
-    diffsByAlignmentId,
-
     workspaceLoading,
-    diffsLoading,
-
     workspaceError,
-    diffsError,
-
-    selectedDiffs,
-    selectedAlignment,
-    selectedDiff,
-
-    selectAlignment,
-    selectDiff,
-
     reloadWorkspace,
-    reloadSelectedDiffs,
-
-    beginCompareOperation,
-    mergeCompareResponse,
   };
 }

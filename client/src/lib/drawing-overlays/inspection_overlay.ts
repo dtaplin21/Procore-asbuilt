@@ -68,7 +68,15 @@ function readDiffId(overlay: DrawingOverlay): number | null {
   return overlay.diff_id ?? wire.diffId ?? null;
 }
 
-function readLabel(geometry: Record<string, unknown>, meta: Record<string, unknown> | null): string | null {
+function readLabel(
+  overlay: DrawingOverlay,
+  geometry: Record<string, unknown>,
+  meta: Record<string, unknown> | null
+): string | null {
+  const wire = overlay as DrawingOverlay & { label?: string | null };
+  if (typeof wire.label === "string" && wire.label.trim()) {
+    return wire.label.trim();
+  }
   const fromGeometry = geometry.label;
   if (typeof fromGeometry === "string" && fromGeometry.trim()) {
     return fromGeometry.trim();
@@ -265,7 +273,7 @@ export function toOverlayRegions(overlays: DrawingOverlay[]): OverlayRegion[] {
       id: overlay.id,
       kind,
       sourceId: inspectionRunId ?? diffId,
-      label: readLabel(overlay.geometry, meta),
+      label: readLabel(overlay, overlay.geometry, meta),
       severity: readSeverity(overlay, meta),
       bbox,
       shape: {

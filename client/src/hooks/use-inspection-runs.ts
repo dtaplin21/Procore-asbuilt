@@ -4,8 +4,16 @@ import type {
   InspectionRunListResponse,
   DrawingOverlay,
   RunInspectionRequest,
+  InspectionRunEvidenceUploadResponse,
 } from "@shared/schema";
 
+import {
+  buildDrawingOverlaysUrl,
+  createInspectionRun,
+  fetchDrawingOverlays,
+  refreshInspectionWorkspaceQueries,
+  uploadInspectionRunEvidence,
+} from "@/lib/api/inspection_runs";
 import { requestJson, resolveFetchUrl } from "@/lib/api/http";
 
 export type InspectionRunsFilters = {
@@ -46,14 +54,6 @@ export async function fetchInspectionRuns(
   );
 }
 
-/**
- * Fetch inspection runs for a project.
- * GET /api/projects/${projectId}/inspections/runs
- * Query params: master_drawing_id, status (optional)
- *
- * Prefer omitting `status` when consumers can filter client-side (e.g. Procore writeback)
- * so the query shares cache with {@link InspectionRunsPanel}.
- */
 export function useInspectionRuns(
   projectId: number | null,
   filters?: InspectionRunsFilters,
@@ -78,11 +78,7 @@ export function useInspectionRuns(
 }
 
 /**
- * Run the inspection mapping pipeline.
- * POST /api/projects/${projectId}/inspections/runs
- * Body: { master_drawing_id, evidence_id?, inspection_type? }
- *
- * Invalidates inspection runs and overlays queries on success.
+ * Legacy LLM inspection mapping pipeline (POST /inspections/runs with evidence_id).
  */
 export function useRunInspection(projectId: string | null) {
   const queryClient = useQueryClient();
@@ -95,12 +91,16 @@ export function useRunInspection(projectId: string | null) {
       const url = resolveFetchUrl(`/api/projects/${projectId}/inspections/runs`);
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
         credentials: "include",
         body: JSON.stringify({
           master_drawing_id: body.master_drawing_id,
           evidence_id: body.evidence_id ?? null,
           inspection_type: body.inspection_type ?? null,
+          skip_pipeline: body.skip_pipeline ?? false,
         }),
       });
       if (!res.ok) {
@@ -113,54 +113,78 @@ export function useRunInspection(projectId: string | null) {
     },
     onSuccess: (_, variables) => {
       if (projectId) {
-        queryClient.invalidateQueries({
-          predicate: (query) => {
-            const key = query.queryKey[0];
-            return (
-              typeof key === "string" &&
-              key.includes(`/api/projects/${projectId}/inspections/runs`)
-            );
-          },
-        });
-        queryClient.invalidateQueries({
-          predicate: (query) => {
-            const key = query.queryKey[0];
-            return (
-              typeof key === "string" &&
-              key.includes(`/api/projects/${projectId}/drawings/${variables.master_drawing_id}/overlays`)
-            );
-          },
-        });
+        const pid = Number(projectId);
+        void refreshInspectionWorkspaceQueries(
+          queryClient,
+          pid,
+          variables.master_drawing_id
+        );
       }
     },
   });
 }
 
+export function useCreateInspectionRun(projectId: number | null) {
+  return useMutation<InspectionRun, Error, RunInspectionRequest>({
+    mutationFn: (body) => {
+      if (projectId == null) {
+        throw new Error("Project required");
+      }
+      return createInspectionRun(projectId, body);
+    },
+  });
+}
+
+export type UploadInspectionRunEvidenceVariables = {
+  inspectionRunId: number;
+  file: File;
+  masterDrawingId: number;
+};
+
 /**
- * Fetch drawing overlays for a master drawing.
- * GET /api/projects/${projectId}/drawings/${drawingId}/overlays
- * Query params: inspection_run_id, diff_id (optional)
+ * Document pipeline upload: POST .../inspections/runs/{run_id}/evidence
  */
+export function useUploadInspectionRunEvidence(projectId: number | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    InspectionRunEvidenceUploadResponse,
+    Error,
+    UploadInspectionRunEvidenceVariables
+  >({
+    mutationFn: async ({ inspectionRunId, file }) => {
+      if (projectId == null) {
+        throw new Error("Project required");
+      }
+      return uploadInspectionRunEvidence(projectId, inspectionRunId, file);
+    },
+    onSuccess: (_, variables) => {
+      if (projectId != null) {
+        void refreshInspectionWorkspaceQueries(
+          queryClient,
+          projectId,
+          variables.masterDrawingId
+        );
+      }
+    },
+  });
+}
+
 export function useDrawingOverlays(
   projectId: string | null,
   drawingId: string | null,
   filters?: { inspectionRunId?: number | null; diffId?: number | null }
 ) {
-  const params = new URLSearchParams();
-  if (filters?.inspectionRunId != null) {
-    params.set("inspection_run_id", String(filters.inspectionRunId));
-  }
-  if (filters?.diffId != null) {
-    params.set("diff_id", String(filters.diffId));
-  }
-  const query = params.toString();
+  const pid = projectId != null ? Number(projectId) : NaN;
+  const did = drawingId != null ? Number(drawingId) : NaN;
   const url =
     projectId && drawingId
-      ? `/api/projects/${projectId}/drawings/${drawingId}/overlays${query ? `?${query}` : ""}`
+      ? buildDrawingOverlaysUrl(pid, did, filters)
       : "";
 
   return useQuery<DrawingOverlay[]>({
     queryKey: [url],
-    enabled: !!projectId && !!drawingId && !!url,
+    queryFn: () => fetchDrawingOverlays(pid, did, filters),
+    enabled: !!projectId && !!drawingId && !!url && Number.isFinite(pid) && Number.isFinite(did),
   });
 }

@@ -503,6 +503,8 @@ export interface RunInspectionRequest {
   master_drawing_id: number;
   evidence_id?: number | null;
   inspection_type?: string | null;
+  /** When true, only create the run — document upload uses POST .../runs/{id}/evidence. */
+  skip_pipeline?: boolean;
 }
 
 /** Human pass/fail review — scoped to alignment (legacy) or inspection run. */
@@ -677,6 +679,8 @@ export interface RunInspectionRequest {
   master_drawing_id: number;
   evidence_id?: number | null;
   inspection_type?: string | null;
+  /** When true, only create the run — document upload uses POST .../runs/{id}/evidence. */
+  skip_pipeline?: boolean;
 }
 
 /** Drawing overlay (API response shape; snake_case from backend). */
@@ -694,6 +698,15 @@ export interface DrawingOverlay {
   tagsJson?: Record<string, unknown> | null;
   meta: Record<string, unknown> | null;
   created_at: string;
+}
+
+/** Response from POST .../inspections/runs/{run_id}/evidence (document pipeline). */
+export interface InspectionRunEvidenceUploadResponse {
+  evidence_id: number;
+  overlays_created: number;
+  unresolved_count: number;
+  untagged_region_count: number;
+  overlay_ids: number[];
 }
 
 // Procore writeback (Phase 5)

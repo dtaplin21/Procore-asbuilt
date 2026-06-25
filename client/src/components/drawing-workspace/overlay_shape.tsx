@@ -16,6 +16,7 @@ type Props = {
   index: number;
   /** Pass/fail/changed tone, or `neutral` when status coloring is hidden. */
   inspectionTone: OverlayInspectionTone;
+  label?: string | null;
 };
 
 /** SVG rect/polygon for one normalized overlay region (master drawing space). */
@@ -25,25 +26,46 @@ export default function OverlayShape({
   selected = false,
   index,
   inspectionTone,
+  label = null,
 }: Props) {
   const { stroke, fill, strokeWidth } = overlayColorsForTone(inspectionTone, selected);
+  const caption =
+    label && label.trim().length > 0
+      ? label.trim().length > 48
+        ? `${label.trim().slice(0, 45)}…`
+        : label.trim()
+      : null;
 
   if (region.kind === "rect") {
     const rect = normalizedRectToPixels(region.rect, viewerSize);
 
     return (
-      <rect
-        x={rect.x}
-        y={rect.y}
-        width={rect.width}
-        height={rect.height}
-        fill={fill}
-        stroke={stroke}
-        strokeWidth={strokeWidth}
-        rx={4}
-        ry={4}
-        data-testid={`overlay-rect-${index}`}
-      />
+      <g data-testid={`overlay-group-${index}`}>
+        <rect
+          x={rect.x}
+          y={rect.y}
+          width={rect.width}
+          height={rect.height}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          rx={4}
+          ry={4}
+          data-testid={`overlay-rect-${index}`}
+        />
+        {caption ? (
+          <text
+            x={rect.x + 4}
+            y={Math.max(12, rect.y - 6)}
+            fill={stroke}
+            fontSize={11}
+            fontWeight={600}
+            data-testid={`overlay-label-${index}`}
+          >
+            {caption}
+          </text>
+        ) : null}
+      </g>
     );
   }
 
