@@ -1,33 +1,89 @@
 /**
- * Last drawing workspace URL for sidebar "return to workspace" navigation.
+ * Remembers "the last drawing the user was looking at" so sidebar nav and
+ * "back to drawing" actions land somewhere useful. Per the merge plan
+ * (Phase 1/2): this now stores Objects URLs (/objects?...) instead of the
+ * old /projects/:id/drawings/:id/workspace path.
  *
- * **Storage:** `sessionStorage` — scoped to the browser tab; a new tab has no
- * remembered path until the user visits a workspace in that tab.
- *
- * **Key:** `qcqa:lastDrawingWorkspace`
- *
- * **Value:** Full client path to restore, including query string when needed:
- * - Path: `/projects/:projectId/drawings/:drawingId/workspace`
- * - Query: other keys (e.g. dashboard `projectId`, insight `findingId`) may appear;
- *   preserve the full `location` string from wouter when saving so nothing is dropped
- *   unintentionally. Legacy `alignmentId` / `diffId` params are ignored by the workspace UI.
+ * Storage: sessionStorage, scoped per browser tab/session — deliberately
+ * NOT localStorage, since "last viewed drawing" shouldn't leak across
+ * separate browser sessions/devices for the same logged-in user (that's
+ * server-side state if you want it to persist that broadly).
  */
 
-export const WORKSPACE_RETURN_PATH_STORAGE_KEY = "qcqa:lastDrawingWorkspace";
+import { objectsPagePath } from "@/lib/objectsRoute";
 
-/** Sidebar fallback: last project id as decimal string (integer > 0). */
+const STORAGE_KEY = "lastDrawingReturnPath";
+
+/** Sidebar + migration helpers (same module, same storage key). */
+const LEGACY_STORAGE_KEY = "qcqa:lastDrawingWorkspace";
 export const LAST_PROJECT_ID_STORAGE_KEY = "qcqa:lastProjectId";
-
 export const WORKSPACE_STORAGE_CHANGE_EVENT = "qcqa-workspace-storage";
-
-function safeSessionStorage(): Storage | null {
-  if (typeof sessionStorage === "undefined") return null;
-  return sessionStorage;
-}
+/** @deprecated Use STORAGE_KEY via getDrawingReturnPath. */
+export const WORKSPACE_RETURN_PATH_STORAGE_KEY = STORAGE_KEY;
 
 function notifyWorkspaceStorageUpdated(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(WORKSPACE_STORAGE_CHANGE_EVENT));
+}
+
+export function setDrawingReturnPath(
+  projectId: string,
+  drawingId: string,
+  runId?: string | null,
+): void {
+  const path = objectsPagePath(projectId, drawingId, runId ?? undefined);
+  try {
+    window.sessionStorage.setItem(STORAGE_KEY, path);
+    notifyWorkspaceStorageUpdated();
+  } catch {
+    // sessionStorage can throw in some embedded/private-browsing
+    // contexts — losing "remember last drawing" is not worth a crash.
+  }
+}
+
+/**
+ * Returns the last-remembered Objects URL, or null if none is stored yet
+ * (e.g. first visit this session). Callers should fall back to a sensible
+ * default (e.g. the project's drawing list) when this returns null.
+ */
+export function getDrawingReturnPath(): string | null {
+  try {
+    const current = window.sessionStorage.getItem(STORAGE_KEY);
+    if (current?.trim()) {
+      return current.trim();
+    }
+    const legacy = window.sessionStorage.getItem(LEGACY_STORAGE_KEY);
+    return legacy?.trim() ? legacy.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearDrawingReturnPath(): void {
+  try {
+    window.sessionStorage.removeItem(STORAGE_KEY);
+    window.sessionStorage.removeItem(LEGACY_STORAGE_KEY);
+    notifyWorkspaceStorageUpdated();
+  } catch {
+    // no-op — see setDrawingReturnPath
+  }
+}
+
+/** Store a full Objects URL (e.g. when overlay query params are present). */
+export function setWorkspaceReturnPath(fullPath: string): void {
+  const trimmed = fullPath.trim();
+  if (!trimmed.startsWith("/")) return;
+  try {
+    window.sessionStorage.setItem(STORAGE_KEY, trimmed);
+    notifyWorkspaceStorageUpdated();
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+/** @deprecated Prefer {@link getDrawingReturnPath}. */
+export function getWorkspaceReturnPath(): string | null {
+  return getDrawingReturnPath();
 }
 
 export function subscribeWorkspaceStorage(callback: () => void): () => void {
@@ -36,45 +92,14 @@ export function subscribeWorkspaceStorage(callback: () => void): () => void {
   return () => window.removeEventListener(WORKSPACE_STORAGE_CHANGE_EVENT, callback);
 }
 
-export function getWorkspaceReturnPath(): string | null {
-  const s = safeSessionStorage();
-  if (!s) return null;
-  try {
-    const raw = s.getItem(WORKSPACE_RETURN_PATH_STORAGE_KEY);
-    if (!raw || !raw.trim()) return null;
-    const path = raw.trim();
-    if (!path.startsWith("/")) return null;
-    return path;
-  } catch {
-    return null;
-  }
-}
-
-/** Persist path like `/projects/2/drawings/3/workspace` (query string preserved when present). */
-export function setWorkspaceReturnPath(fullPath: string): void {
-  const s = safeSessionStorage();
-  if (!s) return;
-  const trimmed = fullPath.trim();
-  if (!trimmed.startsWith("/")) return;
-  try {
-    s.setItem(WORKSPACE_RETURN_PATH_STORAGE_KEY, trimmed);
-    notifyWorkspaceStorageUpdated();
-  } catch {
-    /* quota / private mode */
-  }
-}
-
 function isValidPositiveIntId(n: number): boolean {
   return Number.isInteger(n) && n > 0;
 }
 
-/** Optional fallback for nav when no full workspace path is stored. */
 export function setLastProjectIdForWorkspaceFallback(projectId: number): void {
   if (!isValidPositiveIntId(projectId)) return;
-  const s = safeSessionStorage();
-  if (!s) return;
   try {
-    s.setItem(LAST_PROJECT_ID_STORAGE_KEY, String(projectId));
+    window.sessionStorage.setItem(LAST_PROJECT_ID_STORAGE_KEY, String(projectId));
     notifyWorkspaceStorageUpdated();
   } catch {
     /* quota / private mode */
@@ -82,10 +107,8 @@ export function setLastProjectIdForWorkspaceFallback(projectId: number): void {
 }
 
 export function getLastProjectIdForWorkspaceFallback(): number | null {
-  const s = safeSessionStorage();
-  if (!s) return null;
   try {
-    const raw = s.getItem(LAST_PROJECT_ID_STORAGE_KEY);
+    const raw = window.sessionStorage.getItem(LAST_PROJECT_ID_STORAGE_KEY);
     if (raw == null || raw === "") return null;
     const n = Number(raw);
     if (!isValidPositiveIntId(n)) return null;
@@ -96,24 +119,22 @@ export function getLastProjectIdForWorkspaceFallback(): number | null {
 }
 
 export type WorkspaceSidebarNav = {
-  /** Target when `disabled` is false; ignored when disabled. */
   href: string;
   disabled: boolean;
   tooltip: string;
 };
 
-/** Nav row: full workspace URL, else project drawing picker (B), else disabled (C). */
 export function getWorkspaceSidebarNav(): WorkspaceSidebarNav {
-  const last = getWorkspaceReturnPath();
+  const last = getDrawingReturnPath();
   if (
     last &&
-    last.startsWith("/projects/") &&
-    last.includes("/workspace")
+    (last.startsWith("/objects") ||
+      (last.startsWith("/projects/") && last.includes("/workspace")))
   ) {
     return {
       href: last,
       disabled: false,
-      tooltip: "Workspace",
+      tooltip: last.startsWith("/objects") ? "Return to drawing" : "Workspace",
     };
   }
   const pid = getLastProjectIdForWorkspaceFallback();
@@ -121,12 +142,12 @@ export function getWorkspaceSidebarNav(): WorkspaceSidebarNav {
     return {
       href: `/projects/${pid}/drawings`,
       disabled: false,
-      tooltip: "Drawings — open workspace from a drawing",
+      tooltip: "Drawings — open a drawing from the list",
     };
   }
   return {
     href: "/",
     disabled: true,
-    tooltip: "Open a drawing workspace from the dashboard first.",
+    tooltip: "Open a drawing from the dashboard or Objects page first.",
   };
 }

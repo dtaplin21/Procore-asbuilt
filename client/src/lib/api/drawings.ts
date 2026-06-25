@@ -89,6 +89,62 @@ export async function fetchProjectDrawings(
   return requestJson<ProjectDrawingsResponse>(`/api/projects/${pid}/drawings`);
 }
 
+/** Rendition-aware master drawing payload for DrawingViewer consumers. */
+export interface MasterDrawing {
+  id: string;
+  projectId: string;
+  name: string;
+  /** URL of the rendered drawing image to display in DrawingViewer. */
+  imageUrl: string;
+}
+
+export interface ProjectDrawingSummary {
+  id: string;
+  name: string;
+}
+
+type WorkspaceDrawingWire = {
+  id: number;
+  name: string;
+  fileUrl: string;
+  projectId?: number | null;
+};
+
+/**
+ * GET /api/projects/{project_id}/drawings/{drawing_id}
+ * Returns the workspace drawing payload mapped to {@link MasterDrawing}.
+ */
+export async function fetchMasterDrawing(
+  projectId: number | string,
+  drawingId: number | string,
+  page?: number,
+): Promise<MasterDrawing> {
+  const pid = coerceProjectIdForApi(projectId);
+  const did = coerceDrawingIdForApi(drawingId);
+  let path = `/api/projects/${pid}/drawings/${did}`;
+  if (page != null && page >= 1) {
+    path += `?page=${encodeURIComponent(String(page))}`;
+  }
+  const data = await requestJson<WorkspaceDrawingWire>(path);
+  return {
+    id: String(data.id),
+    projectId: String(data.projectId ?? pid),
+    name: data.name,
+    imageUrl: data.fileUrl,
+  };
+}
+
+/** CamelCase summaries for master-drawing pickers (Inspections upload, etc.). */
+export async function fetchProjectDrawingSummaries(
+  projectId: number | string,
+): Promise<ProjectDrawingSummary[]> {
+  const response = await fetchProjectDrawings(projectId);
+  return response.drawings.map((drawing) => ({
+    id: String(drawing.id),
+    name: drawing.name,
+  }));
+}
+
 /**
  * POST /api/projects/{project_id}/drawings — multipart upload.
  * Form field name `file` matches FastAPI `File(...)`.

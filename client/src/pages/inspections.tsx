@@ -18,10 +18,10 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useInspectionRuns } from "@/hooks/use-inspection-runs";
-import { buildDrawingPickerUrl, buildWorkspaceUrl } from "@/lib/workspace-links";
+import { buildDrawingPickerUrl, buildObjectsUrlWithRun } from "@/lib/workspace-links";
 import {
+  setDrawingReturnPath,
   setLastProjectIdForWorkspaceFallback,
-  setWorkspaceReturnPath,
 } from "@/lib/workspace-return-path";
 import type { InspectionRunListResponse, ProjectListResponse } from "@shared/schema";
 
@@ -123,11 +123,16 @@ export default function Inspections() {
     if (selectedProjectId == null) return;
     const run = runs.find((item) => item.id === runId);
     if (!run) return;
-    const path = buildWorkspaceUrl({
-      projectId: selectedProjectId,
-      masterDrawingId: run.master_drawing_id,
-    });
-    setWorkspaceReturnPath(path);
+    const path = buildObjectsUrlWithRun(
+      String(selectedProjectId),
+      String(run.master_drawing_id),
+      String(runId),
+    );
+    setDrawingReturnPath(
+      String(selectedProjectId),
+      String(run.master_drawing_id),
+      String(runId),
+    );
     setLastProjectIdForWorkspaceFallback(selectedProjectId);
     setLocation(path);
   };

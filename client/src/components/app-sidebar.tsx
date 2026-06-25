@@ -70,6 +70,9 @@ function isWorkspaceNavActive(location: string, nav: WorkspaceSidebarNav): boole
   if (nav.disabled) return false;
   const locPath = workspaceRoutePathOnly(location);
   const hrefPath = workspaceRoutePathOnly(nav.href);
+  if (hrefPath.startsWith("/objects")) {
+    return locPath === "/objects";
+  }
   if (hrefPath.includes("/workspace")) {
     return locPath === hrefPath;
   }

@@ -49,6 +49,7 @@ import { fetchMasterDrawing } from "@/lib/api/drawing_workspace";
 import { toOverlayRegions } from "@/lib/drawing-overlays/inspection_overlay";
 import { objectsPagePath } from "@/lib/objectsRoute";
 import {
+  setDrawingReturnPath,
   setLastProjectIdForWorkspaceFallback,
   setWorkspaceReturnPath,
 } from "@/lib/workspace-return-path";
@@ -262,14 +263,21 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     ) {
       return;
     }
-    setWorkspaceReturnPath(
-      objectsPagePath(
+    const path = objectsPagePath(
+      String(selectedProjectId),
+      String(selectedMasterDrawingId),
+      runIdFromUrlRaw ?? null,
+      overlayIdFromUrlRaw ?? null,
+    );
+    if (overlayIdFromUrlRaw) {
+      setWorkspaceReturnPath(path);
+    } else {
+      setDrawingReturnPath(
         String(selectedProjectId),
         String(selectedMasterDrawingId),
         runIdFromUrlRaw ?? null,
-        overlayIdFromUrlRaw ?? null,
-      ),
-    );
+      );
+    }
     setLastProjectIdForWorkspaceFallback(selectedProjectId);
   }, [
     selectedProjectId,
