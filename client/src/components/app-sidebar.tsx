@@ -22,8 +22,10 @@ import {
 } from "@/components/ui/sidebar";
 import { ProcoreStatus } from "@/components/procore-status";
 import {
+  getInspectionsSidebarNav,
   getObjectsSidebarNav,
   subscribeWorkspaceStorage,
+  type InspectionsSidebarNav,
   type ObjectsSidebarNav,
 } from "@/lib/workspace-return-path";
 import type { ProcoreConnection } from "@shared/schema";
@@ -33,11 +35,6 @@ const mainNavItems = [
     title: "Dashboard",
     url: "/",
     icon: LayoutDashboard,
-  },
-  {
-    title: "Inspections",
-    url: "/inspections",
-    icon: ClipboardCheck,
   },
 ];
 
@@ -63,16 +60,30 @@ function isObjectsNavActive(location: string): boolean {
   return workspaceRoutePathOnly(location) === "/objects";
 }
 
+function isInspectionsNavActive(location: string): boolean {
+  return workspaceRoutePathOnly(location) === "/inspections";
+}
+
 export function AppSidebar({ procoreConnection, onProcoreSync }: AppSidebarProps) {
   const [location] = useLocation();
 
-  const objectsNavJson = useSyncExternalStore(
+  const sidebarNavJson = useSyncExternalStore(
     subscribeWorkspaceStorage,
-    () => JSON.stringify(getObjectsSidebarNav()),
-    () => JSON.stringify(getObjectsSidebarNav())
+    () =>
+      JSON.stringify({
+        inspections: getInspectionsSidebarNav(),
+        objects: getObjectsSidebarNav(),
+      }),
+    () =>
+      JSON.stringify({
+        inspections: getInspectionsSidebarNav(),
+        objects: getObjectsSidebarNav(),
+      }),
   );
 
-  const objectsNav = JSON.parse(objectsNavJson) as ObjectsSidebarNav;
+  const { inspections: inspectionsNav, objects: objectsNav } = JSON.parse(
+    sidebarNavJson,
+  ) as { inspections: InspectionsSidebarNav; objects: ObjectsSidebarNav };
 
   return (
     <Sidebar>
@@ -109,6 +120,18 @@ export function AppSidebar({ procoreConnection, onProcoreSync }: AppSidebarProps
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              <SidebarMenuItem key="inspections">
+                <SidebarMenuButton
+                  asChild
+                  isActive={isInspectionsNavActive(location)}
+                  tooltip="Inspections"
+                >
+                  <Link href={inspectionsNav.href} data-testid="nav-inspections">
+                    <ClipboardCheck className="w-4 h-4" />
+                    <span>Inspections</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem key="objects">
                 <SidebarMenuButton
                   asChild

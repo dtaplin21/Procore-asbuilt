@@ -1,18 +1,10 @@
-import { useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useCanonicalMasterDrawing } from "@/hooks/use_canonical_master_drawing";
 import { toast } from "@/hooks/use-toast";
-import { fetchProjectDrawings, projectDrawingsQueryKey } from "@/lib/api/drawings";
 import {
   createInspectionRun,
   uploadInspectionRunEvidence,
@@ -22,7 +14,7 @@ import type { EvidenceUploadResponse } from "@/types/inspection_overlay";
 
 export type InspectionUploadFormProps = {
   projectId: number;
-  /** Pre-select a master drawing (e.g. deep link or single-drawing projects). */
+  /** Override resolved master (tests / deep links). */
   initialMasterDrawingId?: string | null;
   /** Called after a successful upload with the new run and pipeline summary. */
   onUploaded?: (result: {
@@ -39,24 +31,27 @@ export default function InspectionUploadForm({
 }: InspectionUploadFormProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [masterDrawingId, setMasterDrawingId] = useState(
-    initialMasterDrawingId ?? "",
-  );
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const drawingsQuery = useQuery({
-    queryKey: projectDrawingsQueryKey(projectId),
-    queryFn: () => fetchProjectDrawings(projectId),
-    enabled: Number.isFinite(projectId) && projectId > 0,
-  });
+  const {
+    masterDrawingId: canonicalMasterId,
+    name: canonicalMasterName,
+    isLoading: canonicalLoading,
+  } = useCanonicalMasterDrawing(projectId);
 
-  const drawings = drawingsQuery.data?.drawings ?? [];
-  const uploadDisabled =
-    uploading ||
-    drawingsQuery.isLoading ||
-    !masterDrawingId ||
-    drawings.length === 0;
+  const resolvedMasterDrawingId = useMemo(() => {
+    if (initialMasterDrawingId) return initialMasterDrawingId;
+    if (canonicalMasterId != null) return String(canonicalMasterId);
+    return null;
+  }, [initialMasterDrawingId, canonicalMasterId]);
+
+  const masterDrawingName = useMemo(() => {
+    if (initialMasterDrawingId) return `Drawing ${initialMasterDrawingId}`;
+    return canonicalMasterName;
+  }, [initialMasterDrawingId, canonicalMasterName]);
+
+  const uploadDisabled = uploading || canonicalLoading || !resolvedMasterDrawingId;
 
   const handlePickFile = () => {
     fileInputRef.current?.click();
@@ -65,7 +60,7 @@ export default function InspectionUploadForm({
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file || !masterDrawingId) return;
+    if (!file || !resolvedMasterDrawingId) return;
 
     setUploadError(null);
     setUploading(true);
@@ -74,21 +69,21 @@ export default function InspectionUploadForm({
       try {
         const run = await createInspectionRun({
           projectId: String(projectId),
-          masterDrawingId,
+          masterDrawingId: resolvedMasterDrawingId,
           skipPipeline: true,
         });
 
         const response = await uploadInspectionRunEvidence({
           projectId: String(projectId),
           runId: run.id,
-          masterDrawingId,
+          masterDrawingId: resolvedMasterDrawingId,
           file,
         });
 
         await refreshInspectionWorkspaceQueries(
           queryClient,
           projectId,
-          Number(masterDrawingId),
+          Number(resolvedMasterDrawingId),
         );
 
         const parts = [
@@ -108,7 +103,7 @@ export default function InspectionUploadForm({
 
         onUploaded?.({
           runId: run.id,
-          masterDrawingId,
+          masterDrawingId: resolvedMasterDrawingId,
           response,
         });
       } catch (error) {
@@ -132,37 +127,22 @@ export default function InspectionUploadForm({
       data-testid="inspection-upload-form"
     >
       <div className="grid gap-2">
-        <Label htmlFor="inspection-upload-master-drawing">Master drawing</Label>
-        <Select
-          value={masterDrawingId || undefined}
-          onValueChange={setMasterDrawingId}
-          disabled={drawingsQuery.isLoading || drawings.length === 0}
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="inspection-upload-master-label"
         >
-          <SelectTrigger
-            id="inspection-upload-master-drawing"
-            data-testid="inspection-upload-master-drawing"
-          >
-            <SelectValue
-              placeholder={
-                drawingsQuery.isLoading
-                  ? "Loading drawings…"
-                  : drawings.length === 0
-                    ? "No drawings in project"
-                    : "Select master drawing"
-              }
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {drawings.map((drawing) => (
-              <SelectItem key={drawing.id} value={String(drawing.id)}>
-                {drawing.name || `Drawing ${drawing.id}`}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          Master sheet:{" "}
+          {canonicalLoading ? (
+            <span>Loading…</span>
+          ) : masterDrawingName ? (
+            <span className="font-medium text-foreground">{masterDrawingName}</span>
+          ) : (
+            <span>No canonical master sheet — upload a drawing on the Dashboard first.</span>
+          )}
+        </p>
         <p className="text-xs text-muted-foreground">
-          Upload an inspection document (PDF or image). Findings are mapped onto the selected
-          master sheet — open the run on Objects to review overlays.
+          Upload an inspection document (PDF or image). Findings are mapped onto the
+          project master sheet — open the run on Objects to review overlays.
         </p>
         {uploadError ? (
           <p className="text-xs text-destructive" data-testid="inspection-upload-error">

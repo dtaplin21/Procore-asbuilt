@@ -30,23 +30,12 @@ import {
   buildWorkspaceUrl,
   buildWorkspaceUrlWithFinding,
 } from "@/lib/workspace-links";
+import { replaceDashboardProjectIdInUrl } from "@/lib/active_project";
+import { useActiveProject } from "@/contexts/active_project_context";
 import { fetchProjectDashboardSummary } from "@/lib/api/projects";
 import { formatInspectionCoverageKpi } from "@/lib/dashboard/inspection-coverage-kpi";
 import { resolveFetchUrl } from "@/lib/api/http";
 import { UploadDrawingModal } from "@/components/drawing-workspace/UploadDrawingModal";
-
-function getProjectIdFromUrl(): string | null {
-  const sp = new URLSearchParams(window.location.search);
-  const raw = sp.get("projectId");
-  return raw && raw.trim().length > 0 ? raw : null;
-}
-
-function setProjectIdInUrl(projectId: string | null) {
-  const url = new URL(window.location.href);
-  if (projectId) url.searchParams.set("projectId", projectId);
-  else url.searchParams.delete("projectId");
-  window.history.replaceState({}, "", url.toString());
-}
 
 function readMasterDrawingIdFromSummary(
   summary: DashboardSummary | undefined | null
@@ -95,11 +84,10 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
   const isInsightsView = location === "/insights";
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const queryClient = useQueryClient();
-
-  // Selected project context (scopes the dashboard structurally)
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() =>
-    getProjectIdFromUrl()
-  );
+  const { projectId, projectName: selectedProjectName, setActiveProjectId } =
+    useActiveProject();
+  const selectedProjectId =
+    projectId != null ? String(projectId) : null;
 
   // Kept for Critical Alerts Banner only; top section uses projectSummary
   const { data: stats } = useQuery<DashboardStats>({
@@ -188,27 +176,25 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
     enabled: !!selectedProjectId && Number.isFinite(Number(selectedProjectId)),
   });
 
-  // If URL has no projectId, pick a default once projects load
+  // If no active project, pick a default once projects load
   useEffect(() => {
     if (projectsLoading) return;
     if (!projects || projects.length === 0) return;
-    if (selectedProjectId) return;
+    if (projectId != null) return;
 
-    const firstId = String(projects[0].id);
-    setSelectedProjectId(firstId);
-    setProjectIdInUrl(firstId);
-  }, [projectsLoading, projects, selectedProjectId]);
+    const firstId = projects[0].id;
+    setActiveProjectId(firstId);
+    replaceDashboardProjectIdInUrl(String(firstId));
+  }, [projectsLoading, projects, projectId, setActiveProjectId]);
 
-  // Whenever selection changes, persist it in the URL
-  useEffect(() => {
-    setProjectIdInUrl(selectedProjectId);
-  }, [selectedProjectId]);
-
-  const selectedProjectName = useMemo(() => {
-    if (!projects || !selectedProjectId) return null;
-    const p = projects.find((x) => String(x.id) === String(selectedProjectId));
-    return p?.name ?? null;
-  }, [projects, selectedProjectId]);
+  function handleProjectSelect(nextProjectIdStr: string) {
+    const nextProjectId =
+      nextProjectIdStr && Number.isFinite(Number(nextProjectIdStr))
+        ? Number(nextProjectIdStr)
+        : null;
+    setActiveProjectId(nextProjectId);
+    replaceDashboardProjectIdInUrl(nextProjectIdStr || null);
+  }
 
   const summary = projectSummary;
 
@@ -271,7 +257,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
             <select
               className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground"
               value={selectedProjectId ?? ""}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
+              onChange={(e) => handleProjectSelect(e.target.value)}
               disabled={projectsLoading || !projects || projects.length === 0}
               data-testid="project-selector"
             >

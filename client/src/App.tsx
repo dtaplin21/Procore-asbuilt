@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { ActiveProjectProvider } from "@/contexts/active_project_context";
 import Dashboard from "@/pages/dashboard";
 import Inspections from "@/pages/inspections";
 import Objects from "@/pages/objects";
@@ -217,34 +218,36 @@ function App() {
     <ThemeProvider>
       <BrowserRouter>
         <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-              <div className="flex h-screen w-full">
-                <AppSidebar 
-                  procoreConnection={procoreConnection} 
-                  onProcoreSync={handleProcoreSync}
-                />
-                <div className="flex flex-col flex-1 min-w-0">
-                  <header className="flex items-center justify-between gap-4 px-4 h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-                    <SidebarTrigger data-testid="button-sidebar-toggle" />
-                  </header>
-                  <main className="flex-1 overflow-auto bg-muted/30">
-                    <Router 
-                      procoreConnection={procoreConnection}
-                      onProcoreSync={handleProcoreSync}
-                      onConnectProcore={handleConnectProcore}
-                      onDisconnectProcore={handleDisconnectProcore}
-                      procoreUserId={procoreUserId}
-                      activeCompanyId={activeCompanyId}
-                      onRefreshProcoreStatus={refreshProcoreStatus}
-                      onInvalidateCompanyScopedData={invalidateCompanyScopedData}
-                    />
-                  </main>
+          <ActiveProjectProvider>
+            <TooltipProvider>
+              <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+                <div className="flex h-screen w-full">
+                  <AppSidebar 
+                    procoreConnection={procoreConnection} 
+                    onProcoreSync={handleProcoreSync}
+                  />
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <header className="flex items-center justify-between gap-4 px-4 h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+                      <SidebarTrigger data-testid="button-sidebar-toggle" />
+                    </header>
+                    <main className="flex-1 overflow-auto bg-muted/30">
+                      <Router 
+                        procoreConnection={procoreConnection}
+                        onProcoreSync={handleProcoreSync}
+                        onConnectProcore={handleConnectProcore}
+                        onDisconnectProcore={handleDisconnectProcore}
+                        procoreUserId={procoreUserId}
+                        activeCompanyId={activeCompanyId}
+                        onRefreshProcoreStatus={refreshProcoreStatus}
+                        onInvalidateCompanyScopedData={invalidateCompanyScopedData}
+                      />
+                    </main>
+                  </div>
                 </div>
-              </div>
-            </SidebarProvider>
-            <Toaster />
-          </TooltipProvider>
+              </SidebarProvider>
+              <Toaster />
+            </TooltipProvider>
+          </ActiveProjectProvider>
         </QueryClientProvider>
       </BrowserRouter>
     </ThemeProvider>

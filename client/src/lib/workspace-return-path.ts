@@ -11,6 +11,11 @@
  */
 
 import { objectsPagePath, workspacePathToObjectsUrl } from "@/lib/objectsRoute";
+import {
+  getActiveProjectIdFromStorage,
+  parsePositiveIntId,
+  setActiveProjectIdInStorage,
+} from "@/lib/active_project";
 
 const STORAGE_KEY = "lastDrawingReturnPath";
 
@@ -98,6 +103,7 @@ function isValidPositiveIntId(n: number): boolean {
 
 export function setLastProjectIdForWorkspaceFallback(projectId: number): void {
   if (!isValidPositiveIntId(projectId)) return;
+  setActiveProjectIdInStorage(projectId);
   try {
     window.sessionStorage.setItem(LAST_PROJECT_ID_STORAGE_KEY, String(projectId));
     notifyWorkspaceStorageUpdated();
@@ -107,6 +113,8 @@ export function setLastProjectIdForWorkspaceFallback(projectId: number): void {
 }
 
 export function getLastProjectIdForWorkspaceFallback(): number | null {
+  const active = getActiveProjectIdFromStorage();
+  if (active != null) return active;
   try {
     const raw = window.sessionStorage.getItem(LAST_PROJECT_ID_STORAGE_KEY);
     if (raw == null || raw === "") return null;
@@ -118,10 +126,43 @@ export function getLastProjectIdForWorkspaceFallback(): number | null {
   }
 }
 
+export type InspectionsSidebarNav = {
+  href: string;
+};
+
 export type ObjectsSidebarNav = {
   href: string;
   tooltip: string;
 };
+
+function parseProjectIdFromObjectsHref(href: string): number | null {
+  if (!href.startsWith("/objects")) return null;
+  const q = href.indexOf("?");
+  if (q === -1) return null;
+  return parsePositiveIntId(new URLSearchParams(href.slice(q + 1)).get("projectId"));
+}
+
+function resolveActiveProjectIdForNav(
+  activeProjectId?: number | null,
+): number | null {
+  if (activeProjectId !== undefined) {
+    return activeProjectId;
+  }
+  return (
+    getActiveProjectIdFromStorage() ?? getLastProjectIdForWorkspaceFallback()
+  );
+}
+
+/** Optional ?projectId= when an active project is stored (bookmarking). */
+export function getInspectionsSidebarNav(
+  activeProjectId?: number | null,
+): InspectionsSidebarNav {
+  const pid = resolveActiveProjectIdForNav(activeProjectId);
+  if (pid != null) {
+    return { href: `/inspections?projectId=${pid}` };
+  }
+  return { href: "/inspections" };
+}
 
 function resolveObjectsHrefFromReturnPath(path: string): string | null {
   if (path.startsWith("/objects")) {
@@ -136,26 +177,45 @@ function resolveObjectsHrefFromReturnPath(path: string): string | null {
   return null;
 }
 
-/**
- * Smart Objects sidebar link (merge plan Phase 1, Option A):
- * remembered drawing deep link → last project → bare /objects.
- */
-export function getObjectsSidebarNav(): ObjectsSidebarNav {
+/** Drop stored Objects deep link when it targets a different project. */
+export function clearDrawingReturnPathIfProjectMismatch(
+  activeProjectId: number,
+): void {
   const last = getDrawingReturnPath();
-  if (last) {
+  if (!last) return;
+  const href = resolveObjectsHrefFromReturnPath(last);
+  if (!href?.startsWith("/objects")) return;
+  const returnProjectId = parseProjectIdFromObjectsHref(href);
+  if (returnProjectId != null && returnProjectId !== activeProjectId) {
+    clearDrawingReturnPath();
+  }
+}
+
+/**
+ * Objects sidebar: active project base URL + drawing/run from return path
+ * only when the stored path matches the active project.
+ */
+export function getObjectsSidebarNav(
+  activeProjectId?: number | null,
+): ObjectsSidebarNav {
+  const pid = resolveActiveProjectIdForNav(activeProjectId);
+  const last = getDrawingReturnPath();
+  if (last && pid != null) {
     const href = resolveObjectsHrefFromReturnPath(last);
-    if (href) {
-      return {
-        href,
-        tooltip: "Return to last viewed drawing",
-      };
+    if (href?.startsWith("/objects")) {
+      const returnProjectId = parseProjectIdFromObjectsHref(href);
+      if (returnProjectId === pid) {
+        return {
+          href,
+          tooltip: "Return to last viewed drawing",
+        };
+      }
     }
   }
-  const pid = getLastProjectIdForWorkspaceFallback();
   if (pid != null) {
     return {
       href: `/objects?projectId=${pid}`,
-      tooltip: "Objects for your last project",
+      tooltip: "Objects for active project",
     };
   }
   return {

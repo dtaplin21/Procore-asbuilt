@@ -17,7 +17,6 @@ import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -40,15 +39,17 @@ import { ProcoreWritebackPanel } from "@/components/ProcoreWritebackPanel";
 import type {
   DrawingObject,
   ObjectStatus,
-  ProjectListResponse,
 } from "@shared/schema";
-import type { ProjectDrawingsResponse, ProjectDrawingCandidate } from "@/types/drawing_workspace";
+import type { ProjectDrawingsResponse } from "@/types/drawing_workspace";
 import { useDrawingOverlays } from "@/hooks/use-inspection-runs";
+import { useCanonicalMasterDrawing } from "@/hooks/use_canonical_master_drawing";
 import { useObjectsQueryParams } from "@/hooks/use_objects_query_params";
 import { fetchProjectDrawings, projectDrawingsQueryKey } from "@/lib/api/drawings";
 import { fetchMasterDrawing } from "@/lib/api/drawing_workspace";
 import { toOverlayRegions } from "@/lib/drawing-overlays/inspection_overlay";
 import { objectsPagePath } from "@/lib/objectsRoute";
+import { useActiveProject } from "@/contexts/active_project_context";
+import { replaceDashboardProjectIdInUrl } from "@/lib/active_project";
 import {
   setDrawingReturnPath,
   setLastProjectIdForWorkspaceFallback,
@@ -56,17 +57,9 @@ import {
 } from "@/lib/workspace-return-path";
 
 /**
- * Part 6 (Option A): `/objects?projectId=…&drawingId=…` drives project + master selection.
- * When `drawingId` is missing or invalid, we default to the newest master candidate.
- * GET /drawings list items omit `created_at`; highest numeric `id` approximates latest upload.
+ * `/objects?projectId=…&drawingId=…` — project from active context; drawing from
+ * deep-link `drawingId`, else canonical master from dashboard summary.
  */
-function pickNewestMasterId(
-  masters: ProjectDrawingCandidate[]
-): number | null {
-  if (masters.length === 0) return null;
-  return masters.reduce((max, d) => (d.id > max ? d.id : max), masters[0].id);
-}
-
 function parseNumericParam(value: string | undefined): number | null {
   if (value === undefined) return null;
   const parsed = Number(value);
@@ -82,7 +75,14 @@ const statusConfig: Record<ObjectStatus, { label: string; color: string }> = {
   as_built: { label: "As-Built Complete", color: "bg-primary" },
 };
 
+function dashboardHrefForProject(projectId: number | null): string {
+  if (projectId == null) return "/";
+  return `/?projectId=${projectId}`;
+}
+
 export default function Objects({ procoreUserId }: { procoreUserId?: string | null }) {
+  const { projectId: activeProjectId, projectName: activeProjectName } =
+    useActiveProject();
   const {
     projectId: projectIdFromUrlRaw,
     drawingId: drawingIdFromUrlRaw,
@@ -94,46 +94,27 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     setOverlay,
   } = useObjectsQueryParams();
 
-  const projectIdFromUrl = parseNumericParam(projectIdFromUrlRaw);
   const drawingIdFromUrl = parseNumericParam(drawingIdFromUrlRaw);
+  const selectedProjectId = activeProjectId;
+
+  const {
+    masterDrawingId: canonicalMasterId,
+    name: canonicalMasterName,
+    isLoading: canonicalLoading,
+  } = useCanonicalMasterDrawing(selectedProjectId);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedTool, setSelectedTool] = useState<"select" | "pan" | "zoom">("select");
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [selectedMasterDrawingId, setSelectedMasterDrawingId] = useState<number | null>(null);
 
+  /** Sync active project into URL when landing via sidebar (not a picker). */
   useEffect(() => {
-    if (projectIdFromUrl !== null) {
-      setSelectedProjectId(projectIdFromUrl);
-    }
-  }, [projectIdFromUrl]);
-
-  function handleProjectChange(nextProjectId: number | null) {
-    setSelectedProjectId(nextProjectId);
-    setSelectedMasterDrawingId(null);
-    setProject(nextProjectId != null ? String(nextProjectId) : null);
-  }
-
-  function handleMasterDrawingChange(nextDrawingId: number | null) {
-    setSelectedMasterDrawingId(nextDrawingId);
-
-    if (selectedProjectId === null) {
-      return;
-    }
-
-    if (nextDrawingId === null) {
-      setProject(String(selectedProjectId));
-      return;
-    }
-
-    setDrawing(String(selectedProjectId), String(nextDrawingId));
-  }
-
-  const { data: projectsData, isLoading: projectsLoading } = useQuery<ProjectListResponse>({
-    queryKey: ["/api/projects"],
-  });
+    if (activeProjectId == null) return;
+    if (projectIdFromUrlRaw != null) return;
+    setProject(String(activeProjectId));
+  }, [activeProjectId, projectIdFromUrlRaw, setProject]);
 
   const drawingsQuery = useQuery<ProjectDrawingsResponse>({
     queryKey:
@@ -153,28 +134,7 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
   const drawingsData = drawingsQuery.data;
   const drawingsLoading = drawingsQuery.isLoading;
 
-  const projects = projectsData?.items ?? [];
   const drawings = drawingsData?.drawings ?? [];
-
-  /** One project + no URL — pick it so the viewer and master auto-default can run. */
-  useEffect(() => {
-    if (projectIdFromUrl !== null) return;
-    if (projectsLoading) return;
-    if (projects.length !== 1) return;
-    if (selectedProjectId !== null) return;
-    const id = projects[0].id;
-    setSelectedProjectId(id);
-    setSelectedMasterDrawingId(null);
-    setProject(String(id));
-  }, [
-    projectIdFromUrl,
-    projectsLoading,
-    projects,
-    selectedProjectId,
-    setProject,
-  ]);
-
-  const masterDrawingOptions = drawings;
 
   const masterWorkspaceQuery = useQuery({
     queryKey: [
@@ -229,53 +189,60 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
   );
 
   useEffect(() => {
-    if (selectedProjectId === null || !drawingsQuery.isSuccess) {
+    if (selectedProjectId === null) {
+      setSelectedMasterDrawingId(null);
+      return;
+    }
+    if (canonicalLoading || !drawingsQuery.isSuccess) {
       return;
     }
 
-    const rowList = drawingsQuery.data?.drawings ?? [];
-    const masters = rowList;
-    if (masters.length === 0) {
-      return;
-    }
-
-    const newestId = pickNewestMasterId(masters);
-    if (newestId === null) return;
+    const masters = drawingsQuery.data?.drawings ?? [];
 
     if (drawingIdFromUrl !== null) {
-      const exists = masters.some((m) => m.id === drawingIdFromUrl);
-      if (exists) {
-        if (selectedMasterDrawingId !== drawingIdFromUrl) {
-          setSelectedMasterDrawingId(drawingIdFromUrl);
-        }
+      if (masters.some((m) => m.id === drawingIdFromUrl)) {
+        setSelectedMasterDrawingId(drawingIdFromUrl);
         return;
       }
+    }
 
-      setSelectedMasterDrawingId(newestId);
-      setDrawing(String(selectedProjectId), String(newestId));
+    if (
+      canonicalMasterId != null &&
+      masters.some((m) => m.id === canonicalMasterId)
+    ) {
+      setSelectedMasterDrawingId(canonicalMasterId);
+      if (drawingIdFromUrl !== canonicalMasterId) {
+        setDrawing(String(selectedProjectId), String(canonicalMasterId));
+      }
       return;
     }
 
-    const stateMasterInProject =
-      selectedMasterDrawingId !== null &&
-      masters.some((m) => m.id === selectedMasterDrawingId);
-    if (selectedMasterDrawingId !== null && !stateMasterInProject) {
-      setSelectedMasterDrawingId(newestId);
-      setDrawing(String(selectedProjectId), String(newestId));
-      return;
-    }
-
-    if (selectedMasterDrawingId === null) {
-      setSelectedMasterDrawingId(newestId);
-      setDrawing(String(selectedProjectId), String(newestId));
-    }
+    setSelectedMasterDrawingId(null);
   }, [
     selectedProjectId,
+    canonicalLoading,
     drawingsQuery.isSuccess,
     drawingsQuery.data,
     drawingIdFromUrl,
-    selectedMasterDrawingId,
+    canonicalMasterId,
     setDrawing,
+  ]);
+
+  const masterDrawingName = useMemo(() => {
+    if (selectedMasterDrawingId == null) return null;
+    if (selectedMasterDrawingId === canonicalMasterId && canonicalMasterName) {
+      return canonicalMasterName;
+    }
+    const fromList = drawings.find((d) => d.id === selectedMasterDrawingId);
+    if (fromList?.name) return fromList.name;
+    if (masterWorkspaceQuery.data?.name) return masterWorkspaceQuery.data.name;
+    return `Drawing ${selectedMasterDrawingId}`;
+  }, [
+    selectedMasterDrawingId,
+    canonicalMasterId,
+    canonicalMasterName,
+    drawings,
+    masterWorkspaceQuery.data?.name,
   ]);
 
   /** Keep sidebar Workspace + return path aligned with Objects project / master selection. */
@@ -372,6 +339,31 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
             Object Recognition
           </h1>
           <p className="text-muted-foreground">AI-recognized construction objects and their status</p>
+          {activeProjectId != null && activeProjectName ? (
+            <p className="mt-2 text-sm text-muted-foreground" data-testid="objects-project-header">
+              Project:{" "}
+              <span className="font-medium text-foreground">{activeProjectName}</span>
+              {" · "}
+              <Link
+                href={dashboardHrefForProject(activeProjectId)}
+                className="text-primary hover:underline"
+                onClick={() => {
+                  replaceDashboardProjectIdInUrl(String(activeProjectId));
+                }}
+                data-testid="objects-change-project-link"
+              >
+                Change on Dashboard
+              </Link>
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground" data-testid="objects-no-project">
+              No project selected.{" "}
+              <Link href="/" className="text-primary hover:underline">
+                Choose a project on the Dashboard
+              </Link>
+              .
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -427,14 +419,18 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
         <ProcoreWritebackPanel
           projectId={selectedProjectId}
           procoreUserId={procoreUserId ?? null}
-          projectName={projects.find((p) => p.id === selectedProjectId)?.name ?? null}
+          projectName={activeProjectName}
           masterDrawingId={selectedMasterDrawingId}
         />
       ) : (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
             <p className="text-sm">
-              Select a project in the Drawing Viewer to write inspection results back to Procore.
+              Choose a project on the{" "}
+              <Link href="/" className="text-primary hover:underline">
+                Dashboard
+              </Link>{" "}
+              to write inspection results back to Procore.
             </p>
           </CardContent>
         </Card>
@@ -444,51 +440,24 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
       <Card>
         <CardHeader className="space-y-4 pb-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <CardTitle className="shrink-0">Drawing Viewer</CardTitle>
+            <div className="space-y-1">
+              <CardTitle className="shrink-0">Drawing Viewer</CardTitle>
+              {selectedProjectId != null ? (
+                <p
+                  className="text-sm text-muted-foreground"
+                  data-testid="objects-master-header"
+                >
+                  Master sheet:{" "}
+                  <span className="font-medium text-foreground">
+                    {canonicalLoading || drawingsLoading
+                      ? "Loading…"
+                      : masterDrawingName ??
+                        "No canonical master sheet — upload a drawing on the Dashboard first."}
+                  </span>
+                </p>
+              ) : null}
+            </div>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:flex-1 sm:justify-end">
-              <div className="grid gap-2 w-full sm:max-w-xs">
-                <Label htmlFor="objects-project">Project</Label>
-                <Select
-                  value={selectedProjectId != null ? String(selectedProjectId) : ""}
-                  onValueChange={(v) => {
-                    const id = v ? parseInt(v, 10) : null;
-                    handleProjectChange(id);
-                  }}
-                  disabled={projectsLoading}
-                >
-                  <SelectTrigger id="objects-project" data-testid="select-objects-project">
-                    <SelectValue placeholder="Select project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projects.map((p) => (
-                      <SelectItem key={String(p.id)} value={String(p.id)}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2 w-full sm:max-w-xs">
-                <Label htmlFor="objects-master-drawing">Master drawing</Label>
-                <Select
-                  value={selectedMasterDrawingId != null ? String(selectedMasterDrawingId) : ""}
-                  onValueChange={(v) => {
-                    handleMasterDrawingChange(v ? parseInt(v, 10) : null);
-                  }}
-                  disabled={!selectedProjectId || drawingsLoading}
-                >
-                  <SelectTrigger id="objects-master-drawing" data-testid="select-objects-master-drawing">
-                    <SelectValue placeholder="Select master drawing" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {masterDrawingOptions.map((drawing) => (
-                      <SelectItem key={drawing.id} value={String(drawing.id)}>
-                        {drawing.name || `Drawing ${drawing.id}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
               <div className="flex items-center gap-1 bg-muted rounded-lg p-1 shrink-0">
                 <Button
                   variant={selectedTool === "select" ? "secondary" : "ghost"}
@@ -521,11 +490,29 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
         <CardContent className="pt-0">
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
             <div className="relative min-h-[480px] overflow-hidden rounded-lg border bg-muted/30">
-              {!selectedProjectId || !selectedMasterDrawingId ? (
+              {!selectedProjectId ? (
                 <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 border-2 border-dashed border-muted-foreground/25 p-8 text-center text-muted-foreground">
                   <Layers className="h-12 w-12 opacity-50" />
                   <p className="font-medium">Drawing canvas</p>
-                  <p className="text-sm">Select a project and master drawing to load the sheet.</p>
+                  <p className="text-sm">
+                    Choose a project on the{" "}
+                    <Link href="/" className="text-primary hover:underline">
+                      Dashboard
+                    </Link>{" "}
+                    to load a sheet.
+                  </p>
+                </div>
+              ) : !selectedMasterDrawingId ? (
+                <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 border-2 border-dashed border-muted-foreground/25 p-8 text-center text-muted-foreground">
+                  <Layers className="h-12 w-12 opacity-50" />
+                  <p className="font-medium">Drawing canvas</p>
+                  <p className="text-sm">
+                    No canonical master sheet — upload a drawing on the{" "}
+                    <Link href={dashboardHrefForProject(activeProjectId)} className="text-primary hover:underline">
+                      Dashboard
+                    </Link>{" "}
+                    first.
+                  </p>
                 </div>
               ) : masterWorkspaceQuery.isPending ? (
                 <div className="flex min-h-[320px] items-center justify-center gap-2 text-muted-foreground">

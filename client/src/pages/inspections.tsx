@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { useLocation } from "wouter";
+import { useMemo, useState } from "react";
+import { useLocation, Link } from "wouter";
 import { useQuery, type Query } from "@tanstack/react-query";
 import { ClipboardCheck, Filter, Loader2, Search } from "lucide-react";
 
@@ -17,13 +16,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useActiveProject } from "@/contexts/active_project_context";
 import { useInspectionRuns } from "@/hooks/use-inspection-runs";
+import { replaceDashboardProjectIdInUrl } from "@/lib/active_project";
 import { buildObjectsUrlWithRun } from "@/lib/workspace-links";
 import {
   setDrawingReturnPath,
   setLastProjectIdForWorkspaceFallback,
 } from "@/lib/workspace-return-path";
-import type { InspectionRunListResponse, ProjectListResponse } from "@shared/schema";
+import type { InspectionRunListResponse } from "@shared/schema";
 
 const ACTIVE_RUN_STATUSES = new Set(["queued", "processing"]);
 
@@ -36,55 +37,16 @@ function pollWhileRunsActive(
     : false;
 }
 
+function dashboardHrefForProject(projectId: number | null): string {
+  if (projectId == null) return "/";
+  return `/?projectId=${projectId}`;
+}
+
 export default function Inspections() {
-  const [searchParams, setSearchParams] = useSearchParams();
   const [, setLocation] = useLocation();
-
-  const projectIdFromUrlRaw = searchParams.get("projectId");
-  const projectIdFromUrl =
-    projectIdFromUrlRaw !== null && Number.isFinite(Number(projectIdFromUrlRaw))
-      ? Number(projectIdFromUrlRaw)
-      : null;
-
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const { projectId: selectedProjectId, projectName } = useActiveProject();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-
-  useEffect(() => {
-    if (projectIdFromUrl !== null) {
-      setSelectedProjectId(projectIdFromUrl);
-    }
-  }, [projectIdFromUrl]);
-
-  const { data: projectsData, isLoading: projectsLoading } = useQuery<ProjectListResponse>({
-    queryKey: ["/api/projects"],
-  });
-
-  const projects = projectsData?.items ?? [];
-
-  useEffect(() => {
-    if (projectIdFromUrl !== null) return;
-    if (projectsLoading) return;
-    if (projects.length !== 1) return;
-    if (selectedProjectId !== null) return;
-    const id = projects[0].id;
-    setSelectedProjectId(id);
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set("projectId", String(id));
-      return next;
-    });
-  }, [projectIdFromUrl, projectsLoading, projects, selectedProjectId, setSearchParams]);
-
-  function handleProjectChange(nextProjectId: number | null) {
-    setSelectedProjectId(nextProjectId);
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (nextProjectId === null) next.delete("projectId");
-      else next.set("projectId", String(nextProjectId));
-      return next;
-    });
-  }
 
   const statusParam =
     statusFilter === "all" ? null : statusFilter;
@@ -171,6 +133,33 @@ export default function Inspections() {
             Upload inspection documents, then review mapped findings on the Objects drawing
             viewer.
           </p>
+          {selectedProjectId != null && projectName ? (
+            <p className="mt-2 text-sm text-muted-foreground" data-testid="inspections-project-header">
+              Project:{" "}
+              <span className="font-medium text-foreground">{projectName}</span>
+              {" · "}
+              <Link
+                href={dashboardHrefForProject(selectedProjectId)}
+                className="text-primary hover:underline"
+                onClick={() => {
+                  if (selectedProjectId != null) {
+                    replaceDashboardProjectIdInUrl(String(selectedProjectId));
+                  }
+                }}
+                data-testid="inspections-change-project-link"
+              >
+                Change on Dashboard
+              </Link>
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground" data-testid="inspections-no-project">
+              No project selected.{" "}
+              <Link href="/" className="text-primary hover:underline">
+                Choose a project on the Dashboard
+              </Link>
+              .
+            </p>
+          )}
         </div>
       </div>
 
@@ -189,30 +178,7 @@ export default function Inspections() {
       ) : null}
 
       <Card>
-        <CardContent className="grid gap-4 p-4 sm:grid-cols-3">
-          <div className="grid gap-2 sm:col-span-1">
-            <Label htmlFor="inspections-project-select">Project</Label>
-            <Select
-              value={selectedProjectId != null ? String(selectedProjectId) : "none"}
-              onValueChange={(value) => {
-                handleProjectChange(value === "none" ? null : Number(value));
-              }}
-              disabled={projectsLoading}
-            >
-              <SelectTrigger id="inspections-project-select" data-testid="inspections-project-select">
-                <SelectValue placeholder="Select a project" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Select a project</SelectItem>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={String(project.id)}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
+        <CardContent className="grid gap-4 p-4 sm:grid-cols-2">
           <div className="grid gap-2 sm:col-span-1">
             <Label htmlFor="inspections-search">Search</Label>
             <div className="relative">
@@ -256,8 +222,14 @@ export default function Inspections() {
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <ClipboardCheck className="mx-auto mb-4 h-12 w-12 opacity-50" />
-            <p className="text-lg font-medium">Select a project</p>
-            <p className="text-sm">Inspection runs are listed per project.</p>
+            <p className="text-lg font-medium">No project selected</p>
+            <p className="text-sm">
+              Choose a project on the{" "}
+              <Link href="/" className="text-primary hover:underline">
+                Dashboard
+              </Link>{" "}
+              to view inspection runs.
+            </p>
           </CardContent>
         </Card>
       ) : runsLoading ? (

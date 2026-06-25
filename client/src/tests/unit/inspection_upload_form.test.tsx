@@ -8,6 +8,7 @@ import InspectionUploadForm from "@/components/inspections/inspection_upload_for
 const createInspectionRunMock = vi.fn();
 const uploadInspectionRunEvidenceMock = vi.fn();
 const refreshInspectionWorkspaceQueriesMock = vi.fn();
+const fetchProjectDashboardSummaryMock = vi.fn();
 
 vi.mock("@/lib/api/inspections", () => ({
   createInspectionRun: (...args: unknown[]) => createInspectionRunMock(...args),
@@ -20,14 +21,9 @@ vi.mock("@/lib/api/inspection_runs", () => ({
     refreshInspectionWorkspaceQueriesMock(...args),
 }));
 
-vi.mock("@/lib/api/drawings", () => ({
-  projectDrawingsQueryKey: (projectId: number) => ["project-drawings", projectId],
-  fetchProjectDrawings: vi.fn().mockResolvedValue({
-    drawings: [
-      { id: 10, name: "Level 1", source: "master" },
-      { id: 11, name: "Level 2", source: "master" },
-    ],
-  }),
+vi.mock("@/lib/api/projects", () => ({
+  fetchProjectDashboardSummary: (...args: unknown[]) =>
+    fetchProjectDashboardSummaryMock(...args),
 }));
 
 function renderForm(ui: ReactElement) {
@@ -46,6 +42,11 @@ describe("InspectionUploadForm", () => {
     createInspectionRunMock.mockReset();
     uploadInspectionRunEvidenceMock.mockReset();
     refreshInspectionWorkspaceQueriesMock.mockReset();
+    fetchProjectDashboardSummaryMock.mockReset();
+    fetchProjectDashboardSummaryMock.mockResolvedValue({
+      project: { id: 2, name: "Test", masterDrawingId: 10 },
+      masterDrawing: { id: 10, name: "Level 1", updated_at: "2026-01-01T00:00:00Z" },
+    });
     createInspectionRunMock.mockResolvedValue({
       id: "7",
       projectId: "2",
@@ -63,24 +64,28 @@ describe("InspectionUploadForm", () => {
     refreshInspectionWorkspaceQueriesMock.mockResolvedValue(undefined);
   });
 
-  it("requires a master drawing before upload", async () => {
+  it("disables upload when the project has no canonical master", async () => {
+    fetchProjectDashboardSummaryMock.mockResolvedValue({
+      project: { id: 2, name: "Test", masterDrawingId: null },
+      masterDrawing: null,
+    });
+
     renderForm(<InspectionUploadForm projectId={2} />);
 
-    await screen.findByTestId("inspection-upload-master-drawing");
+    await screen.findByTestId("inspection-upload-master-label");
     expect(screen.getByTestId("inspection-upload-submit")).toBeDisabled();
+    expect(
+      screen.getByText(/No canonical master sheet — upload a drawing on the Dashboard first/i),
+    ).toBeInTheDocument();
   });
 
-  it("creates a run and uploads evidence for the selected master drawing", async () => {
+  it("shows the canonical master sheet and uploads against it", async () => {
     const onUploaded = vi.fn();
     renderForm(
-      <InspectionUploadForm
-        projectId={2}
-        initialMasterDrawingId="10"
-        onUploaded={onUploaded}
-      />,
+      <InspectionUploadForm projectId={2} onUploaded={onUploaded} />,
     );
 
-    await screen.findByTestId("inspection-upload-submit");
+    await screen.findByText("Level 1");
     expect(screen.getByTestId("inspection-upload-submit")).not.toBeDisabled();
 
     const file = new File(["pdf"], "inspection.pdf", { type: "application/pdf" });
@@ -110,5 +115,14 @@ describe("InspectionUploadForm", () => {
         masterDrawingId: "10",
       }),
     );
+  });
+
+  it("honors initialMasterDrawingId override", async () => {
+    renderForm(
+      <InspectionUploadForm projectId={2} initialMasterDrawingId="11" />,
+    );
+
+    await screen.findByText("Drawing 11");
+    expect(screen.getByTestId("inspection-upload-submit")).not.toBeDisabled();
   });
 });
