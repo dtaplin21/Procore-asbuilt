@@ -13,7 +13,12 @@ from models.schemas import (
     EvidenceListResponse,
     InspectionRunEvidenceUploadResponse,
 )
-from services.evidence_file_storage import UnsupportedEvidenceFileType, save_upload
+from services.evidence_file_storage import (
+    UnsupportedEvidenceFileType,
+    evidence_storage_dir,
+    save_upload,
+    storage_key_from_path,
+)
 from services.file_storage import get_file_path, read_and_validate_upload, save_upload_from_bytes, sha256_bytes
 from services.idempotency import begin_idempotent_operation, finish_idempotent_operation
 from services.overlay_storage import create_drawing_overlays, flag_unresolved_evidence
@@ -66,14 +71,17 @@ async def upload_inspection_run_evidence(
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
     try:
-        saved = save_upload(
+        saved_path = save_upload(
             original_name,
             file_bytes,
-            project_id=project_id,
-            content_type=content_type,
+            storage_root=evidence_storage_dir(project_id),
         )
     except UnsupportedEvidenceFileType as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    storage_key = storage_key_from_path(saved_path)
 
     evidence = storage.create_evidence_record(
         project_id=project_id,
@@ -81,8 +89,8 @@ async def upload_inspection_run_evidence(
         trade=None,
         spec_section=None,
         title=original_name,
-        storage_key=saved.storage_key,
-        content_type=saved.content_type,
+        storage_key=storage_key,
+        content_type=content_type,
         text_content=None,
         meta={"inspectionRunId": inspection_run_id},
     )
@@ -94,13 +102,13 @@ async def upload_inspection_run_evidence(
         db.refresh(run)
 
     region_load = build_region_index(db, master_drawing_id)
-    registration = _try_visual_registration(str(saved.file_path), str(master_drawing_id))
+    registration = _try_visual_registration(str(saved_path), str(master_drawing_id))
 
     evidence_input = DocumentEvidenceInput(
         evidence_id=str(evidence_id),
         inspection_run_id=str(inspection_run_id),
         master_drawing_id=str(master_drawing_id),
-        file_path=str(saved.file_path),
+        file_path=str(saved_path),
         region_index=region_load.regions,
         registration_transform=registration,
     )
@@ -124,12 +132,7 @@ async def upload_inspection_run_evidence(
 
     saved_overlays = create_drawing_overlays(db, overlays) if overlays else []
     if unresolved:
-        flag_unresolved_evidence(
-            db,
-            unresolved,
-            evidence_id=evidence_id,
-            project_id=project_id,
-        )
+        flag_unresolved_evidence(db, unresolved)
 
     if region_load.untagged_region_count > 0:
         logger.info(

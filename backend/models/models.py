@@ -559,8 +559,8 @@ class DrawingOverlay(Base):
 
     ``created_at`` is when the record was uploaded/created in this system
     (``uploaded_at`` in refactor docs). ``inspection_date`` is when the
-    inspection was performed per the source document (nullable until
-    date extraction is wired).
+    inspection was performed per the source document (nullable when the
+    document states no recognizable date).
     """
 
     __tablename__ = "drawing_overlays"

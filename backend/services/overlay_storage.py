@@ -1,4 +1,9 @@
-"""Persist document-pipeline overlay records and unresolved evidence flags."""
+"""Persistence layer for inspection_mapping.py pipeline output.
+
+Converts ``DrawingOverlayRecord`` / ``UnresolvedEvidenceRecord`` dataclasses
+into ORM rows on ``drawing_overlays`` and ``unresolved_evidence``. Called
+directly from ``api.routes.evidence`` after ``map_document_to_overlays()``.
+"""
 
 from __future__ import annotations
 
@@ -7,8 +12,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from ai.pipelines.inspection_mapping import DrawingOverlayRecord, UnresolvedEvidenceRecord
-from models.models import DrawingOverlay, UnresolvedEvidence
-from services.storage import StorageService
+from models.models import DrawingOverlay, EvidenceRecord, UnresolvedEvidence
 
 
 def _overlay_status_from_tags(tags: Any) -> str:
@@ -37,77 +41,127 @@ def _bbox_to_geometry(
     }
 
 
+def _build_overlay_row(record: DrawingOverlayRecord) -> DrawingOverlay:
+    if record.bbox is None:
+        raise ValueError(
+            f"DrawingOverlayRecord {record.id!r} has no bbox — only call "
+            f"create_drawing_overlay for resolved overlays. Unresolved "
+            f"evidence belongs in flag_unresolved_evidence instead."
+        )
+
+    tags_dict = record.tags.to_dict()
+    meta: dict[str, Any] = {
+        "label": record.label,
+        "severity": record.severity,
+        "pipelineOverlayId": record.id,
+        **tags_dict,
+    }
+    return DrawingOverlay(
+        master_drawing_id=int(record.drawing_id),
+        inspection_run_id=int(record.inspection_run_id),
+        geometry=_bbox_to_geometry(record.bbox, label=record.label),
+        status=_overlay_status_from_tags(record.tags),
+        meta=meta,
+        label=record.label,
+        severity=record.severity,
+        confidence_label=record.tags.confidence_label,
+        inspection_date=record.inspection_date,
+        tags_json=tags_dict,
+    )
+
+
+def create_drawing_overlay(db: Session, overlay: DrawingOverlayRecord) -> DrawingOverlay:
+    """Persist one resolved overlay and return the saved ORM row."""
+    row = _build_overlay_row(overlay)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
 def create_drawing_overlays(
     db: Session,
     overlays: list[DrawingOverlayRecord],
 ) -> list[DrawingOverlay]:
-    """Persist illustrative pipeline overlays as ``drawing_overlays`` rows."""
-    storage = StorageService(db)
-    saved: list[DrawingOverlay] = []
-
-    for record in overlays:
-        if record.bbox is None:
+    """Batch persist — one commit for the whole upload."""
+    rows: list[DrawingOverlay] = []
+    for overlay in overlays:
+        if overlay.bbox is None:
             continue
+        rows.append(_build_overlay_row(overlay))
 
-        tags_dict = record.tags.to_dict()
-        meta: dict[str, Any] = {
-            "label": record.label,
-            "severity": record.severity,
-            "pipelineOverlayId": record.id,
-            **tags_dict,
-        }
-        overlay = storage.create_drawing_overlay(
-            int(record.drawing_id),
-            _bbox_to_geometry(record.bbox, label=record.label),
-            _overlay_status_from_tags(record.tags),
-            meta=meta,
-            inspection_run_id=int(record.inspection_run_id),
-            label=record.label,
-            severity=record.severity,
-            confidence_label=record.tags.confidence_label,
-            inspection_date=record.inspection_date,
-            tags_json=tags_dict,
-        )
-        saved.append(overlay)
+    if not rows:
+        return []
 
-    return saved
+    db.add_all(rows)
+    db.commit()
+    for row in rows:
+        db.refresh(row)
+    return rows
+
+
+def _mirror_unresolved_to_evidence_meta(
+    db: Session,
+    unresolved: list[UnresolvedEvidenceRecord],
+) -> None:
+    """Keep evidence.meta in sync for callers that still read the legacy field."""
+    payloads_by_evidence: dict[int, list[dict[str, Any]]] = {}
+    for item in unresolved:
+        evidence_id = int(item.evidence_id)
+        payloads_by_evidence.setdefault(evidence_id, []).append(item.to_dict())
+
+    if not payloads_by_evidence:
+        return
+
+    for evidence_id, payloads in payloads_by_evidence.items():
+        evidence = db.query(EvidenceRecord).filter(EvidenceRecord.id == evidence_id).first()
+        if evidence is None:
+            continue
+        meta = dict(getattr(evidence, "meta", None) or {})
+        meta["documentPipelineUnresolved"] = payloads
+        setattr(evidence, "meta", meta)
+
+    db.commit()
 
 
 def flag_unresolved_evidence(
     db: Session,
     unresolved: list[UnresolvedEvidenceRecord],
-    *,
-    evidence_id: int,
-    project_id: int,
 ) -> list[UnresolvedEvidence]:
-    """Persist unresolved document placements for reviewer follow-up."""
-    if not unresolved:
-        return []
-
-    storage = StorageService(db)
-    evidence = storage.get_evidence_record(project_id, evidence_id)
-    if evidence is None:
-        return []
-
-    saved: list[UnresolvedEvidence] = []
-    for item in unresolved:
-        row = UnresolvedEvidence(
-            evidence_id=evidence_id,
-            inspection_run_id=int(item.inspection_run_id),
-            master_drawing_id=int(item.master_drawing_id),
-            reason=item.reason,
-            extracted_terms_json=[term.to_dict() for term in item.extracted_terms],
-            resolved_by_human=False,
+    """Persist evidence that could not be auto-placed for reviewer follow-up."""
+    rows: list[UnresolvedEvidence] = []
+    for record in unresolved:
+        rows.append(
+            UnresolvedEvidence(
+                evidence_id=int(record.evidence_id),
+                inspection_run_id=int(record.inspection_run_id),
+                master_drawing_id=int(record.master_drawing_id),
+                reason=record.reason,
+                extracted_terms_json=[term.to_dict() for term in record.extracted_terms],
+                resolved_by_human=False,
+            )
         )
-        db.add(row)
-        saved.append(row)
 
-    meta = dict(getattr(evidence, "meta", None) or {})
-    meta["documentPipelineUnresolved"] = [item.to_dict() for item in unresolved]
-    setattr(evidence, "meta", meta)
+    if rows:
+        db.add_all(rows)
+        db.commit()
+        for row in rows:
+            db.refresh(row)
+        _mirror_unresolved_to_evidence_meta(db, unresolved)
 
-    db.commit()
-    for row in saved:
-        db.refresh(row)
-    db.refresh(evidence)
-    return saved
+    return rows
+
+
+def list_unresolved_evidence(
+    db: Session,
+    master_drawing_id: int | str,
+    *,
+    include_resolved: bool = False,
+) -> list[UnresolvedEvidence]:
+    """Unresolved placements for a master drawing (default: still needs review)."""
+    query = db.query(UnresolvedEvidence).filter(
+        UnresolvedEvidence.master_drawing_id == int(master_drawing_id)
+    )
+    if not include_resolved:
+        query = query.filter(UnresolvedEvidence.resolved_by_human.is_(False))
+    return query.order_by(UnresolvedEvidence.created_at.desc()).all()

@@ -45,6 +45,7 @@ from sqlalchemy.orm import Session
 from typing import Any, Dict, List, Optional, cast
 
 from ai.pipelines.document_text_extraction import ExtractedDocument, extract_document
+from ai.pipelines.date_extractor import extract_inspection_date
 from ai.pipelines.drawing_location_resolver import (
     MasterRegion,
     RegistrationTransform,
@@ -308,6 +309,7 @@ def map_document_to_overlays(
     rather than losing the whole submission to one bad reference.
     """
     document: ExtractedDocument = extract_document(evidence.file_path)
+    inspection_date = extract_inspection_date(document)
     positioned_terms = extract_positioned_terms(
         document, categories=_RESOLUTION_VOCAB_CATEGORIES
     )
@@ -382,7 +384,11 @@ def map_document_to_overlays(
             )
             overlays.append(
                 _build_overlay_record(
-                    evidence, all_terms, (x0, y0, x1, y1), representative
+                    evidence,
+                    all_terms,
+                    (x0, y0, x1, y1),
+                    representative,
+                    inspection_date=inspection_date,
                 )
             )
         else:
@@ -405,7 +411,13 @@ def map_document_to_overlays(
                 if bbox is None:
                     continue
                 overlays.append(
-                    _build_overlay_record(evidence, group_terms, bbox, representative)
+                    _build_overlay_record(
+                        evidence,
+                        group_terms,
+                        bbox,
+                        representative,
+                        inspection_date=inspection_date,
+                    )
                 )
 
     return overlays, unresolved
@@ -416,6 +428,8 @@ def _build_overlay_record(
     terms: list[PositionedTerm],
     bbox_fractional: tuple[float, float, float, float],
     representative: ResolvedLocation,
+    *,
+    inspection_date: date | None = None,
 ) -> DrawingOverlayRecord:
     """Shared overlay-construction step used by both the alignment and
     reference-lookup branches of map_document_to_overlays, so label/
@@ -439,6 +453,7 @@ def _build_overlay_record(
         severity=severity,
         tags=tags,
         created_at=datetime.now(timezone.utc),
+        inspection_date=inspection_date,
     )
 
 

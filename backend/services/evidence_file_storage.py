@@ -1,63 +1,73 @@
-"""Save uploaded inspection evidence files to disk for the document pipeline."""
+"""Save uploaded inspection evidence files to disk for the document pipeline.
+
+Minimal local-disk helper for ``api.routes.evidence``. Returns a path that
+``document_text_extraction.extract_document()`` can read. Swap ``storage_root``
+or replace this module with S3/GCS when deploying to object storage.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import os
+import uuid
 from pathlib import Path
 
-from services.file_storage import get_file_path, save_upload_from_bytes
+from services.file_storage import BASE_UPLOAD_DIR
+
+# Override in deployment via EVIDENCE_STORAGE_ROOT; defaults under backend/uploads.
+EVIDENCE_STORAGE_ROOT = Path(
+    os.environ.get("EVIDENCE_STORAGE_ROOT", str(BASE_UPLOAD_DIR / "evidence_uploads"))
+)
+
+ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
 
 
 class UnsupportedEvidenceFileType(ValueError):
-    """Raised when an uploaded file type is not supported for document extraction."""
+    """Raised when the uploaded file extension is not supported."""
 
 
-_ALLOWED_CONTENT_TYPES = {
-    "application/pdf",
-    "image/png",
-    "image/jpeg",
-    "image/jpg",
-    "image/gif",
-    "image/tiff",
-    "image/webp",
-}
+def evidence_storage_dir(project_id: int) -> Path:
+    """Per-project subdirectory under the evidence upload root."""
+    return EVIDENCE_STORAGE_ROOT / "projects" / str(project_id)
 
 
-@dataclass(frozen=True)
-class SavedEvidenceUpload:
-    storage_key: str
-    file_path: Path
-    content_type: str
-    original_name: str
+def storage_key_from_path(saved_path: Path) -> str:
+    """Relative key stored on EvidenceRecord.storage_key (under BASE_UPLOAD_DIR layout)."""
+    resolved = saved_path.resolve()
+    uploads_root = BASE_UPLOAD_DIR.resolve()
+    try:
+        return str(resolved.relative_to(uploads_root))
+    except ValueError:
+        return str(saved_path)
 
 
 def save_upload(
-    original_name: str,
+    original_filename: str,
     file_bytes: bytes,
     *,
-    project_id: int,
-    content_type: str,
-) -> SavedEvidenceUpload:
-    """Persist evidence bytes and return paths for ``extract_document()``."""
+    storage_root: Path | None = None,
+) -> Path:
+    """Persist an uploaded evidence file to disk and return its absolute path."""
     if not file_bytes:
         raise ValueError("Uploaded file is empty.")
 
-    normalized_type = (content_type or "").split(";", 1)[0].strip().lower()
-    if normalized_type not in _ALLOWED_CONTENT_TYPES:
+    suffix = Path(original_filename or "evidence").suffix.lower()
+    if suffix not in ALLOWED_EXTENSIONS:
         raise UnsupportedEvidenceFileType(
-            f"Unsupported evidence file type: {content_type or 'unknown'!r}"
+            f"Unsupported evidence file type {suffix!r}. "
+            f"Allowed: {sorted(ALLOWED_EXTENSIONS)}"
         )
 
-    storage_key = save_upload_from_bytes(
-        file_bytes,
-        project_id,
-        category="evidence",
-        content_type=normalized_type,
-        original_name=original_name or "evidence",
-    )
-    return SavedEvidenceUpload(
-        storage_key=storage_key,
-        file_path=get_file_path(storage_key),
-        content_type=normalized_type,
-        original_name=original_name or "evidence",
-    )
+    root = storage_root or EVIDENCE_STORAGE_ROOT
+    root.mkdir(parents=True, exist_ok=True)
+
+    saved_path = root / f"{uuid.uuid4().hex}{suffix}"
+    saved_path.write_bytes(file_bytes)
+    return saved_path.resolve()
+
+
+def delete_upload(path: Path) -> None:
+    """Best-effort cleanup — never raises if the file is already gone."""
+    try:
+        Path(path).unlink(missing_ok=True)
+    except OSError:
+        pass
