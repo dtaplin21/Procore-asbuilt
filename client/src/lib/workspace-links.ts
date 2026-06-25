@@ -1,5 +1,7 @@
 import type { WorkspaceLinkMetadata } from "@shared/schema";
 
+import { objectsPagePath } from "@/lib/objectsRoute";
+
 export type WorkspaceLinkInput = {
   projectId: number;
   masterDrawingId: number;
@@ -7,25 +9,19 @@ export type WorkspaceLinkInput = {
   overlayId?: number | null;
 };
 
-/** Master workspace route with optional inspection run + overlay selection. */
+/** Master drawing surface on the Objects page with optional run + overlay selection. */
 export function buildWorkspaceUrl({
   projectId,
   masterDrawingId,
   inspectionRunId,
   overlayId,
 }: WorkspaceLinkInput): string {
-  const base = `/projects/${projectId}/drawings/${masterDrawingId}/workspace`;
-  const params: string[] = [];
-  if (inspectionRunId != null) {
-    params.push(`run=${encodeURIComponent(String(inspectionRunId))}`);
-  }
-  if (overlayId != null) {
-    params.push(`overlay=${encodeURIComponent(String(overlayId))}`);
-  }
-  if (params.length === 0) {
-    return base;
-  }
-  return `${base}?${params.join("&")}`;
+  return objectsPagePath(
+    String(projectId),
+    String(masterDrawingId),
+    inspectionRunId != null ? String(inspectionRunId) : null,
+    overlayId != null ? String(overlayId) : null,
+  );
 }
 
 /** Map API workspace metadata into {@link buildWorkspaceUrl}. */

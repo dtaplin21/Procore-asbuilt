@@ -82,11 +82,11 @@ export default function InspectionRunsPanel({
   const uploadBusy = uploadPending || createRunPending;
   const runDisabled = runPending || hasActiveRun || uploadBusy;
 
-  const { data: overlays = [], isLoading: overlaysLoading } = useDrawingOverlays(
-    String(projectId),
-    String(masterDrawingId),
-    { inspectionRunId: selectedRunId }
-  );
+  const { data: overlays = [], isLoading: overlaysLoading } = useDrawingOverlays({
+    projectId: String(projectId),
+    drawingId: String(masterDrawingId),
+    runId: selectedRunId != null ? String(selectedRunId) : null,
+  });
 
   const overlayItems = useMemo(
     () => overlays.map((overlay) => formatOverlayListItem(overlay)),

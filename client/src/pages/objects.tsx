@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Layers, 
@@ -44,9 +43,11 @@ import type {
 } from "@shared/schema";
 import type { ProjectDrawingsResponse, ProjectDrawingCandidate } from "@/types/drawing_workspace";
 import { useDrawingOverlays } from "@/hooks/use-inspection-runs";
+import { useObjectsQueryParams } from "@/hooks/use_objects_query_params";
 import { fetchProjectDrawings, projectDrawingsQueryKey } from "@/lib/api/drawings";
 import { fetchMasterDrawing } from "@/lib/api/drawing_workspace";
 import { toOverlayRegions } from "@/lib/drawing-overlays/inspection_overlay";
+import { objectsPagePath } from "@/lib/objectsRoute";
 import {
   setLastProjectIdForWorkspaceFallback,
   setWorkspaceReturnPath,
@@ -64,6 +65,12 @@ function pickNewestMasterId(
   return masters.reduce((max, d) => (d.id > max ? d.id : max), masters[0].id);
 }
 
+function parseNumericParam(value: string | undefined): number | null {
+  if (value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 const statusConfig: Record<ObjectStatus, { label: string; color: string }> = {
   not_started: { label: "Not Started", color: "bg-foreground/30" },
   pending_shop_drawing: { label: "Pending Shop Drawing", color: "bg-primary/50" },
@@ -74,19 +81,17 @@ const statusConfig: Record<ObjectStatus, { label: string; color: string }> = {
 };
 
 export default function Objects({ procoreUserId }: { procoreUserId?: string | null }) {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const projectIdFromUrlRaw = searchParams.get("projectId");
-  const drawingIdFromUrlRaw = searchParams.get("drawingId");
+  const {
+    projectId: projectIdFromUrlRaw,
+    drawingId: drawingIdFromUrlRaw,
+    runId: runIdFromUrlRaw,
+    overlayId: overlayIdFromUrlRaw,
+    setProject,
+    setDrawing,
+  } = useObjectsQueryParams();
 
-  const projectIdFromUrl =
-    projectIdFromUrlRaw !== null && Number.isFinite(Number(projectIdFromUrlRaw))
-      ? Number(projectIdFromUrlRaw)
-      : null;
-
-  const drawingIdFromUrl =
-    drawingIdFromUrlRaw !== null && Number.isFinite(Number(drawingIdFromUrlRaw))
-      ? Number(drawingIdFromUrlRaw)
-      : null;
+  const projectIdFromUrl = parseNumericParam(projectIdFromUrlRaw);
+  const drawingIdFromUrl = parseNumericParam(drawingIdFromUrlRaw);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -104,35 +109,22 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
   function handleProjectChange(nextProjectId: number | null) {
     setSelectedProjectId(nextProjectId);
     setSelectedMasterDrawingId(null);
-
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-
-      if (nextProjectId === null) {
-        next.delete("projectId");
-      } else {
-        next.set("projectId", String(nextProjectId));
-      }
-
-      next.delete("drawingId");
-      return next;
-    });
+    setProject(nextProjectId != null ? String(nextProjectId) : null);
   }
 
   function handleMasterDrawingChange(nextDrawingId: number | null) {
     setSelectedMasterDrawingId(nextDrawingId);
 
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
+    if (selectedProjectId === null) {
+      return;
+    }
 
-      if (nextDrawingId === null) {
-        next.delete("drawingId");
-      } else {
-        next.set("drawingId", String(nextDrawingId));
-      }
+    if (nextDrawingId === null) {
+      setProject(String(selectedProjectId));
+      return;
+    }
 
-      return next;
-    });
+    setDrawing(String(selectedProjectId), String(nextDrawingId));
   }
 
   const { data: projectsData, isLoading: projectsLoading } = useQuery<ProjectListResponse>({
@@ -169,18 +161,13 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     const id = projects[0].id;
     setSelectedProjectId(id);
     setSelectedMasterDrawingId(null);
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set("projectId", String(id));
-      next.delete("drawingId");
-      return next;
-    });
+    setProject(String(id));
   }, [
     projectIdFromUrl,
     projectsLoading,
     projects,
     selectedProjectId,
-    setSearchParams,
+    setProject,
   ]);
 
   const masterDrawingOptions = drawings;
@@ -208,10 +195,11 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     selectedProjectId != null ? String(selectedProjectId) : null;
   const overlayDrawingId =
     selectedMasterDrawingId != null ? String(selectedMasterDrawingId) : null;
-  const { data: overlays = [] } = useDrawingOverlays(
-    overlayProjectId,
-    overlayDrawingId
-  );
+  const { data: overlays = [] } = useDrawingOverlays({
+    projectId: overlayProjectId ?? undefined,
+    drawingId: overlayDrawingId ?? undefined,
+    runId: runIdFromUrlRaw ?? null,
+  });
   const overlayRegions = useMemo(() => toOverlayRegions(overlays), [overlays]);
 
   useEffect(() => {
@@ -238,11 +226,7 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
       }
 
       setSelectedMasterDrawingId(newestId);
-      setSearchParams((prev) => {
-        const next = new URLSearchParams(prev);
-        next.set("drawingId", String(newestId));
-        return next;
-      });
+      setDrawing(String(selectedProjectId), String(newestId));
       return;
     }
 
@@ -251,27 +235,13 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
       masters.some((m) => m.id === selectedMasterDrawingId);
     if (selectedMasterDrawingId !== null && !stateMasterInProject) {
       setSelectedMasterDrawingId(newestId);
-      setSearchParams((prev) => {
-        const next = new URLSearchParams(prev);
-        if (selectedProjectId !== null) {
-          next.set("projectId", String(selectedProjectId));
-        }
-        next.set("drawingId", String(newestId));
-        return next;
-      });
+      setDrawing(String(selectedProjectId), String(newestId));
       return;
     }
 
     if (selectedMasterDrawingId === null) {
       setSelectedMasterDrawingId(newestId);
-      setSearchParams((prev) => {
-        const next = new URLSearchParams(prev);
-        if (selectedProjectId !== null) {
-          next.set("projectId", String(selectedProjectId));
-        }
-        next.set("drawingId", String(newestId));
-        return next;
-      });
+      setDrawing(String(selectedProjectId), String(newestId));
     }
   }, [
     selectedProjectId,
@@ -279,7 +249,7 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     drawingsQuery.data,
     drawingIdFromUrl,
     selectedMasterDrawingId,
-    setSearchParams,
+    setDrawing,
   ]);
 
   /** Keep sidebar Workspace + return path aligned with Objects project / master selection. */
@@ -293,10 +263,20 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
       return;
     }
     setWorkspaceReturnPath(
-      `/projects/${selectedProjectId}/drawings/${selectedMasterDrawingId}/workspace`
+      objectsPagePath(
+        String(selectedProjectId),
+        String(selectedMasterDrawingId),
+        runIdFromUrlRaw ?? null,
+        overlayIdFromUrlRaw ?? null,
+      ),
     );
     setLastProjectIdForWorkspaceFallback(selectedProjectId);
-  }, [selectedProjectId, selectedMasterDrawingId]);
+  }, [
+    selectedProjectId,
+    selectedMasterDrawingId,
+    runIdFromUrlRaw,
+    overlayIdFromUrlRaw,
+  ]);
 
   const SEVERITY_RANK = { low: 1, medium: 2, high: 3, critical: 4 } as const;
   const MISMATCH_THRESHOLD = "high" as const;

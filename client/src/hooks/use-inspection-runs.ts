@@ -1,19 +1,23 @@
 import { useMutation, useQuery, useQueryClient, type Query } from "@tanstack/react-query";
 import type {
+  DrawingOverlay,
   InspectionRun,
   InspectionRunListResponse,
-  DrawingOverlay,
-  RunInspectionRequest,
   InspectionRunEvidenceUploadResponse,
+  RunInspectionRequest,
 } from "@shared/schema";
 
 import {
-  buildDrawingOverlaysUrl,
   createInspectionRun,
-  fetchDrawingOverlays,
   refreshInspectionWorkspaceQueries,
   uploadInspectionRunEvidence,
 } from "@/lib/api/inspection_runs";
+import {
+  fetchDrawingOverlays,
+  fetchLatestRunOverlays,
+  invalidateOverlaysForRun,
+  overlaysQueryKey,
+} from "@/lib/api/overlays";
 import { requestJson, resolveFetchUrl } from "@/lib/api/http";
 
 export type InspectionRunsFilters = {
@@ -152,39 +156,73 @@ export function useUploadInspectionRunEvidence(projectId: number | null) {
     Error,
     UploadInspectionRunEvidenceVariables
   >({
-    mutationFn: async ({ inspectionRunId, file }) => {
+    mutationFn: async ({ inspectionRunId, file, masterDrawingId }) => {
       if (projectId == null) {
         throw new Error("Project required");
       }
-      return uploadInspectionRunEvidence(projectId, inspectionRunId, file);
+      return uploadInspectionRunEvidence(
+        projectId,
+        inspectionRunId,
+        file,
+        masterDrawingId,
+      );
     },
     onSuccess: (_, variables) => {
       if (projectId != null) {
+        invalidateOverlaysForRun(
+          queryClient,
+          String(variables.masterDrawingId),
+          String(variables.inspectionRunId),
+        );
         void refreshInspectionWorkspaceQueries(
           queryClient,
           projectId,
-          variables.masterDrawingId
+          variables.masterDrawingId,
         );
       }
     },
   });
 }
 
-export function useDrawingOverlays(
-  projectId: string | null,
-  drawingId: string | null,
-  filters?: { inspectionRunId?: number | null; diffId?: number | null }
-) {
-  const pid = projectId != null ? Number(projectId) : NaN;
-  const did = drawingId != null ? Number(drawingId) : NaN;
-  const url =
-    projectId && drawingId
-      ? buildDrawingOverlaysUrl(pid, did, filters)
-      : "";
+export { overlaysQueryKey };
 
+export interface UseDrawingOverlaysOptions {
+  projectId: string | undefined;
+  drawingId: string | undefined;
+  /** Specific run to show overlays for. If omitted/null, shows the
+   * latest complete run's overlays (per merge plan Phase 2 default). */
+  runId?: string | null;
+  enabled?: boolean;
+}
+
+export function useDrawingOverlays({
+  projectId,
+  drawingId,
+  runId,
+  enabled = true,
+}: UseDrawingOverlaysOptions) {
   return useQuery<DrawingOverlay[]>({
-    queryKey: [url],
-    queryFn: () => fetchDrawingOverlays(pid, did, filters),
-    enabled: !!projectId && !!drawingId && !!url && Number.isFinite(pid) && Number.isFinite(did),
+    queryKey: overlaysQueryKey(drawingId ?? "", runId),
+    queryFn: () => {
+      if (!projectId || !drawingId) {
+        return Promise.resolve([]);
+      }
+      return runId
+        ? fetchDrawingOverlays({
+            projectId,
+            drawingId,
+            inspectionRunId: runId,
+          })
+        : fetchLatestRunOverlays(projectId, drawingId);
+    },
+    enabled: enabled && Boolean(projectId && drawingId),
+    staleTime: 60_000,
   });
+}
+
+export function useInvalidateOverlaysForRun() {
+  const queryClient = useQueryClient();
+  return (drawingId: string, runId: string) => {
+    invalidateOverlaysForRun(queryClient, drawingId, runId);
+  };
 }

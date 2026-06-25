@@ -1,112 +1,69 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type {
-  DrawingOverlay,
-  InspectionRun,
   InspectionRunEvidenceUploadResponse,
   RunInspectionRequest,
 } from "@shared/schema";
 
-import { readApiError, requestJson, resolveFetchUrl } from "@/lib/api/http";
+import {
+  createInspectionRun as createInspectionRunApi,
+  uploadInspectionRunEvidence as uploadInspectionRunEvidenceApi,
+} from "@/lib/api/inspections";
+import { invalidateOverlaysForDrawing } from "@/lib/api/overlays";
 
-export function buildDrawingOverlaysUrl(
-  projectId: number,
-  drawingId: number,
-  filters?: { inspectionRunId?: number | null; diffId?: number | null }
-): string {
-  const params = new URLSearchParams();
-  if (filters?.inspectionRunId != null) {
-    params.set("inspection_run_id", String(filters.inspectionRunId));
-  }
-  if (filters?.diffId != null) {
-    params.set("diff_id", String(filters.diffId));
-  }
-  const query = params.toString();
-  return `/api/projects/${projectId}/drawings/${drawingId}/overlays${query ? `?${query}` : ""}`;
-}
-
-export async function fetchDrawingOverlays(
-  projectId: number,
-  drawingId: number,
-  filters?: { inspectionRunId?: number | null; diffId?: number | null }
-): Promise<DrawingOverlay[]> {
-  return requestJson<DrawingOverlay[]>(buildDrawingOverlaysUrl(projectId, drawingId, filters));
-}
-
+/** @deprecated Prefer `@/lib/api/inspections` — kept for existing hook imports. */
 export async function createInspectionRun(
   projectId: number,
-  body: RunInspectionRequest
-): Promise<InspectionRun> {
-  const response = await fetch(
-    resolveFetchUrl(`/api/projects/${projectId}/inspections/runs`),
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": crypto.randomUUID(),
-      },
-      credentials: "include",
-      body: JSON.stringify({
-        master_drawing_id: body.master_drawing_id,
-        evidence_id: body.evidence_id ?? null,
-        inspection_type: body.inspection_type ?? null,
-        skip_pipeline: body.skip_pipeline ?? false,
-      }),
-    }
-  );
-  if (!response.ok) {
-    await readApiError(response);
-  }
-  return response.json() as Promise<InspectionRun>;
+  body: RunInspectionRequest,
+) {
+  const run = await createInspectionRunApi({
+    projectId: String(projectId),
+    masterDrawingId: String(body.master_drawing_id),
+    skipPipeline: body.skip_pipeline ?? false,
+  });
+  return {
+    id: Number(run.id),
+    project_id: Number(run.projectId),
+    master_drawing_id: Number(run.masterDrawingId),
+    evidence_id: body.evidence_id ?? null,
+    inspection_type: body.inspection_type ?? null,
+    status: run.status,
+    started_at: null,
+    completed_at: null,
+    error_message: null,
+    created_at: run.createdAt,
+    updated_at: run.createdAt,
+  } satisfies import("@shared/schema").InspectionRun;
 }
 
-/**
- * POST /api/projects/{project_id}/inspections/runs/{run_id}/evidence
- * Multipart file upload — runs document pipeline and persists overlays.
- */
+/** @deprecated Prefer `@/lib/api/inspections` — kept for existing hook imports. */
 export async function uploadInspectionRunEvidence(
   projectId: number,
   inspectionRunId: number,
-  file: File
+  file: File,
+  masterDrawingId: number,
 ): Promise<InspectionRunEvidenceUploadResponse> {
-  if (!(file instanceof File)) {
-    throw new TypeError("uploadInspectionRunEvidence requires a File instance");
-  }
-
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const response = await fetch(
-    resolveFetchUrl(
-      `/api/projects/${projectId}/inspections/runs/${inspectionRunId}/evidence`
-    ),
-    {
-      method: "POST",
-      credentials: "include",
-      body: formData,
-    }
-  );
-
-  if (!response.ok) {
-    await readApiError(response);
-  }
-
-  return response.json() as Promise<InspectionRunEvidenceUploadResponse>;
+  const response = await uploadInspectionRunEvidenceApi({
+    projectId: String(projectId),
+    runId: String(inspectionRunId),
+    masterDrawingId: String(masterDrawingId),
+    file,
+  });
+  return {
+    evidence_id: Number(response.evidence_id),
+    overlays_created: response.overlays_created,
+    unresolved_count: response.unresolved_count,
+    untagged_region_count: response.untagged_region_count,
+    overlay_ids: response.overlay_ids.map(Number),
+  };
 }
 
 export function invalidateDrawingOverlayQueries(
   queryClient: QueryClient,
-  projectId: number,
+  _projectId: number,
   drawingId: number
 ): Promise<void> {
-  return queryClient.invalidateQueries({
-    predicate: (query) => {
-      const key = query.queryKey[0];
-      return (
-        typeof key === "string" &&
-        key.includes(`/api/projects/${projectId}/drawings/${drawingId}/overlays`)
-      );
-    },
-  });
+  invalidateOverlaysForDrawing(queryClient, String(drawingId));
+  return Promise.resolve();
 }
 
 export async function refreshInspectionWorkspaceQueries(

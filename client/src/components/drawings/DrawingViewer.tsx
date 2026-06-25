@@ -61,11 +61,11 @@ export default function DrawingViewer({
   const drawingIdStr =
     drawing?.id != null && Number.isFinite(drawing.id) ? String(drawing.id) : null;
 
-  const { data: overlays = [], isLoading: overlaysLoading } = useDrawingOverlays(
-    projectIdStr,
-    drawingIdStr,
-    { inspectionRunId }
-  );
+  const { data: overlays = [], isLoading: overlaysLoading } = useDrawingOverlays({
+    projectId: projectIdStr ?? undefined,
+    drawingId: drawingIdStr ?? undefined,
+    runId: inspectionRunId != null ? String(inspectionRunId) : null,
+  });
   const regions = useMemo(() => toOverlayRegions(overlays), [overlays]);
 
   const masterSrcRaw = drawing?.fileUrl ?? null;
