@@ -3,7 +3,7 @@
  * calls the backend route:
  *   POST /api/projects/{project_id}/inspections/runs/{run_id}/evidence
  *   (backend/api/routes/evidence.py — multipart file upload, returns
- *   InspectionRunEvidenceUploadResponse).
+ *   EvidenceUploadResponse).
  *
  * createInspectionRun targets POST /api/projects/{project_id}/inspections/runs
  * (backend/api/routes/inspections.py). Downstream callers only depend on this
@@ -35,6 +35,8 @@ type InspectionRunWire = {
   evidence_file_id?: number | string | null;
   overlays_created?: number;
   unresolved_count?: number;
+  region_id?: number | string | null;
+  region_label?: string | null;
 };
 
 function mapInspectionRun(row: InspectionRunWire): InspectionRun {
@@ -50,6 +52,8 @@ function mapInspectionRun(row: InspectionRunWire): InspectionRun {
       row.evidence_file_id != null ? String(row.evidence_file_id) : null,
     overlaysCreated: row.overlays_created,
     unresolvedCount: row.unresolved_count,
+    regionId: row.region_id != null ? String(row.region_id) : null,
+    regionLabel: row.region_label ?? null,
   };
 }
 
@@ -72,7 +76,11 @@ function mapEvidenceUploadResponse(data: {
 export interface CreateInspectionRunParams {
   projectId: string;
   masterDrawingId: string;
-  /** When true, create the run without running the legacy auto-mapping pass. */
+  /** When true, the backend creates the run record without immediately
+   * attempting any legacy auto-mapping pass — the merge plan's upload
+   * flow always creates the run first, then uploads evidence against it
+   * as a separate step, so the pipeline runs exactly once per evidence
+   * file rather than once at run-creation and again at upload. */
   skipPipeline?: boolean;
 }
 
@@ -113,7 +121,8 @@ export interface UploadInspectionRunEvidenceParams {
 /**
  * Upload one evidence file against an inspection run.
  * POST /api/projects/{project_id}/inspections/runs/{run_id}/evidence
- * with multipart field "file".
+ * with the file sent as multipart/form-data field "file" — see
+ * backend/api/routes/evidence.py upload_inspection_run_evidence().
  */
 export async function uploadInspectionRunEvidence(
   params: UploadInspectionRunEvidenceParams,
@@ -133,6 +142,8 @@ export async function uploadInspectionRunEvidence(
       method: "POST",
       credentials: "include",
       body: formData,
+      // Deliberately no Content-Type header — the browser sets the
+      // correct multipart/form-data boundary automatically.
     },
   );
   const data = await parseJsonOrThrow<{
@@ -161,7 +172,12 @@ export async function fetchProjectInspectionRuns(
   return data.items.map(mapInspectionRun);
 }
 
-/** Download URL for an evidence file attached to a project. */
+/**
+ * Build the URL for downloading the original evidence file a run's
+ * mapping was produced from — per the merge plan's "Reference uploaded
+ * inspections" requirement ("Link to original file:
+ * /api/projects/{id}/evidence/{evidence_id}/file").
+ */
 export function evidenceFileDownloadUrl(
   projectId: string,
   evidenceFileId: string,

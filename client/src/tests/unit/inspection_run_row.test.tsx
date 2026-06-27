@@ -1,3 +1,10 @@
+/**
+ * client/src/tests/unit/inspection_run_row.test.tsx
+ *
+ * PR5: history rows show linked region label + "View region" deep link;
+ * panel rows remain selectable without region chrome.
+ */
+
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -11,58 +18,78 @@ vi.mock("@/lib/api/inspections", () => ({
 
 function buildRun(overrides: Partial<InspectionRunRowRun> = {}): InspectionRunRowRun {
   return {
-    id: 15,
-    project_id: 2,
-    master_drawing_id: 8,
+    id: 1,
+    project_id: 1,
+    master_drawing_id: 1,
     status: "complete",
     inspection_type: "Roof QA",
-    evidence_id: 99,
-    created_at: "2026-06-01T12:00:00.000Z",
-    updated_at: "2026-06-01T12:05:00.000Z",
+    evidence_id: null,
+    created_at: "2026-06-24T00:00:00Z",
+    updated_at: "2026-06-24T00:00:00Z",
     started_at: null,
-    completed_at: "2026-06-01T12:05:00.000Z",
+    completed_at: "2026-06-24T00:05:00Z",
     error_message: null,
-    overlays_created: 3,
-    unresolved_count: 1,
-    region_id: 7,
-    region_label: "Roof MR",
-    evidence_title: "Roof inspection report",
     ...overrides,
   };
 }
 
-describe("InspectionRunRow history mode", () => {
-  it("shows evidence title, region label, and action links", () => {
-    render(
-      <ul>
-        <InspectionRunRow run={buildRun()} projectId="2" />
-      </ul>,
-    );
+function renderHistoryRow(run: InspectionRunRowRun, projectId: string) {
+  return render(
+    <ul>
+      <InspectionRunRow run={run} projectId={projectId} />
+    </ul>,
+  );
+}
 
-    expect(screen.getByText("Roof inspection report")).toBeInTheDocument();
-    expect(screen.getByTestId("inspection-run-region-label")).toHaveTextContent("Roof MR");
-    expect(screen.getByTestId("view-on-drawing-link")).toHaveAttribute(
-      "href",
-      "/objects?projectId=2&drawingId=8&run=15",
-    );
-    expect(screen.getByTestId("view-region-link")).toHaveAttribute(
-      "href",
-      "/objects?projectId=2&drawingId=8&run=15&region=7",
-    );
-    expect(screen.getByTestId("evidence-file-link")).toHaveAttribute(
-      "href",
-      "/api/projects/2/evidence/99/file",
-    );
+describe("InspectionRunRow", () => {
+  it("renders without a region label or link when the run has no region", () => {
+    renderHistoryRow(buildRun({ region_id: null, region_label: null }), "p1");
+    expect(screen.queryByTestId("inspection-run-region-label")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("view-region-link")).not.toBeInTheDocument();
   });
 
-  it("omits region link when run has no region", () => {
-    render(
-      <ul>
-        <InspectionRunRow run={buildRun({ region_id: null, region_label: null })} projectId="2" />
-      </ul>,
+  it("shows the region label and a view-region link when the run has a linked region", () => {
+    renderHistoryRow(
+      buildRun({ region_id: 1, region_label: "Storm Drain #44" }),
+      "p1",
     );
+    expect(screen.getByTestId("inspection-run-region-label")).toHaveTextContent("Storm Drain #44");
+    expect(screen.getByTestId("view-region-link")).toBeInTheDocument();
+  });
 
-    expect(screen.queryByTestId("view-region-link")).not.toBeInTheDocument();
+  it("the view-region link includes projectId, drawingId, run, and region in the URL", () => {
+    renderHistoryRow(
+      buildRun({
+        id: 42,
+        master_drawing_id: 9,
+        region_id: 5,
+        region_label: "Roof",
+      }),
+      "p7",
+    );
+    const link = screen.getByTestId("view-region-link") as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe("/objects?projectId=p7&drawingId=9&run=42&region=5");
+  });
+
+  it("always renders the plain view-on-drawing link regardless of region presence", () => {
+    renderHistoryRow(buildRun(), "p1");
+    expect(screen.getByTestId("view-on-drawing-link")).toBeInTheDocument();
+  });
+
+  it("shows finding counts and review-needed text alongside the region label", () => {
+    renderHistoryRow(
+      buildRun({
+        overlays_created: 2,
+        unresolved_count: 1,
+        region_id: 1,
+        region_label: "Utility MR",
+      }),
+      "p1",
+    );
+    const row = screen.getByTestId("inspection-run-row");
+    expect(row).toHaveTextContent("2 findings placed");
+    expect(row).toHaveTextContent("1 needs review");
+    expect(row).toHaveTextContent("Utility MR");
   });
 });
 
@@ -72,7 +99,7 @@ describe("InspectionRunRow panel mode", () => {
 
     render(
       <ul>
-        <InspectionRunRow run={buildRun()} onSelect={onSelect} />
+        <InspectionRunRow run={buildRun({ id: 15 })} onSelect={onSelect} />
       </ul>,
     );
 

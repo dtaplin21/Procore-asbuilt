@@ -53,6 +53,8 @@ type Props = {
   showInspectableAreas?: boolean;
   onRegionHoverChange?: (region: RenderableRegion | null) => void;
   onRegionClick?: (region: RenderableRegion) => void;
+  /** Optional overlay click handler (wired from DrawingComparisonWorkspace). */
+  onOverlayClick?: (overlay: DrawingOverlay) => void;
 };
 
 export default function DrawingViewer({

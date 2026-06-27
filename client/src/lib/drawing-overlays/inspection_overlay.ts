@@ -332,3 +332,18 @@ export function includeOverlayWhenChangesOnly(
   const badge = region.reviewBadge ?? region.shape.reviewBadge;
   return badge == null || badge === "changed";
 }
+
+export type OverlaySeverityBucket = "high" | "medium" | "info";
+
+/** Collapse overlay rows into the three legend buckets used by DrawingComparisonWorkspace. */
+export function overlaySeverityBucket(overlay: DrawingOverlay): OverlaySeverityBucket {
+  const meta = isRecord(overlay.meta) ? overlay.meta : null;
+  const severity = readSeverity(overlay, meta).toLowerCase();
+  if (severity === "high" || severity === "critical" || severity === "fail") {
+    return "high";
+  }
+  if (severity === "medium" || severity === "changed") {
+    return "medium";
+  }
+  return "info";
+}

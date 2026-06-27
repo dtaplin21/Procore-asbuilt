@@ -6,6 +6,7 @@
  *   /objects?projectId=2&drawingId=8                       -> master sheet, latest run overlays (or none)
  *   /objects?projectId=2&drawingId=8&run=15                -> sheet + overlays for run 15
  *   /objects?projectId=2&drawingId=8&run=15&overlay=42     -> focus a specific overlay
+ *   /objects?projectId=2&drawingId=8&region=r1              -> focus a specific region (PR5)
  *
  * This replaces the old workspace URL pattern
  * (/projects/:id/drawings/:id/workspace) as the canonical destination for
@@ -19,6 +20,10 @@ export interface ObjectsRouteParams {
   drawingId: string;
   runId?: string;
   overlayId?: string;
+  /** PR5: focus a specific backend region (e.g. from a region-aware
+   * deep link or the inspection-run-row "region" link). Independent of
+   * overlayId — a region can be focused without an overlay being
+   * focused, and vice versa. */
   regionId?: string;
 }
 
@@ -48,26 +53,22 @@ export function objectsPagePath(
   return `/objects?${params.toString()}`;
 }
 
-/** Build an Objects URL with optional run, overlay, and region focus params. */
-export function objectsPagePathWithParams(params: {
-  projectId: string;
-  drawingId: string;
-  runId?: string | null;
-  overlayId?: string | null;
-  regionId?: string | null;
-}): string {
+/**
+ * Options-object variant covering the full param set including PR5's
+ * regionId — added as a separate function rather than a 5th positional
+ * parameter on objectsPagePath() so existing call sites (and their
+ * tests) don't need to change. Prefer this for any new call site that
+ * needs to set regionId.
+ */
+export function objectsPagePathWithParams(
+  params: Partial<ObjectsRouteParams> & { projectId: string; drawingId: string },
+): string {
   const search = new URLSearchParams();
   search.set("projectId", params.projectId);
   search.set("drawingId", params.drawingId);
-  if (params.runId) {
-    search.set("run", params.runId);
-  }
-  if (params.overlayId) {
-    search.set("overlay", params.overlayId);
-  }
-  if (params.regionId) {
-    search.set("region", params.regionId);
-  }
+  if (params.runId) search.set("run", params.runId);
+  if (params.overlayId) search.set("overlay", params.overlayId);
+  if (params.regionId) search.set("region", params.regionId);
   return `/objects?${search.toString()}`;
 }
 
@@ -106,7 +107,7 @@ export function objectsPagePathForRun(params: {
 const WORKSPACE_PATH =
   /^\/projects\/(\d+)\/drawings\/(\d+)\/workspace\/?$/;
 
-/** Legacy workspace path → Objects URL (preserves run, overlay, findingId). */
+/** Legacy workspace path → Objects URL (preserves run, overlay, findingId, region). */
 export function workspacePathToObjectsUrl(
   pathname: string,
   search = "",
@@ -119,11 +120,13 @@ export function workspacePathToObjectsUrl(
   const params = new URLSearchParams(raw);
   const runId = params.get("run");
   const overlayId = params.get("overlay") ?? params.get("findingId");
+  const regionId = params.get("region");
 
-  return objectsPagePath(
+  return objectsPagePathWithParams({
     projectId,
     drawingId,
-    runId,
-    overlayId,
-  );
+    runId: runId ?? undefined,
+    overlayId: overlayId ?? undefined,
+    regionId: regionId ?? undefined,
+  });
 }

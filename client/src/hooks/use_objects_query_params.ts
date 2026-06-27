@@ -1,7 +1,7 @@
 /**
  * Centralizes the Objects page's URL query param reading/writing —
- * projectId, drawingId, run, overlay. Extracted out of objects.tsx per
- * the merge plan's "Files to create" list, so the param-sync logic isn't
+ * projectId, drawingId, run, overlay, region. Extracted out of objects.tsx
+ * per the merge plan's "Files to create" list, so the param-sync logic isn't
  * duplicated between the page component and anywhere else that needs to
  * read or update these params (e.g. a future overlay-focus action).
  *
@@ -23,6 +23,8 @@ export interface ObjectsQueryParams {
   drawingId: string | undefined;
   runId: string | undefined;
   overlayId: string | undefined;
+  /** PR5: focused backend region, from ?region=. */
+  regionId: string | undefined;
 }
 
 export interface UseObjectsQueryParamsResult extends ObjectsQueryParams {
@@ -30,6 +32,7 @@ export interface UseObjectsQueryParamsResult extends ObjectsQueryParams {
   setDrawing: (projectId: string, drawingId: string) => void;
   setRun: (runId: string | null) => void;
   setOverlay: (overlayId: string | null) => void;
+  setRegion: (regionId: string | null) => void;
   clearRunAndOverlay: () => void;
 }
 
@@ -50,6 +53,7 @@ export function useObjectsQueryParams(): UseObjectsQueryParamsResult {
         next.delete("drawingId");
         next.delete("run");
         next.delete("overlay");
+        next.delete("region");
         return next;
       });
     },
@@ -62,11 +66,12 @@ export function useObjectsQueryParams(): UseObjectsQueryParamsResult {
         const next = new URLSearchParams(prev);
         next.set("projectId", projectId);
         next.set("drawingId", drawingId);
-        // Changing the drawing invalidates any run/overlay selection
-        // from the PREVIOUS drawing — clear both rather than carry over
-        // a run id that belongs to a different sheet.
+        // Changing the drawing invalidates any run/overlay/region
+        // selection from the PREVIOUS drawing — clear all rather than
+        // carry over an id that belongs to a different sheet.
         next.delete("run");
         next.delete("overlay");
+        next.delete("region");
         return next;
       });
     },
@@ -83,7 +88,8 @@ export function useObjectsQueryParams(): UseObjectsQueryParamsResult {
           next.delete("run");
         }
         // A new run selection invalidates any overlay focus from a
-        // different run.
+        // different run. Region focus is independent of run, so it's
+        // deliberately left untouched here.
         next.delete("overlay");
         return next;
       });
@@ -106,6 +112,21 @@ export function useObjectsQueryParams(): UseObjectsQueryParamsResult {
     [setSearchParams],
   );
 
+  const setRegion = useCallback(
+    (regionId: string | null) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (regionId) {
+          next.set("region", regionId);
+        } else {
+          next.delete("region");
+        }
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
+
   const clearRunAndOverlay = useCallback(() => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -120,10 +141,12 @@ export function useObjectsQueryParams(): UseObjectsQueryParamsResult {
     drawingId: params.drawingId,
     runId: params.runId,
     overlayId: params.overlayId,
+    regionId: params.regionId,
     setProject,
     setDrawing,
     setRun,
     setOverlay,
+    setRegion,
     clearRunAndOverlay,
   };
 }

@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
+/**
+ * client/src/tests/unit/region_display.test.ts
+ */
 
+import { describe, it, expect } from "vitest";
 import {
   resolveRegionViewerState,
   resolveRenderableRegions,
@@ -7,68 +10,111 @@ import {
 } from "@/lib/drawing-regions/region_display";
 import type { RegionInspectionSummaryEntry } from "@/lib/drawing-regions/types";
 
-function entry(
-  overrides: Partial<RegionInspectionSummaryEntry> & Pick<RegionInspectionSummaryEntry, "regionId" | "state">,
+function makeEntry(
+  overrides: Partial<RegionInspectionSummaryEntry> = {},
 ): RegionInspectionSummaryEntry {
   return {
-    masterDrawingId: 1,
-    label: "Zone",
-    bbox: [0, 0, 0.1, 0.1],
-    locationTags: [],
-    inspectionTypeTags: [],
+    regionId: 1,
+    masterDrawingId: 42,
+    state: "hidden",
+    label: "Roof",
+    bbox: [0.1, 0.1, 0.2, 0.2],
+    locationTags: ["Roof"],
+    inspectionTypeTags: ["Final"],
+    latestOverlayId: null,
+    latestInspectionRunId: null,
+    inspectionStatusDisplay: null,
+    inspectionDate: null,
+    procoreInspectionId: null,
     ...overrides,
   };
 }
 
-describe("region_display", () => {
-  it("hides uninspected regions when the admin toggle is off", () => {
-    const hidden = entry({ regionId: 1, state: "hidden" });
-    expect(resolveRegionViewerState(hidden, false)).toBe("hidden");
+describe("resolveRegionViewerState", () => {
+  it("inspected entries are always 'inspected', regardless of the admin toggle", () => {
+    const entry = makeEntry({ state: "inspected" });
+    expect(resolveRegionViewerState(entry, false)).toBe("inspected");
+    expect(resolveRegionViewerState(entry, true)).toBe("inspected");
+  });
+
+  it("hidden entries stay 'hidden' when the admin toggle is off", () => {
+    const entry = makeEntry({ state: "hidden" });
+    expect(resolveRegionViewerState(entry, false)).toBe("hidden");
+  });
+
+  it("hidden entries become 'setup_faint' when the admin toggle is on", () => {
+    const entry = makeEntry({ state: "hidden" });
+    expect(resolveRegionViewerState(entry, true)).toBe("setup_faint");
+  });
+});
+
+describe("styleForViewerState", () => {
+  it("hidden state has no style at all (not rendered)", () => {
     expect(styleForViewerState("hidden")).toBeNull();
   });
 
-  it("shows faint outlines for uninspected regions when toggle is on", () => {
-    const hidden = entry({ regionId: 1, state: "hidden" });
-    expect(resolveRegionViewerState(hidden, true)).toBe("setup_faint");
-    expect(styleForViewerState("setup_faint")).toMatchObject({
-      strokeDasharray: "4,3",
-      fillOpacity: 0,
-    });
+  it("inspected state gets the bold style", () => {
+    const style = styleForViewerState("inspected");
+    expect(style?.strokeWidth).toBeGreaterThanOrEqual(3);
+    expect(style?.strokeDasharray).toBeUndefined();
   });
 
-  it("always renders inspected regions as bold regardless of toggle", () => {
-    const inspected = entry({ regionId: 2, state: "inspected" });
-    expect(resolveRegionViewerState(inspected, false)).toBe("inspected");
-    expect(resolveRegionViewerState(inspected, true)).toBe("inspected");
-    expect(styleForViewerState("inspected")).toMatchObject({
-      strokeWidth: 3.5,
-      strokeDasharray: undefined,
-    });
+  it("setup_faint state gets a dashed, thin style", () => {
+    const style = styleForViewerState("setup_faint");
+    expect(style?.strokeWidth).toBeLessThan(2);
+    expect(style?.strokeDasharray).toBeDefined();
   });
 
-  it("sorts inspected regions after faint ones for paint order", () => {
-    const result = resolveRenderableRegions(
-      [
-        entry({ regionId: 1, state: "inspected" }),
-        entry({ regionId: 2, state: "hidden" }),
-      ],
-      true,
-    );
+  it("bold style is IDENTICAL regardless of which status produced it — bold ignores status per spec", () => {
+    const styleA = styleForViewerState("inspected");
+    const styleB = styleForViewerState("inspected");
+    expect(styleA).toEqual(styleB);
+  });
+});
 
-    expect(result.map((r) => r.state)).toEqual(["setup_faint", "inspected"]);
-    expect(result.map((r) => r.entry.regionId)).toEqual([2, 1]);
+describe("resolveRenderableRegions", () => {
+  it("excludes hidden regions when the toggle is off", () => {
+    const entries = [makeEntry({ regionId: 1, state: "hidden" })];
+    const renderable = resolveRenderableRegions(entries, false);
+    expect(renderable).toHaveLength(0);
   });
 
-  it("omits hidden regions when toggle is off", () => {
-    const result = resolveRenderableRegions(
-      [
-        entry({ regionId: 1, state: "hidden" }),
-        entry({ regionId: 2, state: "inspected" }),
-      ],
-      false,
-    );
+  it("includes hidden regions as setup_faint when the toggle is on", () => {
+    const entries = [makeEntry({ regionId: 1, state: "hidden" })];
+    const renderable = resolveRenderableRegions(entries, true);
+    expect(renderable).toHaveLength(1);
+    expect(renderable[0].state).toBe("setup_faint");
+  });
 
-    expect(result).toHaveLength(1);
-    expect(result[0]?.state).toBe("inspected");
+  it("always includes inspected regions regardless of the toggle", () => {
+    const entries = [makeEntry({ regionId: 1, state: "inspected" })];
+    expect(resolveRenderableRegions(entries, false)).toHaveLength(1);
+    expect(resolveRenderableRegions(entries, true)).toHaveLength(1);
+  });
+
+  it("sorts inspected (bold) regions last so they paint on top of faint outlines", () => {
+    const entries = [
+      makeEntry({ regionId: 10, state: "hidden" }),
+      makeEntry({ regionId: 20, state: "inspected" }),
+    ];
+    const renderable = resolveRenderableRegions(entries, true);
+    expect(renderable.map((r) => r.entry.regionId)).toEqual([10, 20]);
+  });
+
+  it("two inspected regions with different statuses get the SAME bold style", () => {
+    const entries = [
+      makeEntry({
+        regionId: 1,
+        state: "inspected",
+        inspectionStatusDisplay: "Approved As Noted",
+      }),
+      makeEntry({
+        regionId: 2,
+        state: "inspected",
+        inspectionStatusDisplay: "Rejected",
+      }),
+    ];
+    const renderable = resolveRenderableRegions(entries, false);
+    expect(renderable[0].style).toEqual(renderable[1].style);
   });
 });

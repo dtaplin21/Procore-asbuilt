@@ -51,6 +51,11 @@ export interface DrawingOverlay {
   /** When this record was created in our system (the upload moment).
    * ISO 8601 datetime string, always set. */
   uploadedAt: string;
+  /** The backend drawing_regions row this overlay matched against, if
+   * any (region-visibility spec PR1). Null for overlays with no region
+   * link. Used by DrawingViewer to suppress a redundant overlay pin
+   * when the region layer already shows this finding's location bold. */
+  regionId: string | null;
 }
 
 export type InspectionRunStatus =
@@ -77,7 +82,13 @@ export interface InspectionRun {
   evidenceFileId?: string | null;
   overlaysCreated?: number;
   unresolvedCount?: number;
-  /** When the run's primary overlay is linked to a drawing region (PR5). */
+  /** PR5: the backend region this run's evidence resolved to, if any —
+   * an optional join field similar to evidenceTitle, populated by the
+   * backend if/when InspectionRunResponse is extended to embed it (the
+   * region-visibility spec's PR1 already exposes region_id on
+   * individual overlays; surfacing a representative one here at the
+   * run level avoids a second query from the Inspections list). Null/
+   * absent if the run's evidence didn't resolve to any backend region. */
   regionId?: string | null;
   regionLabel?: string | null;
 }

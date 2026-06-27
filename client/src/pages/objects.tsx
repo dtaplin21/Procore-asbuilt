@@ -33,21 +33,26 @@ import {
 } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/status-badge";
-import DrawingViewer from "@/components/drawings/DrawingViewer";
+import DrawingComparisonWorkspace from "@/components/drawings/DrawingComparisonWorkspace";
 import InspectionRunsPanel from "@/components/drawing-workspace/inspection_runs_panel";
+import { RegionEditor } from "@/components/drawing-workspace/region_editor";
 import { ProcoreWritebackPanel } from "@/components/ProcoreWritebackPanel";
 import type {
   DrawingObject,
+  DrawingOverlay,
   ObjectStatus,
 } from "@shared/schema";
 import type { ProjectDrawingsResponse } from "@/types/drawing_workspace";
 import { useDrawingOverlays } from "@/hooks/use-inspection-runs";
+import { useRegionInspectionSummary } from "@/hooks/use-region-inspection-summary";
 import { useCanonicalMasterDrawing } from "@/hooks/use_canonical_master_drawing";
 import { useObjectsQueryParams } from "@/hooks/use_objects_query_params";
+import { apiUrl } from "@/lib/api/base_url";
 import { fetchProjectDrawings, projectDrawingsQueryKey } from "@/lib/api/drawings";
 import { fetchMasterDrawing } from "@/lib/api/drawing_workspace";
 import { toOverlayRegions } from "@/lib/drawing-overlays/inspection_overlay";
-import { objectsPagePath } from "@/lib/objectsRoute";
+import type { RenderableRegion } from "@/lib/drawing-regions/region_display";
+import { objectsPagePathWithParams } from "@/lib/objectsRoute";
 import { useActiveProject } from "@/contexts/active_project_context";
 import { replaceDashboardProjectIdInUrl } from "@/lib/active_project";
 import {
@@ -88,10 +93,12 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     drawingId: drawingIdFromUrlRaw,
     runId: runIdFromUrlRaw,
     overlayId: overlayIdFromUrlRaw,
+    regionId: regionIdFromUrlRaw,
     setProject,
     setDrawing,
     setRun,
     setOverlay,
+    setRegion,
   } = useObjectsQueryParams();
 
   const drawingIdFromUrl = parseNumericParam(drawingIdFromUrlRaw);
@@ -108,6 +115,8 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedTool, setSelectedTool] = useState<"select" | "pan" | "zoom">("select");
   const [selectedMasterDrawingId, setSelectedMasterDrawingId] = useState<number | null>(null);
+  const [showInspectableAreas, setShowInspectableAreas] = useState(false);
+  const [isManagingRegions, setIsManagingRegions] = useState(false);
 
   /** Sync active project into URL when landing via sidebar (not a picker). */
   useEffect(() => {
@@ -167,12 +176,18 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
   const {
     data: overlays = [],
     isLoading: overlaysLoading,
+    isError: overlaysError,
   } = useDrawingOverlays({
     projectId: overlayProjectId ?? undefined,
     drawingId: overlayDrawingId ?? undefined,
     runId: runIdFromUrlRaw ?? null,
   });
   const overlayRegions = useMemo(() => toOverlayRegions(overlays), [overlays]);
+
+  const regionSummaryQuery = useRegionInspectionSummary({
+    projectId: selectedProjectId,
+    masterDrawingId: selectedMasterDrawingId,
+  });
 
   const handleSelectInspectionRun = useCallback(
     (runId: number | null) => {
@@ -186,6 +201,20 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
       setOverlay(overlayId);
     },
     [setOverlay],
+  );
+
+  const handleOverlayClick = useCallback(
+    (overlay: DrawingOverlay) => {
+      setOverlay(String(overlay.id));
+    },
+    [setOverlay],
+  );
+
+  const handleRegionClick = useCallback(
+    (region: RenderableRegion) => {
+      setRegion(String(region.entry.regionId));
+    },
+    [setRegion],
   );
 
   useEffect(() => {
@@ -255,12 +284,13 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     ) {
       return;
     }
-    const path = objectsPagePath(
-      String(selectedProjectId),
-      String(selectedMasterDrawingId),
-      runIdFromUrlRaw ?? null,
-      overlayIdFromUrlRaw ?? null,
-    );
+    const path = objectsPagePathWithParams({
+      projectId: String(selectedProjectId),
+      drawingId: String(selectedMasterDrawingId),
+      runId: runIdFromUrlRaw,
+      overlayId: overlayIdFromUrlRaw,
+      regionId: regionIdFromUrlRaw,
+    });
     if (overlayIdFromUrlRaw) {
       setWorkspaceReturnPath(path);
     } else {
@@ -276,6 +306,7 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     selectedMasterDrawingId,
     runIdFromUrlRaw,
     overlayIdFromUrlRaw,
+    regionIdFromUrlRaw,
   ]);
 
   const SEVERITY_RANK = { low: 1, medium: 2, high: 3, critical: 4 } as const;
@@ -309,7 +340,7 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
   }, {} as Record<string, { total: number; byStatus: Record<string, number> }>);
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto" data-testid="objects-page">
       {/* Mismatch Banner: severity >= threshold */}
       {showMismatchBanner && (
         <Alert variant="destructive" className="border-destructive/50">
@@ -452,6 +483,29 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
               ) : null}
             </div>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:flex-1 sm:justify-end">
+              {selectedProjectId != null && selectedMasterDrawingId != null ? (
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      data-testid="show-inspectable-areas-toggle"
+                      checked={showInspectableAreas}
+                      onChange={(e) => setShowInspectableAreas(e.target.checked)}
+                      className="rounded border-border text-primary focus:ring-primary"
+                    />
+                    Show inspectable areas
+                  </label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    data-testid="manage-regions-button"
+                    onClick={() => setIsManagingRegions((prev) => !prev)}
+                  >
+                    {isManagingRegions ? "Back to viewer" : "Manage regions"}
+                  </Button>
+                </div>
+              ) : null}
               <div className="flex items-center gap-1 bg-muted rounded-lg p-1 shrink-0">
                 <Button
                   variant={selectedTool === "select" ? "secondary" : "ghost"}
@@ -483,8 +537,9 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
         </CardHeader>
         <CardContent className="pt-0">
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-            <div className="relative min-h-[480px] overflow-hidden rounded-lg border bg-muted/30">
-              {!selectedProjectId ? (
+            <div className="flex flex-col gap-2">
+              <div className="relative min-h-[480px] overflow-hidden rounded-lg border bg-muted/30">
+                {!selectedProjectId ? (
                 <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 border-2 border-dashed border-muted-foreground/25 p-8 text-center text-muted-foreground">
                   <Layers className="h-12 w-12 opacity-50" />
                   <p className="font-medium">Drawing canvas</p>
@@ -523,19 +578,57 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
                       : "Check the network tab or try another drawing."}
                   </p>
                 </div>
+              ) : isManagingRegions && masterWorkspaceQuery.data ? (
+                <RegionEditor
+                  projectId={selectedProjectId!}
+                  masterDrawingId={selectedMasterDrawingId!}
+                  imageUrl={apiUrl(masterWorkspaceQuery.data.fileUrl)}
+                  pageWidth={masterWorkspaceQuery.data.widthPx ?? 1000}
+                  pageHeight={masterWorkspaceQuery.data.heightPx ?? 1000}
+                  onClose={() => setIsManagingRegions(false)}
+                />
               ) : (
-                <DrawingViewer
+                <DrawingComparisonWorkspace
                   projectId={selectedProjectId}
-                  drawing={masterWorkspaceQuery.data ?? null}
-                  inspectionRunId={selectedInspectionRunId}
+                  masterDrawing={masterWorkspaceQuery.data ?? null}
+                  selectedInspectionRunId={selectedInspectionRunId}
                   overlays={overlays}
                   overlaysLoading={overlaysLoading}
                   focusedOverlayId={overlayIdFromUrlRaw ?? null}
+                  onOverlayClick={handleOverlayClick}
+                  regionSummary={regionSummaryQuery.data ?? []}
+                  showInspectableAreas={showInspectableAreas}
+                  onRegionClick={handleRegionClick}
                 />
               )}
+              </div>
+
+              {regionIdFromUrlRaw ? (
+                <p className="text-sm text-muted-foreground" data-testid="objects-focused-region">
+                  Focused region: {regionIdFromUrlRaw}
+                </p>
+              ) : null}
+
+              {overlaysError ? (
+                <p className="text-sm text-destructive">
+                  Could not load inspection overlays for this drawing. Try refreshing, or check the
+                  Inspections tab for upload status.
+                </p>
+              ) : null}
+
+              {!overlaysLoading &&
+              selectedMasterDrawingId != null &&
+              overlays.length === 0 &&
+              !isManagingRegions ? (
+                <p className="text-sm text-muted-foreground">
+                  No inspection findings yet for this drawing
+                  {selectedInspectionRunId != null ? " on this run" : ""}. Upload an inspection
+                  document on the Inspections tab to get started.
+                </p>
+              ) : null}
             </div>
 
-            {selectedProjectId != null && selectedMasterDrawingId != null ? (
+            {selectedProjectId != null && selectedMasterDrawingId != null && !isManagingRegions ? (
               <aside className="rounded-lg border border-border bg-card p-4 shadow-sm">
                 <InspectionRunsPanel
                   projectId={selectedProjectId}
