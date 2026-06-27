@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import DrawingOverlayLayer from "@/components/drawing-workspace/drawing_overlay_layer";
+import { DrawingRegionLayer } from "@/components/drawing-workspace/drawing_region_layer";
+import { RegionHoverTooltip } from "@/components/drawing-workspace/region_hover_tooltip";
 import PanZoomContainer from "@/components/drawing-workspace/pan_zoom_container";
 import WorkspaceEmptyState from "@/components/drawing-workspace/workspace_empty_state";
 import { useDrawingOverlays } from "@/hooks/use-inspection-runs";
 import { useResizeObserver } from "@/hooks/use_resize_observer";
 import { toOverlayRegions } from "@/lib/drawing-overlays/inspection_overlay";
+import type { RenderableRegion } from "@/lib/drawing-regions/region_display";
+import type { RegionInspectionSummaryEntry } from "@/lib/drawing-regions/types";
 import type { DrawingOverlay } from "@shared/schema";
 import type { DrawingWorkspaceDrawing } from "@/types/drawing_workspace";
 
@@ -44,6 +48,11 @@ type Props = {
   overlayShowChangesOnly?: boolean;
   /** Diff SVG: color by passed/failed/changed; when false, use a single highlight tone. */
   overlayShowInspectionStatuses?: boolean;
+  /** PR4: backend region summary — bold inspected regions + optional faint setup outlines. */
+  regionSummary?: RegionInspectionSummaryEntry[];
+  showInspectableAreas?: boolean;
+  onRegionHoverChange?: (region: RenderableRegion | null) => void;
+  onRegionClick?: (region: RenderableRegion) => void;
 };
 
 export default function DrawingViewer({
@@ -55,6 +64,10 @@ export default function DrawingViewer({
   focusedOverlayId = null,
   overlayShowChangesOnly = false,
   overlayShowInspectionStatuses = true,
+  regionSummary = [],
+  showInspectableAreas = false,
+  onRegionHoverChange,
+  onRegionClick,
 }: Props) {
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const layoutSize = useResizeObserver(layoutRef);
@@ -62,6 +75,8 @@ export default function DrawingViewer({
 
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [hoveredRegion, setHoveredRegion] = useState<RenderableRegion | null>(null);
+  const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
 
   const resolvedProjectId = projectIdProp ?? drawing?.projectId ?? null;
   const projectIdStr =
@@ -87,6 +102,29 @@ export default function DrawingViewer({
     : fetchedOverlaysLoading;
 
   const regions = useMemo(() => toOverlayRegions(overlays), [overlays]);
+
+  const visibleRegions = useMemo(() => {
+    const inspectedRegionIds = new Set(
+      regionSummary.filter((entry) => entry.state === "inspected").map((entry) => entry.regionId),
+    );
+    return regions.filter(
+      (region) =>
+        region.linkedRegionId == null || !inspectedRegionIds.has(region.linkedRegionId),
+    );
+  }, [regions, regionSummary]);
+
+  const handleRegionHoverChange = useCallback(
+    (region: RenderableRegion | null, position?: { x: number; y: number }) => {
+      setHoveredRegion(region);
+      if (position) {
+        setCursorPosition(position);
+      } else if (!region) {
+        setCursorPosition(null);
+      }
+      onRegionHoverChange?.(region);
+    },
+    [onRegionHoverChange],
+  );
 
   const masterSrcRaw = drawing?.fileUrl ?? null;
 
@@ -240,9 +278,23 @@ export default function DrawingViewer({
                   draggable={false}
                 />
 
-                {canRenderOverlay && regions.length > 0 ? (
+                {canRenderOverlay ? (
+                  <DrawingRegionLayer
+                    summary={regionSummary}
+                    showInspectableAreas={showInspectableAreas}
+                    onRegionHoverChange={handleRegionHoverChange}
+                    onRegionClick={onRegionClick}
+                  />
+                ) : null}
+
+                <RegionHoverTooltip
+                  hoveredRegion={hoveredRegion}
+                  anchorPosition={cursorPosition}
+                />
+
+                {canRenderOverlay && visibleRegions.length > 0 ? (
                   <DrawingOverlayLayer
-                    regions={regions}
+                    regions={visibleRegions}
                     viewerSize={{
                       width: layoutSize.width,
                       height: layoutSize.height,

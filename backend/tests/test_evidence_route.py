@@ -1,9 +1,22 @@
-"""End-to-end test of POST .../inspections/runs/{run_id}/evidence.
+"""End-to-end test of POST /api/projects/{project_id}/inspections/runs/{run_id}/evidence.
 
-Multipart upload hits the real FastAPI route (via TestClient), which runs the
-real region loader → map_document_to_overlays() → overlay/unresolved
-persistence. Only PDF text-layer extraction is monkeypatched — the same seam
-as the rest of this suite.
+Multipart upload hits the real FastAPI route on ``main.app`` (via TestClient),
+which runs the real region loader → ``map_document_to_overlays()`` → overlay /
+unresolved persistence against Postgres (``conftest.db_session``). Only PDF
+text-layer extraction is monkeypatched — the same legitimate external seam as
+the rest of this suite.
+
+This proves "wired into the actual upload route" is true: a real multipart file
+upload hits a real route, which calls the real pipeline, which writes real rows
+to a real (test) database, which these tests then query directly to confirm.
+
+Reconciled with this codebase vs the reference SQLite slice test:
+  - Integer ``project_id`` / ``inspection_run_id`` / ``master_drawing_id`` (not
+    string ``run1`` / ``master_1`` query params)
+  - Regions seeded via ``StorageService.create_drawing_region`` (normalized
+    geometry JSON) rather than ``DrawingRegionSQLite`` pixel columns
+  - ``tags_json`` is structured JSON (``inspectionStatuses``, ``fieldConditions``)
+  - Upload timestamp column is ``created_at``; ``uploaded_at`` is a read-only alias
 """
 
 from __future__ import annotations
@@ -22,7 +35,8 @@ from ai.pipelines.document_text_extraction import (
     PositionedWord,
     SourceFormat,
 )
-from models.models import Drawing, DrawingOverlay, UnresolvedEvidence
+from models.drawing_overlay import DrawingOverlay, UnresolvedEvidence
+from models.models import Drawing
 from services.storage import StorageService
 
 
@@ -182,6 +196,7 @@ class TestEvidenceUploadHappyPath:
         tags = cast(dict[str, Any], saved.tags_json)
         assert "Rejected" in tags.get("inspectionStatuses", [])
         assert "Repair" in tags.get("fieldConditions", [])
+        assert saved.region_id is not None
 
     def test_response_reports_untagged_region_count(
         self,
@@ -394,6 +409,8 @@ class TestTimestampDisambiguation:
         assert rows[0].id != rows[1].id
         assert rows[0].created_at is not None
         assert rows[1].created_at is not None
+        assert rows[0].uploaded_at == rows[0].created_at
+        assert rows[1].uploaded_at == rows[1].created_at
 
     def test_inspection_date_extracted_from_document_text(
         self,
@@ -491,3 +508,10 @@ class TestTimestampDisambiguation:
         assert row.inspection_date is not None
         assert row.inspection_date.isoformat() == "2020-01-15"
         assert row.created_at.year >= 2026
+        assert row.uploaded_at.year >= 2026
+
+
+if __name__ == "__main__":
+    import sys
+
+    sys.exit(pytest.main([__file__, "-v"]))

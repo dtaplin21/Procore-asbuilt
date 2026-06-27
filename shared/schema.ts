@@ -578,6 +578,7 @@ export interface DrawingOverlay {
   confidenceLabel?: string | null;
   inspectionDate?: string | null;
   tagsJson?: Record<string, unknown> | null;
+  region_id?: number | null;
   meta: Record<string, unknown> | null;
   created_at: string;
 }
@@ -732,6 +733,7 @@ export interface DrawingOverlay {
   confidenceLabel?: string | null;
   inspectionDate?: string | null;
   tagsJson?: Record<string, unknown> | null;
+  region_id?: number | null;
   meta: Record<string, unknown> | null;
   created_at: string;
 }

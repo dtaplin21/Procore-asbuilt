@@ -54,8 +54,20 @@ def _layout(words: list[str]) -> list[PositionedWord]:
 
 @pytest.fixture
 def db_session(monkeypatch: pytest.MonkeyPatch):
+    from sqlalchemy import event
+
     engine = create_engine("sqlite:///:memory:")
-    SQLiteModelBase.metadata.create_all(engine)
+
+    @event.listens_for(engine, "connect")
+    def _sqlite_pragmas(dbapi_connection, _connection_record) -> None:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=OFF")
+        cursor.close()
+
+    SQLiteModelBase.metadata.create_all(
+        engine,
+        tables=[SQLiteModelBase.metadata.tables["drawing_regions"]],
+    )
     session = sessionmaker(bind=engine)()
     monkeypatch.setattr(loader_module, "DrawingRegion", DrawingRegionSQLite)
     yield session

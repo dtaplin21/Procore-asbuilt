@@ -81,24 +81,6 @@ export default function Inspections() {
     });
   }, [runs, searchQuery]);
 
-  const openRunOnObjects = (runId: number) => {
-    if (selectedProjectId == null) return;
-    const run = runs.find((item) => item.id === runId);
-    if (!run) return;
-    const path = buildObjectsUrlWithRun(
-      String(selectedProjectId),
-      String(run.master_drawing_id),
-      String(runId),
-    );
-    setDrawingReturnPath(
-      String(selectedProjectId),
-      String(run.master_drawing_id),
-      String(runId),
-    );
-    setLastProjectIdForWorkspaceFallback(selectedProjectId);
-    setLocation(path);
-  };
-
   const handleInspectionUploaded = (result: {
     runId: string;
     masterDrawingId: string;
@@ -262,7 +244,7 @@ export default function Inspections() {
             <InspectionRunRow
               key={run.id}
               run={run}
-              onSelect={openRunOnObjects}
+              projectId={String(selectedProjectId)}
             />
           ))}
         </ul>

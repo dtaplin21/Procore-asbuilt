@@ -1,0 +1,45 @@
+[
+  {
+    "geometry": {
+      "x": 50,
+      "y": 80,
+      "width": 120,
+      "height": 90,
+      "page_width": 2000,
+      "page_height": 1500
+    },
+    "tags": {
+      "inspection_type_tags": ["Underground Fire Water Rough In", "Hydrostatic Test"],
+      "location_tags": ["Utility MR"]
+    }
+  },
+  {
+    "geometry": {
+      "x": 300,
+      "y": 200,
+      "width": 100,
+      "height": 100,
+      "page_width": 2000,
+      "page_height": 1500
+    },
+    "tags": {
+      "inspection_type_tags": ["Final"],
+      "location_tags": ["Roof"]
+    }
+  },
+  {
+    "geometry": {
+      "x": 600,
+      "y": 450,
+      "width": 80,
+      "height": 80,
+      "page_width": 2000,
+      "page_height": 1500,
+      "polygon_points": [[600, 450], [680, 450], [660, 530], [610, 510]]
+    },
+    "tags": {
+      "inspection_type_tags": ["Flush"],
+      "location_tags": ["Yard", "Grid Line C"]
+    }
+  }
+]

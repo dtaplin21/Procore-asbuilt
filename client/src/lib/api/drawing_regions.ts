@@ -1,11 +1,36 @@
+/**
+ * API client for backend drawing regions — list/create/patch/delete (PR2) and
+ * the region inspection summary (PR1). Calls the real routes in
+ * backend/api/routes/drawing_regions.py.
+ *
+ * Reconciled with this codebase vs the reference wire-format client:
+ *   - Project-scoped paths:
+ *     `/api/projects/{projectId}/drawings/{masterDrawingId}/…`
+ *   - Normalized geometry JSON on the wire (no pixel x/y/pageWidth conversion)
+ *   - Integer IDs; backend summary JSON uses camelCase aliases (`regionId`, …)
+ *   - POST requires `Idempotency-Key` (same as other mutating routes)
+ */
+
 import type {
+  CreateDrawingRegionInput,
   DrawingRegionCreate,
   DrawingRegionResponse,
   DrawingRegionUpdate,
-  RegionInspectionSummaryResponse,
-} from "@shared/schema";
+  UpdateDrawingRegionInput,
+} from "@/lib/drawing-regions/types";
+import type { RegionInspectionSummaryResponse } from "@shared/schema";
 
 import { requestJson } from "@/lib/api/http";
+
+export type {
+  CreateDrawingRegionInput,
+  DrawingRegion,
+  DrawingRegionCreate,
+  DrawingRegionResponse,
+  DrawingRegionUpdate,
+  UpdateDrawingRegionInput,
+} from "@/lib/drawing-regions/types";
+export type { RegionInspectionSummaryResponse } from "@shared/schema";
 
 export function drawingRegionsQueryKey(
   projectId: string | number,
@@ -50,16 +75,21 @@ export async function fetchDrawingRegions(params: {
   );
 }
 
+/** Alias for fetchDrawingRegions (reference naming). */
+export const listDrawingRegions = fetchDrawingRegions;
+
 export async function createDrawingRegion(params: {
   projectId: string | number;
   masterDrawingId: string | number;
-  body: DrawingRegionCreate;
+  body: DrawingRegionCreate | CreateDrawingRegionInput;
 }): Promise<DrawingRegionResponse> {
   const projectId = Number(params.projectId);
   const masterDrawingId = Number(params.masterDrawingId);
   return requestJson<DrawingRegionResponse>(regionsBaseUrl(projectId, masterDrawingId), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Idempotency-Key": crypto.randomUUID(),
+    },
     body: JSON.stringify(params.body),
   });
 }
@@ -68,7 +98,7 @@ export async function updateDrawingRegion(params: {
   projectId: string | number;
   masterDrawingId: string | number;
   regionId: string | number;
-  body: DrawingRegionUpdate;
+  body: DrawingRegionUpdate | UpdateDrawingRegionInput;
 }): Promise<DrawingRegionResponse> {
   const projectId = Number(params.projectId);
   const masterDrawingId = Number(params.masterDrawingId);

@@ -77,6 +77,9 @@ export interface InspectionRun {
   evidenceFileId?: string | null;
   overlaysCreated?: number;
   unresolvedCount?: number;
+  /** When the run's primary overlay is linked to a drawing region (PR5). */
+  regionId?: string | null;
+  regionLabel?: string | null;
 }
 
 /** A piece of evidence that could not be automatically placed on the

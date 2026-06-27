@@ -68,6 +68,14 @@ function readDiffId(overlay: DrawingOverlay): number | null {
   return overlay.diff_id ?? wire.diffId ?? null;
 }
 
+function readLinkedRegionId(overlay: DrawingOverlay): number | null {
+  const wire = overlay as DrawingOverlay & { regionId?: number | null };
+  const raw = overlay.region_id ?? wire.regionId ?? null;
+  if (raw == null) return null;
+  const n = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 function readLabel(
   overlay: DrawingOverlay,
   geometry: Record<string, unknown>,
@@ -282,6 +290,7 @@ export function toOverlayRegions(overlays: DrawingOverlay[]): OverlayRegion[] {
         reviewBadge,
       },
       reviewBadge,
+      linkedRegionId: readLinkedRegionId(overlay),
     });
   }
 

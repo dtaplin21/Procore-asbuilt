@@ -1,23 +1,40 @@
-"""Tests for services.region_index_loader — drawing_regions → MasterRegion index.
+"""
+Tests for services.region_index_loader — drawing_regions → MasterRegion index.
 
-``build_region_index`` integration tests use an in-memory SQLite database with a
-SQLite-compatible mirror of ``DrawingRegion`` (JSON tag columns instead of
-Postgres ARRAY). The loader module is monkeypatched to query that model so
-query + conversion logic is verified against a real, queryable DB without
-requiring Postgres or the a3f9c1d8e2b4 migration at test time.
+Exercises ``build_region_index`` against a REAL database (SQLite in-memory)
+rather than mocking the ORM layer — the production model uses Postgres
+ARRAY columns, which SQLite does not support natively, so this test defines a
+SQLite-compatible mirror of DrawingRegion using JSON-backed columns for the
+two tag fields. The production model (models/drawing_region.py) uses
+postgresql.ARRAY directly; this test double exists purely so the loader's
+QUERY and CONVERSION logic gets verified against a real, queryable database
+instead of hand-rolled fakes.
+
+IMPORTANT: this test double registers on the SAME shared models.base.Base as
+every real model (DrawingOverlay, InspectionRun, etc.), not a separate
+declarative_base(). Cross-model foreign keys (e.g. DrawingOverlay.region_id
+→ drawing_regions.id) only resolve at mapper-configuration time if both tables
+live in one shared metadata registry — using a second, disconnected Base here
+was a real bug that broke every test importing both this module and
+models.drawing_overlay together (NoReferencedTableError).
+
+Reconciled with this codebase: integer PK/FK ``master_drawing_id``, normalized
+0–1 ``geometry`` JSON (not legacy pixel x/y/width columns).
 """
 
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import Column, Integer, String, create_engine
-from sqlalchemy.orm import Session, declarative_base, sessionmaker
+from sqlalchemy import Column, ForeignKey, Integer, String, create_engine, event
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 from sqlalchemy.types import JSON
 
 from ai.pipelines.drawing_location_resolver import MasterRegion, resolve_document_location
 from ai.pipelines.positioned_term_extractor import PositionedTerm
 from ai.pipelines.term_extractor import ConfidenceLabel, ExtractedTerm
-from models.models import DrawingRegion
+from models.base import Base as SQLiteModelBase
+from models.drawing_region import DrawingRegion
 from services import region_index_loader as loader_module
 from services.inspection_vocabulary import VocabCategory
 from services.region_index_loader import (
@@ -27,28 +44,66 @@ from services.region_index_loader import (
     load_master_regions,
 )
 
-SQLiteModelBase = declarative_base()
-
 
 class DrawingRegionSQLite(SQLiteModelBase):
-    """SQLite test double for models.models.DrawingRegion — JSON tags, same shape."""
+    """SQLite-compatible test double for models.drawing_region.DrawingRegion.
+
+    Same columns as production, JSON instead of ARRAY for tag fields (SQLite
+    has no array type). See module docstring.
+
+    extend_existing=True: models.drawing_region.DrawingRegion already registers
+    a table named ``drawing_regions`` on this same shared Base when that module
+    is imported (transitively, via services.region_index_loader, which imports
+    the real DrawingRegion class directly) — without this flag, SQLAlchemy
+    raises on the duplicate table name.
+
+    NOTE: index=True is deliberately OMITTED on master_drawing_id here (unlike
+    the production model) — with extend_existing, both classes mapped to one
+    table name in one registry would each try to issue their own CREATE INDEX
+    for the same index name, which collides ("index ... already exists"). The
+    production DrawingRegion model already declares this index in the same
+    shared metadata, so it is redundant (and breaks table creation) to repeat
+    it here.
+    """
 
     __tablename__ = "drawing_regions"
+    __table_args__ = {"extend_existing": True}
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    master_drawing_id = Column(Integer, nullable=False, index=True)
+    master_drawing_id = Column(
+        Integer,
+        ForeignKey("drawings.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     label = Column(String(length=255), nullable=False)
     page = Column(Integer, nullable=False, default=1)
     geometry = Column(JSON, nullable=False)
+    polygon_points = Column(JSON, nullable=True)
     inspection_type_tags = Column(JSON, nullable=True)
     location_tags = Column(JSON, nullable=True)
 
 
 @pytest.fixture
 def db_session(monkeypatch: pytest.MonkeyPatch):
-    """Ephemeral SQLite DB; loader queries DrawingRegionSQLite for these tests."""
-    engine = create_engine("sqlite:///:memory:")
-    SQLiteModelBase.metadata.create_all(engine)
+    """Real, ephemeral SQLite DB per test, with the loader module monkeypatched
+    to query the SQLite-compatible model instead of the production Postgres one.
+    """
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+
+    @event.listens_for(engine, "connect")
+    def _sqlite_pragmas(dbapi_connection, _connection_record) -> None:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=OFF")
+        cursor.close()
+
+    SQLiteModelBase.metadata.create_all(
+        engine,
+        tables=[SQLiteModelBase.metadata.tables["drawing_regions"]],
+    )
     SessionLocal = sessionmaker(bind=engine)
     session = SessionLocal()
 
@@ -299,3 +354,9 @@ class TestResolverIntegration:
         assert resolved.bbox_fractional == pytest.approx((0.3, 0.3, 0.5, 0.5))
         assert resolved.matched_region is not None
         assert resolved.confidence_score == pytest.approx(0.92)
+
+
+if __name__ == "__main__":
+    import sys
+
+    sys.exit(pytest.main([__file__, "-v"]))

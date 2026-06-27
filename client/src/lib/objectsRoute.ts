@@ -19,6 +19,7 @@ export interface ObjectsRouteParams {
   drawingId: string;
   runId?: string;
   overlayId?: string;
+  regionId?: string;
 }
 
 /**
@@ -47,6 +48,29 @@ export function objectsPagePath(
   return `/objects?${params.toString()}`;
 }
 
+/** Build an Objects URL with optional run, overlay, and region focus params. */
+export function objectsPagePathWithParams(params: {
+  projectId: string;
+  drawingId: string;
+  runId?: string | null;
+  overlayId?: string | null;
+  regionId?: string | null;
+}): string {
+  const search = new URLSearchParams();
+  search.set("projectId", params.projectId);
+  search.set("drawingId", params.drawingId);
+  if (params.runId) {
+    search.set("run", params.runId);
+  }
+  if (params.overlayId) {
+    search.set("overlay", params.overlayId);
+  }
+  if (params.regionId) {
+    search.set("region", params.regionId);
+  }
+  return `/objects?${search.toString()}`;
+}
+
 /**
  * Parse the Objects page's query params back out of a URLSearchParams
  * instance (or anything with a compatible .get() — e.g. React Router's
@@ -62,6 +86,7 @@ export function parseObjectsRouteParams(
     drawingId: searchParams.get("drawingId") ?? undefined,
     runId: searchParams.get("run") ?? undefined,
     overlayId: searchParams.get("overlay") ?? undefined,
+    regionId: searchParams.get("region") ?? undefined,
   };
 }
 

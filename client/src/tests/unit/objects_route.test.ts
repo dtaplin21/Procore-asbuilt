@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   objectsPagePath,
   objectsPagePathForRun,
+  objectsPagePathWithParams,
   parseObjectsRouteParams,
   workspacePathToObjectsUrl,
 } from "@/lib/objectsRoute";
@@ -28,14 +29,29 @@ describe("objectsPagePath", () => {
 describe("parseObjectsRouteParams", () => {
   it("reads canonical query param names", () => {
     const params = new URLSearchParams(
-      "projectId=2&drawingId=8&run=15&overlay=42",
+      "projectId=2&drawingId=8&run=15&overlay=42&region=7",
     );
     expect(parseObjectsRouteParams(params)).toEqual({
       projectId: "2",
       drawingId: "8",
       runId: "15",
       overlayId: "42",
+      regionId: "7",
     });
+  });
+});
+
+describe("objectsPagePathWithParams", () => {
+  it("includes optional run, overlay, and region", () => {
+    expect(
+      objectsPagePathWithParams({
+        projectId: "2",
+        drawingId: "8",
+        runId: "15",
+        overlayId: "42",
+        regionId: "7",
+      }),
+    ).toBe("/objects?projectId=2&drawingId=8&run=15&overlay=42&region=7");
   });
 });
 

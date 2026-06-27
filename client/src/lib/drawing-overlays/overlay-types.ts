@@ -18,6 +18,8 @@ export type OverlayRegion = {
   /** Shape payload consumed by {@link resolveOverlayRegion}. */
   shape: DrawingDiffRegion;
   reviewBadge?: ReviewBadgeTone | null;
+  /** drawing_regions.id when this overlay is linked to an inspectable region (PR4). */
+  linkedRegionId?: number | null;
 };
 
 export type ViewerSize = {

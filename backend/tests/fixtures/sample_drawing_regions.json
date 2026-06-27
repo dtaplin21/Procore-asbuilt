@@ -1,0 +1,49 @@
+[
+  {
+    "label": "Utility MR",
+    "page": 1,
+    "geometry": {
+      "type": "rect",
+      "x": 0.08,
+      "y": 0.12,
+      "width": 0.22,
+      "height": 0.18
+    },
+    "inspection_type_tags": ["Rough In"],
+    "location_tags": ["Utility MR"]
+  },
+  {
+    "label": "Mechanical Room",
+    "page": 1,
+    "geometry": {
+      "type": "rect",
+      "x": 0.45,
+      "y": 0.3,
+      "width": 0.2,
+      "height": 0.25
+    },
+    "tags": {
+      "inspection_type_tags": ["Fire Protection"],
+      "location_tags": ["Mechanical Room"]
+    }
+  },
+  {
+    "label": "Roof Area",
+    "page": 1,
+    "geometry": {
+      "type": "rect",
+      "x": 0.1,
+      "y": 0.55,
+      "width": 0.35,
+      "height": 0.2
+    },
+    "polygon_points": [
+      [0.1, 0.55],
+      [0.45, 0.55],
+      [0.45, 0.75],
+      [0.1, 0.75]
+    ],
+    "inspection_type_tags": ["Roofing"],
+    "location_tags": ["Roof"]
+  }
+]
