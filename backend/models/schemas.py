@@ -617,6 +617,43 @@ class DrawingRegionCreate(BaseModel):
         return v
 
 
+class DrawingRegionUpdate(BaseModel):
+    label: Optional[str] = None
+    page: Optional[int] = None
+    geometry: Optional[dict] = None
+    polygon_points: Optional[List[List[float]]] = None
+    inspection_type_tags: Optional[List[str]] = None
+    location_tags: Optional[List[str]] = None
+
+    @field_validator("geometry")
+    @classmethod
+    def geometry_normalized(cls, v: Any) -> Any:
+        if v is None:
+            return v
+        if not isinstance(v, dict):
+            raise ValueError("geometry must be an object")
+        gtype = v.get("type")
+        if gtype == "rect":
+            for key in ("x", "y", "width", "height"):
+                if key in v:
+                    val = v[key]
+                    if not isinstance(val, (int, float)):
+                        raise ValueError(f"{key} must be a number")
+                    _check_normalized(float(val), key)
+        elif gtype == "polygon":
+            pts = v.get("points")
+            if not isinstance(pts, list):
+                raise ValueError("polygon must have points array")
+            for i, p in enumerate(pts):
+                if not isinstance(p, (list, tuple)) or len(p) < 2:
+                    raise ValueError(f"point {i} must be [x, y]")
+                _check_normalized(float(p[0]), f"points[{i}][0]")
+                _check_normalized(float(p[1]), f"points[{i}][1]")
+        else:
+            raise ValueError("geometry.type must be 'rect' or 'polygon'")
+        return v
+
+
 class DrawingRegionResponse(BaseModel):
     id: int
     master_drawing_id: int
@@ -636,6 +673,40 @@ class DrawingRegionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class RegionInspectionSummaryEntryResponse(BaseModel):
+    region_id: int = Field(..., serialization_alias="regionId")
+    master_drawing_id: int = Field(..., serialization_alias="masterDrawingId")
+    state: str
+    label: str
+    bbox: List[float]
+    location_tags: List[str] = Field(default_factory=list, serialization_alias="locationTags")
+    inspection_type_tags: List[str] = Field(
+        default_factory=list, serialization_alias="inspectionTypeTags"
+    )
+    latest_overlay_id: Optional[int] = Field(default=None, serialization_alias="latestOverlayId")
+    latest_inspection_run_id: Optional[int] = Field(
+        default=None, serialization_alias="latestInspectionRunId"
+    )
+    inspection_type: Optional[str] = Field(default=None, serialization_alias="inspectionType")
+    inspection_status_display: Optional[str] = Field(
+        default=None, serialization_alias="inspectionStatusDisplay"
+    )
+    inspection_date: Optional[date] = Field(default=None, serialization_alias="inspectionDate")
+    procore_inspection_id: Optional[str] = Field(
+        default=None, serialization_alias="procoreInspectionId"
+    )
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+
+class RegionInspectionSummaryResponse(BaseModel):
+    items: List[RegionInspectionSummaryEntryResponse]
 
 
 class DrawingAlignmentCreate(BaseModel):
@@ -1179,6 +1250,7 @@ class InspectionRunResponse(BaseModel):
     evidence_id: Optional[int] = None
     inspection_type: Optional[str] = None
     status: str
+    procore_inspection_id: Optional[str] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     error_message: Optional[str] = None
@@ -1202,6 +1274,7 @@ class DrawingOverlayResponse(BaseModel):
     id: int
     master_drawing_id: int
     inspection_run_id: Optional[int] = None
+    region_id: Optional[int] = Field(default=None, serialization_alias="regionId")
     diff_id: Optional[int] = None
     geometry: dict  # OverlayGeometry structure (validated on create)
     status: str

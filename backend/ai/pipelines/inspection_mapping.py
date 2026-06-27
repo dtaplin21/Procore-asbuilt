@@ -45,7 +45,7 @@ from sqlalchemy.orm import Session
 from typing import Any, Dict, List, Optional, cast
 
 from ai.pipelines.document_text_extraction import ExtractedDocument, extract_document
-from ai.pipelines.date_extractor import extract_inspection_date
+from ai.pipelines.date_extractor import extract_inspection_date, extract_primary_date
 from ai.pipelines.drawing_location_resolver import (
     MasterRegion,
     RegistrationTransform,
@@ -130,6 +130,18 @@ class DrawingOverlayRecord:
     (backend/models/models.py) — inspection_run_id is required per the
     PR7 schema cleanup (the diff_id branch of the old XOR constraint is
     gone), plus the normalized vocabulary tags this module adds.
+
+    Two distinct timestamps are tracked, deliberately not collapsed into
+    one:
+      - inspection_date: the date the inspection was PERFORMED, as stated
+        in the document itself (extracted via date_extractor.py). None
+        if the document doesn't state one.
+      - uploaded_at: when this record was created in our system (i.e.
+        when the file was submitted). Always set, automatically.
+    These tell two different submissions apart even when they resolve to
+    the same location/label — e.g. a re-inspection of the same spot a
+    week later produces a new record with a new inspection_date and a
+    new uploaded_at, rather than being indistinguishable from the first.
     """
 
     id: str
@@ -139,9 +151,25 @@ class DrawingOverlayRecord:
     label: str
     severity: str
     tags: NormalizedEvidenceTags
-    created_at: datetime
-    inspection_date: date | None = None
+    inspection_date: date | None
+    uploaded_at: datetime
     region_id: str | None = None
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "drawingId": self.drawing_id,
+            "inspectionRunId": self.inspection_run_id,
+            "bbox": list(self.bbox) if self.bbox is not None else None,
+            "label": self.label,
+            "severity": self.severity,
+            "tags": self.tags.to_dict(),
+            "inspectionDate": (
+                self.inspection_date.isoformat() if self.inspection_date else None
+            ),
+            "uploadedAt": self.uploaded_at.isoformat(),
+            "regionId": self.region_id,
+        }
 
 
 _CATEGORY_TO_TAGS_FIELD: dict[VocabCategory, str] = {
@@ -200,6 +228,7 @@ def map_evidence_to_overlay(evidence: EvidenceInput) -> DrawingOverlayRecord:
     """
     tags = normalize_evidence_text(evidence.note_text)
     severity = _severity_from_tags(tags)
+    inspection_date = extract_primary_date(evidence.note_text)
 
     label = tags.inspection_types[0] if tags.inspection_types else "Inspection finding"
     if tags.locations:
@@ -213,7 +242,8 @@ def map_evidence_to_overlay(evidence: EvidenceInput) -> DrawingOverlayRecord:
         label=label,
         severity=severity,
         tags=tags,
-        created_at=datetime.now(timezone.utc),
+        inspection_date=inspection_date,
+        uploaded_at=datetime.now(timezone.utc),
     )
 
 
@@ -310,10 +340,14 @@ def map_document_to_overlays(
     rather than losing the whole submission to one bad reference.
     """
     document: ExtractedDocument = extract_document(evidence.file_path)
-    inspection_date = extract_inspection_date(document)
     positioned_terms = extract_positioned_terms(
         document, categories=_RESOLUTION_VOCAB_CATEGORIES
     )
+
+    # Performed-on date from document text; upload moment shared by all
+    # overlays produced from this single submission.
+    inspection_date = extract_inspection_date(document)
+    uploaded_at = datetime.now(timezone.utc)
 
     if not positioned_terms:
         return [], [
@@ -332,10 +366,10 @@ def map_document_to_overlays(
         ]
 
     resolved_pairs = resolve_locations_per_term(
-        positioned_terms,
-        evidence.master_drawing_id,
-        evidence.region_index,
-        evidence.registration_transform,
+        document_terms=positioned_terms,
+        master_drawing_id=evidence.master_drawing_id,
+        region_index=evidence.region_index,
+        registration_transform=evidence.registration_transform,
     )
 
     unresolved_terms: list[PositionedTerm] = []
@@ -389,7 +423,8 @@ def map_document_to_overlays(
                     all_terms,
                     (x0, y0, x1, y1),
                     representative,
-                    inspection_date=inspection_date,
+                    inspection_date,
+                    uploaded_at,
                 )
             )
         else:
@@ -417,7 +452,8 @@ def map_document_to_overlays(
                         group_terms,
                         bbox,
                         representative,
-                        inspection_date=inspection_date,
+                        inspection_date,
+                        uploaded_at,
                     )
                 )
 
@@ -429,8 +465,8 @@ def _build_overlay_record(
     terms: list[PositionedTerm],
     bbox_fractional: tuple[float, float, float, float],
     representative: ResolvedLocation,
-    *,
-    inspection_date: date | None = None,
+    inspection_date: date | None,
+    uploaded_at: datetime,
 ) -> DrawingOverlayRecord:
     """Shared overlay-construction step used by both the alignment and
     reference-lookup branches of map_document_to_overlays, so label/
@@ -457,8 +493,8 @@ def _build_overlay_record(
         label=label,
         severity=severity,
         tags=tags,
-        created_at=datetime.now(timezone.utc),
         inspection_date=inspection_date,
+        uploaded_at=uploaded_at,
         region_id=matched_region_id,
     )
 

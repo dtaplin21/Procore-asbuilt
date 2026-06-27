@@ -21,6 +21,7 @@ from models.models import Company, Drawing, EvidenceRecord, Project
 from models.drawing_overlay import DrawingOverlay, UnresolvedEvidence
 from services.inspection_vocabulary import VocabCategory
 from services.overlay_storage import (
+    _derive_pass_fail_status,
     create_drawing_overlay,
     create_drawing_overlays,
     flag_unresolved_evidence,
@@ -49,7 +50,8 @@ def _drawing_overlay_record(
         label=label,
         severity=severity,
         tags=tags,
-        created_at=created_at,
+        inspection_date=None,
+        uploaded_at=created_at,
         region_id=region_id,
     )
 
@@ -284,3 +286,20 @@ def test_list_unresolved_evidence_excludes_resolved_by_default(
             include_resolved=True,
         )
     ) == 1
+
+
+@pytest.mark.parametrize(
+    ("statuses", "expected"),
+    [
+        (["Approved"], "pass"),
+        (["Approved As Noted"], "pass"),
+        (["Closed"], "pass"),
+        (["Completed"], "pass"),
+        (["Rejected"], "fail"),
+        (["Failed"], "fail"),
+        (["Open"], "unknown"),
+        (["Approved", "Rejected"], "fail"),
+    ],
+)
+def test_derive_pass_fail_status(statuses: list[str], expected: str) -> None:
+    assert _derive_pass_fail_status(statuses) == expected

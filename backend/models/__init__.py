@@ -9,6 +9,7 @@ Model package exports.
 from .base import Base
 from .drawing_overlay import DrawingOverlay, UnresolvedEvidence
 from .drawing_region import DrawingRegion
+from .inspection_run import InspectionRun
 
-__all__ = ["Base", "DrawingRegion", "DrawingOverlay", "UnresolvedEvidence"]
+__all__ = ["Base", "DrawingRegion", "DrawingOverlay", "UnresolvedEvidence", "InspectionRun"]
 

@@ -25,6 +25,7 @@ from api.routes import (
     evidence,
     evidence_records,
     drawing_alignment,
+    drawing_regions,
     drawing_progress,
     inspection_reviews,
 )
@@ -38,7 +39,7 @@ from sqlalchemy.exc import SQLAlchemyError
 configure_logging()
 
 tags_metadata = [
-    {"name": "drawing-alignment", "description": "User-defined regions on master drawings."},
+    {"name": "drawing-regions", "description": "Inspectable zones on master drawings (CRUD + inspection summary)."},
     {"name": "projects", "description": "Projects, drawings, and project-scoped resources."},
     {"name": "findings", "description": "Project findings with serialized API rows."},
     {"name": "insights", "description": "AI findings and insights."},
@@ -165,7 +166,7 @@ app.include_router(drawings.router)
 app.include_router(drawing_files.router)
 app.include_router(evidence.router)
 app.include_router(evidence_records.router)
-app.include_router(drawing_alignment.router)
+app.include_router(drawing_regions.router)
 app.include_router(drawing_progress.router)
 app.include_router(inspection_reviews.router)
 

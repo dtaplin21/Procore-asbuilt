@@ -1,8 +1,19 @@
-"""Persistence layer for inspection_mapping.py pipeline output.
+"""
+Persistence layer for inspection_mapping.py's output. Two functions,
+matching the names used in IMPLEMENTATION_GUIDE.md's route snippet:
 
-Converts ``DrawingOverlayRecord`` / ``UnresolvedEvidenceRecord`` dataclasses
-into ORM rows on ``drawing_overlays`` and ``unresolved_evidence``. Called
-directly from ``api.routes.evidence`` after ``map_document_to_overlays()``.
+  - create_drawing_overlay(db, overlay): persists one DrawingOverlayRecord
+  - flag_unresolved_evidence(db, unresolved): persists one or more
+    UnresolvedEvidenceRecord, for a reviewer to follow up on
+
+Both take the dataclasses inspection_mapping.py already produces
+(DrawingOverlayRecord, UnresolvedEvidenceRecord) and convert them to the
+ORM rows defined in models/drawing_overlay.py. Called directly from
+api.routes.evidence after map_document_to_overlays().
+
+Reconciled with this codebase: integer PKs/FKs, master_drawing_id,
+geometry JSON (not separate bbox columns), tags_json as JSON dict,
+created_at as upload timestamp (not a separate uploaded_at column).
 """
 
 from __future__ import annotations
@@ -15,13 +26,27 @@ from ai.pipelines.inspection_mapping import DrawingOverlayRecord, UnresolvedEvid
 from models.drawing_overlay import DrawingOverlay, UnresolvedEvidence
 from models.models import EvidenceRecord
 
+# Per the region-visibility spec (§2): this derived classification is
+# kept ONLY for analytics/filters on the drawing_overlays.status column.
+# It must NEVER drive region bold styling or stroke color on the
+# Objects viewer (bold is status-agnostic) — the hover tooltip's status
+# line uses the full vocab string from tags_json.inspectionStatuses[0]
+# instead (see region_inspection_summary.py's _inspection_status_display).
+_PASS_STATUSES = {"Approved", "Approved As Noted", "Passed", "Completed", "Closed"}
+_FAIL_STATUSES = {"Rejected", "Failed"}
 
-def _overlay_status_from_tags(tags: Any) -> str:
-    statuses = getattr(tags, "inspection_statuses", None) or []
-    if any(s in {"Passed", "Approved"} for s in statuses):
-        return "pass"
-    if any(s in {"Rejected", "Failed"} for s in statuses):
+
+def _derive_pass_fail_status(inspection_statuses: list[str]) -> str:
+    """pass | fail | unknown, derived from the full vocab status list.
+
+    Fail takes priority over pass if a document somehow carries both
+    (e.g. a re-inspection note correcting an earlier "Approved" mention).
+    """
+    statuses = set(inspection_statuses)
+    if statuses & _FAIL_STATUSES:
         return "fail"
+    if statuses & _PASS_STATUSES:
+        return "pass"
     return "unknown"
 
 
@@ -66,7 +91,7 @@ def _build_overlay_row(record: DrawingOverlayRecord) -> DrawingOverlay:
         inspection_run_id=int(record.inspection_run_id),
         region_id=region_id,
         geometry=_bbox_to_geometry(record.bbox, label=record.label),
-        status=_overlay_status_from_tags(record.tags),
+        status=_derive_pass_fail_status(record.tags.inspection_statuses or []),
         meta=meta,
         label=record.label,
         severity=record.severity,
@@ -77,10 +102,14 @@ def _build_overlay_row(record: DrawingOverlayRecord) -> DrawingOverlay:
 
 
 def create_drawing_overlay(db: Session, overlay: DrawingOverlayRecord) -> DrawingOverlay:
-    """Persist one resolved overlay and return the saved ORM row."""
+    """Persist one resolved overlay. Returns the saved ORM row (with its id)."""
     row = _build_overlay_row(overlay)
     db.add(row)
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(row)
     return row
 
@@ -89,18 +118,17 @@ def create_drawing_overlays(
     db: Session,
     overlays: list[DrawingOverlayRecord],
 ) -> list[DrawingOverlay]:
-    """Batch persist — one commit for the whole upload."""
-    rows: list[DrawingOverlay] = []
-    for overlay in overlays:
-        if overlay.bbox is None:
-            continue
-        rows.append(_build_overlay_row(overlay))
-
+    """Batch convenience wrapper — one commit for the whole batch."""
+    rows = [_build_overlay_row(overlay) for overlay in overlays]
     if not rows:
         return []
 
     db.add_all(rows)
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     for row in rows:
         db.refresh(row)
     return rows
@@ -134,7 +162,7 @@ def flag_unresolved_evidence(
     db: Session,
     unresolved: list[UnresolvedEvidenceRecord],
 ) -> list[UnresolvedEvidence]:
-    """Persist evidence that could not be auto-placed for reviewer follow-up."""
+    """Persist evidence that couldn't be auto-placed, for human review."""
     rows: list[UnresolvedEvidence] = []
     for record in unresolved:
         rows.append(
@@ -150,7 +178,11 @@ def flag_unresolved_evidence(
 
     if rows:
         db.add_all(rows)
-        db.commit()
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
         for row in rows:
             db.refresh(row)
         _mirror_unresolved_to_evidence_meta(db, unresolved)

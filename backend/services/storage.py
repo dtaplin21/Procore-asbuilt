@@ -607,45 +607,79 @@ class StorageService:
         inspection_type_tags: Optional[List[str]] = None,
         location_tags: Optional[List[str]] = None,
     ) -> DrawingRegion:
-        region = DrawingRegion(
-            master_drawing_id=master_drawing_id,
-            label=label,
-            page=page,
-            geometry=geometry,
-            polygon_points=polygon_points,
-            inspection_type_tags=inspection_type_tags or [],
-            location_tags=location_tags or [],
-        )
-        self.db.add(region)
+        from services.region_storage import create_drawing_region as _create
+
         try:
-            self.db.commit()
+            return _create(
+                self.db,
+                master_drawing_id,
+                label=label,
+                page=page,
+                geometry=geometry,
+                polygon_points=polygon_points,
+                inspection_type_tags=inspection_type_tags,
+                location_tags=location_tags,
+            )
         except SQLAlchemyError:
             self.db.rollback()
             raise
-        self.db.refresh(region)
-        return region
 
     def list_drawing_regions(self, master_drawing_id: int) -> List[DrawingRegion]:
-        return (
-            self.db.query(DrawingRegion)
-            .filter(DrawingRegion.master_drawing_id == master_drawing_id)
-            .order_by(DrawingRegion.created_at.desc(), DrawingRegion.id.desc())
-            .all()
-        )
+        from services.region_storage import list_drawing_regions as _list
+
+        return _list(self.db, master_drawing_id)
 
     def get_drawing_region(
         self,
         master_drawing_id: int,
         region_id: int,
     ) -> Optional[DrawingRegion]:
-        return (
-            self.db.query(DrawingRegion)
-            .filter(
-                DrawingRegion.master_drawing_id == master_drawing_id,
-                DrawingRegion.id == region_id,
+        from services.region_storage import get_drawing_region as _get
+
+        return _get(self.db, master_drawing_id, region_id)
+
+    def update_drawing_region(
+        self,
+        master_drawing_id: int,
+        region_id: int,
+        *,
+        label: Optional[str] = None,
+        page: Optional[int] = None,
+        geometry: Optional[Dict[str, Any]] = None,
+        polygon_points: Optional[List[Any]] | object = ...,
+        inspection_type_tags: Optional[List[str]] = None,
+        location_tags: Optional[List[str]] = None,
+    ) -> Optional[DrawingRegion]:
+        from services.region_storage import update_drawing_region as _update
+
+        try:
+            return _update(
+                self.db,
+                master_drawing_id,
+                region_id,
+                label=label,
+                page=page,
+                geometry=geometry,
+                polygon_points=polygon_points,
+                inspection_type_tags=inspection_type_tags,
+                location_tags=location_tags,
             )
-            .first()
-        )
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+
+    def delete_drawing_region(
+        self,
+        master_drawing_id: int,
+        region_id: int,
+    ) -> bool:
+        from services.region_storage import delete_drawing_region as _delete
+
+        try:
+            return _delete(self.db, master_drawing_id, region_id)
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
 
     # ------------------------------------------------------------------
     # Drawing inspection reviews (human pass / fail)

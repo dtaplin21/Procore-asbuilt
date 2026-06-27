@@ -366,6 +366,7 @@ class DrawingRendition(Base):
 
 from .drawing_region import DrawingRegion
 from .drawing_overlay import DrawingOverlay, UnresolvedEvidence
+from .inspection_run import InspectionRun
 
 
 class DrawingInspectionReview(Base):
@@ -418,69 +419,6 @@ class DrawingInspectionReview(Base):
     inspection_run = relationship("InspectionRun", back_populates="inspection_reviews")
     overlay = relationship("DrawingOverlay", back_populates="inspection_reviews")
     region = relationship("DrawingRegion", back_populates="inspection_reviews")
-
-
-# Inspection runs (AI extraction from evidence docs)
-class InspectionRun(Base):
-    __tablename__ = "inspection_runs"
-    __table_args__ = (
-        CheckConstraint(
-            "status in ('queued','processing','complete','failed')",
-            name="ck_inspection_runs_status",
-        ),
-        Index("ix_inspection_runs_project_id", "project_id"),
-        Index("ix_inspection_runs_master_drawing_id", "master_drawing_id"),
-        Index("ix_inspection_runs_evidence_id", "evidence_id"),
-        Index("ix_inspection_runs_status", "status"),
-        Index("ix_inspection_runs_project_id_created_at", "project_id", "created_at"),
-    )
-
-    id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(
-        Integer,
-        ForeignKey("projects.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    master_drawing_id = Column(
-        Integer,
-        ForeignKey("drawings.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    evidence_id = Column(
-        Integer,
-        ForeignKey("evidence_records.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-
-    inspection_type = Column(String, nullable=True)
-    status = Column(String, nullable=False, server_default="queued")  # queued | processing | complete | failed
-
-    # Procore sync: set after successful inspection writeback (commit) for item-level writeback
-    procore_inspection_id = Column(String, nullable=True, index=True)
-
-    started_at = Column(DateTime, nullable=True)
-    completed_at = Column(DateTime, nullable=True)
-    error_message = Column(Text, nullable=True)
-
-    created_at = Column(DateTime, nullable=False, server_default=func.now())
-    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
-
-    # Relationships
-    project = relationship("Project", back_populates="inspection_runs")
-    master_drawing = relationship("Drawing", back_populates="inspection_runs")
-    evidence = relationship("EvidenceRecord", back_populates="inspection_runs")
-    results = relationship("InspectionResult", back_populates="inspection_run", cascade="all, delete-orphan")
-    overlays = relationship("DrawingOverlay", back_populates="inspection_run", passive_deletes=True)
-    unresolved_evidence = relationship(
-        "UnresolvedEvidence",
-        back_populates="inspection_run",
-        cascade="all, delete-orphan",
-    )
-    inspection_reviews = relationship(
-        "DrawingInspectionReview",
-        back_populates="inspection_run",
-        cascade="all, delete-orphan",
-    )
 
 
 class InspectionResult(Base):

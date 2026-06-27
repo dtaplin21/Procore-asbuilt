@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Iterator
 from unittest.mock import patch
 
+from datetime import datetime, timezone
+
 import pytest
 
 from ai.pipelines.document_text_extraction import (
@@ -54,6 +56,24 @@ def test_map_evidence_to_overlay_builds_record() -> None:
     assert overlay.bbox == (0.1, 0.2, 0.3, 0.4)
     assert overlay.severity == "high"
     assert "Mechanical Room" in overlay.label
+
+
+def test_drawing_overlay_record_to_dict() -> None:
+    uploaded = datetime(2026, 3, 15, 12, 0, tzinfo=timezone.utc)
+    overlay = map_evidence_to_overlay(
+        EvidenceInput(
+            evidence_id="ev-2",
+            inspection_run_id="run-2",
+            drawing_id="dwg-2",
+            note_text="Approved in Roof Area on 03/10/2026",
+            bbox=(0.0, 0.0, 0.1, 0.1),
+        )
+    )
+    overlay.uploaded_at = uploaded
+    payload = overlay.to_dict()
+    assert payload["drawingId"] == "dwg-2"
+    assert payload["uploadedAt"] == uploaded.isoformat()
+    assert payload["regionId"] is None
 
 
 def _positioned_term(

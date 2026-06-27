@@ -148,6 +148,15 @@ export interface DrawingRegionCreate {
   location_tags?: string[];
 }
 
+export interface DrawingRegionUpdate {
+  label?: string;
+  page?: number;
+  geometry?: DrawingRegionGeometry;
+  polygon_points?: Array<[number, number]> | null;
+  inspection_type_tags?: string[];
+  location_tags?: string[];
+}
+
 export interface DrawingRegionResponse {
   id: number;
   master_drawing_id: number;
@@ -159,6 +168,28 @@ export interface DrawingRegionResponse {
   location_tags: string[];
   created_at: string;
   updated_at: string;
+}
+
+export type RegionViewerState = "hidden" | "inspected";
+
+export interface RegionInspectionSummaryEntry {
+  regionId: number;
+  masterDrawingId: number;
+  state: RegionViewerState;
+  label: string;
+  bbox: [number, number, number, number];
+  locationTags: string[];
+  inspectionTypeTags: string[];
+  latestOverlayId?: number | null;
+  latestInspectionRunId?: number | null;
+  inspectionType?: string | null;
+  inspectionStatusDisplay?: string | null;
+  inspectionDate?: string | null;
+  procoreInspectionId?: string | null;
+}
+
+export interface RegionInspectionSummaryResponse {
+  items: RegionInspectionSummaryEntry[];
 }
 
 // ----------------------------
@@ -488,6 +519,7 @@ export interface InspectionRun {
   evidence_id: number | null;
   inspection_type: string | null;
   status: string;
+  procore_inspection_id?: string | null;
   started_at: string | null;
   completed_at: string | null;
   error_message: string | null;
@@ -662,6 +694,7 @@ export interface InspectionRun {
   evidence_id: number | null;
   inspection_type: string | null;
   status: string;
+  procore_inspection_id?: string | null;
   started_at: string | null;
   completed_at: string | null;
   error_message: string | null;
