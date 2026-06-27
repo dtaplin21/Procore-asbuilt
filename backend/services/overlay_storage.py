@@ -12,7 +12,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from ai.pipelines.inspection_mapping import DrawingOverlayRecord, UnresolvedEvidenceRecord
-from models.models import DrawingOverlay, EvidenceRecord, UnresolvedEvidence
+from models.drawing_overlay import DrawingOverlay, UnresolvedEvidence
+from models.models import EvidenceRecord
 
 
 def _overlay_status_from_tags(tags: Any) -> str:
@@ -56,9 +57,14 @@ def _build_overlay_row(record: DrawingOverlayRecord) -> DrawingOverlay:
         "pipelineOverlayId": record.id,
         **tags_dict,
     }
+    region_id: int | None = None
+    if record.region_id is not None and str(record.region_id).strip().isdigit():
+        region_id = int(record.region_id)
+
     return DrawingOverlay(
         master_drawing_id=int(record.drawing_id),
         inspection_run_id=int(record.inspection_run_id),
+        region_id=region_id,
         geometry=_bbox_to_geometry(record.bbox, label=record.label),
         status=_overlay_status_from_tags(record.tags),
         meta=meta,

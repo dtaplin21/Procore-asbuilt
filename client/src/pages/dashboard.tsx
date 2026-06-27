@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import type { DrawingResponse, InsightListResponse } from "@shared/schema";
+import type { DrawingResponse } from "@shared/schema";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { 
+import {
   AlertTriangle,
-  Sparkles,
-  FileText,
   FolderOpen,
   FileStack,
   ClipboardList,
   ShieldCheck,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/stat-card";
@@ -22,14 +20,9 @@ import type {
   DashboardSummary,
   ProjectListResponse,
   JobListResponse,
-  FindingListResponse,
 } from "@shared/schema";
 import JobQueueList from "@/components/JobQueueList";
-import {
-  buildDrawingPickerUrl,
-  buildWorkspaceUrl,
-  buildWorkspaceUrlWithFinding,
-} from "@/lib/workspace-links";
+import { buildWorkspaceUrl } from "@/lib/workspace-links";
 import { replaceDashboardProjectIdInUrl } from "@/lib/active_project";
 import { useActiveProject } from "@/contexts/active_project_context";
 import { fetchProjectDashboardSummary } from "@/lib/api/projects";
@@ -47,27 +40,6 @@ function readMasterDrawingIdFromSummary(
   return undefined;
 }
 
-/** Deep-link to canonical master workspace when summary matches selected project; else picker. */
-function workspaceOrPickerWithFinding(
-  projectId: number,
-  findingFocusId: string | number,
-  selectedProjectIdStr: string | null,
-  projectSummary: DashboardSummary | undefined | null
-): string {
-  const canonical = readMasterDrawingIdFromSummary(projectSummary);
-  if (
-    selectedProjectIdStr != null &&
-    String(projectId) === selectedProjectIdStr &&
-    canonical !== undefined
-  ) {
-    return buildWorkspaceUrlWithFinding(
-      { projectId, masterDrawingId: canonical },
-      findingFocusId
-    );
-  }
-  return buildDrawingPickerUrl(projectId, findingFocusId);
-}
-
 interface DashboardProps {
   procoreConnection: ProcoreConnection;
   /**
@@ -80,8 +52,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ procoreConnection, procoreUserId, onProcoreSync }: DashboardProps) {
-  const [location, setLocation] = useLocation();
-  const isInsightsView = location === "/insights";
+  const [, setLocation] = useLocation();
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const queryClient = useQueryClient();
   const { projectId, projectName: selectedProjectName, setActiveProjectId } =
@@ -89,58 +60,16 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
   const selectedProjectId =
     projectId != null ? String(projectId) : null;
 
-  // Kept for Critical Alerts Banner only; top section uses projectSummary
   const { data: stats } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
   });
 
-  const insightsLimit = isInsightsView ? 100 : 4;
-
-  const { data: insightsPage, isLoading: insightsLoading } = useQuery<InsightListResponse>({
-    queryKey: [
-      selectedProjectId
-        ? `/api/insights?project_id=${encodeURIComponent(selectedProjectId)}&limit=${insightsLimit}`
-        : `/api/insights?limit=${insightsLimit}`,
-    ],
-    enabled: !!selectedProjectId,
-  });
-
-  const insights = insightsPage?.items ?? [];
-  const insightsPreview = isInsightsView ? insights : insights.slice(0, 3);
-
-  // Projects list for selector (Phase 1 / Step 3)
   const { data: projectsData, isLoading: projectsLoading } = useQuery<ProjectListResponse>({
     queryKey: ["/api/projects"],
   });
 
   const projects = projectsData?.items ?? [];
 
-  const {
-    data: recentFindings,
-    isLoading: findingsLoading,
-    error: findingsError,
-  } = useQuery<FindingListResponse>({
-    queryKey: ["projectFindings", selectedProjectId],
-    queryFn: async () => {
-      if (!selectedProjectId) {
-        throw new Error("No project selected");
-      }
-
-      const res = await fetch(
-        resolveFetchUrl(`/api/projects/${selectedProjectId}/findings?limit=5`),
-        { credentials: "include" }
-      );
-
-      if (!res.ok) {
-        throw new Error("Failed to load project findings");
-      }
-
-      return res.json();
-    },
-    enabled: !!selectedProjectId,
-  });
-
-  // Project jobs (GET /api/projects/{id}/jobs?status=active)
   const {
     data: projectJobs,
     isLoading: jobsLoading,
@@ -166,7 +95,6 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
     enabled: !!selectedProjectId,
   });
 
-  // Project-specific summary (Phase 0 change)
   const { data: projectSummary, isLoading: projectSummaryLoading } = useQuery<DashboardSummary>({
     queryKey: ["project-dashboard-summary", selectedProjectId, null, procoreUserId ?? null],
     queryFn: () =>
@@ -176,7 +104,6 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
     enabled: !!selectedProjectId && Number.isFinite(Number(selectedProjectId)),
   });
 
-  // If no active project, pick a default once projects load
   useEffect(() => {
     if (projectsLoading) return;
     if (!projects || projects.length === 0) return;
@@ -215,21 +142,15 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
     );
   };
 
-  // NOTE (future): when backend supports project-scoped stats/insights, use query params:
-  // queryKey: [`/api/dashboard/stats?project_id=${selectedProjectId}`]
-  // queryKey: [`/api/insights?limit=4&project_id=${selectedProjectId}`]
-
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">
-            {isInsightsView ? "Insights" : "Dashboard"}
+            Dashboard
           </h1>
           <p className="text-muted-foreground">
-            {isInsightsView
-              ? "AI findings and inspection context"
-              : "Quality control overview and AI insights"}
+            Quality control overview for your project
           </p>
           {selectedProjectName && (
             <div className="text-sm text-muted-foreground mt-1 space-y-1" data-testid="text-selected-project">
@@ -250,8 +171,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
             </div>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          {/* Project Selector */}
+        <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col">
             <label className="text-xs text-muted-foreground">Project</label>
             <select
@@ -276,30 +196,25 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
           </div>
 
           {selectedProjectId ? (
-            <div className="flex flex-wrap items-center gap-2 self-end">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-9 border-primary bg-background text-primary hover:bg-primary-soft hover:text-primary"
-                onClick={() => setUploadModalOpen(true)}
-                data-testid="dashboard-upload-drawing"
-              >
-                Upload drawing
-              </Button>
-            </div>
+            <Button
+              type="button"
+              className="h-9 px-5"
+              onClick={() => setUploadModalOpen(true)}
+              data-testid="dashboard-upload-drawing"
+            >
+              Upload drawing
+            </Button>
           ) : null}
 
-          {/* Existing Procore status */}
           <ProcoreStatus connection={procoreConnection} onSync={onProcoreSync} />
         </div>
       </div>
 
-      {/* Project summary KPIs (top section) — hide on dedicated insights view */}
-      {selectedProjectId && !isInsightsView && (
+      {selectedProjectId && (
         projectSummaryLoading ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
                 <Card key={i}>
                   <CardContent className="p-4">
                     <Skeleton className="h-4 w-20 mb-2" />
@@ -311,19 +226,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <StatCard
-                title="Total Findings"
-                value={projectSummary?.kpis?.total_findings ?? 0}
-                icon={FileText}
-                variant="default"
-              />
-              <StatCard
-                title="Open Findings"
-                value={projectSummary?.kpis?.open_findings ?? 0}
-                icon={AlertTriangle}
-                variant="warning"
-              />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard
                 title="Drawings"
                 value={projectSummary?.kpis?.drawings_count ?? 0}
@@ -363,88 +266,6 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
         )
       )}
 
-      {/* AI Insights Section */}
-      <div className="space-y-3">
-        <div className="flex flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold">
-              {isInsightsView ? "All insights" : "AI Insights"}
-            </h2>
-          </div>
-          {!isInsightsView ? (
-            <Link href="/insights">
-              <Button variant="ghost" size="sm" data-testid="button-view-all-insights">
-                View All
-              </Button>
-            </Link>
-          ) : (
-            <Link href="/">
-              <Button variant="ghost" size="sm" data-testid="button-back-dashboard">
-                Back to dashboard
-              </Button>
-            </Link>
-          )}
-        </div>
-        {insightsLoading ? (
-          <div className="space-y-3">
-            {(isInsightsView ? [1, 2, 3, 4, 5, 6] : [1, 2, 3]).map((i) => (
-              <Skeleton key={i} className="h-24 w-full" />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-xl border border-border bg-card shadow-sm">
-            <div className="border-b border-border px-4 py-3">
-              <h3 className="text-sm font-semibold text-foreground">Insights</h3>
-            </div>
-            <div className="divide-y divide-border">
-              {insightsPreview.length === 0 ? (
-                <div className="px-4 py-6 text-sm text-muted-foreground">
-                  No insights yet for this project.
-                </div>
-              ) : (
-                insightsPreview.map((insight) => {
-                  const content = (
-                    <div className="px-4 py-3 transition-colors hover:bg-muted/50">
-                      <div className="text-sm font-medium text-foreground">{insight.title}</div>
-                      {insight.description ? (
-                        <div className="mt-1 text-sm text-muted-foreground">{insight.description}</div>
-                      ) : null}
-                    </div>
-                  );
-                  const ws = insight.workspaceLink;
-                  if (ws) {
-                    return (
-                      <Link
-                        key={insight.id}
-                        href={buildWorkspaceUrlWithFinding(ws, insight.id)}
-                      >
-                        {content}
-                      </Link>
-                    );
-                  }
-                  return (
-                    <Link
-                      key={insight.id}
-                      href={workspaceOrPickerWithFinding(
-                        Number(insight.projectId),
-                        insight.id,
-                        selectedProjectId,
-                        summary
-                      )}
-                    >
-                      {content}
-                    </Link>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Active Jobs */}
-      {!isInsightsView && (
       <div className="mt-8">
         <h2 className="text-xl font-semibold mb-4">Active Jobs</h2>
 
@@ -458,61 +279,7 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
           />
         )}
       </div>
-      )}
 
-      {!isInsightsView && (
-      <div className="mt-8">
-        <h2 className="text-xl font-semibold mb-4">Bottom: Recent findings</h2>
-
-        {!selectedProjectId ? (
-          <div>Select a project to view recent findings.</div>
-        ) : findingsLoading ? (
-          <div className="text-sm text-muted-foreground">Loading recent findings…</div>
-        ) : findingsError ? (
-          <div className="text-sm text-destructive">Failed to load recent findings</div>
-        ) : (
-          <div className="rounded-xl border border-border bg-card shadow-sm">
-            <div className="border-b border-border px-4 py-3">
-              <h3 className="text-sm font-semibold text-foreground">Recent Findings</h3>
-            </div>
-            <div className="divide-y divide-border">
-              {(recentFindings?.findings ?? []).length === 0 ? (
-                <div className="px-4 py-6 text-sm text-muted-foreground">
-                  No recent findings for this project.
-                </div>
-              ) : (
-                (recentFindings?.findings ?? []).map((finding) => {
-                  const content = (
-                    <div className="px-4 py-3 transition-colors hover:bg-muted/50">
-                      <div className="text-sm font-medium text-foreground">{finding.title}</div>
-                      {finding.severity ? (
-                        <div className="mt-1 text-xs text-muted-foreground">Severity: {finding.severity}</div>
-                      ) : null}
-                    </div>
-                  );
-                  const ws = finding.workspaceLink;
-                  const href = ws
-                    ? buildWorkspaceUrlWithFinding(ws, finding.id)
-                    : workspaceOrPickerWithFinding(
-                        finding.projectId,
-                        finding.id,
-                        selectedProjectId,
-                        summary
-                      );
-                  return (
-                    <Link key={finding.id} href={href}>
-                      {content}
-                    </Link>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-      )}
-
-      {/* Critical Alerts Banner */}
       {stats && stats.criticalAlerts > 0 && (
         <Card className="border-foreground/30 bg-foreground/5">
           <CardContent className="p-4">
@@ -528,11 +295,6 @@ export default function Dashboard({ procoreConnection, procoreUserId, onProcoreS
                   Immediate attention required for compliance issues
                 </p>
               </div>
-              <Link href="/insights">
-                <Button variant="destructive" size="sm" data-testid="button-view-alerts">
-                  View Alerts
-                </Button>
-              </Link>
             </div>
           </CardContent>
         </Card>

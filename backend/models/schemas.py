@@ -586,6 +586,7 @@ class DrawingRegionCreate(BaseModel):
     label: str
     page: int = 1
     geometry: dict  # rect or polygon, all coords normalized 0-1
+    polygon_points: Optional[List[List[float]]] = None
     inspection_type_tags: List[str] = Field(default_factory=list)
     location_tags: List[str] = Field(default_factory=list)
 
@@ -622,6 +623,7 @@ class DrawingRegionResponse(BaseModel):
     label: str
     page: int
     geometry: dict
+    polygon_points: Optional[List[List[float]]] = None
     inspection_type_tags: List[str] = Field(default_factory=list)
     location_tags: List[str] = Field(default_factory=list)
     created_at: datetime

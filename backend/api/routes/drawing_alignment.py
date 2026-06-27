@@ -103,6 +103,7 @@ def create_drawing_region(
         label=body.label,
         page=body.page,
         geometry=body.geometry,
+        polygon_points=body.polygon_points,
         inspection_type_tags=body.inspection_type_tags,
         location_tags=body.location_tags,
     )

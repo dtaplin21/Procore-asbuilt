@@ -319,14 +319,8 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
             <span>
               {mismatchCount} inspection overlay
               {mismatchCount > 1 ? " regions" : " region"} with severity{" "}
-              {MISMATCH_THRESHOLD} or higher (or failed status).
-              {" "}
-              <Link
-                href="/insights"
-                className="font-medium underline underline-offset-4 hover:no-underline"
-              >
-                View insights
-              </Link>
+              {MISMATCH_THRESHOLD} or higher (or failed status). Review overlays
+              in the inspection runs panel.
             </span>
           </AlertDescription>
         </Alert>

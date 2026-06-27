@@ -142,6 +142,8 @@ export interface DrawingRegionCreate {
   label: string;
   page?: number;
   geometry: DrawingRegionGeometry;
+  /** Optional normalized polygon detail; null for simple rects. */
+  polygon_points?: Array<[number, number]> | null;
   inspection_type_tags?: string[];
   location_tags?: string[];
 }
@@ -152,6 +154,7 @@ export interface DrawingRegionResponse {
   label: string;
   page: number;
   geometry: DrawingRegionGeometry;
+  polygon_points?: Array<[number, number]> | null;
   inspection_type_tags: string[];
   location_tags: string[];
   created_at: string;

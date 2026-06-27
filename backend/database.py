@@ -1,6 +1,9 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from models.models import Base
+from models.base import Base
+import models.drawing_region  # noqa: F401 — register drawing_regions before overlay FK
+import models.drawing_overlay  # noqa: F401
+import models.models  # noqa: F401 — register remaining ORM tables on Base.metadata
 from config import settings, sqlalchemy_connect_args
 
 DATABASE_URL = settings.database_url

@@ -43,7 +43,7 @@ if _BACKEND_ROOT not in sys.path:
 from sqlalchemy import text  # noqa: E402
 
 from database import engine  # noqa: E402
-from models.models import Base  # noqa: E402
+from models.base import Base  # noqa: E402
 
 _SKIP_TABLES = frozenset({"alembic_version"})
 

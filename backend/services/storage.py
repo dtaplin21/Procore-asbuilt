@@ -603,6 +603,7 @@ class StorageService:
         label: str,
         page: int = 1,
         geometry: Dict[str, Any],
+        polygon_points: Optional[List[Any]] = None,
         inspection_type_tags: Optional[List[str]] = None,
         location_tags: Optional[List[str]] = None,
     ) -> DrawingRegion:
@@ -611,6 +612,7 @@ class StorageService:
             label=label,
             page=page,
             geometry=geometry,
+            polygon_points=polygon_points,
             inspection_type_tags=inspection_type_tags or [],
             location_tags=location_tags or [],
         )

@@ -17,7 +17,8 @@ from ai.pipelines.inspection_mapping import (
 )
 from ai.pipelines.positioned_term_extractor import PositionedTerm
 from ai.pipelines.term_extractor import ConfidenceLabel, ExtractedTerm
-from models.models import Drawing, DrawingOverlay, EvidenceRecord, UnresolvedEvidence
+from models.models import Company, Drawing, EvidenceRecord, Project
+from models.drawing_overlay import DrawingOverlay, UnresolvedEvidence
 from services.inspection_vocabulary import VocabCategory
 from services.overlay_storage import (
     create_drawing_overlay,
@@ -38,6 +39,7 @@ def _drawing_overlay_record(
     severity: str,
     tags: NormalizedEvidenceTags,
     created_at: datetime,
+    region_id: str | None = None,
 ) -> DrawingOverlayRecord:
     return DrawingOverlayRecord(  # type: ignore[call-arg]
         id=record_id,
@@ -48,6 +50,7 @@ def _drawing_overlay_record(
         severity=severity,
         tags=tags,
         created_at=created_at,
+        region_id=region_id,
     )
 
 
@@ -121,6 +124,44 @@ def test_create_drawing_overlays_persists_geometry_and_meta(
     assert str(getattr(overlay, "label")) == "Rough In — Utility MR"
     assert str(getattr(overlay, "severity")) == "high"
     assert getattr(overlay, "tags_json") is not None
+    assert getattr(overlay, "region_id") is None
+
+
+def test_create_drawing_overlays_persists_region_id(
+    db_session: Session,
+    project,
+    master_drawing: Drawing,
+) -> None:
+    storage = StorageService(db_session)
+    region = storage.create_drawing_region(
+        cast(int, master_drawing.id),
+        label="Utility MR",
+        page=1,
+        geometry={"type": "rect", "x": 0.1, "y": 0.2, "width": 0.3, "height": 0.2},
+        inspection_type_tags=["Rough In"],
+        location_tags=["Utility MR"],
+    )
+    run = storage.create_inspection_run(
+        project_id=cast(int, project.id),
+        master_drawing_id=cast(int, master_drawing.id),
+        evidence_id=None,
+        inspection_type="general",
+    )
+    record = _drawing_overlay_record(
+        record_id=f"overlay_ev1_region_{region.id}",
+        drawing_id=str(master_drawing.id),
+        inspection_run_id=str(run.id),
+        bbox=(0.1, 0.2, 0.4, 0.5),
+        label="Rough In — Utility MR",
+        severity="high",
+        tags=NormalizedEvidenceTags(),
+        created_at=cast(datetime, run.created_at),
+        region_id=str(region.id),
+    )
+
+    saved = create_drawing_overlays(db_session, [record])
+    assert len(saved) == 1
+    assert getattr(saved[0], "region_id") == region.id
 
 
 def test_flag_unresolved_evidence_writes_table_and_meta(

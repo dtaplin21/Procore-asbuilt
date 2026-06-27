@@ -1,7 +1,7 @@
 """Build the list[MasterRegion] that drawing_location_resolver.py matches against.
 
 Reads from the drawing_regions table (inspection_type_tags and location_tags
-columns — migration a3f9c1d8e2b4, model in models.models.DrawingRegion).
+columns — migration a3f9c1d8e2b4, model in models.drawing_region.DrawingRegion).
 
 Intended caller pattern (evidence upload / document pipeline):
 
@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from ai.pipelines.document_text_extraction import BoundingBox
 from ai.pipelines.drawing_location_resolver import MasterRegion
-from models.models import DrawingRegion
+from models.drawing_region import DrawingRegion
 
 logger = logging.getLogger(__name__)
 

@@ -141,6 +141,7 @@ class DrawingOverlayRecord:
     tags: NormalizedEvidenceTags
     created_at: datetime
     inspection_date: date | None = None
+    region_id: str | None = None
 
 
 _CATEGORY_TO_TAGS_FIELD: dict[VocabCategory, str] = {
@@ -444,8 +445,12 @@ def _build_overlay_record(
     elif tags.locations:
         label = f"{label} — {tags.locations[0]}"
 
+    matched_region_id: str | None = (
+        representative.matched_region.region_id if representative.matched_region else None
+    )
+
     return DrawingOverlayRecord(
-        id=f"overlay_{evidence.evidence_id}_{representative.matched_region.region_id if representative.matched_region else 'unmatched'}",
+        id=f"overlay_{evidence.evidence_id}_{matched_region_id or 'unmatched'}",
         drawing_id=representative.master_drawing_id,
         inspection_run_id=evidence.inspection_run_id,
         bbox=bbox_fractional,
@@ -454,6 +459,7 @@ def _build_overlay_record(
         tags=tags,
         created_at=datetime.now(timezone.utc),
         inspection_date=inspection_date,
+        region_id=matched_region_id,
     )
 
 

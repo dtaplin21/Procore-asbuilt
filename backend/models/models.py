@@ -2,11 +2,10 @@
 from sqlalchemy import CheckConstraint, Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Float, JSON, UniqueConstraint, Index, text, Date
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.sql import func
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 
-Base = declarative_base()
+from .base import Base
 
 # OAuth & User Management
 class User(Base):
@@ -365,50 +364,8 @@ class DrawingRendition(Base):
     drawing = relationship("Drawing", back_populates="renditions")
 
 
-class DrawingRegion(Base):
-    """User-defined region on a master drawing (geometry + lookup tags).
-
-    ``inspection_type_tags`` and ``location_tags`` are read by
-    ``services.region_index_loader`` to build the ``MasterRegion`` index
-    that ``drawing_location_resolver`` matches uploaded evidence against.
-    """
-
-    __tablename__ = "drawing_regions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    master_drawing_id = Column(
-        Integer,
-        ForeignKey("drawings.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    label = Column(String(length=255), nullable=False)
-    page = Column(Integer, nullable=False, default=1)
-    geometry = Column(JSON, nullable=False)  # normalized 0-1; rect or polygon
-    # Inspection type(s) for this region, e.g. ["Underground Fire Water Rough In"].
-    # Array because a region can be relevant to more than one type over a project.
-    inspection_type_tags = Column(
-        ARRAY(String),
-        nullable=True,
-        server_default=text("'{}'::text[]"),
-    )
-    # Place name(s) for this region, e.g. ["Utility MR", "Level 2"].
-    location_tags = Column(
-        ARRAY(String),
-        nullable=True,
-        server_default=text("'{}'::text[]"),
-    )
-
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-    )
-
-    # Relationships
-    master_drawing = relationship("Drawing", back_populates="regions")
-    inspection_reviews = relationship("DrawingInspectionReview", back_populates="region")
+from .drawing_region import DrawingRegion
+from .drawing_overlay import DrawingOverlay, UnresolvedEvidence
 
 
 class DrawingInspectionReview(Base):
@@ -552,101 +509,6 @@ class InspectionResult(Base):
 
     # Relationships
     inspection_run = relationship("InspectionRun", back_populates="results")
-
-
-class DrawingOverlay(Base):
-    """Overlay on a master drawing from the inspection-mapping pipeline.
-
-    ``created_at`` is when the record was uploaded/created in this system
-    (``uploaded_at`` in refactor docs). ``inspection_date`` is when the
-    inspection was performed per the source document (nullable when the
-    document states no recognizable date).
-    """
-
-    __tablename__ = "drawing_overlays"
-    __table_args__ = (
-        CheckConstraint(
-            "status in ('pass','fail','unknown')",
-            name="ck_drawing_overlays_status",
-        ),
-        CheckConstraint(
-            "inspection_run_id IS NOT NULL",
-            name="ck_drawing_overlays_inspection_run_required",
-        ),
-        Index("ix_drawing_overlays_master_drawing_id", "master_drawing_id"),
-        Index("ix_drawing_overlays_inspection_run_id", "inspection_run_id"),
-        Index("ix_drawing_overlays_status", "status"),
-        Index("ix_drawing_overlays_master_drawing_id_created_at", "master_drawing_id", "created_at"),
-        Index("ix_drawing_overlays_inspection_date", "inspection_date"),
-    )
-
-    id = Column(Integer, primary_key=True, index=True)
-
-    master_drawing_id = Column(
-        Integer,
-        ForeignKey("drawings.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    inspection_run_id = Column(
-        Integer,
-        ForeignKey("inspection_runs.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-
-    geometry = Column(JSON, nullable=False)
-    status = Column(String, nullable=False, server_default="unknown")  # pass | fail | unknown
-
-    label = Column(String(length=255), nullable=True)
-    severity = Column(String(length=32), nullable=True)  # high | medium | info
-    confidence_label = Column(String(length=64), nullable=True)
-    inspection_date = Column(Date, nullable=True)
-    tags_json = Column(JSON, nullable=True)
-
-    meta = Column(JSON, nullable=True)
-    created_at = Column(DateTime, nullable=False, server_default=func.now())
-
-    # Relationships
-    master_drawing = relationship("Drawing", back_populates="overlays")
-    inspection_run = relationship("InspectionRun", back_populates="overlays")
-    inspection_reviews = relationship(
-        "DrawingInspectionReview",
-        back_populates="overlay",
-        passive_deletes=True,
-    )
-
-
-class UnresolvedEvidence(Base):
-    """Evidence map_document_to_overlays() could not place on the master drawing."""
-
-    __tablename__ = "unresolved_evidence"
-
-    id = Column(Integer, primary_key=True, index=True)
-    evidence_id = Column(
-        Integer,
-        ForeignKey("evidence_records.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    inspection_run_id = Column(
-        Integer,
-        ForeignKey("inspection_runs.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    master_drawing_id = Column(
-        Integer,
-        ForeignKey("drawings.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    reason = Column(Text, nullable=False)
-    extracted_terms_json = Column(JSON, nullable=False)
-    resolved_by_human = Column(Boolean, nullable=False, server_default=text("false"))
-    created_at = Column(DateTime, nullable=False, server_default=func.now())
-
-    evidence = relationship("EvidenceRecord", back_populates="unresolved_placements")
-    inspection_run = relationship("InspectionRun", back_populates="unresolved_evidence")
-    master_drawing = relationship("Drawing", back_populates="unresolved_evidence")
 
 
 # Evidence Records (specs, inspection docs, etc.)

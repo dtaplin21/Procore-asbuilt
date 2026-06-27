@@ -7,7 +7,10 @@ from sqlalchemy import create_engine, pool
 
 # When running Alembic from backend/, imports resolve from this directory.
 from config import settings, sqlalchemy_connect_args
-from models.models import Base
+from models.base import Base
+import models.drawing_region  # noqa: F401
+import models.drawing_overlay  # noqa: F401
+import models.models  # noqa: F401 — register ORM tables on Base.metadata
 
 
 # Alembic Config object (reads settings from alembic.ini)
