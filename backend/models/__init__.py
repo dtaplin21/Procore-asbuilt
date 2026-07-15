@@ -10,6 +10,14 @@ from .base import Base
 from .drawing_overlay import DrawingOverlay, UnresolvedEvidence
 from .drawing_region import DrawingRegion
 from .inspection_run import InspectionRun
+from .review_queue_item import ReviewQueueItem
 
-__all__ = ["Base", "DrawingRegion", "DrawingOverlay", "UnresolvedEvidence", "InspectionRun"]
+__all__ = [
+    "Base",
+    "DrawingRegion",
+    "DrawingOverlay",
+    "UnresolvedEvidence",
+    "InspectionRun",
+    "ReviewQueueItem",
+]
 

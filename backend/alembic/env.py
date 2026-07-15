@@ -11,6 +11,7 @@ from models.base import Base
 import models.drawing_region  # noqa: F401
 import models.drawing_overlay  # noqa: F401
 import models.inspection_run  # noqa: F401
+import models.review_queue_item  # noqa: F401
 import models.models  # noqa: F401 — register ORM tables on Base.metadata
 
 
