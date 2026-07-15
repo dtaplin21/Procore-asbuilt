@@ -80,7 +80,12 @@ def fake_rasterize_pdf_pages(file_path: str | Path) -> list[Path]:
 
 @pytest.fixture(autouse=True)
 def fake_backends(request: pytest.FixtureRequest) -> Iterator[None]:
-    if request.node.name == "test_real_backends_raise_not_implemented_without_patches":
+    if request.node.name in {
+        "test_real_backends_raise_not_implemented_without_patches",
+        "test_pdf_has_text_layer_native_pdf",
+        "test_pdf_has_text_layer_scanned_pdf",
+        "test_pdf_text_layer_extracts_words_with_boxes",
+    }:
         yield
         return
     with (
@@ -190,4 +195,59 @@ def test_real_backends_raise_not_implemented_without_patches() -> None:
     from ai.pipelines import document_text_extraction as module
 
     with pytest.raises(NotImplementedError):
-        module._pdf_has_text_layer("/tmp/file.pdf")
+        module._ocr_image("/tmp/file.png")
+
+
+def test_pdf_has_text_layer_native_pdf(tmp_path: Path) -> None:
+    import fitz
+
+    from ai.pipelines.document_text_extraction import _pdf_has_text_layer
+
+    native_path = tmp_path / "native.pdf"
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Underground Fire Water Rough In — Utility MR")
+    doc.save(str(native_path))
+    doc.close()
+
+    assert _pdf_has_text_layer(native_path) is True
+
+
+def test_pdf_has_text_layer_scanned_pdf(tmp_path: Path) -> None:
+    import fitz
+
+    from ai.pipelines.document_text_extraction import _pdf_has_text_layer
+
+    scanned_path = tmp_path / "scanned.pdf"
+    doc = fitz.open()
+    doc.new_page()
+    doc.save(str(scanned_path))
+    doc.close()
+
+    assert _pdf_has_text_layer(scanned_path) is False
+
+
+def test_pdf_text_layer_extracts_words_with_boxes(tmp_path: Path) -> None:
+    import fitz
+
+    from ai.pipelines.document_text_extraction import (
+        SourceFormat,
+        _pdf_text_layer,
+    )
+
+    pdf_path = tmp_path / "report.pdf"
+    doc = fitz.open()
+    page = doc.new_page(width=612, height=792)
+    page.insert_text((72, 100), "Hydrostatic Test Passed")
+    doc.save(str(pdf_path))
+    doc.close()
+
+    extracted = _pdf_text_layer(pdf_path)
+    assert extracted.source_format == SourceFormat.NATIVE_PDF
+    assert extracted.page_count == 1
+    assert extracted.words
+    assert all(w.page_index == 0 for w in extracted.words)
+    assert all(w.bbox.page_width == 612.0 for w in extracted.words)
+    assert all(w.bbox.page_height == 792.0 for w in extracted.words)
+    assert "Hydrostatic" in extracted.full_text()
+    assert "Passed" in extracted.full_text()

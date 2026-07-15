@@ -103,8 +103,17 @@ The script **refuses** when ``APP_ENV=production`` unless you pass ``--allow-pro
 ## Running the Server
 
 ### Development mode:
+
+From the repo root, `npm run dev` starts the API (port 2000), Vite frontend, and the **job worker** that processes `drawing_render` jobs (PDF → page PNGs after upload). To run only the API:
+
 ```bash
 uvicorn main:app --reload --host 0.0.0.0 --port 2000
+```
+
+To run only the worker (e.g. while API is already up):
+
+```bash
+npm run worker
 ```
 
 ### Production mode:

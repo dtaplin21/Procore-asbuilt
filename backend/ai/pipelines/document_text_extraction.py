@@ -35,6 +35,8 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+import fitz  # PyMuPDF
+
 
 class SourceFormat(str, Enum):
     NATIVE_PDF = "native_pdf"  # PDF with an extractable text layer
@@ -153,26 +155,52 @@ def detect_source_format(file_path: str | Path, has_text_layer: bool | None = No
 
 def _pdf_has_text_layer(file_path: str | Path) -> bool:
     """Probe whether a PDF has a real, extractable text layer vs. being
-    just scanned images. Real implementation: try pdfplumber/pypdf text
-    extraction on the first couple pages; if it returns near-empty or
-    garbage text, treat it as scanned.
+    just scanned images. Uses PyMuPDF to read page-0 text; >= 20 non-ws
+    chars on the first page counts as native PDF (OCR not required).
     """
-    raise NotImplementedError(
-        "Wire up a PDF text-layer probe (e.g. pdfplumber) here. "
-        "See backend/tests/test_document_text_extraction.py for the "
-        "fake backend used in tests."
-    )
+    doc = fitz.open(str(file_path))
+    try:
+        if doc.page_count == 0:
+            return False
+        text = doc.load_page(0).get_text("text") or ""
+        return len(text.strip()) >= 20
+    finally:
+        doc.close()
 
 
 def _pdf_text_layer(file_path: str | Path) -> ExtractedDocument:
-    """Extract words + boxes directly from a native PDF's text layer.
-    Real implementation: pdfplumber's page.extract_words() (or pypdf
-    equivalent) gives word-level boxes natively in PDF point space.
-    """
-    raise NotImplementedError(
-        "Wire up native PDF text-layer extraction (e.g. pdfplumber "
-        "page.extract_words()) here."
-    )
+    """Extract words + boxes directly from a native PDF's text layer."""
+    doc = fitz.open(str(file_path))
+    words: list[PositionedWord] = []
+    try:
+        for page_index in range(doc.page_count):
+            page = doc.load_page(page_index)
+            pw, ph = page.rect.width, page.rect.height
+            for w in page.get_text("words"):  # x0,y0,x1,y1, word, block, line, word_no
+                x0, y0, x1, y1, text, *_ = w
+                if not str(text).strip():
+                    continue
+                words.append(
+                    PositionedWord(
+                        text=str(text),
+                        bbox=BoundingBox(
+                            x=float(x0),
+                            y=float(y0),
+                            width=float(x1 - x0),
+                            height=float(y1 - y0),
+                            page_width=float(pw),
+                            page_height=float(ph),
+                        ),
+                        page_index=page_index,
+                    )
+                )
+        return ExtractedDocument(
+            source_format=SourceFormat.NATIVE_PDF,
+            page_count=doc.page_count,
+            words=words,
+        )
+    finally:
+        doc.close()
 
 
 def _ocr_image(file_path: str | Path, page_index: int = 0) -> tuple[list[PositionedWord], float, float]:
