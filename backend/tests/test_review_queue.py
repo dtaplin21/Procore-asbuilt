@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from typing import cast
 
 import pytest
 from sqlalchemy.orm import Session
@@ -39,15 +40,15 @@ def test_add_to_review_queue_persists_row(db: Session) -> None:
     )
 
     assert item.id is not None
-    assert item.file_id == file_id
-    assert item.reason == "low_confidence_classification"
-    assert item.document_type_guess == "inspection_report"
-    assert item.classification_confidence == 0.42
-    assert item.resolved is False
+    assert cast(str, item.file_id) == file_id
+    assert cast(str, item.reason) == "low_confidence_classification"
+    assert cast(str | None, item.document_type_guess) == "inspection_report"
+    assert cast(float | None, item.classification_confidence) == 0.42
+    assert cast(bool, item.resolved) is False
     assert item.created_at is not None
 
-    stored = db.query(ReviewQueueItem).filter_by(id=item.id).one()
-    assert stored.file_id == file_id
+    stored = db.query(ReviewQueueItem).filter_by(id=cast(int, item.id)).one()
+    assert cast(str, stored.file_id) == file_id
 
 
 def test_add_to_review_queue_without_commit_uses_flush(db: Session) -> None:
@@ -61,5 +62,5 @@ def test_add_to_review_queue_without_commit_uses_flush(db: Session) -> None:
     )
 
     assert item.id is not None
-    pending = db.query(ReviewQueueItem).filter_by(id=item.id).one()
-    assert pending.reason == "extraction_validation_failed"
+    pending = db.query(ReviewQueueItem).filter_by(id=cast(int, item.id)).one()
+    assert cast(str, pending.reason) == "extraction_validation_failed"

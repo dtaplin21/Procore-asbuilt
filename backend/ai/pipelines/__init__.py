@@ -9,5 +9,13 @@ The legacy inspection_query_builder module is not used in this repo.
 from ai.pipelines.clue_extractor import build_clues
 from ai.pipelines.document_classifier import classify_document
 from ai.pipelines.inspection_mapping import run_inspection_mapping
+from ai.pipelines.type_specific_extractor import extract_type_specific_fields
+from ai.pipelines.universal_field_extractor import extract_universal_fields
 
-__all__ = ["build_clues", "classify_document", "run_inspection_mapping"]
+__all__ = [
+    "build_clues",
+    "classify_document",
+    "extract_type_specific_fields",
+    "extract_universal_fields",
+    "run_inspection_mapping",
+]
