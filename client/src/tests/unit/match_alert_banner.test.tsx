@@ -62,4 +62,18 @@ describe("MatchAlertBanner", () => {
       "No likely location was found on the master drawing for this inspection.",
     );
   });
+
+  it("ucsf needs_review shows alert without numeric scores", () => {
+    useInspectionMatchStatusMock.mockReturnValue({
+      inspection_id: "ucsf-evidence-1",
+      match_status: "needs_review",
+      bbox: null,
+    });
+
+    render(<MatchAlertBanner inspectionId="ucsf-evidence-1" />);
+
+    const banner = screen.getByRole("alert");
+    expect(banner).toHaveTextContent("could not be automatically placed");
+    expect(banner.textContent).not.toMatch(/\d+%/);
+  });
 });

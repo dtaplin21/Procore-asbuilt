@@ -172,3 +172,24 @@ class TestInspectionMatchStatusApi:
         assert response.status_code == 200
         assert response.json()["match_status"] == "no_match"
         assert response.json()["bbox"] is None
+
+
+class TestInspectionMatchStatusApiNoScoreLeaks:
+    def test_match_status_json_has_no_nested_score_fields(
+        self,
+        client,
+        db_session: Session,
+    ) -> None:
+        from api.schemas.frontend_safe import contains_forbidden_frontend_score_fields
+
+        _, inspection_id = _seed_run_with_overlay(
+            db_session,
+            match_status="needs_review",
+            with_bbox=False,
+        )
+
+        response = client.get(f"/api/inspections/{inspection_id}/match-status")
+        body = response.json()
+
+        assert response.status_code == 200
+        assert contains_forbidden_frontend_score_fields(body) == []

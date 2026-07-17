@@ -18,20 +18,23 @@ from ai.pipelines.candidate_tile_selector import (
     compute_tile_match_score,
     find_candidate_tiles_from_clues,
 )
-from ai.pipelines.inspection_mapping import UNMAPPED_GEOMETRY
 from models.drawing_overlay import DrawingOverlay
 from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
-from models.inspection_run import InspectionRun
 from models.models import JobQueue, Project, User, UserCompany
-from services.storage import StorageService
+from services.inspection_match_persistence import (
+    MATCH_SCORE_THRESHOLD,
+    InternalMatchCandidate,
+    MatchStatus,
+    match_status_from_internal_score,
+    persist_inspection_match_overlay,
+    record_internal_match_candidate,
+    resolve_inspection_run_id,
+)
 
 logger = logging.getLogger(__name__)
 
 JOB_TYPE_INSPECTION_MATCH = "inspection_match"
-MATCH_SCORE_THRESHOLD = 0.75  # Tune after observing real backend score distributions.
-
-MatchStatus = Literal["matched", "needs_review", "no_match"]
 
 
 @dataclass(frozen=True)
@@ -45,7 +48,7 @@ def load_inspection_match_status(
     inspection_id: str,
 ) -> InspectionMatchRecord | None:
     """Load frontend-safe match status from the latest overlay for an inspection."""
-    run_id = _resolve_inspection_run_id(session, inspection_id)
+    run_id = resolve_inspection_run_id(session, inspection_id)
     if run_id is None:
         return None
 
@@ -186,12 +189,13 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
     )
 
     if extraction is None:
-        _persist_match_status(
+        persist_inspection_match_overlay(
             session=session,
             inspection_id=inspection_id,
             drawing_id=drawing_id,
             status="needs_review",
             bbox=None,
+            page=page,
         )
         return "needs_review"
 
@@ -210,29 +214,45 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
     )
 
     if not candidates:
-        _persist_match_status(
+        persist_inspection_match_overlay(
             session=session,
             inspection_id=inspection_id,
             drawing_id=drawing_id,
             status="needs_review",
             bbox=None,
+            page=page,
         )
         return "needs_review"
 
-    best = candidates[0]
-    internal_score = compute_tile_match_score(best, clues)
-    status: MatchStatus = (
-        "matched" if internal_score >= MATCH_SCORE_THRESHOLD else "needs_review"
-    )
-    bbox = best.bbox_normalized if status == "matched" else None
+    scored_candidates: list[tuple[float, CandidateTile]] = []
+    for rank, tile in enumerate(candidates, start=1):
+        internal_score = compute_tile_match_score(tile, clues)
+        scored_candidates.append((internal_score, tile))
+        record_internal_match_candidate(
+            session,
+            inspection_id=inspection_id,
+            drawing_id=drawing_id,
+            candidate=InternalMatchCandidate(
+                score=internal_score,
+                bbox=tile.bbox_normalized,
+                page=tile.page,
+                region_id=tile.region_id,
+                source="clue_match",
+                rank=rank,
+            ),
+        )
+    session.commit()
 
-    _persist_match_status(
-        session=session,
+    best_score, best = max(scored_candidates, key=lambda item: item[0])
+    status = match_status_from_internal_score(best_score)
+    persist_inspection_match_overlay(
+        session,
         inspection_id=inspection_id,
         drawing_id=drawing_id,
         status=status,
-        bbox=bbox,
-        candidate=best,
+        bbox=best.bbox_normalized if status == "matched" else None,
+        page=best.page,
+        region_id=best.region_id,
     )
     return status
 
@@ -250,101 +270,3 @@ async def process_inspection_match_job(payload: dict[str, Any]) -> MatchStatus:
             db.close()
 
     return await asyncio.to_thread(_run)
-
-
-def _resolve_inspection_run_id(session: Session, inspection_id: str) -> int | None:
-    if inspection_id.isdigit():
-        run_id = int(inspection_id)
-        run = session.query(InspectionRun).filter(InspectionRun.id == run_id).first()
-        if run is not None:
-            return run_id
-
-        run = (
-            session.query(InspectionRun)
-            .filter(InspectionRun.evidence_id == run_id)
-            .order_by(InspectionRun.id.desc())
-            .first()
-        )
-        if run is not None:
-            return cast(int, run.id)
-
-    return None
-
-
-def _bbox_to_geometry(
-    bbox: tuple[float, float, float, float] | None,
-    *,
-    page: int,
-) -> dict[str, Any]:
-    if bbox is None:
-        geometry = dict(UNMAPPED_GEOMETRY)
-        geometry["page"] = page
-        return geometry
-
-    x0, y0, x1, y1 = bbox
-    return {
-        "page": page,
-        "type": "rect",
-        "x": x0,
-        "y": y0,
-        "width": x1 - x0,
-        "height": y1 - y0,
-        "label": "inspection_match",
-    }
-
-
-def _persist_match_status(
-    session: Session,
-    inspection_id: str,
-    drawing_id: str | int,
-    status: MatchStatus,
-    bbox: tuple[float, float, float, float] | None,
-    *,
-    candidate: CandidateTile | None = None,
-) -> None:
-    """Persist frontend-safe match status on overlay meta (no numeric confidence)."""
-    run_id = _resolve_inspection_run_id(session, inspection_id)
-    if run_id is None:
-        logger.warning(
-            "inspection_match_missing_run",
-            extra={"inspection_id": inspection_id, "match_status": status},
-        )
-        return
-
-    master_drawing_id = int(drawing_id)
-    page = int(candidate.page if candidate is not None else 1)
-    meta_patch = {"match_status": status}
-
-    overlay = (
-        session.query(DrawingOverlay)
-        .filter(
-            DrawingOverlay.inspection_run_id == run_id,
-            DrawingOverlay.master_drawing_id == master_drawing_id,
-        )
-        .order_by(DrawingOverlay.id.desc())
-        .first()
-    )
-
-    if overlay is not None:
-        current_meta = overlay.meta if isinstance(overlay.meta, dict) else {}
-        setattr(overlay, "meta", {**current_meta, **meta_patch})
-        if status == "matched" and bbox is not None:
-            setattr(overlay, "geometry", _bbox_to_geometry(bbox, page=page))
-            if candidate is not None and candidate.region_id is not None:
-                setattr(overlay, "region_id", candidate.region_id)
-        session.commit()
-        return
-
-    geometry = _bbox_to_geometry(bbox if status == "matched" else None, page=page)
-    storage = StorageService(session)
-    created = storage.create_drawing_overlay(
-        master_drawing_id,
-        geometry,
-        "unknown",
-        meta=meta_patch,
-        inspection_run_id=run_id,
-        label="Inspection match",
-    )
-    if candidate is not None and candidate.region_id is not None:
-        setattr(created, "region_id", candidate.region_id)
-        session.commit()

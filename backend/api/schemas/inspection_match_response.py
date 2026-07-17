@@ -5,7 +5,7 @@ No confidence, score, or classification_confidence field is allowed here.
 
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class BboxResponse(BaseModel):
@@ -19,3 +19,5 @@ class InspectionMatchStatusResponse(BaseModel):
     inspection_id: str
     match_status: str  # matched | needs_review | no_match
     bbox: Optional[BboxResponse] = None
+
+    model_config = ConfigDict(extra="forbid")

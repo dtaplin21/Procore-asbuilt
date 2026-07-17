@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from ai.pipelines.candidate_tile_selector import CandidateTile
 from database import SessionLocal
 from models.drawing_overlay import DrawingOverlay
+from models.drawing_match_candidate import DrawingMatchCandidate
 from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
 from models.models import Company, Drawing, EvidenceRecord, Project
@@ -150,6 +151,15 @@ def test_run_inspection_match_job_matched(mock_find, mock_score, db: Session):
     assert meta["match_status"] == "matched"
     assert "confidence" not in meta
     assert overlay.geometry is not None
+
+    candidate = (
+        db.query(DrawingMatchCandidate)
+        .filter(DrawingMatchCandidate.inspection_id == file_id)
+        .order_by(DrawingMatchCandidate.rank.asc())
+        .first()
+    )
+    assert candidate is not None
+    assert float(cast(float, candidate.score)) >= MATCH_SCORE_THRESHOLD
 
 
 @patch("services.inspection_matching_jobs.compute_tile_match_score")

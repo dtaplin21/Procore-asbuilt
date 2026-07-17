@@ -10,6 +10,8 @@ from pydantic import AliasChoices, BaseModel, EmailStr, Field, ConfigDict, field
 from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime, date
 
+from api.schemas.frontend_safe import sanitize_frontend_dict
+
 # User Schemas
 class UserBase(BaseModel):
     email: EmailStr
@@ -1287,6 +1289,11 @@ class DrawingOverlayResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    @field_validator("meta", mode="before")
+    @classmethod
+    def _sanitize_overlay_meta(cls, value: Any) -> Any:
+        return sanitize_frontend_dict(value)
 
 
 class InspectionRunListResponse(BaseModel):

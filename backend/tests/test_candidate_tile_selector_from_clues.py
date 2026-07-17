@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ai.pipelines.candidate_tile_selector import (
     CandidateTile,
+    _clue_matches_row,
     find_candidate_tiles_from_clues,
 )
 from ai.schemas.document_extraction_schemas import Clue
@@ -29,6 +30,29 @@ def _clue(value: str, confidence: float = 0.8) -> Clue:
     )
 
 
+def test_location_relevant_clues_are_used_for_matching() -> None:
+    clue = SimpleNamespace(
+        clue_value="COLO",
+        clue_type="location_text",
+        confidence=0.9,
+        location_relevant=True,
+    )
+
+    assert clue.location_relevant is True
+    assert clue.clue_value == "COLO"
+
+
+def test_clue_matching_uses_literal_substrings_not_regex() -> None:
+    """Clue values are matched literally, not via legacy regex search terms."""
+    dot_clue = SimpleNamespace(clue_value=".", location_relevant=True, confidence=0.9)
+    assert _clue_matches_row(dot_clue, "roof drainage plan") is False
+    assert _clue_matches_row(dot_clue, "a.b") is True
+
+    paren_clue = SimpleNamespace(clue_value="(COLO)", location_relevant=True, confidence=0.9)
+    assert _clue_matches_row(paren_clue, "colo parking lot") is False
+    assert _clue_matches_row(paren_clue, "(colo) parking lot") is True
+
+
 def _tile(text: str, confidence: float = 0.75) -> CandidateTile:
     return CandidateTile(
         drawing_id="10",
@@ -41,11 +65,11 @@ def _tile(text: str, confidence: float = 0.75) -> CandidateTile:
 
 
 @patch("ai.pipelines.candidate_tile_selector._load_candidate_tiles")
-def test_location_relevant_clues_match_colo_sewer_region(mock_load):
-    mock_load.return_value = [
-        _tile("COLO PARKING LOT SANITARY SEWER"),
-        _tile("ROOF DRAINAGE PLAN"),
-    ]
+def test_location_relevant_clues_match_colo_sewer_region(mock_load) -> None:
+    """COLO sewer row ranks; roof drainage row is excluded (no regex search terms)."""
+    sewer_row = _tile("COLO PARKING LOT SANITARY SEWER")
+    roof_row = _tile("ROOF DRAINAGE PLAN")
+    mock_load.return_value = [sewer_row, roof_row]
     clues = [
         _clue("COLO", confidence=0.90),
         _clue("Sanitary Sewerage", confidence=0.85),
@@ -60,6 +84,8 @@ def test_location_relevant_clues_match_colo_sewer_region(mock_load):
     )
 
     assert len(results) == 1
+    assert results[0] is sewer_row
+    assert roof_row not in results
     assert "COLO" in results[0].text
     assert "sanitary sewer" in results[0].text.lower()
 
