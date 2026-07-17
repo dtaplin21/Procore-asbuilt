@@ -13,11 +13,39 @@ from api.dependencies import get_db, get_idempotency_key
 from services.idempotency import begin_idempotent_operation, finish_idempotent_operation
 from ai.pipelines.inspection_mapping import run_inspection_mapping
 from models.schemas import InspectionRunCreate, InspectionRunListResponse, InspectionRunResponse
+from api.schemas.inspection_match_response import BboxResponse, InspectionMatchStatusResponse
+from services.inspection_matching_jobs import load_inspection_match_status
 from services.storage import StorageService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/projects", tags=["inspections"])
+match_router = APIRouter(prefix="/api/inspections", tags=["inspections"])
+
+
+@match_router.get(
+    "/{inspection_id}/match-status",
+    response_model=InspectionMatchStatusResponse,
+)
+def get_match_status(
+    inspection_id: str,
+    db: Session = Depends(get_db),
+) -> InspectionMatchStatusResponse:
+    """Return frontend-safe inspection match status (no confidence or score)."""
+    record = load_inspection_match_status(db, inspection_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Inspection not found")
+
+    bbox = None
+    if record.bbox is not None:
+        x, y, width, height = record.bbox
+        bbox = BboxResponse(x=x, y=y, width=width, height=height)
+
+    return InspectionMatchStatusResponse(
+        inspection_id=inspection_id,
+        match_status=record.match_status,
+        bbox=bbox,
+    )
 
 
 def _ensure_project_exists(storage: StorageService, project_id: int) -> None:

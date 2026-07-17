@@ -23,6 +23,10 @@ from services.drawing_render_jobs import (
     DRAWING_RENDER_JOB_TYPE,
     process_drawing_render_job,
 )
+from services.inspection_matching_jobs import (
+    JOB_TYPE_INSPECTION_MATCH,
+    process_inspection_match_job,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +41,13 @@ async def handle_job(job: JobQueue) -> None:
         if drawing_id is None:
             raise ValueError("drawing_render job missing input_data.drawing_id")
         await process_drawing_render_job(coerce_job_int(drawing_id, "drawing_id"))
+        return
+
+    if job_type == JOB_TYPE_INSPECTION_MATCH:
+        input_data = cast(dict[str, Any] | None, job.input_data)
+        if not input_data:
+            raise ValueError("inspection_match job missing input_data")
+        await process_inspection_match_job(input_data)
         return
 
     raise ValueError(f"Unknown job_type: {job_type}")
