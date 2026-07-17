@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import List
 
+from ai.pipelines.photo_clue_logic import build_field_photo_clue_candidates
 from ai.schemas.document_extraction_schemas import (
     Clue,
     DocumentType,
@@ -105,47 +106,14 @@ def build_clues(
             )
 
     elif isinstance(type_specific, FieldPhotoFields):
-        if type_specific.utility_type:
+        for entry in build_field_photo_clue_candidates(type_specific):
             clues.append(
                 Clue(
-                    type="utility_type",
-                    value=type_specific.utility_type,
+                    type=entry.clue_type,
+                    value=entry.value,
                     source="field_photo",
-                    confidence=0.70,
-                    location_relevant=True,
-                )
-            )
-
-        for obj in type_specific.visible_objects:
-            clues.append(
-                Clue(
-                    type="visible_object",
-                    value=obj,
-                    source="field_photo",
-                    confidence=0.55,
-                    location_relevant=True,
-                )
-            )
-
-        for text in type_specific.visible_text:
-            clues.append(
-                Clue(
-                    type="visible_text",
-                    value=text,
-                    source="field_photo",
-                    confidence=0.60,
-                    location_relevant=True,
-                )
-            )
-
-        for clue_text in type_specific.possible_location_clues:
-            clues.append(
-                Clue(
-                    type="location_hint",
-                    value=clue_text,
-                    source="field_photo",
-                    confidence=0.60,
-                    location_relevant=True,
+                    confidence=entry.confidence,
+                    location_relevant=entry.location_relevant,
                 )
             )
 

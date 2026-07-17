@@ -8,6 +8,8 @@ EXPANSIONS = {
     "storm drainage": ["storm drain", "SD", "storm"],
     "parking lot": ["lot", "pavement", "asphalt", "parking"],
     "colo": ["Colo", "COLO parking lot", "colocated", "colocation"],
+    "utility line": ["utility", "util line"],
+    "trench": ["utility trench", "excavation"],
 }
 
 

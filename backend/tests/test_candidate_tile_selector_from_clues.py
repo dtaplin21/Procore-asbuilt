@@ -141,6 +141,38 @@ def test_sanitary_sewerage_expansion_matches_ss_abbreviation(mock_load):
 
 
 @patch("ai.pipelines.candidate_tile_selector._load_candidate_tiles")
+def test_field_photo_clues_match_master_drawing_text_not_pixels(mock_load):
+    from ai.pipelines.clue_extractor import build_clues
+    from ai.schemas.document_extraction_schemas import DocumentType, FieldPhotoFields, UniversalFields
+
+    mock_load.return_value = [
+        _tile("COLO PARKING LOT SS SANITARY SEWER MH"),
+        _tile("ROOF DRAINAGE PLAN"),
+    ]
+    photo_clues = build_clues(
+        DocumentType.FIELD_PHOTO,
+        UniversalFields(),
+        FieldPhotoFields(
+            visible_objects=["trench", "pipe", "parking lot"],
+            utility_type="sanitary sewer",
+            possible_location_clues=["parking lot area", "utility trench"],
+            environment="outdoor parking lot construction area",
+        ),
+    )
+
+    results = find_candidate_tiles_from_clues(
+        session=_mock_session(),
+        drawing_id="10",
+        page=1,
+        clues=photo_clues,
+    )
+
+    assert len(results) == 1
+    assert "PARKING LOT" in results[0].text
+    assert "SS" in results[0].text
+
+
+@patch("ai.pipelines.candidate_tile_selector._load_candidate_tiles")
 def test_no_text_match_returns_empty_list(mock_load):
     mock_load.return_value = [_tile("ROOF DRAINAGE PLAN")]
     clues = [_clue("COLO"), _clue("sanitary sewer")]

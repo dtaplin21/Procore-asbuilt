@@ -71,6 +71,8 @@ def test_field_photo_produces_visible_and_location_clues():
         utility_type="sanitary sewer",
         visible_objects=["trench", "pipe"],
         visible_text=["SS"],
+        environment="outdoor parking lot construction area",
+        camera_perspective="ground-level field photo",
         possible_location_clues=["parking lot", "utility trench"],
     )
 
@@ -81,6 +83,9 @@ def test_field_photo_produces_visible_and_location_clues():
     assert "visible_object" in clue_types
     assert "visible_text" in clue_types
     assert "location_hint" in clue_types
+    assert "environment" in clue_types
+    assert "camera_perspective" in clue_types
+    assert "derived_search_term" in clue_types
     assert all(c.source == "field_photo" for c in clues if c.type != "contractor")
 
 
