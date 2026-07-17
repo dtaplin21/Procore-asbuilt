@@ -13,6 +13,7 @@ from models.schemas import (
     EvidenceListResponse,
     InspectionRunEvidenceUploadResponse,
 )
+from services.evidence_document_extraction import ingest_evidence_document_extraction
 from services.evidence_file_storage import (
     UnsupportedEvidenceFileType,
     evidence_storage_dir,
@@ -95,6 +96,12 @@ async def upload_inspection_run_evidence(
         meta={"inspectionRunId": inspection_run_id},
     )
     evidence_id = cast(int, evidence.id)
+
+    ingest_evidence_document_extraction(
+        db,
+        evidence_id=evidence_id,
+        file_path=str(saved_path),
+    )
 
     if getattr(run, "evidence_id", None) is None:
         setattr(run, "evidence_id", evidence_id)
@@ -248,6 +255,13 @@ async def upload_evidence(
         text_content=None,
         meta=parsed_meta,
     )
+
+    if type_lower == "inspection_doc":
+        ingest_evidence_document_extraction(
+            db,
+            evidence_id=cast(int, evidence.id),
+            file_path=get_file_path(storage_key),
+        )
 
     evidence.file_url = f"/api/projects/{project_id}/evidence/{cast(int, evidence.id)}/file"
     db.commit()

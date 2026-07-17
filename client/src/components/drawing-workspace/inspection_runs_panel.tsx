@@ -9,6 +9,7 @@ import type {
 } from "@shared/schema";
 
 import InspectionRunRow from "@/components/drawing-workspace/inspection_run_row";
+import { MatchAlertBanner } from "@/components/drawing-workspace/match_alert_banner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -111,6 +112,12 @@ export default function InspectionRunsPanel({
     () => overlays.map((overlay) => formatOverlayListItem(overlay)),
     [overlays]
   );
+
+  const matchInspectionId = useMemo(() => {
+    if (selectedRunId == null) return null;
+    const selectedRun = runs.find((run) => run.id === selectedRunId);
+    return String(selectedRun?.evidence_id ?? selectedRunId);
+  }, [runs, selectedRunId]);
 
   const evidenceLabelById = useMemo(() => {
     const map = new Map<number, string>();
@@ -330,6 +337,9 @@ export default function InspectionRunsPanel({
 
       {selectedRunId != null ? (
         <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
+          {matchInspectionId ? (
+            <MatchAlertBanner inspectionId={matchInspectionId} />
+          ) : null}
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Overlays on sheet
