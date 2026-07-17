@@ -3,13 +3,20 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import patch
+from typing import cast
+from unittest.mock import MagicMock, patch
+
+from sqlalchemy.orm import Session
 
 from ai.pipelines.candidate_tile_selector import (
     CandidateTile,
     find_candidate_tiles_from_clues,
 )
 from ai.schemas.document_extraction_schemas import Clue
+
+
+def _mock_session() -> Session:
+    return cast(Session, MagicMock())
 
 
 def _clue(value: str, confidence: float = 0.8) -> Clue:
@@ -46,7 +53,7 @@ def test_location_relevant_clues_match_colo_sewer_region(mock_load):
     ]
 
     results = find_candidate_tiles_from_clues(
-        session=SimpleNamespace(),
+        session=_mock_session(),
         drawing_id="10",
         page=1,
         clues=clues,
@@ -72,7 +79,7 @@ def test_non_location_clues_are_ignored(mock_load):
     ]
 
     results = find_candidate_tiles_from_clues(
-        session=SimpleNamespace(),
+        session=_mock_session(),
         drawing_id="10",
         page=1,
         clues=clues,
@@ -104,7 +111,7 @@ def test_document_clue_rows_are_supported(mock_load):
     ]
 
     results = find_candidate_tiles_from_clues(
-        session=SimpleNamespace(),
+        session=_mock_session(),
         drawing_id="10",
         page=1,
         clues=clues,
@@ -115,12 +122,31 @@ def test_document_clue_rows_are_supported(mock_load):
 
 
 @patch("ai.pipelines.candidate_tile_selector._load_candidate_tiles")
+def test_sanitary_sewerage_expansion_matches_ss_abbreviation(mock_load):
+    mock_load.return_value = [
+        _tile("AREA SS-3 NEAR COLO"),
+        _tile("ROOF DRAINAGE PLAN"),
+    ]
+    clues = [_clue("33-Sanitary Sewerage", confidence=0.85)]
+
+    results = find_candidate_tiles_from_clues(
+        session=_mock_session(),
+        drawing_id="10",
+        page=1,
+        clues=clues,
+    )
+
+    assert len(results) == 1
+    assert "SS" in results[0].text
+
+
+@patch("ai.pipelines.candidate_tile_selector._load_candidate_tiles")
 def test_no_text_match_returns_empty_list(mock_load):
     mock_load.return_value = [_tile("ROOF DRAINAGE PLAN")]
     clues = [_clue("COLO"), _clue("sanitary sewer")]
 
     results = find_candidate_tiles_from_clues(
-        session=SimpleNamespace(),
+        session=_mock_session(),
         drawing_id="10",
         page=1,
         clues=clues,

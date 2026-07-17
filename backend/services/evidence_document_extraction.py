@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -11,8 +12,16 @@ from ai.pipelines.document_extraction_orchestrator import run_document_extractio
 from ai.pipelines.document_text_extraction import extract_document
 from models.document_extraction import DocumentExtraction
 from models.models import EvidenceRecord
+from services.inspection_matching_jobs import maybe_enqueue_inspection_match_job
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class InspectionMatchEnqueueContext:
+    project_id: int
+    master_drawing_id: int | str
+    page: int = 1
 
 
 def extract_evidence_file_content(file_path: str | Path) -> str:
@@ -27,6 +36,7 @@ def ingest_evidence_document_extraction(
     evidence_id: int,
     file_path: str | Path,
     persist_text_content: bool = True,
+    match_context: InspectionMatchEnqueueContext | None = None,
 ) -> DocumentExtraction | None:
     """Run clue-based document extraction for an uploaded evidence file."""
     try:
@@ -52,7 +62,7 @@ def ingest_evidence_document_extraction(
             session.flush()
 
     try:
-        return run_document_extraction(
+        extraction = run_document_extraction(
             session,
             file_id=str(evidence_id),
             content=content,
@@ -64,3 +74,14 @@ def ingest_evidence_document_extraction(
         )
         session.rollback()
         return None
+
+    if extraction is not None and match_context is not None:
+        maybe_enqueue_inspection_match_job(
+            session,
+            project_id=match_context.project_id,
+            inspection_id=str(evidence_id),
+            master_drawing_id=match_context.master_drawing_id,
+            page=match_context.page,
+        )
+
+    return extraction

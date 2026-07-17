@@ -13,7 +13,10 @@ from models.schemas import (
     EvidenceListResponse,
     InspectionRunEvidenceUploadResponse,
 )
-from services.evidence_document_extraction import ingest_evidence_document_extraction
+from services.evidence_document_extraction import (
+    InspectionMatchEnqueueContext,
+    ingest_evidence_document_extraction,
+)
 from services.evidence_file_storage import (
     UnsupportedEvidenceFileType,
     evidence_storage_dir,
@@ -101,6 +104,11 @@ async def upload_inspection_run_evidence(
         db,
         evidence_id=evidence_id,
         file_path=str(saved_path),
+        match_context=InspectionMatchEnqueueContext(
+            project_id=project_id,
+            master_drawing_id=master_drawing_id,
+            page=1,
+        ),
     )
 
     if getattr(run, "evidence_id", None) is None:

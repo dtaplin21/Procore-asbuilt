@@ -136,6 +136,43 @@ def enqueue_inspection_match_job(
     return job
 
 
+def maybe_enqueue_inspection_match_job(
+    db: Session,
+    *,
+    project_id: int | None,
+    inspection_id: str | None,
+    master_drawing_id: int | str | None,
+    page: int = 1,
+    user_id: Optional[int] = None,
+) -> JobQueue | None:
+    """Enqueue clue-based matching when project, inspection, and master drawing are known."""
+    if project_id is None or not inspection_id or master_drawing_id is None:
+        return None
+
+    safe_page = page if page >= 1 else 1
+
+    try:
+        return enqueue_inspection_match_job(
+            db,
+            project_id=project_id,
+            inspection_id=str(inspection_id),
+            drawing_id=master_drawing_id,
+            page=safe_page,
+            user_id=user_id,
+        )
+    except Exception:
+        logger.exception(
+            "inspection_match_enqueue_failed",
+            extra={
+                "project_id": project_id,
+                "inspection_id": inspection_id,
+                "master_drawing_id": master_drawing_id,
+                "page": safe_page,
+            },
+        )
+        return None
+
+
 def run_inspection_match_job(payload: dict[str, Any], session: Session) -> MatchStatus:
     inspection_id = str(payload["inspection_id"])
     drawing_id = payload["drawing_id"]

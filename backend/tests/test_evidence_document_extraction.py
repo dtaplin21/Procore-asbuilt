@@ -26,10 +26,15 @@ from ai.schemas.document_extraction_schemas import (
 )
 from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
-from models.models import Company, Project
+from models.models import Company, JobQueue, Project, User, UserCompany
 from services.evidence_document_extraction import (
+    InspectionMatchEnqueueContext,
     extract_evidence_file_content,
     ingest_evidence_document_extraction,
+)
+from services.inspection_matching_jobs import (
+    JOB_TYPE_INSPECTION_MATCH,
+    maybe_enqueue_inspection_match_job,
 )
 from services.storage import StorageService
 
@@ -66,6 +71,12 @@ def evidence_upload_setup(
     from services import evidence_file_storage
 
     monkeypatch.setattr(evidence_file_storage, "EVIDENCE_STORAGE_ROOT", tmp_path)
+
+    user = User(email=f"test-{uuid.uuid4().hex[:8]}@example.com")
+    db_session.add(user)
+    db_session.flush()
+    db_session.add(UserCompany(user_id=user.id, company_id=project.company_id))
+    db_session.commit()
 
     drawing = Drawing(
         project_id=project.id,
@@ -256,3 +267,71 @@ def test_upload_inspection_run_evidence_triggers_document_extraction(
     values = {cast(str, clue.clue_value) for clue in clues}
     assert "COLO" in values
     assert "33-Sanitary Sewerage" in values
+
+    job = (
+        db_session.query(JobQueue)
+        .filter(JobQueue.job_type == JOB_TYPE_INSPECTION_MATCH)
+        .order_by(JobQueue.id.desc())
+        .first()
+    )
+    assert job is not None
+    input_data = cast(dict, job.input_data)
+    assert input_data["inspection_id"] == str(evidence_id)
+    assert input_data["drawing_id"] == str(master_id)
+    assert input_data["page"] == 1
+
+
+def test_maybe_enqueue_inspection_match_job_skips_without_master_drawing(
+    db_session: Session,
+    project,
+) -> None:
+    job = maybe_enqueue_inspection_match_job(
+        db_session,
+        project_id=cast(int, project.id),
+        inspection_id="123",
+        master_drawing_id=None,
+    )
+    assert job is None
+
+
+@patch("services.evidence_document_extraction.run_document_extraction")
+def test_ingest_without_match_context_does_not_enqueue(
+    mock_run,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    project,
+) -> None:
+    file_path = tmp_path / "report.pdf"
+    file_path.write_bytes(b"%PDF-1.4")
+    _patch_pdf_text(monkeypatch, ["COLO"])
+
+    storage = StorageService(db_session)
+    evidence = storage.create_evidence_record(
+        project_id=cast(int, project.id),
+        type="inspection_doc",
+        trade=None,
+        spec_section=None,
+        title="Report",
+        storage_key="evidence/report.pdf",
+        content_type="application/pdf",
+    )
+
+    mock_run.return_value = DocumentExtraction(
+        file_id=str(evidence.id),
+        document_type=DocumentType.INSPECTION_REPORT.value,
+        classification_confidence=0.9,
+    )
+
+    ingest_evidence_document_extraction(
+        db_session,
+        evidence_id=cast(int, evidence.id),
+        file_path=file_path,
+    )
+
+    job_count = (
+        db_session.query(JobQueue)
+        .filter(JobQueue.job_type == JOB_TYPE_INSPECTION_MATCH)
+        .count()
+    )
+    assert job_count == 0

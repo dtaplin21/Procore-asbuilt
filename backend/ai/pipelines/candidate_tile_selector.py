@@ -16,6 +16,7 @@ from typing import Any, Sequence
 
 from sqlalchemy.orm import Session
 
+from ai.pipelines.clue_expander import expand_clue_value
 from models.drawing_region import DrawingRegion
 from services.region_index_loader import geometry_to_bounding_box
 
@@ -57,7 +58,10 @@ def _clue_matches_row(clue: Any, row_text: str) -> bool:
     value = _clue_value(clue)
     if value is None:
         return False
-    return value.lower() in row_text
+    for expanded in expand_clue_value(value):
+        if expanded.lower() in row_text:
+            return True
+    return False
 
 
 def _region_search_text(row: DrawingRegion) -> str:
