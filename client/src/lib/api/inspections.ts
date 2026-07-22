@@ -186,3 +186,19 @@ export function evidenceFileDownloadUrl(
     `/api/projects/${encodeURIComponent(projectId)}/evidence/${encodeURIComponent(evidenceFileId)}/file`,
   );
 }
+
+export async function deleteInspectionRun(
+  projectId: string,
+  runId: string,
+): Promise<void> {
+  const response = await fetch(
+    resolveFetchUrl(
+      `/api/projects/${encodeURIComponent(projectId)}/inspections/runs/${encodeURIComponent(runId)}`,
+    ),
+    {
+      method: "DELETE",
+      credentials: "include",
+    },
+  );
+  await parseJsonOrThrow<{ ok: boolean }>(response, "Deleting inspection run");
+}

@@ -20,8 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  refreshInspectionWorkspaceQueries,
   useCreateInspectionRun,
+  useDeleteInspectionRun,
   useDrawingOverlays,
   useInspectionRuns,
   useRunInspection,
@@ -29,6 +29,7 @@ import {
 } from "@/hooks/use-inspection-runs";
 import { toast } from "@/hooks/use-toast";
 import { fetchProjectEvidence, projectEvidenceQueryKey } from "@/lib/api/evidence";
+import { refreshInspectionWorkspaceQueries } from "@/lib/api/inspection_runs";
 import { formatOverlayListItem } from "@/lib/drawing-overlays/overlay_display";
 import {
   hasActiveInspectionRun,
@@ -83,6 +84,8 @@ export default function InspectionRunsPanel({
     useCreateInspectionRun(projectId);
   const { mutateAsync: uploadRunEvidence, isPending: uploadPending } =
     useUploadInspectionRunEvidence(projectId);
+  const { mutate: deleteInspectionRun, isPending: deletePending } =
+    useDeleteInspectionRun(projectId);
 
   const uploadBusy = uploadPending || createRunPending;
   const runDisabled = runPending || hasActiveRun || uploadBusy;
@@ -223,6 +226,32 @@ export default function InspectionRunsPanel({
     })();
   };
 
+  const handleDeleteRun = (runId: number) => {
+    deleteInspectionRun(runId, {
+      onSuccess: () => {
+        if (selectedRunId === runId) {
+          onSelectRun?.(null);
+        }
+        void refreshInspectionWorkspaceQueries(
+          queryClient,
+          projectId,
+          masterDrawingId,
+        );
+        toast({
+          title: "Inspection deleted",
+          description: `Run #${runId} and its evidence were removed from the project.`,
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Delete failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      },
+    });
+  };
+
   return (
     <section
       className="flex flex-col gap-3 border-t border-border pt-4"
@@ -329,6 +358,8 @@ export default function InspectionRunsPanel({
               onSelect={(runId) => {
                 onSelectRun?.(selectedRunId === runId ? null : runId);
               }}
+              onDelete={handleDeleteRun}
+              deletePending={deletePending}
             />
           ))}
         </ul>

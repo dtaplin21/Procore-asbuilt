@@ -12,6 +12,7 @@ import {
   refreshInspectionWorkspaceQueries,
   uploadInspectionRunEvidence,
 } from "@/lib/api/inspection_runs";
+import { deleteInspectionRun } from "@/lib/api/inspections";
 import {
   fetchDrawingOverlays,
   fetchLatestRunOverlays,
@@ -225,4 +226,33 @@ export function useInvalidateOverlaysForRun() {
   return (drawingId: string, runId: string) => {
     invalidateOverlaysForRun(queryClient, drawingId, runId);
   };
+}
+
+export function useDeleteInspectionRun(projectId: number | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, number>({
+    mutationFn: async (runId) => {
+      if (projectId == null) {
+        throw new Error("Project required");
+      }
+      await deleteInspectionRun(String(projectId), String(runId));
+    },
+    onSuccess: () => {
+      if (projectId != null) {
+        void queryClient.invalidateQueries({
+          predicate: (query) => {
+            const key = query.queryKey[0];
+            return (
+              typeof key === "string" &&
+              key.includes(`/api/projects/${projectId}/inspections/runs`)
+            );
+          },
+        });
+        void queryClient.invalidateQueries({
+          queryKey: [`/api/projects/${projectId}/evidence`],
+        });
+      }
+    },
+  });
 }

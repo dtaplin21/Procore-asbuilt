@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveProject } from "@/contexts/active_project_context";
-import { useInspectionRuns } from "@/hooks/use-inspection-runs";
+import { useDeleteInspectionRun, useInspectionRuns } from "@/hooks/use-inspection-runs";
+import { toast } from "@/hooks/use-toast";
 import { replaceDashboardProjectIdInUrl } from "@/lib/active_project";
 import {
   hasActiveInspectionRun,
@@ -53,6 +54,27 @@ export default function Inspections() {
   );
 
   const runs = runsData?.items ?? [];
+
+  const { mutate: deleteInspectionRun, isPending: deletePending } =
+    useDeleteInspectionRun(selectedProjectId);
+
+  const handleDeleteRun = (runId: number) => {
+    deleteInspectionRun(runId, {
+      onSuccess: () => {
+        toast({
+          title: "Inspection deleted",
+          description: `Run #${runId} and its evidence were removed from the project.`,
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Delete failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      },
+    });
+  };
 
   const filteredRuns = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -236,6 +258,8 @@ export default function Inspections() {
               key={run.id}
               run={run}
               projectId={String(selectedProjectId)}
+              onDelete={handleDeleteRun}
+              deletePending={deletePending}
             />
           ))}
         </ul>

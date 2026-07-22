@@ -15,6 +15,7 @@ from ai.pipelines.inspection_mapping import run_inspection_mapping
 from models.schemas import InspectionRunCreate, InspectionRunListResponse, InspectionRunResponse
 from api.schemas.inspection_match_response import BboxResponse, InspectionMatchStatusResponse
 from services.inspection_matching_jobs import load_inspection_match_status
+from services.inspection_run_deletion import delete_inspection_run_from_project
 from services.storage import StorageService
 
 logger = logging.getLogger(__name__)
@@ -216,3 +217,24 @@ def list_inspection_runs(
         limit=limit,
         offset=offset,
     )
+
+
+@router.delete("/{project_id}/inspections/runs/{run_id}")
+def delete_inspection_run(
+    project_id: int,
+    run_id: int,
+    db: Session = Depends(get_db),
+) -> dict[str, bool]:
+    """Delete an inspection run, its evidence file, overlays, and pipeline data."""
+    storage = StorageService(db)
+    _ensure_project_exists(storage, project_id)
+
+    deleted = delete_inspection_run_from_project(
+        db,
+        project_id=project_id,
+        run_id=run_id,
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Inspection run not found")
+
+    return {"ok": True}

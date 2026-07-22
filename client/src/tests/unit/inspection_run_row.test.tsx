@@ -33,15 +33,24 @@ function buildRun(overrides: Partial<InspectionRunRowRun> = {}): InspectionRunRo
   };
 }
 
-function renderHistoryRow(run: InspectionRunRowRun, projectId: string) {
+function renderHistoryRow(
+  run: InspectionRunRowRun,
+  projectId: string,
+  onDelete?: (runId: number) => void,
+) {
   return render(
     <ul>
-      <InspectionRunRow run={run} projectId={projectId} />
+      <InspectionRunRow run={run} projectId={projectId} onDelete={onDelete} />
     </ul>,
   );
 }
 
-describe("InspectionRunRow", () => {
+describe("InspectionRunRow history mode", () => {
+  it("renders delete control when onDelete is provided", () => {
+    renderHistoryRow(buildRun({ id: 42, evidence_title: "Roof QA" }), "p1", vi.fn());
+    expect(screen.getByTestId("inspection-run-delete-42")).toBeInTheDocument();
+  });
+
   it("renders without a region label or link when the run has no region", () => {
     renderHistoryRow(buildRun({ region_id: null, region_label: null }), "p1");
     expect(screen.queryByTestId("inspection-run-region-label")).not.toBeInTheDocument();

@@ -29,6 +29,9 @@ Application environment::
     DATABASE_DISABLE_SSL_FOR_LOCALHOST  # default true in dev — sslmode=disable for localhost DB (non-TLS Postgres)
     OPENAI_API_KEY              # API host only — required for inspection/GPT features (beta)
     OPENAI_CHAT_MODEL           # optional — defaults to gpt-4o-mini
+    OPENAI_VISION_MODEL         # optional — defaults to gpt-4o-mini
+    OCR_BACKEND                 # auto | tesseract | openai_vision
+    TESSERACT_CMD               # optional — path to tesseract binary when not on PATH
 """
 
 from urllib.parse import urlparse
@@ -61,6 +64,15 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = Field(default=None, description="OPENAI_API_KEY")
     #: Chat model for inspection pipeline (optional). Env: ``OPENAI_CHAT_MODEL``.
     openai_chat_model: str = Field(default="gpt-4o-mini", description="OPENAI_CHAT_MODEL")
+    #: Vision model for OCR / image understanding (optional). Env: ``OPENAI_VISION_MODEL``.
+    openai_vision_model: str = Field(default="gpt-4o-mini", description="OPENAI_VISION_MODEL")
+    #: OCR provider selection. Env: ``OCR_BACKEND``.
+    ocr_backend: Literal["auto", "tesseract", "openai_vision"] = Field(
+        default="auto",
+        description="OCR_BACKEND",
+    )
+    #: Path to tesseract binary when not on PATH. Env: ``TESSERACT_CMD``.
+    tesseract_cmd: Optional[str] = Field(default=None, description="TESSERACT_CMD")
     redis_url: Optional[str] = None
     #: ``development`` | ``production`` — use ``production`` on Render. Gates dev-only DB TLS workarounds.
     app_env: str = Field(default="development", description="APP_ENV")
@@ -83,12 +95,26 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    @field_validator("openai_chat_model", mode="before")
+    @field_validator("openai_chat_model", "openai_vision_model", mode="before")
     @classmethod
-    def _strip_openai_chat_model(cls, v: object) -> object:
+    def _strip_openai_model(cls, v: object) -> object:
         if isinstance(v, str):
             s = v.strip()
             return s if s else "gpt-4o-mini"
+        return v
+
+    @field_validator("ocr_backend", mode="before")
+    @classmethod
+    def _normalize_ocr_backend(cls, v: object) -> object:
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
+    @field_validator("tesseract_cmd", mode="before")
+    @classmethod
+    def _empty_tesseract_cmd_to_none(cls, v: object) -> object:
+        if isinstance(v, str) and not v.strip():
+            return None
         return v
 
     @field_validator("openai_api_key", mode="before")

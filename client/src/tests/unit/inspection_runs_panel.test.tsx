@@ -24,6 +24,10 @@ vi.mock("@/hooks/use-inspection-runs", () => ({
     mutateAsync: uploadRunEvidenceAsync,
     isPending: false,
   }),
+  useDeleteInspectionRun: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
   useDrawingOverlays: () => ({
     data: [
       {

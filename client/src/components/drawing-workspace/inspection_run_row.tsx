@@ -8,8 +8,20 @@
  */
 
 import type { InspectionRun as SchemaInspectionRun } from "@shared/schema";
+import { Loader2, Trash2 } from "lucide-react";
 
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { evidenceFileDownloadUrl } from "@/lib/api/inspections";
 import {
   objectsPagePathForRun,
@@ -72,23 +84,99 @@ function historyTitle(run: InspectionRunRowRun): string {
   );
 }
 
-export type InspectionRunPanelRowProps = {
-  run: InspectionRunRowRun;
-  projectId?: undefined;
-  selected?: boolean;
-  onSelect?: (runId: number) => void;
-};
-
 export type InspectionRunHistoryRowProps = {
   run: InspectionRunRowRun;
   projectId: string;
   selected?: never;
   onSelect?: never;
+  onDelete?: (runId: number) => void;
+  deletePending?: boolean;
+};
+
+export type InspectionRunPanelRowProps = {
+  run: InspectionRunRowRun;
+  projectId?: undefined;
+  selected?: boolean;
+  onSelect?: (runId: number) => void;
+  onDelete?: (runId: number) => void;
+  deletePending?: boolean;
 };
 
 export type InspectionRunRowProps = InspectionRunPanelRowProps | InspectionRunHistoryRowProps;
 
-function InspectionRunHistoryRow({ run, projectId }: InspectionRunHistoryRowProps) {
+function DeleteInspectionRunButton({
+  runId,
+  runLabel,
+  onDelete,
+  deletePending = false,
+  variant = "history",
+}: {
+  runId: number;
+  runLabel: string;
+  onDelete?: (runId: number) => void;
+  deletePending?: boolean;
+  variant?: "history" | "panel";
+}) {
+  if (!onDelete) {
+    return null;
+  }
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button
+          type="button"
+          variant={variant === "panel" ? "ghost" : "outline"}
+          size="sm"
+          disabled={deletePending}
+          data-testid={`inspection-run-delete-${runId}`}
+          className={
+            variant === "panel"
+              ? "h-7 shrink-0 px-2 text-destructive hover:text-destructive"
+              : "text-destructive hover:text-destructive"
+          }
+          onClick={(event) => event.stopPropagation()}
+        >
+          {deletePending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <>
+              <Trash2 className="h-4 w-4" />
+              {variant === "history" ? <span className="ml-1">Delete</span> : null}
+            </>
+          )}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete inspection?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This permanently removes {runLabel}, its uploaded evidence file, mapped
+            overlays, and related pipeline data from the project. This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={deletePending}
+            onClick={() => onDelete(runId)}
+          >
+            Delete inspection
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function InspectionRunHistoryRow({
+  run,
+  projectId,
+  onDelete,
+  deletePending = false,
+}: InspectionRunHistoryRowProps) {
   const masterDrawingId = String(run.master_drawing_id);
   const runId = String(run.id);
 
@@ -171,6 +259,12 @@ function InspectionRunHistoryRow({ run, projectId }: InspectionRunHistoryRowProp
         <a href={viewOnDrawingUrl} data-testid="view-on-drawing-link">
           View on drawing
         </a>
+        <DeleteInspectionRunButton
+          runId={run.id}
+          runLabel={historyTitle(run)}
+          onDelete={onDelete}
+          deletePending={deletePending}
+        />
       </div>
     </li>
   );
@@ -180,19 +274,26 @@ function InspectionRunPanelRow({
   run,
   selected = false,
   onSelect,
+  onDelete,
+  deletePending = false,
 }: InspectionRunPanelRowProps) {
   const label = run.inspection_type?.trim() || `Run #${run.id}`;
   const timestamp = formatRunTimestamp(run.completed_at ?? run.started_at ?? run.created_at);
 
   return (
-    <li>
+    <li
+      className={cn(
+        "flex items-stretch gap-1 rounded-md border transition-colors",
+        selected
+          ? "border-primary bg-primary-soft"
+          : "border-border bg-background",
+      )}
+    >
       <button
         type="button"
         className={cn(
-          "w-full rounded-md border px-3 py-2 text-left transition-colors",
-          selected
-            ? "border-primary bg-primary-soft"
-            : "border-border bg-background hover:bg-muted/60",
+          "min-w-0 flex-1 rounded-md px-3 py-2 text-left hover:bg-muted/60",
+          selected ? "bg-transparent" : "bg-background",
         )}
         onClick={() => onSelect?.(run.id)}
         data-testid={`inspection-run-row-${run.id}`}
@@ -213,19 +314,37 @@ function InspectionRunPanelRow({
           <p className="mt-1 line-clamp-2 text-xs text-destructive">{run.error_message}</p>
         ) : null}
       </button>
+      <div className="flex shrink-0 items-start py-2 pr-2">
+        <DeleteInspectionRunButton
+          runId={run.id}
+          runLabel={label}
+          onDelete={onDelete}
+          deletePending={deletePending}
+          variant="panel"
+        />
+      </div>
     </li>
   );
 }
 
 export function InspectionRunRow(props: InspectionRunRowProps) {
   if (props.projectId) {
-    return <InspectionRunHistoryRow run={props.run} projectId={props.projectId} />;
+    return (
+      <InspectionRunHistoryRow
+        run={props.run}
+        projectId={props.projectId}
+        onDelete={props.onDelete}
+        deletePending={props.deletePending}
+      />
+    );
   }
   return (
     <InspectionRunPanelRow
       run={props.run}
       selected={props.selected}
       onSelect={props.onSelect}
+      onDelete={props.onDelete}
+      deletePending={props.deletePending}
     />
   );
 }
