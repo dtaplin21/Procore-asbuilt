@@ -307,13 +307,17 @@ class TestEvidenceUploadValidation:
         client: TestClient,
         evidence_upload_setup,
     ) -> None:
-        project, _master_drawing, run, _storage, _db_session = evidence_upload_setup
+        project, _master_drawing, run, _storage, db_session = evidence_upload_setup
 
         response = client.post(
             _upload_url(cast(int, project.id), cast(int, run.id)),
             files={"file": ("report.pdf", BytesIO(b""), "application/pdf")},
         )
         assert response.status_code == 400
+
+        db_session.refresh(run)
+        assert run.status == "failed"
+        assert run.error_message is not None
 
 
 class TestEvidenceUploadMultiOverlay:

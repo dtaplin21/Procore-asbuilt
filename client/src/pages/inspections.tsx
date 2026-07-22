@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { useLocation, Link } from "wouter";
-import { useQuery, type Query } from "@tanstack/react-query";
 import { ClipboardCheck, Filter, Loader2, Search } from "lucide-react";
 
 import InspectionRunRow from "@/components/drawing-workspace/inspection_run_row";
@@ -19,23 +18,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveProject } from "@/contexts/active_project_context";
 import { useInspectionRuns } from "@/hooks/use-inspection-runs";
 import { replaceDashboardProjectIdInUrl } from "@/lib/active_project";
+import {
+  hasActiveInspectionRun,
+  pollWhileInspectionRunsActive,
+} from "@/lib/inspection-runs/active_run";
 import { buildObjectsUrlWithRun } from "@/lib/workspace-links";
 import {
   setDrawingReturnPath,
   setLastProjectIdForWorkspaceFallback,
 } from "@/lib/workspace-return-path";
-import type { InspectionRunListResponse } from "@shared/schema";
-
-const ACTIVE_RUN_STATUSES = new Set(["queued", "processing"]);
-
-function pollWhileRunsActive(
-  query: Query<InspectionRunListResponse, Error>
-): number | false {
-  const items = query.state.data?.items ?? [];
-  return items.some((run) => ACTIVE_RUN_STATUSES.has(run.status.toLowerCase()))
-    ? 3000
-    : false;
-}
 
 function dashboardHrefForProject(projectId: number | null): string {
   if (projectId == null) return "/";
@@ -58,7 +49,7 @@ export default function Inspections() {
   } = useInspectionRuns(
     selectedProjectId,
     { status: statusParam },
-    { refetchInterval: pollWhileRunsActive }
+    { refetchInterval: pollWhileInspectionRunsActive }
   );
 
   const runs = runsData?.items ?? [];
@@ -250,8 +241,7 @@ export default function Inspections() {
         </ul>
       )}
 
-      {selectedProjectId != null &&
-      runs.some((run) => ACTIVE_RUN_STATUSES.has(run.status.toLowerCase())) ? (
+      {selectedProjectId != null && hasActiveInspectionRun(runs) ? (
         <p className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Refreshing while runs are queued or processing…

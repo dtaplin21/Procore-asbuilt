@@ -8,32 +8,10 @@ import InspectionRunsPanel from "@/components/drawing-workspace/inspection_runs_
 const runMutate = vi.fn();
 const createRunAsync = vi.fn();
 const uploadRunEvidenceAsync = vi.fn();
+const useInspectionRunsMock = vi.fn();
 
 vi.mock("@/hooks/use-inspection-runs", () => ({
-  useInspectionRuns: () => ({
-    data: {
-      items: [
-        {
-          id: 1,
-          project_id: 2,
-          master_drawing_id: 10,
-          evidence_id: 5,
-          inspection_type: "visual",
-          status: "complete",
-          started_at: null,
-          completed_at: "2026-01-01T12:00:00Z",
-          error_message: null,
-          created_at: "2026-01-01T12:00:00Z",
-          updated_at: "2026-01-01T12:00:00Z",
-        },
-      ],
-      total: 1,
-      limit: 50,
-      offset: 0,
-    },
-    isLoading: false,
-    isError: false,
-  }),
+  useInspectionRuns: (...args: unknown[]) => useInspectionRunsMock(...args),
   useRunInspection: () => ({
     mutate: runMutate,
     isPending: false,
@@ -63,6 +41,7 @@ vi.mock("@/hooks/use-inspection-runs", () => ({
     ],
     isLoading: false,
   }),
+  refreshInspectionWorkspaceQueries: vi.fn(),
 }));
 
 function renderPanel(ui: ReactElement) {
@@ -70,6 +49,19 @@ function renderPanel(ui: ReactElement) {
     defaultOptions: { queries: { retry: false } },
   });
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
+function mockRuns(items: Array<Record<string, unknown>>) {
+  useInspectionRunsMock.mockReturnValue({
+    data: {
+      items,
+      total: items.length,
+      limit: 50,
+      offset: 0,
+    },
+    isLoading: false,
+    isError: false,
+  });
 }
 
 describe("InspectionRunsPanel", () => {
@@ -85,6 +77,21 @@ describe("InspectionRunsPanel", () => {
       untagged_region_count: 0,
       overlay_ids: [42],
     });
+    mockRuns([
+      {
+        id: 1,
+        project_id: 2,
+        master_drawing_id: 10,
+        evidence_id: 5,
+        inspection_type: "visual",
+        status: "complete",
+        started_at: null,
+        completed_at: "2026-01-01T12:00:00Z",
+        error_message: null,
+        created_at: "2026-01-01T12:00:00Z",
+        updated_at: "2026-01-01T12:00:00Z",
+      },
+    ]);
   });
 
   it("renders runs and upload control", () => {
@@ -149,5 +156,42 @@ describe("InspectionRunsPanel", () => {
         masterDrawingId: 10,
       });
     });
+  });
+
+  it("keeps upload enabled when a deferred queued run has no evidence yet", () => {
+    mockRuns([
+      {
+        id: 327,
+        project_id: 2,
+        master_drawing_id: 10,
+        evidence_id: null,
+        inspection_type: null,
+        status: "queued",
+        started_at: null,
+        completed_at: null,
+        error_message: null,
+        created_at: "2026-01-01T12:00:00Z",
+        updated_at: "2026-01-01T12:00:00Z",
+      },
+      {
+        id: 339,
+        project_id: 2,
+        master_drawing_id: 10,
+        evidence_id: 55,
+        inspection_type: "visual",
+        status: "complete",
+        started_at: null,
+        completed_at: "2026-01-02T12:00:00Z",
+        error_message: null,
+        created_at: "2026-01-02T12:00:00Z",
+        updated_at: "2026-01-02T12:00:00Z",
+      },
+    ]);
+
+    renderPanel(
+      <InspectionRunsPanel projectId={2} masterDrawingId={10} selectedRunId={339} />
+    );
+
+    expect(screen.getByTestId("inspection-run-evidence-upload")).toBeEnabled();
   });
 });

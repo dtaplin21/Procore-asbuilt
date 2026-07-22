@@ -1,11 +1,10 @@
 import { useMemo, useRef, useState } from "react";
-import { useQuery, type Query } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClipboardCheck, Loader2 } from "lucide-react";
 import type {
   DrawingOverlay,
   EvidenceListResponse,
   InspectionRun,
-  InspectionRunListResponse,
 } from "@shared/schema";
 
 import InspectionRunRow from "@/components/drawing-workspace/inspection_run_row";
@@ -21,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  refreshInspectionWorkspaceQueries,
   useCreateInspectionRun,
   useDrawingOverlays,
   useInspectionRuns,
@@ -30,6 +30,10 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { fetchProjectEvidence, projectEvidenceQueryKey } from "@/lib/api/evidence";
 import { formatOverlayListItem } from "@/lib/drawing-overlays/overlay_display";
+import {
+  hasActiveInspectionRun,
+  pollWhileInspectionRunsActive,
+} from "@/lib/inspection-runs/active_run";
 
 export type InspectionRunsPanelProps = {
   projectId: number;
@@ -43,17 +47,6 @@ export type InspectionRunsPanelProps = {
   onFocusOverlay?: (overlayId: string | null) => void;
 };
 
-const ACTIVE_RUN_STATUSES = new Set(["queued", "processing"]);
-
-function pollWhileRunsActive(
-  query: Query<InspectionRunListResponse, Error>
-): number | false {
-  const items = query.state.data?.items ?? [];
-  return items.some((run) => ACTIVE_RUN_STATUSES.has(run.status.toLowerCase()))
-    ? 3000
-    : false;
-}
-
 export default function InspectionRunsPanel({
   projectId,
   masterDrawingId,
@@ -64,15 +57,16 @@ export default function InspectionRunsPanel({
   focusedOverlayId = null,
   onFocusOverlay,
 }: InspectionRunsPanelProps) {
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedEvidenceId, setSelectedEvidenceId] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const { data: runsData, isLoading: runsLoading, isError: runsError } =
-    useInspectionRuns(projectId, { masterDrawingId }, { refetchInterval: pollWhileRunsActive });
+    useInspectionRuns(projectId, { masterDrawingId }, { refetchInterval: pollWhileInspectionRunsActive });
 
   const runs = runsData?.items ?? [];
-  const hasActiveRun = runs.some((run) => ACTIVE_RUN_STATUSES.has(run.status.toLowerCase()));
+  const hasActiveRun = hasActiveInspectionRun(runs);
 
   const evidenceQuery = useQuery<EvidenceListResponse>({
     queryKey: projectEvidenceQueryKey(projectId),
@@ -215,6 +209,11 @@ export default function InspectionRunsPanel({
         const message =
           error instanceof Error ? error.message : "Failed to upload inspection evidence";
         setUploadError(message);
+        void refreshInspectionWorkspaceQueries(
+          queryClient,
+          projectId,
+          masterDrawingId,
+        );
         toast({
           title: "Upload failed",
           description: message,

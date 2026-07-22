@@ -46,6 +46,28 @@ def _maybe_trigger_run_completion(db: Session, run: InspectionRun) -> None:
     _ = (db, run)
 
 
+def _fail_inspection_run_on_upload_error(
+    storage: StorageService,
+    run_id: int,
+    message: str,
+) -> None:
+    """Mark in-flight runs failed so queued orphans do not block future uploads."""
+    run = storage.db.query(InspectionRun).filter(InspectionRun.id == run_id).first()
+    if run is None:
+        return
+
+    status = str(getattr(run, "status", "") or "").lower()
+    if status not in ("queued", "processing"):
+        return
+
+    trimmed = message.strip() or "Evidence upload failed"
+    storage.update_inspection_run_status(
+        run_id,
+        "failed",
+        error_message=trimmed[:500],
+    )
+
+
 @router.post(
     "/api/projects/{project_id}/inspections/runs/{inspection_run_id}/evidence",
     response_model=InspectionRunEvidenceUploadResponse,
@@ -66,107 +88,123 @@ async def upload_inspection_run_evidence(
         raise HTTPException(status_code=404, detail="Inspection run not found")
 
     master_drawing_id = cast(int, run.master_drawing_id)
-
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="Missing filename")
-
-    file_bytes, content_type, original_name = read_and_validate_upload(file, category="evidence")
-    if not file_bytes:
-        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    run_id = cast(int, run.id)
 
     try:
-        saved_path = save_upload(
-            original_name,
-            file_bytes,
-            storage_root=evidence_storage_dir(project_id),
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Missing filename")
+
+        file_bytes, content_type, original_name = read_and_validate_upload(
+            file, category="evidence"
         )
-    except UnsupportedEvidenceFileType as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not file_bytes:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-    storage_key = storage_key_from_path(saved_path)
+        try:
+            saved_path = save_upload(
+                original_name,
+                file_bytes,
+                storage_root=evidence_storage_dir(project_id),
+            )
+        except UnsupportedEvidenceFileType as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    evidence = storage.create_evidence_record(
-        project_id=project_id,
-        type="inspection_doc",
-        trade=None,
-        spec_section=None,
-        title=original_name,
-        storage_key=storage_key,
-        content_type=content_type,
-        text_content=None,
-        meta={"inspectionRunId": inspection_run_id},
-    )
-    evidence_id = cast(int, evidence.id)
+        storage_key = storage_key_from_path(saved_path)
 
-    ingest_evidence_document_extraction(
-        db,
-        evidence_id=evidence_id,
-        file_path=str(saved_path),
-        match_context=InspectionMatchEnqueueContext(
+        evidence = storage.create_evidence_record(
             project_id=project_id,
-            master_drawing_id=master_drawing_id,
-            page=1,
-        ),
-    )
-
-    if getattr(run, "evidence_id", None) is None:
-        setattr(run, "evidence_id", evidence_id)
-        db.commit()
-        db.refresh(run)
-
-    region_load = build_region_index(db, master_drawing_id)
-    registration = _try_visual_registration(str(saved_path), str(master_drawing_id))
-
-    evidence_input = DocumentEvidenceInput(
-        evidence_id=str(evidence_id),
-        inspection_run_id=str(inspection_run_id),
-        master_drawing_id=str(master_drawing_id),
-        file_path=str(saved_path),
-        region_index=region_load.regions,
-        registration_transform=registration,
-    )
-
-    try:
-        overlays, unresolved = map_document_to_overlays(evidence_input)
-    except Exception:
-        logger.exception(
-            "map_document_to_overlays failed for evidence_id=%s run_id=%s drawing_id=%s",
-            evidence_id,
-            inspection_run_id,
-            master_drawing_id,
+            type="inspection_doc",
+            trade=None,
+            spec_section=None,
+            title=original_name,
+            storage_key=storage_key,
+            content_type=content_type,
+            text_content=None,
+            meta={"inspectionRunId": inspection_run_id},
         )
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "Could not process the uploaded evidence file. It may be "
-                "corrupted, password-protected, or an unsupported format."
+        evidence_id = cast(int, evidence.id)
+
+        ingest_evidence_document_extraction(
+            db,
+            evidence_id=evidence_id,
+            file_path=str(saved_path),
+            match_context=InspectionMatchEnqueueContext(
+                project_id=project_id,
+                master_drawing_id=master_drawing_id,
+                page=1,
             ),
-        ) from None
-
-    saved_overlays = create_drawing_overlays(db, overlays) if overlays else []
-    if unresolved:
-        flag_unresolved_evidence(db, unresolved)
-
-    storage.update_inspection_run_status(cast(int, run.id), "complete")
-
-    if region_load.untagged_region_count > 0:
-        logger.info(
-            "Drawing %s has %d untagged regions — tag with inspection_type_tags/location_tags.",
-            master_drawing_id,
-            region_load.untagged_region_count,
         )
 
-    _maybe_trigger_run_completion(db, run)
+        if getattr(run, "evidence_id", None) is None:
+            setattr(run, "evidence_id", evidence_id)
+            db.commit()
+            db.refresh(run)
 
-    return InspectionRunEvidenceUploadResponse(
-        evidence_id=evidence_id,
-        overlays_created=len(saved_overlays),
-        unresolved_count=len(unresolved),
-        untagged_region_count=region_load.untagged_region_count,
-        overlay_ids=[cast(int, overlay.id) for overlay in saved_overlays],
-    )
+        region_load = build_region_index(db, master_drawing_id)
+        registration = _try_visual_registration(str(saved_path), str(master_drawing_id))
+
+        evidence_input = DocumentEvidenceInput(
+            evidence_id=str(evidence_id),
+            inspection_run_id=str(inspection_run_id),
+            master_drawing_id=str(master_drawing_id),
+            file_path=str(saved_path),
+            region_index=region_load.regions,
+            registration_transform=registration,
+        )
+
+        try:
+            overlays, unresolved = map_document_to_overlays(evidence_input)
+        except Exception:
+            logger.exception(
+                "map_document_to_overlays failed for evidence_id=%s run_id=%s drawing_id=%s",
+                evidence_id,
+                inspection_run_id,
+                master_drawing_id,
+            )
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Could not process the uploaded evidence file. It may be "
+                    "corrupted, password-protected, or an unsupported format."
+                ),
+            ) from None
+
+        saved_overlays = create_drawing_overlays(db, overlays) if overlays else []
+        if unresolved:
+            flag_unresolved_evidence(db, unresolved)
+
+        storage.update_inspection_run_status(run_id, "complete")
+
+        if region_load.untagged_region_count > 0:
+            logger.info(
+                "Drawing %s has %d untagged regions — tag with inspection_type_tags/location_tags.",
+                master_drawing_id,
+                region_load.untagged_region_count,
+            )
+
+        _maybe_trigger_run_completion(db, run)
+
+        return InspectionRunEvidenceUploadResponse(
+            evidence_id=evidence_id,
+            overlays_created=len(saved_overlays),
+            unresolved_count=len(unresolved),
+            untagged_region_count=region_load.untagged_region_count,
+            overlay_ids=[cast(int, overlay.id) for overlay in saved_overlays],
+        )
+    except HTTPException as exc:
+        _fail_inspection_run_on_upload_error(storage, run_id, str(exc.detail))
+        raise
+    except Exception as exc:
+        logger.exception(
+            "upload_inspection_run_evidence failed for run_id=%s project_id=%s",
+            run_id,
+            project_id,
+        )
+        message = "Evidence upload failed"
+        _fail_inspection_run_on_upload_error(storage, run_id, message)
+        raise HTTPException(status_code=500, detail=message) from exc
 
 
 @router.post("/api/projects/{project_id}/evidence", response_model=EvidenceRecordResponse)
