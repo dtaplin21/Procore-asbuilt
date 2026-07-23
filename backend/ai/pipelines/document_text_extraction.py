@@ -13,20 +13,13 @@ Source-format handling
 -----------------------
 - Native PDF (has a real text layer): extract words + boxes directly from
   the PDF's text layer. No OCR needed, highest position accuracy.
-- Scanned PDF (text layer empty/garbage) or image/photo: rasterize (PDF
-  case) or load directly (image case), then run OCR to get words + boxes.
-- The same OCR backend handles "scanned PDF page" and "phone photo of a
-  printed sheet" identically once rasterized to an image — per your
-  answer, the correlating language is present either way, just without a
-  text layer to read off directly.
+- Scanned PDF (text layer empty/garbage): each page is rasterized in memory
+  via PyMuPDF and OCR'd through ``ocr_engine.ocr_pdf_page_in_memory`` — no
+  temp PNG files or poppler/pdf2image.
+- Image/photo: OCR directly via ``ocr_engine.ocr_image``.
 
-This module defines the interfaces and orchestration; the actual OCR and
-PDF-text-layer calls are wrapped behind small adapter functions
-(_ocr_image, _pdf_text_layer) so the real OCR engine (e.g. Tesseract,
-a cloud OCR API, or an in-house model) can be swapped in without touching
-calling code. The adapters here are stubbed with a clearly-marked
-NotImplementedError boundary plus a deterministic test double used by the
-test suite, since no OCR engine is wired into this environment.
+This module defines the interfaces and orchestration; OCR and PDF rasterization
+are delegated to ``ocr_engine.py`` (Tesseract, OpenAI vision, PyMuPDF render).
 """
 
 from __future__ import annotations
@@ -150,8 +143,6 @@ def detect_source_format(file_path: str | Path, has_text_layer: bool | None = No
 # ---------------------------------------------------------------------------
 # Extraction backends (adapter boundary)
 # ---------------------------------------------------------------------------
-# These three functions are the seam where a real PDF library / OCR engine
-# gets wired in. Swap the implementations; keep the signatures.
 
 def _pdf_has_text_layer(file_path: str | Path) -> bool:
     """Probe whether a PDF has a real, extractable text layer vs. being
@@ -162,7 +153,7 @@ def _pdf_has_text_layer(file_path: str | Path) -> bool:
     try:
         if doc.page_count == 0:
             return False
-        text = doc.load_page(0).get_text("text") or ""
+        text = str(doc.load_page(0).get_text("text") or "")
         return len(text.strip()) >= 20
     finally:
         doc.close()
@@ -180,14 +171,15 @@ def _pdf_text_layer(file_path: str | Path) -> ExtractedDocument:
                 x0, y0, x1, y1, text, *_ = w
                 if not str(text).strip():
                     continue
+                fx0, fy0, fx1, fy1 = float(x0), float(y0), float(x1), float(y1)
                 words.append(
                     PositionedWord(
                         text=str(text),
                         bbox=BoundingBox(
-                            x=float(x0),
-                            y=float(y0),
-                            width=float(x1 - x0),
-                            height=float(y1 - y0),
+                            x=fx0,
+                            y=fy0,
+                            width=fx1 - fx0,
+                            height=fy1 - fy0,
                             page_width=float(pw),
                             page_height=float(ph),
                         ),
@@ -204,22 +196,31 @@ def _pdf_text_layer(file_path: str | Path) -> ExtractedDocument:
 
 
 def _ocr_image(file_path: str | Path, page_index: int = 0) -> tuple[list[PositionedWord], float, float]:
-    """Run OCR on a single rasterized page / standalone image.
-    Returns (words, page_width, page_height).
-    Real implementation: Tesseract (pytesseract.image_to_data) or a cloud
-    OCR API, mapped into PositionedWord with per-word confidence.
-    """
-    raise NotImplementedError(
-        "Wire up an OCR backend (e.g. pytesseract.image_to_data) here."
-    )
+    """Run OCR on a single rasterized page / standalone image."""
+    from ai.pipelines.ocr_engine import ocr_image
+
+    return ocr_image(file_path, page_index=page_index)
 
 
-def _rasterize_pdf_pages(file_path: str | Path) -> list[Path]:
-    """Render each page of a scanned PDF to an image for OCR.
-    Real implementation: pdf2image.convert_from_path / poppler.
-    """
-    raise NotImplementedError(
-        "Wire up PDF rasterization (e.g. pdf2image) here."
+def _ocr_scanned_pdf(file_path: str | Path) -> ExtractedDocument:
+    """OCR every page of a scanned PDF in memory (PyMuPDF render + ocr_engine)."""
+    from ai.pipelines.ocr_engine import ocr_pdf_page_in_memory
+
+    doc = fitz.open(str(file_path))
+    try:
+        page_count = doc.page_count
+    finally:
+        doc.close()
+
+    all_words: list[PositionedWord] = []
+    for page_index in range(page_count):
+        words, _, _ = ocr_pdf_page_in_memory(file_path, page_index=page_index)
+        all_words.extend(words)
+
+    return ExtractedDocument(
+        source_format=SourceFormat.SCANNED_PDF,
+        page_count=page_count,
+        words=all_words,
     )
 
 
@@ -244,13 +245,6 @@ def extract_document(file_path: str | Path) -> ExtractedDocument:
         )
 
     if fmt == SourceFormat.SCANNED_PDF:
-        page_images = _rasterize_pdf_pages(file_path)
-        all_words: list[PositionedWord] = []
-        for page_index, page_image_path in enumerate(page_images):
-            words, _, _ = _ocr_image(page_image_path, page_index=page_index)
-            all_words.extend(words)
-        return ExtractedDocument(
-            source_format=fmt, page_count=len(page_images), words=all_words
-        )
+        return _ocr_scanned_pdf(file_path)
 
     raise AssertionError(f"unhandled format: {fmt}")  # exhaustiveness guard

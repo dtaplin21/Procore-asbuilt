@@ -180,23 +180,34 @@ app.include_router(inspection_reviews.router)
 async def startup_event():
     """Initialize database on startup"""
     init_db()
+    from ai.pipelines.ocr_engine import tesseract_is_available
+
     logger.info(
         "startup_complete",
         extra={
             "openai_configured": bool(app_settings.openai_api_key and app_settings.openai_api_key.strip()),
             "openai_chat_model": app_settings.openai_chat_model,
+            "openai_vision_model": app_settings.openai_vision_model,
+            "ocr_backend": app_settings.ocr_backend,
+            "tesseract_available": tesseract_is_available(),
         },
     )
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
+    from ai.pipelines.ocr_engine import tesseract_is_available
+
     return {
         "status": "ok",
         "service": "qc-qa-platform",
         "openai_configured": bool(
             app_settings.openai_api_key and str(app_settings.openai_api_key).strip()
         ),
+        "openai_chat_model": app_settings.openai_chat_model,
+        "openai_vision_model": app_settings.openai_vision_model,
+        "ocr_backend": app_settings.ocr_backend,
+        "tesseract_available": tesseract_is_available(),
     }
 
 @app.get("/")

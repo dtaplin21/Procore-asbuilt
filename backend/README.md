@@ -23,11 +23,26 @@ PROCORE_REDIRECT_URI=http://localhost:2000/api/procore/oauth/callback
 OPENAI_API_KEY=your_openai_key
 # Optional:
 # OPENAI_CHAT_MODEL=gpt-4o-mini
+# OPENAI_VISION_MODEL=gpt-4o-mini
+# OCR_BACKEND=auto
+# TESSERACT_CMD=/usr/local/bin/tesseract
 ```
 
 **Local development:** use ``APP_ENV=development`` (default) so tools like ``scripts/seed_dev_data.py`` are allowed. Keep ``OPENAI_API_KEY`` only on the API host as needed.
 
-**Inspections:** inspection runs (`/api/projects/.../inspections/runs`) call OpenAI when `OPENAI_API_KEY` is set. Without it, type/outcome fall back to heuristics and `"unknown"`. Confirm configuration with `GET /health` (`openai_configured`).
+**Inspections:** inspection runs (`/api/projects/.../inspections/runs`) call OpenAI when `OPENAI_API_KEY` is set. Without it, type/outcome fall back to heuristics and `"unknown"`.
+
+**Document OCR:** scanned PDFs and photos are processed by ``backend/ai/pipelines/ocr_engine.py``. Set ``OCR_BACKEND`` to control the provider:
+
+| Value | Behavior |
+|-------|----------|
+| `auto` (default) | Tesseract when installed, else OpenAI vision |
+| `tesseract` | Local Tesseract only (`pytesseract` + system binary) |
+| `openai_vision` | OpenAI vision OCR only (requires `OPENAI_API_KEY`) |
+
+Install Tesseract locally for best OCR (e.g. ``brew install tesseract`` on macOS). Use ``TESSERACT_CMD`` if the binary is not on ``PATH``.
+
+Confirm configuration with ``GET /health`` — returns ``openai_configured``, ``openai_vision_model``, ``ocr_backend``, and ``tesseract_available``.
 
 On **Render** (or any API host), add `OPENAI_API_KEY` in the service environment; redeploy if you add it after first deploy.
 

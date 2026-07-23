@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -74,17 +74,27 @@ def fake_ocr_image(
     return words, 612.0, 792.0
 
 
-def fake_rasterize_pdf_pages(file_path: str | Path) -> list[Path]:
-    return [Path("/tmp/scanned-page1.png"), Path("/tmp/scanned-page2.png")]
+def fake_ocr_scanned_pdf(file_path: str | Path) -> ExtractedDocument:
+    page0 = [
+        _word("Sheet", page_index=0, y=50.0),
+        _word("U1.C4.31", page_index=0, y=50.0),
+    ]
+    page1 = [_word("Approved", page_index=1, y=60.0)]
+    return ExtractedDocument(
+        source_format=SourceFormat.SCANNED_PDF,
+        page_count=2,
+        words=page0 + page1,
+    )
 
 
 @pytest.fixture(autouse=True)
 def fake_backends(request: pytest.FixtureRequest) -> Iterator[None]:
     if request.node.name in {
-        "test_real_backends_raise_not_implemented_without_patches",
+        "test_real_backends_require_ocr_backend_without_patches",
         "test_pdf_has_text_layer_native_pdf",
         "test_pdf_has_text_layer_scanned_pdf",
         "test_pdf_text_layer_extracts_words_with_boxes",
+        "test_ocr_scanned_pdf_rasterizes_each_page_in_memory",
     }:
         yield
         return
@@ -102,8 +112,8 @@ def fake_backends(request: pytest.FixtureRequest) -> Iterator[None]:
             side_effect=fake_ocr_image,
         ),
         patch(
-            "ai.pipelines.document_text_extraction._rasterize_pdf_pages",
-            side_effect=fake_rasterize_pdf_pages,
+            "ai.pipelines.document_text_extraction._ocr_scanned_pdf",
+            side_effect=fake_ocr_scanned_pdf,
         ),
     ):
         yield
@@ -191,10 +201,15 @@ def test_extract_document_scanned_pdf() -> None:
     assert doc.page_text(1) == "Approved"
 
 
-def test_real_backends_raise_not_implemented_without_patches() -> None:
+@patch("ai.pipelines.ocr_engine._openai_vision_is_available", return_value=False)
+@patch("ai.pipelines.ocr_engine.tesseract_is_available", return_value=False)
+def test_real_backends_require_ocr_backend_without_patches(
+    _mock_tesseract: MagicMock,
+    _mock_openai: MagicMock,
+) -> None:
     from ai.pipelines import document_text_extraction as module
 
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(RuntimeError, match="No OCR backend available"):
         module._ocr_image("/tmp/file.png")
 
 
@@ -251,3 +266,53 @@ def test_pdf_text_layer_extracts_words_with_boxes(tmp_path: Path) -> None:
     assert all(w.bbox.page_height == 792.0 for w in extracted.words)
     assert "Hydrostatic" in extracted.full_text()
     assert "Passed" in extracted.full_text()
+
+
+def test_ocr_scanned_pdf_rasterizes_each_page_in_memory(tmp_path: Path) -> None:
+    """Real PyMuPDF PDF; OCR is mocked — verifies in-memory per-page raster path."""
+    import fitz
+
+    from ai.pipelines.document_text_extraction import (
+        SourceFormat,
+        _ocr_scanned_pdf,
+    )
+
+    pdf_path = tmp_path / "scanned-two-page.pdf"
+    doc = fitz.open()
+    doc.new_page(width=612, height=792)
+    doc.new_page(width=612, height=792)
+    doc.save(str(pdf_path))
+    doc.close()
+
+    page_indices: list[int] = []
+
+    def fake_ocr_page(
+        file_path: str | Path,
+        page_index: int = 0,
+        **kwargs: object,
+    ) -> tuple[list[PositionedWord], float, float]:
+        page_indices.append(page_index)
+        return (
+            [
+                PositionedWord(
+                    text=f"page-{page_index + 1}",
+                    bbox=_bbox(y=40.0, page_width=1700.0, page_height=2200.0),
+                    page_index=page_index,
+                )
+            ],
+            1700.0,
+            2200.0,
+        )
+
+    with patch(
+        "ai.pipelines.ocr_engine.ocr_pdf_page_in_memory",
+        side_effect=fake_ocr_page,
+    ):
+        extracted = _ocr_scanned_pdf(pdf_path)
+
+    assert page_indices == [0, 1]
+    assert extracted.source_format == SourceFormat.SCANNED_PDF
+    assert extracted.page_count == 2
+    assert extracted.page_text(0) == "page-1"
+    assert extracted.page_text(1) == "page-2"
+    assert all(w.bbox.page_width == 1700.0 for w in extracted.words)
