@@ -22,6 +22,7 @@ class InspectionMatchEnqueueContext:
     project_id: int
     master_drawing_id: int | str
     page: int = 1
+    inspection_run_id: int | None = None
 
 
 def extract_evidence_file_content(file_path: str | Path) -> str:
@@ -82,6 +83,7 @@ def ingest_evidence_document_extraction(
             inspection_id=str(evidence_id),
             master_drawing_id=match_context.master_drawing_id,
             page=match_context.page,
+            inspection_run_id=match_context.inspection_run_id,
         )
 
     return extraction

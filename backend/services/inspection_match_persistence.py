@@ -12,6 +12,7 @@ from ai.pipelines.inspection_mapping import UNMAPPED_GEOMETRY
 from models.drawing_match_candidate import DrawingMatchCandidate
 from models.drawing_overlay import DrawingOverlay
 from models.inspection_run import InspectionRun
+from models.models import EvidenceRecord
 from services.storage import StorageService
 
 logger = logging.getLogger(__name__)
@@ -41,9 +42,14 @@ def record_internal_match_candidate(
     inspection_id: str,
     drawing_id: str | int,
     candidate: InternalMatchCandidate,
+    inspection_run_id: int | None = None,
 ) -> DrawingMatchCandidate:
     """Persist a backend-only scored candidate row."""
-    run_id = resolve_inspection_run_id(session, inspection_id)
+    run_id = resolve_inspection_run_id(
+        session,
+        inspection_id,
+        inspection_run_id=inspection_run_id,
+    )
     row = DrawingMatchCandidate(
         inspection_id=str(inspection_id),
         inspection_run_id=run_id,
@@ -69,9 +75,14 @@ def persist_inspection_match_overlay(
     bbox: tuple[float, float, float, float] | None,
     page: int = 1,
     region_id: int | None = None,
+    inspection_run_id: int | None = None,
 ) -> None:
     """Write frontend-safe overlay state: match_status and optional bbox only."""
-    run_id = resolve_inspection_run_id(session, inspection_id)
+    run_id = resolve_inspection_run_id(
+        session,
+        inspection_id,
+        inspection_run_id=inspection_run_id,
+    )
     if run_id is None:
         logger.warning(
             "inspection_match_missing_run",
@@ -123,6 +134,7 @@ def finalize_inspection_match_from_internal_candidate(
     inspection_id: str,
     drawing_id: str | int,
     candidate: InternalMatchCandidate,
+    inspection_run_id: int | None = None,
 ) -> MatchStatus:
     """Record internal score, then persist frontend-safe overlay status."""
     record_internal_match_candidate(
@@ -130,6 +142,7 @@ def finalize_inspection_match_from_internal_candidate(
         inspection_id=inspection_id,
         drawing_id=drawing_id,
         candidate=candidate,
+        inspection_run_id=inspection_run_id,
     )
     status = match_status_from_internal_score(candidate.score)
     persist_inspection_match_overlay(
@@ -140,25 +153,69 @@ def finalize_inspection_match_from_internal_candidate(
         bbox=candidate.bbox if status == "matched" else None,
         page=candidate.page,
         region_id=candidate.region_id,
+        inspection_run_id=inspection_run_id,
     )
     return status
 
 
-def resolve_inspection_run_id(session: Session, inspection_id: str) -> int | None:
-    if inspection_id.isdigit():
-        run_id = int(inspection_id)
-        run = session.query(InspectionRun).filter(InspectionRun.id == run_id).first()
-        if run is not None:
-            return run_id
+def resolve_inspection_run_id(
+    session: Session,
+    inspection_id: str,
+    *,
+    inspection_run_id: int | None = None,
+) -> int | None:
+    """Map an API/job identifier to an inspection run id.
 
+    ``inspection_run_id`` wins when provided (upload/job path). Otherwise
+    ``inspection_id`` may be an evidence record id or a run id. Evidence ids
+    are resolved before run ids so numeric collisions (e.g. evidence 266 vs
+    run 266) attach to the run that owns that evidence file.
+    """
+    if inspection_run_id is not None:
         run = (
             session.query(InspectionRun)
-            .filter(InspectionRun.evidence_id == run_id)
+            .filter(InspectionRun.id == inspection_run_id)
+            .first()
+        )
+        if run is not None:
+            return inspection_run_id
+
+    if not inspection_id.isdigit():
+        return None
+
+    numeric_id = int(inspection_id)
+
+    evidence = (
+        session.query(EvidenceRecord)
+        .filter(EvidenceRecord.id == numeric_id)
+        .first()
+    )
+    if evidence is not None:
+        run = (
+            session.query(InspectionRun)
+            .filter(InspectionRun.evidence_id == numeric_id)
             .order_by(InspectionRun.id.desc())
             .first()
         )
         if run is not None:
             return cast(int, run.id)
+
+    run = (
+        session.query(InspectionRun)
+        .filter(InspectionRun.id == numeric_id)
+        .first()
+    )
+    if run is not None:
+        return numeric_id
+
+    run = (
+        session.query(InspectionRun)
+        .filter(InspectionRun.evidence_id == numeric_id)
+        .order_by(InspectionRun.id.desc())
+        .first()
+    )
+    if run is not None:
+        return cast(int, run.id)
 
     return None
 

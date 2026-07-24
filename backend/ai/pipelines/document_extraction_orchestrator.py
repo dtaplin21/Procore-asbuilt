@@ -11,7 +11,7 @@ from typing import Any
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ai.pipelines.clue_extractor import build_clues
+from ai.pipelines.clue_extractor import build_clues, supplement_location_clues_from_content
 from ai.pipelines.document_classifier import classify_document
 from ai.pipelines.type_specific_extractor import extract_type_specific_fields
 from ai.pipelines.universal_field_extractor import extract_universal_fields
@@ -71,6 +71,7 @@ def run_document_extraction(
         universal=universal,
         type_specific=type_specific,
     )
+    clues = supplement_location_clues_from_content(content, clues)
 
     for clue in clues:
         session.add(

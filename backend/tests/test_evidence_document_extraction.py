@@ -279,6 +279,7 @@ def test_upload_inspection_run_evidence_triggers_document_extraction(
     assert input_data["inspection_id"] == str(evidence_id)
     assert input_data["drawing_id"] == str(master_id)
     assert input_data["page"] == 1
+    assert input_data["inspection_run_id"] == cast(int, run.id)
 
 
 def test_maybe_enqueue_inspection_match_job_skips_without_master_drawing(

@@ -46,9 +46,15 @@ class InspectionMatchRecord:
 def load_inspection_match_status(
     session: Session,
     inspection_id: str,
+    *,
+    inspection_run_id: int | None = None,
 ) -> InspectionMatchRecord | None:
     """Load frontend-safe match status from the latest overlay for an inspection."""
-    run_id = resolve_inspection_run_id(session, inspection_id)
+    run_id = resolve_inspection_run_id(
+        session,
+        inspection_id,
+        inspection_run_id=inspection_run_id,
+    )
     if run_id is None:
         return None
 
@@ -113,6 +119,7 @@ def enqueue_inspection_match_job(
     drawing_id: str | int,
     page: int,
     user_id: Optional[int] = None,
+    inspection_run_id: Optional[int] = None,
 ) -> JobQueue:
     if user_id is None:
         user_id = _resolve_user_id_for_project(db, project_id)
@@ -121,17 +128,21 @@ def enqueue_inspection_match_job(
     if project is None:
         raise ValueError(f"Project {project_id} not found")
 
+    input_data: dict[str, Any] = {
+        "inspection_id": str(inspection_id),
+        "drawing_id": str(drawing_id),
+        "page": int(page),
+    }
+    if inspection_run_id is not None:
+        input_data["inspection_run_id"] = int(inspection_run_id)
+
     job = JobQueue(
         user_id=user_id,
         company_id=project.company_id,
         project_id=project_id,
         job_type=JOB_TYPE_INSPECTION_MATCH,
         status="pending",
-        input_data={
-            "inspection_id": str(inspection_id),
-            "drawing_id": str(drawing_id),
-            "page": int(page),
-        },
+        input_data=input_data,
     )
     db.add(job)
     db.commit()
@@ -147,6 +158,7 @@ def maybe_enqueue_inspection_match_job(
     master_drawing_id: int | str | None,
     page: int = 1,
     user_id: Optional[int] = None,
+    inspection_run_id: Optional[int] = None,
 ) -> JobQueue | None:
     """Enqueue clue-based matching when project, inspection, and master drawing are known."""
     if project_id is None or not inspection_id or master_drawing_id is None:
@@ -162,6 +174,7 @@ def maybe_enqueue_inspection_match_job(
             drawing_id=master_drawing_id,
             page=safe_page,
             user_id=user_id,
+            inspection_run_id=inspection_run_id,
         )
     except Exception:
         logger.exception(
@@ -180,6 +193,22 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
     inspection_id = str(payload["inspection_id"])
     drawing_id = payload["drawing_id"]
     page = int(payload.get("page", 1))
+    run_id_hint: int | None = None
+    raw_run_id = payload.get("inspection_run_id")
+    if raw_run_id is not None:
+        try:
+            run_id_hint = int(raw_run_id)
+        except (TypeError, ValueError):
+            run_id_hint = None
+
+    def _persist(**kwargs: Any) -> None:
+        persist_inspection_match_overlay(
+            session=session,
+            inspection_id=inspection_id,
+            drawing_id=drawing_id,
+            inspection_run_id=run_id_hint,
+            **kwargs,
+        )
 
     extraction = (
         session.query(DocumentExtraction)
@@ -189,14 +218,7 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
     )
 
     if extraction is None:
-        persist_inspection_match_overlay(
-            session=session,
-            inspection_id=inspection_id,
-            drawing_id=drawing_id,
-            status="needs_review",
-            bbox=None,
-            page=page,
-        )
+        _persist(status="needs_review", bbox=None, page=page)
         return "needs_review"
 
     clues = (
@@ -214,14 +236,7 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
     )
 
     if not candidates:
-        persist_inspection_match_overlay(
-            session=session,
-            inspection_id=inspection_id,
-            drawing_id=drawing_id,
-            status="needs_review",
-            bbox=None,
-            page=page,
-        )
+        _persist(status="needs_review", bbox=None, page=page)
         return "needs_review"
 
     scored_candidates: list[tuple[float, CandidateTile]] = []
@@ -240,15 +255,13 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
                 source="clue_match",
                 rank=rank,
             ),
+            inspection_run_id=run_id_hint,
         )
     session.commit()
 
     best_score, best = max(scored_candidates, key=lambda item: item[0])
     status = match_status_from_internal_score(best_score)
-    persist_inspection_match_overlay(
-        session,
-        inspection_id=inspection_id,
-        drawing_id=drawing_id,
+    _persist(
         status=status,
         bbox=best.bbox_normalized if status == "matched" else None,
         page=best.page,

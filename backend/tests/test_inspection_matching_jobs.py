@@ -198,6 +198,7 @@ def test_run_inspection_match_job_no_candidates_needs_review(mock_find, db: Sess
             "inspection_id": file_id,
             "drawing_id": str(run.master_drawing_id),
             "page": 1,
+            "inspection_run_id": run.id,
         },
         db,
     )
@@ -210,3 +211,106 @@ def test_run_inspection_match_job_no_candidates_needs_review(mock_find, db: Sess
     )
     meta = cast(dict, overlay.meta)
     assert meta["match_status"] == "needs_review"
+
+
+@patch("services.inspection_matching_jobs.find_candidate_tiles_from_clues")
+def test_run_inspection_match_job_uses_explicit_run_id_over_id_collision(
+    mock_find,
+    db: Session,
+):
+    """Evidence id equal to an older run id must not attach overlays to that run."""
+    mock_find.return_value = []
+    target_id = 80000 + int(uuid.uuid4().hex[:4], 16) % 10000
+
+    company = Company(name=f"Co {uuid.uuid4().hex[:8]}", procore_company_id=f"pc-{uuid.uuid4().hex[:8]}")
+    db.add(company)
+    db.flush()
+
+    project = Project(
+        company_id=company.id,
+        procore_project_id=f"pp-{uuid.uuid4().hex[:8]}",
+        name="Collision",
+    )
+    db.add(project)
+    db.flush()
+
+    drawing = Drawing(
+        project_id=project.id,
+        source="upload",
+        name="Master",
+        storage_key="drawings/collision.pdf",
+    )
+    db.add(drawing)
+    db.flush()
+
+    old_evidence = EvidenceRecord(
+        project_id=project.id,
+        type="inspection_doc",
+        title="Old",
+        storage_key="evidence/old.pdf",
+    )
+    db.add(old_evidence)
+    db.flush()
+
+    old_run = InspectionRun(
+        id=target_id,
+        project_id=project.id,
+        master_drawing_id=drawing.id,
+        evidence_id=old_evidence.id,
+        status="complete",
+    )
+    db.add(old_run)
+    db.flush()
+
+    new_evidence = EvidenceRecord(
+        id=target_id,
+        project_id=project.id,
+        type="inspection_doc",
+        title="New",
+        storage_key="evidence/new.pdf",
+    )
+    db.add(new_evidence)
+    db.flush()
+
+    new_run = InspectionRun(
+        project_id=project.id,
+        master_drawing_id=drawing.id,
+        evidence_id=new_evidence.id,
+        status="complete",
+    )
+    db.add(new_run)
+    db.flush()
+
+    extraction = DocumentExtraction(
+        file_id=str(new_evidence.id),
+        document_type="inspection_report",
+        classification_confidence=0.9,
+    )
+    db.add(extraction)
+    db.commit()
+
+    assert cast(int, old_run.id) == cast(int, new_evidence.id)
+
+    status = run_inspection_match_job(
+        {
+            "inspection_id": str(new_evidence.id),
+            "drawing_id": str(drawing.id),
+            "page": 1,
+            "inspection_run_id": new_run.id,
+        },
+        db,
+    )
+
+    assert status == "needs_review"
+    assert (
+        db.query(DrawingOverlay)
+        .filter(DrawingOverlay.inspection_run_id == new_run.id)
+        .count()
+        == 1
+    )
+    assert (
+        db.query(DrawingOverlay)
+        .filter(DrawingOverlay.inspection_run_id == old_run.id)
+        .count()
+        == 0
+    )

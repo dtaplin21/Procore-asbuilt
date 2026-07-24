@@ -7,6 +7,7 @@ legacy regex-only inspection query builder approach.
 
 from __future__ import annotations
 
+import re
 from typing import List
 
 from ai.pipelines.photo_clue_logic import build_field_photo_clue_candidates
@@ -18,6 +19,48 @@ from ai.schemas.document_extraction_schemas import (
     MasterDrawingFields,
     UniversalFields,
 )
+
+
+_LOCATION_LABEL_RE = re.compile(
+    r"\bLocation\s*:?\s*([A-Za-z0-9][A-Za-z0-9\-_/]{0,40})\b",
+    re.IGNORECASE,
+)
+
+
+def supplement_location_clues_from_content(content: str, clues: List[Clue]) -> List[Clue]:
+    """Add short location codes parsed from raw text (e.g. Procore ``Location COLO``).
+
+    Universal field extraction often returns a full address for ``location_text``.
+    This keeps compact site codes that appear on master drawing region tags.
+    """
+    existing = {
+        clue.value.strip().lower()
+        for clue in clues
+        if clue.location_relevant and clue.value.strip()
+    }
+    supplemental: List[Clue] = []
+
+    for match in _LOCATION_LABEL_RE.finditer(content):
+        value = match.group(1).strip()
+        if not value or len(value) > 40:
+            continue
+        if any(ch in value for ch in ",;") or value.count(" ") > 3:
+            continue
+        normalized = value.lower()
+        if normalized in existing:
+            continue
+        supplemental.append(
+            Clue(
+                type="location_code",
+                value=value,
+                source="document_text",
+                confidence=0.92,
+                location_relevant=True,
+            )
+        )
+        existing.add(normalized)
+
+    return clues + supplemental
 
 
 def build_clues(

@@ -112,9 +112,8 @@ export default function InspectionRunsPanel({
 
   const matchInspectionId = useMemo(() => {
     if (selectedRunId == null) return null;
-    const selectedRun = runs.find((run) => run.id === selectedRunId);
-    return String(selectedRun?.evidence_id ?? selectedRunId);
-  }, [runs, selectedRunId]);
+    return String(selectedRunId);
+  }, [selectedRunId]);
 
   const evidenceLabelById = useMemo(() => {
     const map = new Map<number, string>();

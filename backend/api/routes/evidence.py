@@ -126,6 +126,11 @@ async def upload_inspection_run_evidence(
         )
         evidence_id = cast(int, evidence.id)
 
+        if getattr(run, "evidence_id", None) is None:
+            setattr(run, "evidence_id", evidence_id)
+            db.commit()
+            db.refresh(run)
+
         ingest_evidence_document_extraction(
             db,
             evidence_id=evidence_id,
@@ -134,13 +139,9 @@ async def upload_inspection_run_evidence(
                 project_id=project_id,
                 master_drawing_id=master_drawing_id,
                 page=1,
+                inspection_run_id=inspection_run_id,
             ),
         )
-
-        if getattr(run, "evidence_id", None) is None:
-            setattr(run, "evidence_id", evidence_id)
-            db.commit()
-            db.refresh(run)
 
         region_load = build_region_index(db, master_drawing_id)
         registration = _try_visual_registration(str(saved_path), str(master_drawing_id))

@@ -1,6 +1,6 @@
 """Phase 7 — clue extraction from universal and type-specific fields."""
 
-from ai.pipelines.clue_extractor import build_clues
+from ai.pipelines.clue_extractor import build_clues, supplement_location_clues_from_content
 from ai.schemas.document_extraction_schemas import (
     DocumentType,
     FieldPhotoFields,
@@ -117,3 +117,20 @@ def test_unknown_type_still_emits_universal_clues():
     assert len(clues) == 2
     assert {c.type for c in clues} == {"location_text", "trade"}
     assert all(c.source == DocumentType.UNKNOWN.value for c in clues)
+
+
+def test_supplement_location_clues_adds_short_location_code_from_text():
+    universal = UniversalFields(
+        location_text="120 Constitution Drive Oakland California",
+        trade="33-Sanitary Sewerage",
+    )
+    clues = build_clues(DocumentType.INSPECTION_REPORT, universal, None)
+    content = "Project UCSF Location COLO Trade 33-Sanitary Sewerage"
+
+    enriched = supplement_location_clues_from_content(content, clues)
+    values = {c.value for c in enriched}
+
+    assert "COLO" in values
+    location_code = next(c for c in enriched if c.type == "location_code")
+    assert location_code.location_relevant is True
+    assert location_code.source == "document_text"
