@@ -27,6 +27,7 @@ from ai.schemas.document_extraction_schemas import (
 from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
 from models.models import Company, JobQueue, Project, User, UserCompany
+from ai.pipelines.pdf_link_follower import LinkFollowResult
 from services.evidence_document_extraction import (
     InspectionMatchEnqueueContext,
     extract_evidence_file_content,
@@ -187,6 +188,80 @@ def test_ingest_evidence_document_extraction_persists_text_and_runs_orchestrator
     db_session.refresh(evidence)
     assert cast(str | None, evidence.text_content) is not None
     assert "COLO" in cast(str, evidence.text_content)
+
+
+@patch("services.evidence_document_extraction.run_document_extraction")
+def test_ingest_merges_pdf_link_supplemental_text_and_cross_refs(
+    mock_run,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    project,
+) -> None:
+    file_path = tmp_path / "report.pdf"
+    file_path.write_bytes(b"%PDF-1.4")
+    _patch_pdf_text(monkeypatch, ["Inspection", "summary"])
+
+    supplemental_block = "\n\n--- Linked content (page 2) ---\nLocation: COLO"
+    link_cross_ref = {
+        "kind": "pdf_internal_link",
+        "source_page": 1,
+        "target_page": 2,
+        "anchor_text": None,
+    }
+
+    def _fake_follow_pdf_links(_file_path: object) -> LinkFollowResult:
+        return LinkFollowResult(
+            supplemental_text=supplemental_block,
+            cross_refs=[link_cross_ref],
+            followed_count=1,
+        )
+
+    monkeypatch.setattr(
+        "services.evidence_document_extraction.follow_pdf_links",
+        _fake_follow_pdf_links,
+    )
+
+    storage = StorageService(db_session)
+    evidence = storage.create_evidence_record(
+        project_id=cast(int, project.id),
+        type="inspection_doc",
+        trade=None,
+        spec_section=None,
+        title="Linked Report",
+        storage_key="evidence/linked-report.pdf",
+        content_type="application/pdf",
+    )
+
+    mock_run.return_value = DocumentExtraction(
+        file_id=str(evidence.id),
+        document_type=DocumentType.INSPECTION_REPORT.value,
+        classification_confidence=0.9,
+    )
+
+    ingest_evidence_document_extraction(
+        db_session,
+        evidence_id=cast(int, evidence.id),
+        file_path=file_path,
+    )
+
+    mock_run.assert_called_once()
+    merged_content = mock_run.call_args.kwargs["content"]
+    assert "Inspection summary" in merged_content
+    assert supplemental_block.strip() in merged_content
+    assert "Location: COLO" in merged_content
+
+    db_session.refresh(evidence)
+    text_content = cast(str, evidence.text_content)
+    assert supplemental_block.strip() in text_content
+    assert "Location: COLO" in text_content
+
+    cross_refs = cast(list[dict], evidence.cross_refs_json)
+    assert any(
+        ref.get("kind") == "pdf_internal_link" and ref.get("target_page") == 2
+        for ref in cross_refs
+        if isinstance(ref, dict)
+    )
 
 
 @patch("ai.pipelines.document_extraction_orchestrator.extract_type_specific_fields")

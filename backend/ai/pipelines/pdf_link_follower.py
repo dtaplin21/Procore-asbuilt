@@ -6,6 +6,7 @@ See Notes/Cursor Implementation Plan (Phase 0) for v1 limits.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -17,6 +18,8 @@ from services.procore_url_parser import build_procore_cross_ref, parse_procore_u
 from services.safe_url_fetch import fetch_url_text, is_allowed_external_url
 
 MAX_SUPPLEMENTAL_TEXT_CHARS = 80_000
+
+logger = logging.getLogger(__name__)
 
 
 class PdfLinkKind(str, Enum):
@@ -53,7 +56,17 @@ def follow_pdf_links(file_path: str | Path) -> LinkFollowResult:
         return LinkFollowResult()
 
     links = _dedupe_links(_extract_hyperlinks(path))
-    return _follow_links(path, links)
+    result = _follow_links(path, links)
+    logger.info(
+        "pdf_link_follow_complete",
+        extra={
+            "file_path": str(file_path),
+            "links_found": len(links),
+            "followed": result.followed_count,
+            "skipped": result.skipped_count,
+        },
+    )
+    return result
 
 
 def _extract_hyperlinks(file_path: str | Path) -> list[PdfHyperlink]:

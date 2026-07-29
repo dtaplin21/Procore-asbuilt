@@ -7,6 +7,7 @@ from models.models import Drawing, EvidenceRecord, EvidenceDrawingLink
 
 
 SHEET_REF_PATTERN = re.compile(r"\b([A-Z]{1,3}-?\d{2,4}[A-Z]?)\b", re.IGNORECASE)
+_AUTO_LINK_SOURCES = ("regex", "pdf_link")
 
 
 def extract_sheet_refs(text: Optional[str]) -> List[str]:
@@ -57,28 +58,77 @@ def find_project_drawings_for_refs(
     return matches
 
 
+def find_drawing_links_from_cross_refs(
+    db: Session,
+    project_id: int,
+    cross_refs: List[Any],
+) -> List[Dict[str, Any]]:
+    """Resolve PDF link cross-refs to project drawings when possible."""
+    matches: List[Dict[str, Any]] = []
+    seen: set[tuple[int, str, str]] = set()
+
+    for entry in cross_refs:
+        if not isinstance(entry, dict):
+            continue
+
+        kind = entry.get("kind")
+        value = str(entry.get("value") or "").strip()
+        if not value:
+            continue
+
+        if kind == "sheet_ref":
+            link_type = "sheet_ref"
+            refs = [value]
+        elif kind == "procore_location" and not value.isdigit():
+            link_type = "procore_location"
+            refs = [value]
+        else:
+            continue
+
+        for match in find_project_drawings_for_refs(db, project_id, refs):
+            key = (match["drawing_id"], link_type, match["matched_text"])
+            if key in seen:
+                continue
+            seen.add(key)
+            matches.append(
+                {
+                    **match,
+                    "source": "pdf_link",
+                    "link_type": link_type,
+                }
+            )
+
+    return matches
+
+
 def replace_evidence_drawing_links(
     db: Session,
     evidence: EvidenceRecord,
+    *,
+    commit: bool = True,
 ) -> List[EvidenceDrawingLink]:
     refs = extract_sheet_refs(cast(Optional[str], evidence.text_content))
-    matches = find_project_drawings_for_refs(
+    regex_matches = find_project_drawings_for_refs(
         db, cast(int, evidence.project_id), refs
     )
 
-    # merge sheet_refs into existing cross_refs_json (preserve rfi_number, etc.)
     cross_raw = cast(Optional[List[Any]], evidence.cross_refs_json)
+    cross_refs = list(cross_raw or [])
+    pdf_matches = find_drawing_links_from_cross_refs(
+        db, cast(int, evidence.project_id), cross_refs
+    )
+
+    # merge sheet_refs into existing cross_refs_json (preserve rfi_number, etc.)
     existing = list(cross_raw or [])
     non_sheet = [c for c in existing if isinstance(c, dict) and c.get("kind") != "sheet_ref"]
     new_sheet_refs = [{"kind": "sheet_ref", "value": ref} for ref in refs]
     evidence.cross_refs_json = non_sheet + new_sheet_refs  # type: ignore[assignment]
 
-    # remove old auto-generated regex links
     old_links = (
         db.query(EvidenceDrawingLink)
         .filter(
             EvidenceDrawingLink.evidence_id == evidence.id,
-            EvidenceDrawingLink.source == "regex",
+            EvidenceDrawingLink.source.in_(_AUTO_LINK_SOURCES),
         )
         .all()
     )
@@ -90,7 +140,7 @@ def replace_evidence_drawing_links(
     created_links: List[EvidenceDrawingLink] = []
     seen_pairs = set()
 
-    for match in matches:
+    for match in regex_matches + pdf_matches:
         pair = (evidence.id, match["drawing_id"])
         if pair in seen_pairs:
             continue
@@ -110,10 +160,13 @@ def replace_evidence_drawing_links(
         created_links.append(link)
 
     db.add(evidence)
-    db.commit()
 
-    for link in created_links:
-        db.refresh(link)
-    db.refresh(evidence)
+    if commit:
+        db.commit()
+        for link in created_links:
+            db.refresh(link)
+        db.refresh(evidence)
+    else:
+        db.flush()
 
     return created_links

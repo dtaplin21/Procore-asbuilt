@@ -14,6 +14,7 @@ from ai.pipelines.document_text_extraction import extract_document
 from ai.pipelines.pdf_link_follower import LinkFollowResult, follow_pdf_links
 from models.document_extraction import DocumentExtraction
 from models.models import EvidenceRecord
+from services.evidence_linking import replace_evidence_drawing_links
 from services.inspection_matching_jobs import maybe_enqueue_inspection_match_job
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,7 @@ def ingest_evidence_document_extraction(
         )
         return None
 
+    evidence: EvidenceRecord | None = None
     if persist_text_content:
         evidence = session.query(EvidenceRecord).filter(EvidenceRecord.id == evidence_id).first()
         if evidence is not None:
@@ -87,6 +89,13 @@ def ingest_evidence_document_extraction(
             }
             evidence.meta = meta  # type: ignore[assignment]
             session.flush()
+            try:
+                replace_evidence_drawing_links(session, evidence, commit=False)
+            except Exception:
+                logger.exception(
+                    "evidence_drawing_link_sync_failed",
+                    extra={"evidence_id": evidence_id},
+                )
 
     try:
         extraction = run_document_extraction(
