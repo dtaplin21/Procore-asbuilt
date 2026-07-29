@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ai.pipelines.document_extraction_orchestrator import run_document_extraction
 from ai.pipelines.document_text_extraction import extract_document
+from ai.pipelines.pdf_link_follower import LinkFollowResult, follow_pdf_links
 from models.document_extraction import DocumentExtraction
 from models.models import EvidenceRecord
 from services.inspection_matching_jobs import maybe_enqueue_inspection_match_job
@@ -31,6 +32,18 @@ def extract_evidence_file_content(file_path: str | Path) -> str:
     return document.full_text()
 
 
+def extract_evidence_file_content_with_links(
+    file_path: str | Path,
+) -> tuple[str, str, LinkFollowResult]:
+    """Return ``(merged_text, base_text, link_result)``."""
+    base = extract_evidence_file_content(file_path).strip()
+    link_result = follow_pdf_links(file_path)
+    merged = base
+    if link_result.supplemental_text.strip():
+        merged = f"{base}\n{link_result.supplemental_text}".strip()
+    return merged, base, link_result
+
+
 def ingest_evidence_document_extraction(
     session: Session,
     *,
@@ -41,7 +54,7 @@ def ingest_evidence_document_extraction(
 ) -> DocumentExtraction | None:
     """Run clue-based document extraction for an uploaded evidence file."""
     try:
-        content = extract_evidence_file_content(file_path).strip()
+        content, base, link_result = extract_evidence_file_content_with_links(file_path)
     except Exception:
         logger.exception(
             "evidence_content_extraction_failed",
@@ -49,7 +62,7 @@ def ingest_evidence_document_extraction(
         )
         return None
 
-    if not content:
+    if not base and not link_result.supplemental_text.strip():
         logger.warning(
             "evidence_content_empty",
             extra={"evidence_id": evidence_id, "file_path": str(file_path)},
@@ -60,6 +73,16 @@ def ingest_evidence_document_extraction(
         evidence = session.query(EvidenceRecord).filter(EvidenceRecord.id == evidence_id).first()
         if evidence is not None:
             setattr(evidence, "text_content", content)
+            existing_refs = list(evidence.cross_refs_json or [])
+            existing_refs.extend(link_result.cross_refs)
+            evidence.cross_refs_json = existing_refs  # type: ignore[assignment]
+            meta = dict(evidence.meta or {})
+            meta["pdfLinkFollow"] = {
+                "followed": link_result.followed_count,
+                "skipped": link_result.skipped_count,
+                "errors": link_result.errors[:5],
+            }
+            evidence.meta = meta
             session.flush()
 
     try:
