@@ -12,10 +12,10 @@ from pathlib import Path
 
 import fitz
 
+from config import settings
 from services.procore_url_parser import build_procore_cross_ref, parse_procore_url
 from services.safe_url_fetch import fetch_url_text, is_allowed_external_url
 
-MAX_EXTERNAL_FETCHES_PER_UPLOAD = 5
 MAX_SUPPLEMENTAL_TEXT_CHARS = 80_000
 
 
@@ -45,6 +45,9 @@ class LinkFollowResult:
 
 def follow_pdf_links(file_path: str | Path) -> LinkFollowResult:
     """Enumerate and follow hyperlinks in a PDF. Non-PDF files return empty result."""
+    if not settings.pdf_link_follow_enabled:
+        return LinkFollowResult()
+
     path = Path(file_path)
     if path.suffix.lower() != ".pdf":
         return LinkFollowResult()
@@ -140,7 +143,7 @@ def _follow_links(file_path: Path, links: list[PdfHyperlink]) -> LinkFollowResul
         if not is_allowed_external_url(uri):
             result.skipped_count += 1
             continue
-        if external_fetches >= MAX_EXTERNAL_FETCHES_PER_UPLOAD:
+        if external_fetches >= settings.pdf_link_follow_max_external:
             result.skipped_count += 1
             continue
         try:

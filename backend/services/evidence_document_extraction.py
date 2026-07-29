@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
 
 from sqlalchemy.orm import Session
 
@@ -73,16 +74,18 @@ def ingest_evidence_document_extraction(
         evidence = session.query(EvidenceRecord).filter(EvidenceRecord.id == evidence_id).first()
         if evidence is not None:
             setattr(evidence, "text_content", content)
-            existing_refs = list(evidence.cross_refs_json or [])
+            cross_raw = cast(list[Any] | None, evidence.cross_refs_json)
+            existing_refs = list(cross_raw or [])
             existing_refs.extend(link_result.cross_refs)
             evidence.cross_refs_json = existing_refs  # type: ignore[assignment]
-            meta = dict(evidence.meta or {})
+            meta_raw = cast(dict[str, Any] | None, evidence.meta)
+            meta = dict(meta_raw or {})
             meta["pdfLinkFollow"] = {
                 "followed": link_result.followed_count,
                 "skipped": link_result.skipped_count,
                 "errors": link_result.errors[:5],
             }
-            evidence.meta = meta
+            evidence.meta = meta  # type: ignore[assignment]
             session.flush()
 
     try:

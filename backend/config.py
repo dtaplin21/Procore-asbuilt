@@ -32,6 +32,12 @@ Application environment::
     OPENAI_VISION_MODEL         # optional — defaults to gpt-4o-mini
     OCR_BACKEND                 # auto | tesseract | openai_vision
     TESSERACT_CMD               # optional — path to tesseract binary when not on PATH
+
+PDF link enrichment (hyperlinks in uploaded evidence PDFs)::
+
+    PDF_LINK_FOLLOW_ENABLED         # default true — set false to skip link follow on upload
+    PDF_LINK_FOLLOW_MAX_EXTERNAL    # max HTTP fetches per PDF (default 5)
+    PDF_LINK_FOLLOW_ALLOWED_HOSTS   # comma-separated host suffixes; FRONTEND_PUBLIC_URL host is merged in
 """
 
 from urllib.parse import urlparse
@@ -85,6 +91,15 @@ class Settings(BaseSettings):
     database_disable_ssl_for_localhost: bool = Field(
         default=True,
         description="DATABASE_DISABLE_SSL_FOR_LOCALHOST",
+    )
+    #: Follow hyperlinks embedded in uploaded evidence PDFs. Env: ``PDF_LINK_FOLLOW_ENABLED``.
+    pdf_link_follow_enabled: bool = Field(default=True, description="PDF_LINK_FOLLOW_ENABLED")
+    #: Max external HTTP fetches per PDF upload. Env: ``PDF_LINK_FOLLOW_MAX_EXTERNAL``.
+    pdf_link_follow_max_external: int = Field(default=5, description="PDF_LINK_FOLLOW_MAX_EXTERNAL")
+    #: Comma-separated allowed host suffixes for external link fetch. Env: ``PDF_LINK_FOLLOW_ALLOWED_HOSTS``.
+    pdf_link_follow_allowed_hosts: str = Field(
+        default="procore.com,sandbox.procore.com",
+        description="PDF_LINK_FOLLOW_ALLOWED_HOSTS",
     )
 
     # In some environments (CI, sandboxes), extra env vars may be present.
@@ -238,6 +253,27 @@ def cors_allowed_origins() -> list[str]:
     if front and front not in origins:
         origins.append(front)
     return origins
+
+
+def pdf_link_follow_allowed_host_suffixes(s: Optional[Settings] = None) -> tuple[str, ...]:
+    """
+    Host suffixes allowed for external PDF link fetch.
+
+    Parses ``PDF_LINK_FOLLOW_ALLOWED_HOSTS`` (comma-separated) and merges the host from
+    ``FRONTEND_PUBLIC_URL`` when not already listed.
+    """
+    cfg = s or settings
+    suffixes: list[str] = []
+    raw = cfg.pdf_link_follow_allowed_hosts.strip()
+    if raw:
+        suffixes.extend(part.strip().lower() for part in raw.split(",") if part.strip())
+    try:
+        front_host = (urlparse(cfg.frontend_public_url.strip()).hostname or "").lower()
+    except Exception:
+        front_host = ""
+    if front_host and front_host not in suffixes:
+        suffixes.append(front_host)
+    return tuple(suffixes)
 
 
 def procore_authorization_url() -> str:

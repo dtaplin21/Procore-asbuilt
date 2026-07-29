@@ -1,7 +1,7 @@
 """Allowlisted HTTP(S) fetch with SSRF guards for PDF link enrichment.
 
 Network and security rules live here — not in the AI pipeline module.
-Extend ``ALLOWED_HOST_SUFFIXES`` from config in Phase 7.
+Allowed hosts come from ``config.pdf_link_follow_allowed_host_suffixes()``.
 """
 
 from __future__ import annotations
@@ -17,11 +17,7 @@ from urllib.parse import urlparse
 import httpx
 
 from ai.pipelines.document_text_extraction import extract_document
-
-ALLOWED_HOST_SUFFIXES = (
-    ".procore.com",
-    "procore.com",
-)
+from config import pdf_link_follow_allowed_host_suffixes
 
 FETCH_TIMEOUT_SECONDS = 10.0
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024  # 5 MB
@@ -42,7 +38,8 @@ def is_allowed_external_url(url: str) -> bool:
     if parsed.scheme not in ("http", "https"):
         return False
     host = (parsed.hostname or "").lower()
-    return any(host == suffix or host.endswith(suffix) for suffix in ALLOWED_HOST_SUFFIXES)
+    suffixes = pdf_link_follow_allowed_host_suffixes()
+    return any(host == suffix or host.endswith(suffix) for suffix in suffixes)
 
 
 def url_fetch_blocked_reason(url: str) -> str | None:
