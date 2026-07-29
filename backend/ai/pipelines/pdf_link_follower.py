@@ -1,6 +1,6 @@
 """Follow hyperlinks embedded in uploaded PDFs to gather supplemental text.
 
-Phase 3: follow same-PDF internal page links.
+Phase 4: external URL fetch wired via services.safe_url_fetch.
 See Notes/Cursor Implementation Plan (Phase 0) for v1 limits.
 """
 
@@ -11,6 +11,12 @@ from enum import Enum
 from pathlib import Path
 
 import fitz
+
+from services.procore_url_parser import build_procore_cross_ref, parse_procore_url
+from services.safe_url_fetch import fetch_url_text, is_allowed_external_url
+
+MAX_EXTERNAL_FETCHES_PER_UPLOAD = 5
+MAX_SUPPLEMENTAL_TEXT_CHARS = 80_000
 
 
 class PdfLinkKind(str, Enum):
@@ -110,55 +116,107 @@ def _text_from_page(doc: fitz.Document, page_index: int) -> str:
 
 def _follow_links(file_path: Path, links: list[PdfHyperlink]) -> LinkFollowResult:
     result = LinkFollowResult()
+
     internal_links = [
         link
         for link in links
         if link.kind == PdfLinkKind.INTERNAL_PAGE and link.target_page is not None
     ]
-    if not internal_links:
-        return result
+    if internal_links:
+        doc = fitz.open(str(file_path))
+        try:
+            _follow_internal_links(doc, internal_links, result)
+        finally:
+            doc.close()
 
-    doc = fitz.open(str(file_path))
-    try:
-        unique_targets: list[int] = []
-        seen_targets: set[int] = set()
-        for link in internal_links:
-            target = link.target_page
-            if target is None:
-                continue
-            if target < 0 or target >= doc.page_count:
-                result.skipped_count += 1
-                result.errors.append(
-                    f"internal link target page {target + 1} out of range "
-                    f"(document has {doc.page_count} pages)"
+    external_links = [
+        link for link in links if link.kind == PdfLinkKind.EXTERNAL_URI and link.uri
+    ]
+    external_fetches = 0
+    for link in external_links:
+        uri = link.uri
+        if not uri:
+            continue
+        if not is_allowed_external_url(uri):
+            result.skipped_count += 1
+            continue
+        if external_fetches >= MAX_EXTERNAL_FETCHES_PER_UPLOAD:
+            result.skipped_count += 1
+            continue
+        try:
+            text = fetch_url_text(uri)
+            external_fetches += 1
+            if text.strip():
+                section = f"\n\n--- Linked content ({uri}) ---\n{text}"
+                if not _append_supplemental_text(result, section):
+                    result.skipped_count += 1
+                    continue
+                result.followed_count += 1
+            parsed = parse_procore_url(uri)
+            if parsed:
+                result.cross_refs.append(
+                    build_procore_cross_ref(
+                        parsed,
+                        source_page=link.page_index + 1,
+                        anchor_text=link.anchor_text,
+                    )
                 )
-                continue
-            if target not in seen_targets:
-                seen_targets.add(target)
-                unique_targets.append(target)
-
-        for page_index in unique_targets:
-            text = _text_from_page(doc, page_index)
-            result.supplemental_text += (
-                f"\n\n--- Linked content (page {page_index + 1}) ---\n{text}"
-            )
-
-        for link in internal_links:
-            target = link.target_page
-            if target is None:
-                continue
-            if target < 0 or target >= doc.page_count:
-                continue
-            result.cross_refs.append(
-                {
-                    "kind": "pdf_internal_link",
-                    "source_page": link.page_index + 1,
-                    "target_page": target + 1,
-                    "anchor_text": link.anchor_text,
-                }
-            )
-            result.followed_count += 1
-    finally:
-        doc.close()
+        except Exception as exc:
+            result.errors.append(str(exc))
+            result.skipped_count += 1
 
     return result
+
+
+def _follow_internal_links(
+    doc: fitz.Document,
+    internal_links: list[PdfHyperlink],
+    result: LinkFollowResult,
+) -> None:
+    unique_targets: list[int] = []
+    seen_targets: set[int] = set()
+    for link in internal_links:
+        target = link.target_page
+        if target is None:
+            continue
+        if target < 0 or target >= doc.page_count:
+            result.skipped_count += 1
+            result.errors.append(
+                f"internal link target page {target + 1} out of range "
+                f"(document has {doc.page_count} pages)"
+            )
+            continue
+        if target not in seen_targets:
+            seen_targets.add(target)
+            unique_targets.append(target)
+
+    for page_index in unique_targets:
+        text = _text_from_page(doc, page_index)
+        section = f"\n\n--- Linked content (page {page_index + 1}) ---\n{text}"
+        _append_supplemental_text(result, section)
+
+    for link in internal_links:
+        target = link.target_page
+        if target is None:
+            continue
+        if target < 0 or target >= doc.page_count:
+            continue
+        result.cross_refs.append(
+            {
+                "kind": "pdf_internal_link",
+                "source_page": link.page_index + 1,
+                "target_page": target + 1,
+                "anchor_text": link.anchor_text,
+            }
+        )
+        result.followed_count += 1
+
+
+def _append_supplemental_text(result: LinkFollowResult, section: str) -> bool:
+    if len(result.supplemental_text) + len(section) > MAX_SUPPLEMENTAL_TEXT_CHARS:
+        result.errors.append(
+            f"supplemental text would exceed {MAX_SUPPLEMENTAL_TEXT_CHARS} character cap"
+        )
+        return False
+    result.supplemental_text += section
+    return True
