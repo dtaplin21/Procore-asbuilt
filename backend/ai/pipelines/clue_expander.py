@@ -1,5 +1,12 @@
 """Expand construction clues into common drawing abbreviations and related search terms."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
 EXPANSIONS = {
     "sanitary sewerage": ["sanitary sewer", "sanitary", "sewer", "SS", "SAN", "sewer lateral"],
     "sanitary sewer": ["SS", "SAN", "sewer lateral", "cleanout", "manhole"],
@@ -13,7 +20,12 @@ EXPANSIONS = {
 }
 
 
-def expand_clue_value(value: str) -> list[str]:
+def expand_clue_value(
+    value: str,
+    *,
+    session: Session | None = None,
+    project_id: int | None = None,
+) -> list[str]:
     if not value:
         return []
 
@@ -24,7 +36,17 @@ def expand_clue_value(value: str) -> list[str]:
         if key in normalized:
             expanded.extend(terms)
 
-    seen = set()
+    if session is not None:
+        from services.legend_lookup import expand_abbreviation, find_codes_for_term
+
+        if len(value.split()) > 1:
+            expanded.extend(find_codes_for_term(session, value, project_id))
+        else:
+            expansion = expand_abbreviation(session, value, project_id)
+            if expansion:
+                expanded.append(expansion)
+
+    seen: set[str] = set()
     result: list[str] = []
 
     for term in expanded:

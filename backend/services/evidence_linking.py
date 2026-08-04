@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 from models.models import Drawing, EvidenceRecord, EvidenceDrawingLink
 
 
-SHEET_REF_PATTERN = re.compile(r"\b([A-Z]{1,3}-?\d{2,4}[A-Z]?)\b", re.IGNORECASE)
+# C-101 / C101 (legacy) and Procore-style C4.20, U1.C4.20
+SHEET_REF_PATTERNS = (
+    re.compile(r"\b([A-Z]{1,3}-?\d{2,4}[A-Z]?)\b", re.IGNORECASE),
+    re.compile(r"\b((?:[A-Z]\d+\.)?[A-Z]\d+\.\d{2,4})\b", re.IGNORECASE),
+)
 _AUTO_LINK_SOURCES = ("regex", "pdf_link")
 
 
@@ -14,21 +18,21 @@ def extract_sheet_refs(text: Optional[str]) -> List[str]:
     if not text:
         return []
 
-    matches = SHEET_REF_PATTERN.findall(text)
     normalized: List[str] = []
-    seen = set()
+    seen: set[str] = set()
 
-    for match in matches:
-        ref = match.upper().replace(" ", "")
-        if ref not in seen:
-            seen.add(ref)
-            normalized.append(ref)
+    for pattern in SHEET_REF_PATTERNS:
+        for match in pattern.findall(text):
+            ref = match.upper().replace(" ", "")
+            if ref not in seen:
+                seen.add(ref)
+                normalized.append(ref)
 
     return normalized
 
 
 def _normalize_name(value: str) -> str:
-    return value.upper().replace(" ", "").replace("_", "").strip()
+    return value.upper().replace(" ", "").replace("_", "").replace("-", "").strip()
 
 
 def find_project_drawings_for_refs(

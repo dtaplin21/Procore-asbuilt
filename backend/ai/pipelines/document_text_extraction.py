@@ -202,8 +202,12 @@ def _ocr_image(file_path: str | Path, page_index: int = 0) -> tuple[list[Positio
     return ocr_image(file_path, page_index=page_index)
 
 
-def _ocr_scanned_pdf(file_path: str | Path) -> ExtractedDocument:
-    """OCR every page of a scanned PDF in memory (PyMuPDF render + ocr_engine)."""
+def _ocr_scanned_pdf(
+    file_path: str | Path,
+    *,
+    max_pages: int | None = None,
+) -> ExtractedDocument:
+    """OCR PDF pages in memory (PyMuPDF render + ocr_engine)."""
     from ai.pipelines.ocr_engine import ocr_pdf_page_in_memory
 
     doc = fitz.open(str(file_path))
@@ -212,14 +216,19 @@ def _ocr_scanned_pdf(file_path: str | Path) -> ExtractedDocument:
     finally:
         doc.close()
 
+    if max_pages is not None and max_pages > 0:
+        pages_to_scan = min(page_count, max_pages)
+    else:
+        pages_to_scan = page_count
+
     all_words: list[PositionedWord] = []
-    for page_index in range(page_count):
+    for page_index in range(pages_to_scan):
         words, _, _ = ocr_pdf_page_in_memory(file_path, page_index=page_index)
         all_words.extend(words)
 
     return ExtractedDocument(
         source_format=SourceFormat.SCANNED_PDF,
-        page_count=page_count,
+        page_count=pages_to_scan,
         words=all_words,
     )
 
@@ -248,3 +257,18 @@ def extract_document(file_path: str | Path) -> ExtractedDocument:
         return _ocr_scanned_pdf(file_path)
 
     raise AssertionError(f"unhandled format: {fmt}")  # exhaustiveness guard
+
+
+def extract_document_via_ocr(
+    file_path: str | Path,
+    *,
+    max_pages: int | None = None,
+) -> ExtractedDocument:
+    """Force OCR for PDFs and images — for link-fetched files with unreliable text layers."""
+    suffix = Path(file_path).suffix.lower()
+    if suffix == ".pdf":
+        return _ocr_scanned_pdf(file_path, max_pages=max_pages)
+    if suffix in {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}:
+        words, _, _ = _ocr_image(file_path, page_index=0)
+        return ExtractedDocument(source_format=SourceFormat.IMAGE, page_count=1, words=words)
+    raise ValueError(f"OCR extraction unsupported for file type: {suffix!r}")

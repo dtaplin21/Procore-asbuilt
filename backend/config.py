@@ -98,8 +98,18 @@ class Settings(BaseSettings):
     pdf_link_follow_max_external: int = Field(default=5, description="PDF_LINK_FOLLOW_MAX_EXTERNAL")
     #: Comma-separated allowed host suffixes for external link fetch. Env: ``PDF_LINK_FOLLOW_ALLOWED_HOSTS``.
     pdf_link_follow_allowed_hosts: str = Field(
-        default="procore.com,sandbox.procore.com",
+        default="procore.com,sandbox.procore.com,amazonaws.com",
         description="PDF_LINK_FOLLOW_ALLOWED_HOSTS",
+    )
+    #: Max bytes per external link response (Procore attachment PDFs). Env: ``PDF_LINK_FOLLOW_MAX_RESPONSE_BYTES``.
+    pdf_link_follow_max_response_bytes: int = Field(
+        default=20 * 1024 * 1024,
+        description="PDF_LINK_FOLLOW_MAX_RESPONSE_BYTES",
+    )
+    #: Max PDF pages to OCR per followed link; ``0`` = all pages. Env: ``PDF_LINK_FOLLOW_OCR_MAX_PAGES``.
+    pdf_link_follow_ocr_max_pages: int = Field(
+        default=0,
+        description="PDF_LINK_FOLLOW_OCR_MAX_PAGES",
     )
 
     # In some environments (CI, sandboxes), extra env vars may be present.
@@ -259,14 +269,17 @@ def pdf_link_follow_allowed_host_suffixes(s: Optional[Settings] = None) -> tuple
     """
     Host suffixes allowed for external PDF link fetch.
 
-    Parses ``PDF_LINK_FOLLOW_ALLOWED_HOSTS`` (comma-separated) and merges the host from
-    ``FRONTEND_PUBLIC_URL`` when not already listed.
+    Parses ``PDF_LINK_FOLLOW_ALLOWED_HOSTS`` (comma-separated) and merges built-in /
+    frontend hosts when not already listed.
     """
     cfg = s or settings
     suffixes: list[str] = []
     raw = cfg.pdf_link_follow_allowed_hosts.strip()
     if raw:
         suffixes.extend(part.strip().lower() for part in raw.split(",") if part.strip())
+    for extra in ("amazonaws.com",):
+        if extra not in suffixes:
+            suffixes.append(extra)
     try:
         front_host = (urlparse(cfg.frontend_public_url.strip()).hostname or "").lower()
     except Exception:

@@ -54,11 +54,17 @@ def _is_location_relevant(clue: Any) -> bool:
     return bool(getattr(clue, "location_relevant", False))
 
 
-def _clue_matches_row(clue: Any, row_text: str) -> bool:
+def _clue_matches_row(
+    clue: Any,
+    row_text: str,
+    *,
+    session: Session | None = None,
+    project_id: int | None = None,
+) -> bool:
     value = _clue_value(clue)
     if value is None:
         return False
-    for expanded in expand_clue_value(value):
+    for expanded in expand_clue_value(value, session=session, project_id=project_id):
         if expanded.lower() in row_text:
             return True
     return False
@@ -136,6 +142,7 @@ def find_candidate_tiles_from_clues(
     page: int,
     clues: Sequence[Any],
     limit: int = 20,
+    project_id: int | None = None,
 ) -> list[CandidateTile]:
     location_clues = [
         clue
@@ -154,7 +161,11 @@ def find_candidate_tiles_from_clues(
 
     for tile in tiles:
         row_text = tile.text.lower()
-        matched = [clue for clue in location_clues if _clue_matches_row(clue, row_text)]
+        matched = [
+            clue
+            for clue in location_clues
+            if _clue_matches_row(clue, row_text, session=session, project_id=project_id)
+        ]
         if not matched:
             continue
 
@@ -166,7 +177,13 @@ def find_candidate_tiles_from_clues(
     return [tile for _, tile in scored[:limit]]
 
 
-def compute_tile_match_score(tile: CandidateTile, clues: Sequence[Any]) -> float:
+def compute_tile_match_score(
+    tile: CandidateTile,
+    clues: Sequence[Any],
+    *,
+    session: Session | None = None,
+    project_id: int | None = None,
+) -> float:
     """Backend-only score used to choose matched vs needs_review."""
     location_clues = [
         clue
@@ -177,7 +194,11 @@ def compute_tile_match_score(tile: CandidateTile, clues: Sequence[Any]) -> float
         return 0.0
 
     row_text = tile.text.lower()
-    matched = [clue for clue in location_clues if _clue_matches_row(clue, row_text)]
+    matched = [
+        clue
+        for clue in location_clues
+        if _clue_matches_row(clue, row_text, session=session, project_id=project_id)
+    ]
     if not matched:
         return 0.0
 

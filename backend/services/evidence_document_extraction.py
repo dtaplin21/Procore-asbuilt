@@ -40,9 +40,12 @@ def extract_evidence_file_content_with_links(
     """Return ``(merged_text, base_text, link_result)``."""
     base = extract_evidence_file_content(file_path).strip()
     link_result = follow_pdf_links(file_path)
-    merged = base
     if link_result.supplemental_text.strip():
-        merged = f"{base}\n{link_result.supplemental_text}".strip()
+        # Priority-ranked linked content first so classifiers/extractors see
+        # install drawings and plans within their preview window.
+        merged = f"{link_result.supplemental_text}\n{base}".strip()
+    else:
+        merged = base
     return merged, base, link_result
 
 

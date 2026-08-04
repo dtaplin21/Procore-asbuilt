@@ -8,7 +8,7 @@ legacy regex-only inspection query builder approach.
 from __future__ import annotations
 
 import re
-from typing import List
+from typing import TYPE_CHECKING, List
 
 from ai.pipelines.photo_clue_logic import build_field_photo_clue_candidates
 from ai.schemas.document_extraction_schemas import (
@@ -19,6 +19,9 @@ from ai.schemas.document_extraction_schemas import (
     MasterDrawingFields,
     UniversalFields,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 
 _LOCATION_LABEL_RE = re.compile(
@@ -63,10 +66,41 @@ def supplement_location_clues_from_content(content: str, clues: List[Clue]) -> L
     return clues + supplemental
 
 
+def _append_legend_abbreviation_clues(
+    clues: List[Clue],
+    session: Session,
+    project_id: int | None = None,
+) -> List[Clue]:
+    from services.legend_lookup import find_codes_for_term
+
+    expanded_clues: List[Clue] = []
+    existing_values = {clue.value.strip().lower() for clue in clues if clue.value.strip()}
+
+    for clue in clues:
+        codes = find_codes_for_term(session, clue.value, project_id)
+        for code in codes:
+            if code.strip().lower() in existing_values:
+                continue
+            expanded_clues.append(
+                Clue(
+                    type=f"{clue.type}_abbreviation",
+                    value=code,
+                    source=clue.source,
+                    confidence=clue.confidence * 0.9,
+                    location_relevant=clue.location_relevant,
+                )
+            )
+            existing_values.add(code.strip().lower())
+
+    return clues + expanded_clues
+
+
 def build_clues(
     document_type: DocumentType,
     universal: UniversalFields,
     type_specific,
+    session: Session | None = None,
+    project_id: int | None = None,
 ) -> List[Clue]:
     clues: List[Clue] = []
 
@@ -193,5 +227,8 @@ def build_clues(
                     location_relevant=True,
                 )
             )
+
+    if session is not None:
+        clues = _append_legend_abbreviation_clues(clues, session, project_id)
 
     return clues

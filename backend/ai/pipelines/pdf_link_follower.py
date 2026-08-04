@@ -13,11 +13,19 @@ from pathlib import Path
 
 import fitz
 
+from ai.pipelines.linked_attachment_merge import (
+    LinkedAttachment,
+    merge_linked_attachments_within_budget,
+)
 from config import settings
 from services.procore_url_parser import build_procore_cross_ref, parse_procore_url
-from services.safe_url_fetch import fetch_url_text, is_allowed_external_url
+from services.safe_url_fetch import (
+    fetch_url_attachment_with_error,
+    is_allowed_external_url,
+)
 
-MAX_SUPPLEMENTAL_TEXT_CHARS = 80_000
+MAX_SUPPLEMENTAL_TEXT_CHARS = 2_000_000
+_TRUNCATION_SUFFIX = "\n...[linked content truncated]"
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +63,15 @@ def follow_pdf_links(file_path: str | Path) -> LinkFollowResult:
     if path.suffix.lower() != ".pdf":
         return LinkFollowResult()
 
-    links = _dedupe_links(_extract_hyperlinks(path))
+    try:
+        links = _dedupe_links(_extract_hyperlinks(path))
+    except Exception:
+        logger.exception(
+            "pdf_hyperlink_extraction_failed",
+            extra={"file_path": str(file_path)},
+        )
+        return LinkFollowResult(errors=["hyperlink extraction failed"])
+
     result = _follow_links(path, links)
     logger.info(
         "pdf_link_follow_complete",
@@ -132,6 +148,7 @@ def _text_from_page(doc: fitz.Document, page_index: int) -> str:
 
 def _follow_links(file_path: Path, links: list[PdfHyperlink]) -> LinkFollowResult:
     result = LinkFollowResult()
+    attachments: list[LinkedAttachment] = []
 
     internal_links = [
         link
@@ -141,7 +158,7 @@ def _follow_links(file_path: Path, links: list[PdfHyperlink]) -> LinkFollowResul
     if internal_links:
         doc = fitz.open(str(file_path))
         try:
-            _follow_internal_links(doc, internal_links, result)
+            _collect_internal_attachments(doc, internal_links, attachments, result)
         finally:
             doc.close()
 
@@ -160,14 +177,31 @@ def _follow_links(file_path: Path, links: list[PdfHyperlink]) -> LinkFollowResul
             result.skipped_count += 1
             continue
         try:
-            text = fetch_url_text(uri)
+            fetched = fetch_url_attachment_with_error(uri)
             external_fetches += 1
-            if text.strip():
-                section = f"\n\n--- Linked content ({uri}) ---\n{text}"
-                if not _append_supplemental_text(result, section):
-                    result.skipped_count += 1
-                    continue
+            if fetched.text.strip():
+                word_count = len(fetched.text.split())
+                attachments.append(
+                    LinkedAttachment(
+                        url=uri,
+                        filename=fetched.filename,
+                        text=fetched.text,
+                        word_count=word_count,
+                        pages=fetched.pages or 1,
+                    )
+                )
+                logger.info(
+                    "pdf_link_fetch_ocr_complete",
+                    extra={
+                        "pages": fetched.pages,
+                        "words": word_count,
+                        "filename": fetched.filename,
+                    },
+                )
                 result.followed_count += 1
+            elif fetched.error:
+                result.errors.append(f"{uri}: {fetched.error}")
+                result.skipped_count += 1
             parsed = parse_procore_url(uri)
             if parsed:
                 result.cross_refs.append(
@@ -181,12 +215,36 @@ def _follow_links(file_path: Path, links: list[PdfHyperlink]) -> LinkFollowResul
             result.errors.append(str(exc))
             result.skipped_count += 1
 
+    if attachments:
+        merge_result = merge_linked_attachments_within_budget(attachments)
+        result.supplemental_text = merge_result["merged_text"]
+        logger.info(
+            "pdf_link_merge_complete",
+            extra={
+                "included": merge_result["included"],
+                "truncated": merge_result["truncated"],
+                "dropped": merge_result["dropped"],
+            },
+        )
+        if merge_result["dropped"]:
+            logger.warning(
+                "pdf_link_attachments_dropped",
+                extra={
+                    "dropped": merge_result["dropped"],
+                    "reason": "word_budget_exhausted",
+                },
+            )
+        if merge_result["truncated"]:
+            for filename in merge_result["truncated"]:
+                result.errors.append(f"linked attachment truncated in merge: {filename}")
+
     return result
 
 
-def _follow_internal_links(
+def _collect_internal_attachments(
     doc: fitz.Document,
     internal_links: list[PdfHyperlink],
+    attachments: list[LinkedAttachment],
     result: LinkFollowResult,
 ) -> None:
     unique_targets: list[int] = []
@@ -208,8 +266,19 @@ def _follow_internal_links(
 
     for page_index in unique_targets:
         text = _text_from_page(doc, page_index)
-        section = f"\n\n--- Linked content (page {page_index + 1}) ---\n{text}"
-        _append_supplemental_text(result, section)
+        if not text.strip():
+            continue
+        page_label = f"page {page_index + 1}"
+        attachments.append(
+            LinkedAttachment(
+                url=page_label,
+                filename=f"{page_label}.pdf",
+                text=text,
+                word_count=len(text.split()),
+                pages=1,
+            )
+        )
+        result.followed_count += 1
 
     for link in internal_links:
         target = link.target_page
@@ -225,14 +294,92 @@ def _follow_internal_links(
                 "anchor_text": link.anchor_text,
             }
         )
-        result.followed_count += 1
 
 
-def _append_supplemental_text(result: LinkFollowResult, section: str) -> bool:
-    if len(result.supplemental_text) + len(section) > MAX_SUPPLEMENTAL_TEXT_CHARS:
+def _append_supplemental_text(
+    result: LinkFollowResult,
+    section: str,
+    *,
+    links_remaining: int = 1,
+) -> bool:
+    """Legacy char-budget append helper retained for unit tests."""
+    remaining = MAX_SUPPLEMENTAL_TEXT_CHARS - len(result.supplemental_text)
+    if remaining <= 0:
         result.errors.append(
-            f"supplemental text would exceed {MAX_SUPPLEMENTAL_TEXT_CHARS} character cap"
+            f"supplemental text at {MAX_SUPPLEMENTAL_TEXT_CHARS} character cap"
         )
         return False
-    result.supplemental_text += section
+
+    budget = remaining
+    if links_remaining > 1:
+        budget = min(remaining, remaining // links_remaining)
+
+    if len(section) <= budget:
+        result.supplemental_text += section
+        return True
+
+    truncated = _truncate_section_to_fit(section, budget)
+    if truncated is None:
+        result.errors.append(
+            f"insufficient room to append linked content "
+            f"({budget} chars budget of {MAX_SUPPLEMENTAL_TEXT_CHARS} cap)"
+        )
+        return False
+
+    result.supplemental_text += truncated
+    omitted = len(section) - len(truncated)
+    if omitted > 0:
+        result.errors.append(
+            f"linked content truncated by {omitted} chars to fit "
+            f"{budget} char budget ({links_remaining} link(s) remaining)"
+        )
     return True
+
+
+def _split_linked_section(section: str) -> tuple[str, str]:
+    """Split ``--- Linked content ... ---`` header from body text."""
+    marker = "--- Linked content"
+    start = section.find(marker)
+    if start == -1:
+        return "", section
+    header_end = section.find("\n", start)
+    if header_end == -1:
+        return section, ""
+    return section[: header_end + 1], section[header_end + 1 :]
+
+
+def _truncate_text(text: str, max_len: int) -> str:
+    if max_len <= 0:
+        return ""
+    if len(text) <= max_len:
+        return text
+    head = text[:max_len]
+    for sep in ("\n", " "):
+        break_at = head.rfind(sep)
+        if break_at > max_len // 2:
+            return head[:break_at]
+    return head
+
+
+def _truncate_section_to_fit(section: str, max_len: int) -> str | None:
+    """Fit ``section`` into ``max_len`` chars, preserving the link header when possible."""
+    if max_len <= 0:
+        return None
+    if len(section) <= max_len:
+        return section
+
+    suffix = _TRUNCATION_SUFFIX
+    if max_len <= len(suffix):
+        return None
+
+    header, body = _split_linked_section(section)
+    if header and len(header) + len(suffix) < max_len:
+        body_budget = max_len - len(header) - len(suffix)
+        if body_budget <= 0:
+            return None
+        return header + _truncate_text(body, body_budget) + suffix
+
+    budget = max_len - len(suffix)
+    if budget <= 0:
+        return None
+    return _truncate_text(section, budget) + suffix

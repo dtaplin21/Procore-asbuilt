@@ -15,6 +15,7 @@ import models.review_queue_item  # noqa: F401
 import models.document_extraction  # noqa: F401
 import models.document_clue  # noqa: F401
 import models.drawing_match_candidate  # noqa: F401
+import models.legend_reference  # noqa: F401
 import models.models  # noqa: F401 — register ORM tables on Base.metadata
 
 

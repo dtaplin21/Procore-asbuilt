@@ -13,12 +13,20 @@ from .drawing_match_candidate import DrawingMatchCandidate
 from .drawing_overlay import DrawingOverlay, UnresolvedEvidence
 from .drawing_region import DrawingRegion
 from .inspection_run import InspectionRun
+from .legend_reference import (
+    DrawingLegendAbbreviation,
+    DrawingLegendLineType,
+    DrawingLegendSymbol,
+)
 from .review_queue_item import ReviewQueueItem
 
 __all__ = [
     "Base",
     "DocumentClue",
     "DocumentExtraction",
+    "DrawingLegendAbbreviation",
+    "DrawingLegendLineType",
+    "DrawingLegendSymbol",
     "DrawingMatchCandidate",
     "DrawingRegion",
     "DrawingOverlay",

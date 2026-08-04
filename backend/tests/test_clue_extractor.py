@@ -134,3 +134,28 @@ def test_supplement_location_clues_adds_short_location_code_from_text():
     location_code = next(c for c in enriched if c.type == "location_code")
     assert location_code.location_relevant is True
     assert location_code.source == "document_text"
+
+
+def test_build_clues_adds_legend_abbreviation_clues(db_session) -> None:
+    from scripts.seed_legend_reference import seed
+
+    seed(db_session, project_id=None)
+    universal = UniversalFields(trade="33-Sanitary Sewerage")
+    type_specific = InspectionReportFields(
+        inspection_notes=["Sanitary sewer inspection prior to backfill"],
+    )
+
+    clues = build_clues(
+        DocumentType.INSPECTION_REPORT,
+        universal,
+        type_specific,
+        session=db_session,
+    )
+
+    abbrev_clues = [clue for clue in clues if clue.type.endswith("_abbreviation")]
+    abbrev_values = {clue.value for clue in abbrev_clues}
+
+    assert "SS" in abbrev_values
+    ss_clue = next(clue for clue in abbrev_clues if clue.value == "SS")
+    assert ss_clue.type == "trade_abbreviation"
+    assert ss_clue.confidence == 0.85 * 0.9

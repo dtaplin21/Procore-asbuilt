@@ -48,9 +48,9 @@ def test_clue_matching_uses_literal_substrings_not_regex() -> None:
     assert _clue_matches_row(dot_clue, "roof drainage plan") is False
     assert _clue_matches_row(dot_clue, "a.b") is True
 
-    paren_clue = SimpleNamespace(clue_value="(COLO)", location_relevant=True, confidence=0.9)
-    assert _clue_matches_row(paren_clue, "colo parking lot") is False
-    assert _clue_matches_row(paren_clue, "(colo) parking lot") is True
+    paren_clue = SimpleNamespace(clue_value="(ZONE-A)", location_relevant=True, confidence=0.9)
+    assert _clue_matches_row(paren_clue, "zone-a parking lot") is False
+    assert _clue_matches_row(paren_clue, "(zone-a) parking lot") is True
 
 
 def _tile(text: str, confidence: float = 0.75) -> CandidateTile:
@@ -211,3 +211,31 @@ def test_no_text_match_returns_empty_list(mock_load):
     )
 
     assert results == []
+
+
+@patch("ai.pipelines.clue_expander.EXPANSIONS", {})
+@patch("ai.pipelines.candidate_tile_selector._load_candidate_tiles")
+def test_sanitary_sewer_clue_matches_ss_only_labels_via_legend(
+    mock_load,
+    db_session,
+) -> None:
+    """Legend lookup widens 'sanitary sewer' to SS when the OCR index has codes only."""
+    from scripts.seed_legend_reference import seed
+
+    seed(db_session, project_id=None)
+    mock_load.return_value = [
+        _tile("U2.C4.00 SS-3"),
+        _tile("ROOF DRAINAGE PLAN"),
+    ]
+    clues = [_clue("sanitary sewer", confidence=0.85)]
+
+    results = find_candidate_tiles_from_clues(
+        session=db_session,
+        drawing_id="10",
+        page=1,
+        clues=clues,
+    )
+
+    assert len(results) == 1
+    assert "SS" in results[0].text
+    assert "ROOF" not in results[0].text

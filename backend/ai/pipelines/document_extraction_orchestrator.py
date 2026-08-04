@@ -18,6 +18,7 @@ from ai.pipelines.universal_field_extractor import extract_universal_fields
 from ai.schemas.document_extraction_schemas import DocumentType
 from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
+from models.models import EvidenceRecord
 from services.review_queue import add_to_review_queue
 
 
@@ -66,10 +67,22 @@ def run_document_extraction(
     session.add(extraction)
     session.flush()
 
+    project_id: int | None = None
+    try:
+        evidence_id = int(file_id)
+    except (TypeError, ValueError):
+        evidence_id = None
+    if evidence_id is not None:
+        evidence = session.get(EvidenceRecord, evidence_id)
+        if evidence is not None:
+            project_id = evidence.project_id  # type: ignore[assignment]
+
     clues = build_clues(
         document_type=classification.document_type,
         universal=universal,
         type_specific=type_specific,
+        session=session,
+        project_id=project_id,
     )
     clues = supplement_location_clues_from_content(content, clues)
 

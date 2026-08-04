@@ -95,6 +95,8 @@ def fake_backends(request: pytest.FixtureRequest) -> Iterator[None]:
         "test_pdf_has_text_layer_scanned_pdf",
         "test_pdf_text_layer_extracts_words_with_boxes",
         "test_ocr_scanned_pdf_rasterizes_each_page_in_memory",
+        "test_ocr_scanned_pdf_respects_max_pages",
+        "test_extract_document_via_ocr_forces_pdf_ocr",
     }:
         yield
         return
@@ -316,3 +318,65 @@ def test_ocr_scanned_pdf_rasterizes_each_page_in_memory(tmp_path: Path) -> None:
     assert extracted.page_text(0) == "page-1"
     assert extracted.page_text(1) == "page-2"
     assert all(w.bbox.page_width == 1700.0 for w in extracted.words)
+
+
+def test_ocr_scanned_pdf_respects_max_pages(tmp_path: Path) -> None:
+    import fitz
+
+    from ai.pipelines.document_text_extraction import _ocr_scanned_pdf
+
+    pdf_path = tmp_path / "scanned-three-page.pdf"
+    doc = fitz.open()
+    for _ in range(3):
+        doc.new_page(width=612, height=792)
+    doc.save(str(pdf_path))
+    doc.close()
+
+    page_indices: list[int] = []
+
+    def fake_ocr_page(
+        file_path: str | Path,
+        page_index: int = 0,
+        **kwargs: object,
+    ) -> tuple[list[PositionedWord], float, float]:
+        page_indices.append(page_index)
+        return ([_word(f"page-{page_index + 1}", page_index=page_index)], 612.0, 792.0)
+
+    with patch(
+        "ai.pipelines.ocr_engine.ocr_pdf_page_in_memory",
+        side_effect=fake_ocr_page,
+    ):
+        extracted = _ocr_scanned_pdf(pdf_path, max_pages=2)
+
+    assert page_indices == [0, 1]
+    assert extracted.page_count == 2
+
+
+def test_extract_document_via_ocr_forces_pdf_ocr(tmp_path: Path) -> None:
+    import fitz
+
+    from ai.pipelines.document_text_extraction import extract_document_via_ocr
+
+    pdf_path = tmp_path / "cad-plan.pdf"
+    doc = fitz.open()
+    page = doc.new_page(width=612, height=792)
+    page.insert_text((72, 100), "native garbage")
+    doc.save(str(pdf_path))
+    doc.close()
+
+    def fake_ocr_page(
+        file_path: str | Path,
+        page_index: int = 0,
+        **kwargs: object,
+    ) -> tuple[list[PositionedWord], float, float]:
+        return ([_word("Sewer and Trench Sanitary", page_index=page_index)], 612.0, 792.0)
+
+    with patch(
+        "ai.pipelines.ocr_engine.ocr_pdf_page_in_memory",
+        side_effect=fake_ocr_page,
+    ):
+        extracted = extract_document_via_ocr(pdf_path)
+
+    assert extracted.source_format == SourceFormat.SCANNED_PDF
+    assert "Sewer" in extracted.full_text()
+    assert "garbage" not in extracted.full_text()
