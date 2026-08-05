@@ -38,6 +38,14 @@ PDF link enrichment (hyperlinks in uploaded evidence PDFs)::
     PDF_LINK_FOLLOW_ENABLED         # default true — set false to skip link follow on upload
     PDF_LINK_FOLLOW_MAX_EXTERNAL    # max HTTP fetches per PDF (default 5)
     PDF_LINK_FOLLOW_ALLOWED_HOSTS   # comma-separated host suffixes; FRONTEND_PUBLIC_URL host is merged in
+
+Master drawing auto-index::
+
+    DRAWING_INDEX_ENABLED                  # default true — set false to skip auto-index jobs
+    DRAWING_INDEX_TILE_SIZE_NORMALIZED     # fallback grid tile size as fraction of page (default 0.08)
+    DRAWING_INDEX_MIN_CLUSTER_WORDS        # min words per OCR cluster for auto-regions (default 2)
+    DRAWING_INDEX_OCR_MAX_PAGES            # max pages to OCR; 0 = all (default 0)
+    DRAWING_INDEX_AUTO_REGION_MODE         # cluster | grid | hybrid (default cluster)
 """
 
 from urllib.parse import urlparse
@@ -112,6 +120,29 @@ class Settings(BaseSettings):
         description="PDF_LINK_FOLLOW_OCR_MAX_PAGES",
     )
 
+    #: Enable master drawing auto-index jobs. Env: ``DRAWING_INDEX_ENABLED``.
+    drawing_index_enabled: bool = Field(default=True, description="DRAWING_INDEX_ENABLED")
+    #: Fallback grid tile size as fraction of page width/height. Env: ``DRAWING_INDEX_TILE_SIZE_NORMALIZED``.
+    drawing_index_tile_size_normalized: float = Field(
+        default=0.08,
+        description="DRAWING_INDEX_TILE_SIZE_NORMALIZED",
+    )
+    #: Min OCR words per cluster when building auto-regions. Env: ``DRAWING_INDEX_MIN_CLUSTER_WORDS``.
+    drawing_index_min_cluster_words: int = Field(
+        default=2,
+        description="DRAWING_INDEX_MIN_CLUSTER_WORDS",
+    )
+    #: Max pages to OCR during index; ``0`` = all pages. Env: ``DRAWING_INDEX_OCR_MAX_PAGES``.
+    drawing_index_ocr_max_pages: int = Field(
+        default=0,
+        description="DRAWING_INDEX_OCR_MAX_PAGES",
+    )
+    #: Auto-region strategy: ``cluster``, ``grid``, or ``hybrid``. Env: ``DRAWING_INDEX_AUTO_REGION_MODE``.
+    drawing_index_auto_region_mode: Literal["cluster", "grid", "hybrid"] = Field(
+        default="cluster",
+        description="DRAWING_INDEX_AUTO_REGION_MODE",
+    )
+
     # In some environments (CI, sandboxes), extra env vars may be present.
     # Ignore unknown keys instead of erroring at import time.
     model_config = SettingsConfigDict(
@@ -131,6 +162,13 @@ class Settings(BaseSettings):
     @field_validator("ocr_backend", mode="before")
     @classmethod
     def _normalize_ocr_backend(cls, v: object) -> object:
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
+    @field_validator("drawing_index_auto_region_mode", mode="before")
+    @classmethod
+    def _normalize_drawing_index_auto_region_mode(cls, v: object) -> object:
         if isinstance(v, str):
             return v.strip().lower()
         return v

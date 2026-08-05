@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from models.models import Drawing, JobQueue, Project, User, UserCompany
 from observability.workflow_logging import log_job_status_transition
+from services.drawing_index_jobs import maybe_enqueue_drawing_index_job
 from services.drawing_rendering import run_render_drawing_job
 
 DRAWING_RENDER_JOB_TYPE = "drawing_render"
@@ -90,5 +91,22 @@ async def process_drawing_render_job(drawing_id: int) -> None:
     """
     Async wrapper for run_render_drawing_job. PyMuPDF rendering is CPU-bound,
     so we offload to a thread via asyncio.to_thread().
+
+    On success, chains a drawing_index job when auto-index is enabled.
     """
+    from database import SessionLocal
+
     await asyncio.to_thread(run_render_drawing_job, drawing_id)
+
+    db = SessionLocal()
+    try:
+        drawing = db.get(Drawing, drawing_id)
+        if drawing is None:
+            return
+        maybe_enqueue_drawing_index_job(
+            db,
+            project_id=cast(int, drawing.project_id),
+            drawing_id=drawing_id,
+        )
+    finally:
+        db.close()

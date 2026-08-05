@@ -23,6 +23,11 @@ from services.drawing_render_jobs import (
     DRAWING_RENDER_JOB_TYPE,
     process_drawing_render_job,
 )
+from services.drawing_index_jobs import (
+    JOB_TYPE as DRAWING_INDEX_JOB_TYPE,
+    maybe_enqueue_drawing_index_job,
+    process_drawing_index_job,
+)
 from services.inspection_matching_jobs import (
     JOB_TYPE_INSPECTION_MATCH,
     process_inspection_match_job,
@@ -40,7 +45,16 @@ async def handle_job(job: JobQueue) -> None:
         drawing_id = input_data.get("drawing_id") if input_data else None
         if drawing_id is None:
             raise ValueError("drawing_render job missing input_data.drawing_id")
-        await process_drawing_render_job(coerce_job_int(drawing_id, "drawing_id"))
+        resolved_drawing_id = coerce_job_int(drawing_id, "drawing_id")
+        await process_drawing_render_job(resolved_drawing_id)
+        return
+
+    if job_type == DRAWING_INDEX_JOB_TYPE:
+        input_data = cast(dict[str, Any] | None, job.input_data)
+        drawing_id = input_data.get("drawing_id") if input_data else None
+        if drawing_id is None:
+            raise ValueError("drawing_index job missing input_data.drawing_id")
+        await process_drawing_index_job(coerce_job_int(drawing_id, "drawing_id"))
         return
 
     if job_type == JOB_TYPE_INSPECTION_MATCH:
