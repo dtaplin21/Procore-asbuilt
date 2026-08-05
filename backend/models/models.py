@@ -307,7 +307,17 @@ class Drawing(Base):
     original_filename = Column(String, nullable=True)
     processing_status = Column(String, nullable=False, default="pending")  # pending, processing, ready, failed
     processing_error = Column(Text, nullable=True)
-    
+
+    # Master drawing auto-index metadata (Phase 0b)
+    scale_json = Column(JSON, nullable=True)
+    page_meta_json = Column(JSON, nullable=True)
+
+    # Master drawing auto-index job status (Phase 0c)
+    index_status = Column(String, nullable=False, default="pending")  # pending, processing, ready, failed
+    index_error = Column(Text, nullable=True)
+    indexed_at = Column(DateTime, nullable=True)
+    index_stats_json = Column(JSON, nullable=True)
+
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,
