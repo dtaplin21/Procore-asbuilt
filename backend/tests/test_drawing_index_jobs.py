@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import io
+import uuid
 from typing import cast
 from unittest.mock import patch
 
+import fitz
 from sqlalchemy.orm import Session
 
 from models.drawing_region import DrawingRegion
 from models.drawing_text_element import DrawingTextElement
-from models.models import Drawing
+from models.models import Drawing, JobQueue, Project
 from services.drawing_index_jobs import (
     AUTO_INDEX_REGION_SOURCE,
     JOB_TYPE,
@@ -19,7 +22,60 @@ from services.drawing_index_jobs import (
     is_auto_index_region,
     run_drawing_index_job,
 )
-from services.drawing_render_jobs import process_drawing_render_job
+from services.drawing_render_jobs import DRAWING_RENDER_JOB_TYPE, process_drawing_render_job
+
+
+def _minimal_pdf_bytes() -> bytes:
+    doc = fitz.open()
+    page = doc.new_page(width=200, height=200)
+    page.insert_text((50, 100), "Test PDF")
+    out = doc.tobytes()
+    doc.close()
+    return out
+
+
+def test_upload_drawing_enqueues_index_job(
+    client,
+    db_session: Session,
+    project: Project,
+) -> None:
+    """Upload → drawing_render job; render success chains drawing_index (Phase 8)."""
+    project_id = cast(int, project.id)
+    pdf = _minimal_pdf_bytes()
+    files = {"file": ("master.pdf", io.BytesIO(pdf), "application/pdf")}
+
+    response = client.post(
+        f"/api/projects/{project_id}/drawings",
+        files=files,
+        headers={"Idempotency-Key": uuid.uuid4().hex},
+    )
+    assert response.status_code == 200, response.text
+    drawing_id = response.json()["id"]
+
+    render_jobs = (
+        db_session.query(JobQueue)
+        .filter(
+            JobQueue.job_type == DRAWING_RENDER_JOB_TYPE,
+            JobQueue.project_id == project_id,
+        )
+        .all()
+    )
+    matching_render = [
+        job
+        for job in render_jobs
+        if isinstance(job.input_data, dict)
+        and int(job.input_data.get("drawing_id", -1)) == drawing_id
+    ]
+    assert len(matching_render) == 1
+
+    with patch("services.drawing_render_jobs.run_render_drawing_job"):
+        with patch(
+            "services.drawing_render_jobs.maybe_enqueue_drawing_index_job"
+        ) as mock_enqueue:
+            asyncio.run(process_drawing_render_job(drawing_id))
+            mock_enqueue.assert_called_once()
+            assert mock_enqueue.call_args.kwargs["project_id"] == project_id
+            assert mock_enqueue.call_args.kwargs["drawing_id"] == drawing_id
 
 
 def test_enqueue_drawing_index_job(db_session: Session, seeded_ready_pdf_drawing: Drawing) -> None:
