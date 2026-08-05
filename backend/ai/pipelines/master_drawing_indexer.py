@@ -1,16 +1,32 @@
-"""Master drawing OCR index pipeline (Phase 2+).
+"""Master drawing OCR index pipeline.
 
-Phase 1a wires the job; OCR ingest, scale parsing, and region building land here.
+Phase 2: extract positioned words from the drawing file and persist
+``DrawingTextElement`` rows. Scale parsing and region building follow in
+later phases.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, cast
 
+import fitz  # PyMuPDF
 from sqlalchemy.orm import Session
 
+from ai.pipelines.document_text_extraction import (
+    ExtractedDocument,
+    PositionedWord,
+    SourceFormat,
+    extract_document,
+)
+from config import settings
+from models.drawing_text_element import DrawingTextElement
 from models.models import Drawing, DrawingRendition
+from services.storage import open_storage_path
+
+_WHITESPACE_RE = re.compile(r"\s+")
 
 
 @dataclass(frozen=True)
@@ -31,21 +47,161 @@ class IndexResult:
         }
 
 
-def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
-    """Run OCR ingest, scale extraction, legend tagging, and region build.
+def normalize_token_text(text: str) -> str:
+    return _WHITESPACE_RE.sub(" ", text.strip()).lower()
 
-    Stub until Phase 2–5 are implemented; returns page count from the drawing.
-    """
+
+def word_bbox_json(word: PositionedWord) -> dict[str, float]:
+    x0, y0, x1, y1 = word.bbox.to_fractional()
+    return {"x0": x0, "y0": y0, "x1": x1, "y1": y1}
+
+
+def element_source(source_format: SourceFormat) -> str:
+    if source_format == SourceFormat.NATIVE_PDF:
+        return "native_pdf"
+    backend = settings.ocr_backend
+    if backend == "openai_vision":
+        return "openai_vision"
+    return "tesseract"
+
+
+def _index_max_pages() -> int | None:
+    cap = int(settings.drawing_index_ocr_max_pages)
+    return cap if cap > 0 else None
+
+
+def _limit_extracted_document(
+    document: ExtractedDocument,
+    max_pages: int | None,
+) -> ExtractedDocument:
+    if max_pages is None or max_pages <= 0 or document.page_count <= max_pages:
+        return document
+    filtered_words = [word for word in document.words if word.page_index < max_pages]
+    return ExtractedDocument(
+        source_format=document.source_format,
+        page_count=max_pages,
+        words=filtered_words,
+    )
+
+
+def extract_drawing_document(file_path: Path) -> ExtractedDocument:
+    document = extract_document(file_path)
+    return _limit_extracted_document(document, _index_max_pages())
+
+
+def build_page_meta_json(
+    session: Session,
+    drawing_id: int,
+    file_path: Path,
+    *,
+    page_count: int,
+) -> list[dict[str, Any]]:
+    renditions = (
+        session.query(DrawingRendition)
+        .filter(DrawingRendition.drawing_id == drawing_id)
+        .order_by(DrawingRendition.page_number.asc())
+        .all()
+    )
+    rendition_by_page = {
+        cast(int, rendition.page_number): rendition for rendition in renditions
+    }
+
+    if file_path.suffix.lower() == ".pdf":
+        doc = fitz.open(str(file_path))
+        try:
+            total_pages = min(doc.page_count, page_count)
+            page_meta: list[dict[str, Any]] = []
+            for page_index in range(total_pages):
+                page = doc.load_page(page_index)
+                page_number = page_index + 1
+                rendition = rendition_by_page.get(page_number)
+                page_meta.append(
+                    {
+                        "page": page_number,
+                        "width_pt": float(page.rect.width),
+                        "height_pt": float(page.rect.height),
+                        "width_px": cast(int | None, rendition.width_px if rendition else None),
+                        "height_px": cast(int | None, rendition.height_px if rendition else None),
+                        "rotation": int(page.rotation),
+                    }
+                )
+            return page_meta
+        finally:
+            doc.close()
+
+    rendition = rendition_by_page.get(1)
+    return [
+        {
+            "page": 1,
+            "width_pt": None,
+            "height_pt": None,
+            "width_px": cast(int | None, rendition.width_px if rendition else None),
+            "height_px": cast(int | None, rendition.height_px if rendition else None),
+            "rotation": 0,
+        }
+    ]
+
+
+def persist_text_elements(
+    session: Session,
+    drawing_id: int,
+    words: list[PositionedWord],
+    source_format: SourceFormat,
+) -> int:
+    source = element_source(source_format)
+    rows: list[DrawingTextElement] = []
+    for word in words:
+        text = word.text.strip()
+        if not text:
+            continue
+        rows.append(
+            DrawingTextElement(
+                master_drawing_id=drawing_id,
+                page=word.page_index + 1,
+                text=text,
+                text_normalized=normalize_token_text(text),
+                bbox_json=word_bbox_json(word),
+                ocr_confidence=float(word.ocr_confidence),
+                source=source,
+            )
+        )
+
+    if rows:
+        session.add_all(rows)
+        session.flush()
+    return len(rows)
+
+
+def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
+    """Extract positioned OCR/text-layer words and persist drawing index rows."""
     drawing = session.get(Drawing, drawing_id)
     if drawing is None:
         raise ValueError(f"Drawing {drawing_id} not found")
 
-    pages = cast(int | None, drawing.page_count)
-    if not pages:
-        pages = (
-            session.query(DrawingRendition)
-            .filter(DrawingRendition.drawing_id == drawing_id)
-            .count()
-        )
+    storage_key = cast(str | None, drawing.storage_key)
+    if not storage_key:
+        raise ValueError(f"Drawing {drawing_id} has no storage_key")
 
-    return IndexResult(pages=int(pages or 0))
+    source_path = open_storage_path(storage_key)
+    if not source_path.exists():
+        raise FileNotFoundError(f"Drawing source file not found: {source_path}")
+
+    extracted = extract_drawing_document(source_path)
+    page_meta_json = build_page_meta_json(
+        session,
+        drawing_id,
+        source_path,
+        page_count=extracted.page_count,
+    )
+    text_elements = persist_text_elements(
+        session,
+        drawing_id,
+        extracted.words,
+        extracted.source_format,
+    )
+
+    return IndexResult(
+        pages=extracted.page_count,
+        text_elements=text_elements,
+        page_meta_json=page_meta_json,
+    )

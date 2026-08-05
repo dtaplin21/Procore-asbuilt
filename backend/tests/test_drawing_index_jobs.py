@@ -43,15 +43,18 @@ def test_run_drawing_index_job_sets_ready_status(
 
     db_session.refresh(seeded_ready_pdf_drawing)
     assert result.pages >= 1
+    assert result.text_elements >= 1
     assert seeded_ready_pdf_drawing.index_status == "ready"
     assert seeded_ready_pdf_drawing.index_error is None
     assert seeded_ready_pdf_drawing.indexed_at is not None
     assert seeded_ready_pdf_drawing.index_stats_json == {
         "pages": result.pages,
-        "text_elements": 0,
+        "text_elements": result.text_elements,
         "regions": 0,
         "scale_found": False,
     }
+    assert seeded_ready_pdf_drawing.page_meta_json is not None
+    assert len(seeded_ready_pdf_drawing.page_meta_json) >= 1
 
 
 def test_clear_drawing_index_artifacts_keeps_manual_regions(
@@ -136,12 +139,13 @@ def test_run_drawing_index_job_is_idempotent(
 
     run_drawing_index_job(drawing_id, db_session)
 
-    text_count = (
+    rows = (
         db_session.query(DrawingTextElement)
         .filter(DrawingTextElement.master_drawing_id == drawing_id)
-        .count()
+        .all()
     )
-    assert text_count == 0
+    assert len(rows) >= 1
+    assert all(row.text != "OLD" for row in rows)
 
 
 def test_process_drawing_render_job_chains_index_job(
