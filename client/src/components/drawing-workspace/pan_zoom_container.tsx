@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useMemo, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Point = {
   x: number;
@@ -95,7 +95,7 @@ export default function PanZoomContainer({
   }, []);
 
   const handleWheel = useCallback(
-    (event: React.WheelEvent<HTMLDivElement>) => {
+    (event: WheelEvent) => {
       event.preventDefault();
 
       const container = containerRef.current;
@@ -126,6 +126,14 @@ export default function PanZoomContainer({
     },
     [minScale, maxScale]
   );
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+  }, [handleWheel]);
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -298,7 +306,6 @@ export default function PanZoomContainer({
         className={`relative flex-1 overflow-hidden bg-muted/40 touch-none ${
           isPinching ? "cursor-zoom-in" : isDragging ? "cursor-grabbing" : "cursor-grab"
         }`}
-        onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={cleanupPointer}

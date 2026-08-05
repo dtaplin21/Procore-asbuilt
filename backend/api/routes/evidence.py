@@ -28,6 +28,7 @@ from services.idempotency import begin_idempotent_operation, finish_idempotent_o
 from services.overlay_storage import create_drawing_overlays, flag_unresolved_evidence
 from services.master_drawing_index_readiness import get_master_drawing_index_readiness
 from services.drawing_index_jobs import maybe_enqueue_drawing_index_job
+from services.region_index_loader import build_region_index
 from services.storage import StorageService
 from fastapi.responses import FileResponse
 
