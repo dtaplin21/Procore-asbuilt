@@ -61,6 +61,10 @@ async def handle_job(job: JobQueue) -> None:
         input_data = cast(dict[str, Any] | None, job.input_data)
         if not input_data:
             raise ValueError("inspection_match job missing input_data")
+        if input_data.get("project_id") is None:
+            job_project_id = getattr(job, "project_id", None)
+            if job_project_id is not None:
+                input_data = {**input_data, "project_id": int(cast(int, job_project_id))}
         await process_inspection_match_job(input_data)
         return
 

@@ -21,7 +21,8 @@ from ai.pipelines.candidate_tile_selector import (
 from models.drawing_overlay import DrawingOverlay
 from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
-from models.models import JobQueue, Project, User, UserCompany
+from models.inspection_run import InspectionRun
+from models.models import Drawing, JobQueue, Project, User, UserCompany
 from services.inspection_match_persistence import (
     MATCH_SCORE_THRESHOLD,
     InternalMatchCandidate,
@@ -111,6 +112,51 @@ def _resolve_user_id_for_project(db: Session, project_id: int) -> int:
     return cast(int, user.id)
 
 
+def _parse_optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _resolve_project_id_for_match(
+    session: Session,
+    *,
+    payload: dict[str, Any],
+    drawing_id: str | int,
+    inspection_id: str,
+    inspection_run_id: int | None,
+) -> int | None:
+    """Resolve project scope for legend expansion during clue matching."""
+    project_id = _parse_optional_int(payload.get("project_id"))
+    if project_id is not None:
+        return project_id
+
+    master_drawing_id = _parse_optional_int(drawing_id)
+    if master_drawing_id is not None:
+        drawing = session.query(Drawing).filter(Drawing.id == master_drawing_id).first()
+        if drawing is not None:
+            drawing_project_id = getattr(drawing, "project_id", None)
+            if drawing_project_id is not None:
+                return int(cast(int, drawing_project_id))
+
+    run_id = resolve_inspection_run_id(
+        session,
+        inspection_id,
+        inspection_run_id=inspection_run_id,
+    )
+    if run_id is not None:
+        run = session.query(InspectionRun).filter(InspectionRun.id == run_id).first()
+        if run is not None:
+            run_project_id = getattr(run, "project_id", None)
+            if run_project_id is not None:
+                return int(cast(int, run_project_id))
+
+    return None
+
+
 def enqueue_inspection_match_job(
     db: Session,
     *,
@@ -194,20 +240,14 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
     inspection_id = str(payload["inspection_id"])
     drawing_id = payload["drawing_id"]
     page = int(payload.get("page", 1))
-    project_id: int | None = None
-    raw_project_id = payload.get("project_id")
-    if raw_project_id is not None:
-        try:
-            project_id = int(raw_project_id)
-        except (TypeError, ValueError):
-            project_id = None
-    run_id_hint: int | None = None
-    raw_run_id = payload.get("inspection_run_id")
-    if raw_run_id is not None:
-        try:
-            run_id_hint = int(raw_run_id)
-        except (TypeError, ValueError):
-            run_id_hint = None
+    run_id_hint = _parse_optional_int(payload.get("inspection_run_id"))
+    project_id = _resolve_project_id_for_match(
+        session,
+        payload=payload,
+        drawing_id=drawing_id,
+        inspection_id=inspection_id,
+        inspection_run_id=run_id_hint,
+    )
 
     def _persist(**kwargs: Any) -> None:
         persist_inspection_match_overlay(

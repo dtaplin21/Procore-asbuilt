@@ -127,6 +127,63 @@ def _candidate(confidence: float = 0.75) -> CandidateTile:
 
 @patch("services.inspection_matching_jobs.compute_tile_match_score")
 @patch("services.inspection_matching_jobs.find_candidate_tiles_from_clues")
+def test_run_inspection_match_job_passes_project_id_to_candidate_selector(
+    mock_find,
+    mock_score,
+    db: Session,
+):
+    run, file_id = _seed_run(db)
+    mock_find.return_value = [_candidate()]
+    mock_score.return_value = MATCH_SCORE_THRESHOLD + 0.1
+    project_id = cast(int, run.project_id)
+
+    status = run_inspection_match_job(
+        {
+            "inspection_id": file_id,
+            "drawing_id": str(run.master_drawing_id),
+            "page": 1,
+            "project_id": project_id,
+        },
+        db,
+    )
+
+    assert status == "matched"
+    mock_find.assert_called_once()
+    assert mock_find.call_args.kwargs["project_id"] == project_id
+    mock_score.assert_called_once()
+    assert mock_score.call_args.kwargs["project_id"] == project_id
+
+
+@patch("services.inspection_matching_jobs.compute_tile_match_score")
+@patch("services.inspection_matching_jobs.find_candidate_tiles_from_clues")
+def test_run_inspection_match_job_resolves_project_id_from_drawing(
+    mock_find,
+    mock_score,
+    db: Session,
+):
+    run, file_id = _seed_run(db)
+    mock_find.return_value = [_candidate()]
+    mock_score.return_value = MATCH_SCORE_THRESHOLD + 0.1
+    project_id = cast(int, run.project_id)
+
+    status = run_inspection_match_job(
+        {
+            "inspection_id": file_id,
+            "drawing_id": str(run.master_drawing_id),
+            "page": 1,
+        },
+        db,
+    )
+
+    assert status == "matched"
+    mock_find.assert_called_once()
+    assert mock_find.call_args.kwargs["project_id"] == project_id
+    mock_score.assert_called_once()
+    assert mock_score.call_args.kwargs["project_id"] == project_id
+
+
+@patch("services.inspection_matching_jobs.compute_tile_match_score")
+@patch("services.inspection_matching_jobs.find_candidate_tiles_from_clues")
 def test_run_inspection_match_job_matched(mock_find, mock_score, db: Session):
     run, file_id = _seed_run(db)
     mock_find.return_value = [_candidate()]

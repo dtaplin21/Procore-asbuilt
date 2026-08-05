@@ -10,9 +10,15 @@ from sqlalchemy.orm import Session
 
 from ai.pipelines.candidate_tile_selector import (
     CandidateTile,
+    _bbox_overlap_ratio,
     _clue_matches_row,
+    _load_candidate_tiles,
+    _merge_candidate_tiles,
     find_candidate_tiles_from_clues,
 )
+from models.drawing_region import DrawingRegion
+from models.drawing_text_element import DrawingTextElement
+from services.storage import StorageService
 from ai.schemas.document_extraction_schemas import Clue
 
 
@@ -239,3 +245,141 @@ def test_sanitary_sewer_clue_matches_ss_only_labels_via_legend(
     assert len(results) == 1
     assert "SS" in results[0].text
     assert "ROOF" not in results[0].text
+
+
+def test_bbox_overlap_ratio_detects_intersection() -> None:
+    left = (0.0, 0.0, 0.5, 0.5)
+    contained = (0.1, 0.1, 0.4, 0.4)
+    assert _bbox_overlap_ratio(left, contained) > 0.5
+    assert _bbox_overlap_ratio(left, (0.6, 0.6, 0.8, 0.8)) == 0.0
+
+
+def test_merge_candidate_tiles_prefers_text_elements_over_overlapping_regions() -> None:
+    text_tile = CandidateTile(
+        drawing_id="10",
+        page=1,
+        text="SS-3",
+        confidence=0.85,
+        bbox_normalized=(0.1, 0.1, 0.2, 0.2),
+        text_element_id=1,
+    )
+    region_tile = CandidateTile(
+        drawing_id="10",
+        page=1,
+        text="SS cluster COLO",
+        confidence=0.75,
+        bbox_normalized=(0.12, 0.12, 0.25, 0.25),
+        region_id=2,
+    )
+    separate_region = CandidateTile(
+        drawing_id="10",
+        page=1,
+        text="ROOF DRAINAGE PLAN",
+        confidence=0.75,
+        bbox_normalized=(0.7, 0.7, 0.9, 0.9),
+        region_id=3,
+    )
+
+    merged = _merge_candidate_tiles([text_tile], [region_tile, separate_region])
+
+    assert len(merged) == 2
+    assert text_tile in merged
+    assert region_tile not in merged
+    assert separate_region in merged
+
+
+def test_candidate_selector_uses_text_elements(db_session, project) -> None:
+    """Fine OCR tokens are loaded before coarse drawing regions."""
+    storage = StorageService(db_session)
+    drawing = storage.create_drawing(
+        project_id=cast(int, project.id),
+        source="upload",
+        name="Master.pdf",
+        storage_key="projects/2/drawings/master.pdf",
+        content_type="application/pdf",
+    )
+    drawing_id = cast(int, drawing.id)
+
+    db_session.add(
+        DrawingTextElement(
+            master_drawing_id=drawing_id,
+            page=1,
+            text="SS-3",
+            text_normalized="ss-3",
+            bbox_json={"x0": 0.10, "y0": 0.10, "x1": 0.14, "y1": 0.12},
+            ocr_confidence=0.95,
+            source="native_pdf",
+        )
+    )
+    db_session.add(
+        DrawingRegion(
+            master_drawing_id=drawing_id,
+            label="COLO sanitary sewer cluster",
+            page=1,
+            geometry={"type": "rect", "x": 0.5, "y": 0.5, "width": 0.2, "height": 0.2},
+            location_tags=["COLO"],
+        )
+    )
+    db_session.commit()
+
+    tiles = _load_candidate_tiles(db_session, drawing_id, page=1)
+
+    assert len(tiles) == 2
+    text_tile = next(tile for tile in tiles if tile.text_element_id is not None)
+    region_tile = next(tile for tile in tiles if tile.region_id is not None)
+    assert "SS-3" in text_tile.text
+    assert "COLO" in region_tile.text
+
+    results = find_candidate_tiles_from_clues(
+        session=db_session,
+        drawing_id=drawing_id,
+        page=1,
+        clues=[_clue("SS-3", confidence=0.9)],
+    )
+
+    assert len(results) == 1
+    assert results[0].text_element_id is not None
+    assert "SS-3" in results[0].text
+
+
+def test_overlapping_region_dropped_when_text_element_covers_same_bbox(
+    db_session,
+    project,
+) -> None:
+    storage = StorageService(db_session)
+    drawing = storage.create_drawing(
+        project_id=cast(int, project.id),
+        source="upload",
+        name="Master.pdf",
+        storage_key="projects/2/drawings/master-overlap.pdf",
+        content_type="application/pdf",
+    )
+    drawing_id = cast(int, drawing.id)
+
+    db_session.add(
+        DrawingTextElement(
+            master_drawing_id=drawing_id,
+            page=1,
+            text="SS-3",
+            text_normalized="ss-3",
+            bbox_json={"x0": 0.10, "y0": 0.10, "x1": 0.20, "y1": 0.20},
+            ocr_confidence=0.95,
+            source="native_pdf",
+        )
+    )
+    db_session.add(
+        DrawingRegion(
+            master_drawing_id=drawing_id,
+            label="SS-3 cluster",
+            page=1,
+            geometry={"type": "rect", "x": 0.10, "y": 0.10, "width": 0.10, "height": 0.10},
+            location_tags=["SS"],
+        )
+    )
+    db_session.commit()
+
+    tiles = _load_candidate_tiles(db_session, drawing_id, page=1)
+
+    assert len(tiles) == 1
+    assert tiles[0].text_element_id is not None
+    assert tiles[0].region_id is None

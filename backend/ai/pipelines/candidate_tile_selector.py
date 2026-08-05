@@ -3,22 +3,24 @@
 This is the first narrowing step before expensive vision calls. Confidence is
 backend-only and used only for ranking.
 
-This repo does not yet have a ``DrawingTextElement`` OCR table. Candidate tiles
-are loaded from ``drawing_regions`` (label + location/inspection tags + geometry)
-which is the existing master-drawing location index used by
-``drawing_location_resolver.py``.
+Candidate tiles are loaded from ``drawing_text_elements`` first (fine OCR/token
+match), then ``drawing_regions`` (coarse tagged clusters). Overlapping tiles are
+deduplicated with text-element matches preferred.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Any, Sequence, cast
 
 from sqlalchemy.orm import Session
 
 from ai.pipelines.clue_expander import expand_clue_value
 from models.drawing_region import DrawingRegion
+from models.drawing_text_element import DrawingTextElement
 from services.region_index_loader import geometry_to_bounding_box
+
+_BBOX_OVERLAP_THRESHOLD = 0.5
 
 
 @dataclass(frozen=True)
@@ -31,6 +33,7 @@ class CandidateTile:
     confidence: float
     bbox_normalized: tuple[float, float, float, float] | None
     region_id: int | None = None
+    text_element_id: int | None = None
 
 
 def _clue_value(clue: Any) -> str | None:
@@ -70,6 +73,132 @@ def _clue_matches_row(
     return False
 
 
+def _bbox_from_json(bbox_json: object) -> tuple[float, float, float, float] | None:
+    if not isinstance(bbox_json, dict):
+        return None
+    if all(key in bbox_json for key in ("x0", "y0", "x1", "y1")):
+        return (
+            float(bbox_json["x0"]),
+            float(bbox_json["y0"]),
+            float(bbox_json["x1"]),
+            float(bbox_json["y1"]),
+        )
+    if all(key in bbox_json for key in ("x", "y", "width", "height")):
+        x = float(bbox_json["x"])
+        y = float(bbox_json["y"])
+        width = float(bbox_json["width"])
+        height = float(bbox_json["height"])
+        return x, y, x + width, y + height
+    return None
+
+
+def _bbox_overlap_ratio(
+    left: tuple[float, float, float, float] | None,
+    right: tuple[float, float, float, float] | None,
+) -> float:
+    if left is None or right is None:
+        return 0.0
+
+    lx0, ly0, lx1, ly1 = left
+    rx0, ry0, rx1, ry1 = right
+    ix0 = max(lx0, rx0)
+    iy0 = max(ly0, ry0)
+    ix1 = min(lx1, rx1)
+    iy1 = min(ly1, ry1)
+    if ix1 <= ix0 or iy1 <= iy0:
+        return 0.0
+
+    intersection = (ix1 - ix0) * (iy1 - iy0)
+    left_area = max((lx1 - lx0) * (ly1 - ly0), 1e-9)
+    right_area = max((rx1 - rx0) * (ry1 - ry0), 1e-9)
+    return intersection / min(left_area, right_area)
+
+
+def _overlaps_existing_tile(
+    tile: CandidateTile,
+    kept: Sequence[CandidateTile],
+    *,
+    threshold: float = _BBOX_OVERLAP_THRESHOLD,
+) -> bool:
+    for existing in kept:
+        if _bbox_overlap_ratio(tile.bbox_normalized, existing.bbox_normalized) >= threshold:
+            return True
+    return False
+
+
+def _merge_candidate_tiles(
+    text_element_tiles: Sequence[CandidateTile],
+    region_tiles: Sequence[CandidateTile],
+) -> list[CandidateTile]:
+    """Prefer OCR text-element tiles; skip overlapping region tiles."""
+    merged = list(text_element_tiles)
+    for tile in region_tiles:
+        if _overlaps_existing_tile(tile, merged):
+            continue
+        merged.append(tile)
+    return merged
+
+
+def _text_element_search_text(row: DrawingTextElement) -> str:
+    parts: list[str] = []
+    text = str(row.text).strip()
+    if text:
+        parts.append(text)
+
+    expansion = row.legend_expansion
+    if isinstance(expansion, str) and expansion.strip():
+        parts.append(expansion.strip())
+
+    codes = row.legend_codes_json
+    if isinstance(codes, list):
+        parts.extend(str(code).strip() for code in codes if str(code).strip())
+
+    return " ".join(parts)
+
+
+def _text_element_confidence(row: DrawingTextElement) -> float:
+    ocr_confidence = float(cast(float, row.ocr_confidence))
+    legend_expansion = getattr(row, "legend_expansion", None)
+    legend_codes = getattr(row, "legend_codes_json", None)
+    if legend_expansion or legend_codes:
+        return max(0.85, ocr_confidence * 0.95)
+    return max(0.80, ocr_confidence * 0.90)
+
+
+def _load_text_element_tiles(
+    session: Session,
+    drawing_id: str | int,
+    page: int,
+) -> list[CandidateTile]:
+    master_drawing_id = int(drawing_id)
+    rows: list[DrawingTextElement] = (
+        session.query(DrawingTextElement)
+        .filter(
+            DrawingTextElement.master_drawing_id == master_drawing_id,
+            DrawingTextElement.page == page,
+        )
+        .order_by(DrawingTextElement.id.asc())
+        .all()
+    )
+
+    tiles: list[CandidateTile] = []
+    for row in rows:
+        text = _text_element_search_text(row)
+        if not text:
+            continue
+        tiles.append(
+            CandidateTile(
+                drawing_id=str(master_drawing_id),
+                page=page,
+                text=text,
+                confidence=_text_element_confidence(row),
+                bbox_normalized=_bbox_from_json(row.bbox_json),
+                text_element_id=getattr(row, "id", None),
+            )
+        )
+    return tiles
+
+
 def _region_search_text(row: DrawingRegion) -> str:
     parts: list[str] = []
     label = getattr(row, "label", None)
@@ -102,7 +231,7 @@ def _region_bbox_normalized(row: DrawingRegion) -> tuple[float, float, float, fl
     return bbox.to_fractional()
 
 
-def _load_candidate_tiles(
+def _load_region_tiles(
     session: Session,
     drawing_id: str | int,
     page: int,
@@ -134,6 +263,16 @@ def _load_candidate_tiles(
             )
         )
     return tiles
+
+
+def _load_candidate_tiles(
+    session: Session,
+    drawing_id: str | int,
+    page: int,
+) -> list[CandidateTile]:
+    text_element_tiles = _load_text_element_tiles(session, drawing_id, page)
+    region_tiles = _load_region_tiles(session, drawing_id, page)
+    return _merge_candidate_tiles(text_element_tiles, region_tiles)
 
 
 def find_candidate_tiles_from_clues(
