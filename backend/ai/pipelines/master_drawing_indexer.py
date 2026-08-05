@@ -21,10 +21,12 @@ from ai.pipelines.document_text_extraction import (
     SourceFormat,
     extract_document,
 )
-from ai.pipelines.drawing_scale_parser import parse_scale_from_words
+from ai.pipelines.drawing_scale_parser import page_size_inches_from_points, parse_scale_from_words
+from ai.pipelines.master_drawing_region_builder import build_auto_regions_from_text_elements
 from config import settings
 from models.drawing_text_element import DrawingTextElement
 from models.models import Drawing, DrawingRendition
+from services.master_drawing_legend_tagger import enrich_text_elements_with_legend
 from services.storage import open_storage_path
 
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -116,11 +118,16 @@ def build_page_meta_json(
                 page = doc.load_page(page_index)
                 page_number = page_index + 1
                 rendition = rendition_by_page.get(page_number)
+                width_pt = float(page.rect.width)
+                height_pt = float(page.rect.height)
+                page_width_in, page_height_in = page_size_inches_from_points(width_pt, height_pt)
                 page_meta.append(
                     {
                         "page": page_number,
-                        "width_pt": float(page.rect.width),
-                        "height_pt": float(page.rect.height),
+                        "width_pt": width_pt,
+                        "height_pt": height_pt,
+                        "page_width_in": page_width_in,
+                        "page_height_in": page_height_in,
                         "width_px": cast(int | None, rendition.width_px if rendition else None),
                         "height_px": cast(int | None, rendition.height_px if rendition else None),
                         "rotation": int(page.rotation),
@@ -201,6 +208,14 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         extracted.source_format,
     )
 
+    enrich_text_elements_with_legend(
+        session,
+        drawing_id,
+        cast(int, drawing.project_id),
+    )
+
+    regions = build_auto_regions_from_text_elements(session, drawing_id)
+
     first_page_meta = page_meta_json[0] if page_meta_json else None
     scale_json = parse_scale_from_words(
         extracted.words,
@@ -211,6 +226,7 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
     return IndexResult(
         pages=extracted.page_count,
         text_elements=text_elements,
+        regions=regions,
         scale_found=scale_json is not None,
         scale_json=scale_json,
         page_meta_json=page_meta_json,

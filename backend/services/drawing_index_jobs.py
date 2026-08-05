@@ -15,6 +15,7 @@ from typing import Any, Optional, cast
 from sqlalchemy.orm import Session
 
 from ai.pipelines.master_drawing_indexer import IndexResult, index_master_drawing
+from ai.pipelines.master_drawing_region_builder import AUTO_INDEX_REGION_SOURCE
 from config import settings
 from models.drawing_region import DrawingRegion
 from models.drawing_text_element import DrawingTextElement
@@ -24,7 +25,6 @@ from observability.workflow_logging import log_job_status_transition
 logger = logging.getLogger(__name__)
 
 JOB_TYPE = "drawing_index"
-AUTO_INDEX_REGION_SOURCE = "auto_index"
 
 
 def region_geometry_source(geometry: object) -> str | None:

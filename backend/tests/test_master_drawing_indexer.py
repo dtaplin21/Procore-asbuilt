@@ -148,6 +148,8 @@ def test_build_page_meta_json_uses_pdf_and_renditions(
     assert page_meta[0]["page"] == 1
     assert page_meta[0]["width_pt"] == pytest.approx(200.0)
     assert page_meta[0]["height_pt"] == pytest.approx(200.0)
+    assert page_meta[0]["page_width_in"] == pytest.approx(200.0 / 72.0)
+    assert page_meta[0]["page_height_in"] == pytest.approx(200.0 / 72.0)
     rendition = seeded_ready_pdf_drawing.renditions[0]
     assert page_meta[0]["width_px"] == rendition.width_px
     assert page_meta[0]["height_px"] == rendition.height_px
