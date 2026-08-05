@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 MATCH_SCORE_THRESHOLD = 0.75
 
-MatchStatus = Literal["matched", "needs_review", "no_match"]
+MatchStatus = Literal["matched", "needs_review", "no_match", "index_pending"]
 
 
 @dataclass(frozen=True)

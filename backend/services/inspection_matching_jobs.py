@@ -22,7 +22,7 @@ from models.drawing_overlay import DrawingOverlay
 from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
 from models.inspection_run import InspectionRun
-from models.models import Drawing, JobQueue, Project, User, UserCompany
+from models.models import Drawing, EvidenceRecord, JobQueue, Project, User, UserCompany
 from services.inspection_match_persistence import (
     MATCH_SCORE_THRESHOLD,
     InternalMatchCandidate,
@@ -32,10 +32,12 @@ from services.inspection_match_persistence import (
     record_internal_match_candidate,
     resolve_inspection_run_id,
 )
+from services.master_drawing_index_readiness import get_master_drawing_index_readiness
 
 logger = logging.getLogger(__name__)
 
 JOB_TYPE_INSPECTION_MATCH = "inspection_match"
+DEFERRED_MATCH_META_KEY = "deferredInspectionMatch"
 
 
 @dataclass(frozen=True)
@@ -72,7 +74,7 @@ def load_inspection_match_status(
     raw_status = meta.get("match_status", "needs_review")
     status: MatchStatus = (
         raw_status
-        if raw_status in ("matched", "needs_review", "no_match")
+        if raw_status in ("matched", "needs_review", "no_match", "index_pending")
         else "needs_review"
     )
 
@@ -234,6 +236,146 @@ def maybe_enqueue_inspection_match_job(
             },
         )
         return None
+
+
+def _defer_inspection_match(
+    session: Session,
+    *,
+    evidence_id: int,
+    project_id: int,
+    inspection_id: str,
+    master_drawing_id: int | str,
+    page: int,
+    inspection_run_id: int | None,
+) -> None:
+    evidence = session.query(EvidenceRecord).filter(EvidenceRecord.id == evidence_id).first()
+    if evidence is not None:
+        meta_raw = getattr(evidence, "meta", None)
+        meta = dict(meta_raw) if isinstance(meta_raw, dict) else {}
+        meta[DEFERRED_MATCH_META_KEY] = {
+            "project_id": project_id,
+            "master_drawing_id": int(master_drawing_id),
+            "page": page,
+            "inspection_run_id": inspection_run_id,
+        }
+        evidence.meta = meta  # type: ignore[assignment]
+        session.flush()
+
+    persist_inspection_match_overlay(
+        session,
+        inspection_id=inspection_id,
+        drawing_id=master_drawing_id,
+        status="index_pending",
+        bbox=None,
+        page=page,
+        inspection_run_id=inspection_run_id,
+    )
+
+
+def maybe_enqueue_inspection_match_after_extraction(
+    db: Session,
+    *,
+    evidence_id: int,
+    project_id: int,
+    inspection_id: str,
+    master_drawing_id: int | str,
+    page: int = 1,
+    user_id: Optional[int] = None,
+    inspection_run_id: Optional[int] = None,
+) -> JobQueue | None:
+    """Enqueue clue matching when the master index is ready; otherwise defer."""
+    readiness = get_master_drawing_index_readiness(db, int(master_drawing_id))
+    if not readiness.is_ready_for_matching:
+        _defer_inspection_match(
+            db,
+            evidence_id=evidence_id,
+            project_id=project_id,
+            inspection_id=inspection_id,
+            master_drawing_id=master_drawing_id,
+            page=page,
+            inspection_run_id=inspection_run_id,
+        )
+        logger.info(
+            "inspection_match_deferred_until_index_ready",
+            extra={
+                "evidence_id": evidence_id,
+                "master_drawing_id": master_drawing_id,
+                "index_status": readiness.index_status,
+                "region_count": readiness.region_count,
+            },
+        )
+        return None
+
+    return maybe_enqueue_inspection_match_job(
+        db,
+        project_id=project_id,
+        inspection_id=inspection_id,
+        master_drawing_id=master_drawing_id,
+        page=page,
+        user_id=user_id,
+        inspection_run_id=inspection_run_id,
+    )
+
+
+def flush_deferred_inspection_matches_for_drawing(
+    session: Session,
+    drawing_id: int,
+) -> int:
+    """Enqueue match jobs that were deferred while this master drawing indexed."""
+    runs = (
+        session.query(InspectionRun)
+        .filter(InspectionRun.master_drawing_id == drawing_id)
+        .order_by(InspectionRun.id.asc())
+        .all()
+    )
+    enqueued = 0
+    for run in runs:
+        evidence_id = getattr(run, "evidence_id", None)
+        if evidence_id is None:
+            continue
+
+        evidence = session.query(EvidenceRecord).filter(EvidenceRecord.id == evidence_id).first()
+        if evidence is None:
+            continue
+
+        meta_raw = getattr(evidence, "meta", None)
+        if not isinstance(meta_raw, dict):
+            continue
+
+        deferred = meta_raw.get(DEFERRED_MATCH_META_KEY)
+        if not isinstance(deferred, dict):
+            continue
+
+        project_id = _parse_optional_int(deferred.get("project_id"))
+        if project_id is None:
+            project_id = _parse_optional_int(getattr(run, "project_id", None))
+        if project_id is None:
+            continue
+
+        page = _parse_optional_int(deferred.get("page")) or 1
+        inspection_run_id = _parse_optional_int(deferred.get("inspection_run_id"))
+        if inspection_run_id is None:
+            inspection_run_id = cast(int, run.id)
+
+        job = maybe_enqueue_inspection_match_job(
+            session,
+            project_id=project_id,
+            inspection_id=str(evidence_id),
+            master_drawing_id=drawing_id,
+            page=page,
+            inspection_run_id=inspection_run_id,
+        )
+        if job is None:
+            continue
+
+        meta = dict(meta_raw)
+        meta.pop(DEFERRED_MATCH_META_KEY, None)
+        evidence.meta = meta  # type: ignore[assignment]
+        enqueued += 1
+
+    if enqueued:
+        session.commit()
+    return enqueued
 
 
 def run_inspection_match_job(payload: dict[str, Any], session: Session) -> MatchStatus:

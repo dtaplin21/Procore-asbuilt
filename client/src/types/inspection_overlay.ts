@@ -115,4 +115,6 @@ export interface EvidenceUploadResponse {
   unresolved_count: number;
   untagged_region_count: number;
   overlay_ids: string[];
+  master_index_status: "ready" | "pending" | "processing" | "failed";
+  master_index_ready: boolean;
 }

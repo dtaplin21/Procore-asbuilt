@@ -330,10 +330,46 @@ class DrawingResponse(BaseModel):
     file_url: Optional[str] = None
     content_type: Optional[str] = None
     page_count: Optional[int] = None
+    index_status: Optional[str] = None
+    index_error: Optional[str] = None
+    indexed_at: Optional[datetime] = None
+    scale_json: Optional[dict[str, Any]] = None
+    index_stats_json: Optional[dict[str, Any]] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DrawingIndexStatusResponse(BaseModel):
+    status: str
+    stats: Optional[dict[str, Any]] = None
+    scale: Optional[dict[str, Any]] = None
+    error: Optional[str] = None
+    indexed_at: Optional[datetime] = None
+
+
+class DrawingReindexResponse(BaseModel):
+    job_id: int
+    index_status: str
+
+
+class DrawingTextElementResponse(BaseModel):
+    id: int
+    page: int
+    text: str
+    text_normalized: str
+    bbox_json: dict[str, Any]
+    legend_expansion: Optional[str] = None
+    legend_codes_json: Optional[List[str]] = None
+    source: str
+
+
+class DrawingTextElementListResponse(BaseModel):
+    items: List[DrawingTextElementResponse]
+    total: int
+    page: int
+    limit: int
 
 
 class DrawingCompareRequest(BaseModel):
@@ -441,6 +477,13 @@ class DrawingWorkspaceDrawingResponse(BaseModel):
     height_px: Optional[int] = Field(None, serialization_alias="heightPx")
     processing_status: str = Field(..., serialization_alias="processingStatus")
     processing_error: Optional[str] = Field(None, serialization_alias="processingError")
+    index_status: Optional[str] = Field(None, serialization_alias="indexStatus")
+    index_error: Optional[str] = Field(None, serialization_alias="indexError")
+    scale_json: Optional[dict[str, Any]] = Field(None, serialization_alias="scaleJson")
+    index_stats_json: Optional[dict[str, Any]] = Field(
+        None,
+        serialization_alias="indexStatsJson",
+    )
     project_id: Optional[int] = Field(None, serialization_alias="projectId")
     source: Optional[str] = Field(None, serialization_alias="source")
 
@@ -1310,6 +1353,8 @@ class InspectionRunEvidenceUploadResponse(BaseModel):
     unresolved_count: int
     untagged_region_count: int
     overlay_ids: List[int]
+    master_index_status: str = "pending"
+    master_index_ready: bool = False
 
 
 # Job Queue Schemas

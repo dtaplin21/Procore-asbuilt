@@ -60,6 +60,8 @@ describe("InspectionUploadForm", () => {
       unresolved_count: 0,
       untagged_region_count: 0,
       overlay_ids: ["1", "2"],
+      master_index_status: "ready",
+      master_index_ready: true,
     });
     refreshInspectionWorkspaceQueriesMock.mockResolvedValue(undefined);
   });
@@ -124,5 +126,30 @@ describe("InspectionUploadForm", () => {
 
     await screen.findByText("Drawing 11");
     expect(screen.getByTestId("inspection-upload-submit")).not.toBeDisabled();
+  });
+
+  it("shows indexing banner when master index is not ready", async () => {
+    uploadInspectionRunEvidenceMock.mockResolvedValue({
+      evidence_id: "99",
+      overlays_created: 1,
+      unresolved_count: 0,
+      untagged_region_count: 0,
+      overlay_ids: ["1"],
+      master_index_status: "pending",
+      master_index_ready: false,
+    });
+
+    renderForm(<InspectionUploadForm projectId={2} />);
+
+    await screen.findByText("Level 1");
+    const file = new File(["pdf"], "inspection.pdf", { type: "application/pdf" });
+    const input = screen.getByTestId("inspection-upload-file-input") as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("inspection-upload-index-pending-banner"),
+      ).toHaveTextContent("Master drawing is still being indexed");
+    });
   });
 });

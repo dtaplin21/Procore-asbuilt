@@ -63,6 +63,8 @@ function mapEvidenceUploadResponse(data: {
   unresolved_count: number;
   untagged_region_count: number;
   overlay_ids: Array<number | string>;
+  master_index_status?: string;
+  master_index_ready?: boolean;
 }): EvidenceUploadResponse {
   return {
     evidence_id: String(data.evidence_id),
@@ -70,6 +72,13 @@ function mapEvidenceUploadResponse(data: {
     unresolved_count: data.unresolved_count,
     untagged_region_count: data.untagged_region_count,
     overlay_ids: data.overlay_ids.map(String),
+    master_index_status:
+      data.master_index_status === "ready" ||
+      data.master_index_status === "processing" ||
+      data.master_index_status === "failed"
+        ? data.master_index_status
+        : "pending",
+    master_index_ready: Boolean(data.master_index_ready),
   };
 }
 
@@ -152,6 +161,8 @@ export async function uploadInspectionRunEvidence(
     unresolved_count: number;
     untagged_region_count: number;
     overlay_ids: Array<number | string>;
+    master_index_status?: string;
+    master_index_ready?: boolean;
   }>(response, "Uploading evidence");
   return mapEvidenceUploadResponse(data);
 }

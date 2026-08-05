@@ -21,6 +21,7 @@ from models.drawing_region import DrawingRegion
 from models.drawing_text_element import DrawingTextElement
 from models.models import Drawing, JobQueue, Project, User, UserCompany
 from observability.workflow_logging import log_job_status_transition
+from services.inspection_matching_jobs import flush_deferred_inspection_matches_for_drawing
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +192,7 @@ def run_drawing_index_job(drawing_id: int, session: Session) -> IndexResult:
         result = index_master_drawing(drawing_id, session)
         _apply_index_result(drawing, result)
         session.commit()
+        flush_deferred_inspection_matches_for_drawing(session, drawing_id)
         return result
     except Exception as exc:
         drawing.index_status = "failed"  # type: ignore[assignment]

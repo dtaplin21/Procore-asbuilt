@@ -76,6 +76,11 @@ export interface DrawingResponse {
   file_url?: string | null;
   content_type?: string | null;
   page_count?: number | null;
+  index_status?: string | null;
+  index_error?: string | null;
+  indexed_at?: string | null;
+  scale_json?: Record<string, unknown> | null;
+  index_stats_json?: Record<string, unknown> | null;
   upload_intent?: "master" | "sub" | null;
   created_at: string;
   updated_at: string;

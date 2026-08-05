@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   Layers, 
   Search, 
@@ -48,7 +48,13 @@ import { useRegionInspectionSummary } from "@/hooks/use-region-inspection-summar
 import { useCanonicalMasterDrawing } from "@/hooks/use_canonical_master_drawing";
 import { useObjectsQueryParams } from "@/hooks/use_objects_query_params";
 import { apiUrl } from "@/lib/api/base_url";
+import { useDrawingIndexStatus } from "@/hooks/use_drawing_index_status";
+import { drawingIndexStatusQueryKey, reindexDrawing } from "@/lib/api/drawing_index";
 import { fetchProjectDrawings, projectDrawingsQueryKey } from "@/lib/api/drawings";
+import {
+  formatDrawingIndexSummary,
+  isDrawingIndexInProgress,
+} from "@/lib/drawing-index/format_index_summary";
 import { fetchMasterDrawing } from "@/lib/api/drawing_workspace";
 import { toOverlayRegions } from "@/lib/drawing-overlays/inspection_overlay";
 import type { RenderableRegion } from "@/lib/drawing-regions/region_display";
@@ -159,6 +165,31 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
       selectedProjectId > 0 &&
       selectedMasterDrawingId > 0,
   });
+
+  const queryClient = useQueryClient();
+  const [reindexPending, setReindexPending] = useState(false);
+  const drawingIndexQuery = useDrawingIndexStatus(
+    selectedProjectId,
+    selectedMasterDrawingId,
+  );
+  const indexSummary = formatDrawingIndexSummary(drawingIndexQuery.data);
+  const indexInProgress = isDrawingIndexInProgress(drawingIndexQuery.data?.status);
+
+  const handleReindexDrawing = useCallback(async () => {
+    if (selectedProjectId == null || selectedMasterDrawingId == null) return;
+    setReindexPending(true);
+    try {
+      await reindexDrawing(selectedProjectId, selectedMasterDrawingId);
+      await queryClient.invalidateQueries({
+        queryKey: drawingIndexStatusQueryKey(
+          selectedProjectId,
+          selectedMasterDrawingId,
+        ),
+      });
+    } finally {
+      setReindexPending(false);
+    }
+  }, [queryClient, selectedMasterDrawingId, selectedProjectId]);
 
   const { data: objects, isLoading } = useQuery<DrawingObject[]>({
     queryKey: ["/api/objects"],
@@ -468,18 +499,57 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
             <div className="space-y-1">
               <CardTitle className="shrink-0">Drawing Viewer</CardTitle>
               {selectedProjectId != null ? (
-                <p
-                  className="text-sm text-muted-foreground"
-                  data-testid="objects-master-header"
-                >
-                  Master sheet:{" "}
-                  <span className="font-medium text-foreground">
-                    {canonicalLoading || drawingsLoading
-                      ? "Loading…"
-                      : masterDrawingName ??
-                        "No canonical master sheet — upload a drawing on the Dashboard first."}
-                  </span>
-                </p>
+                <div className="space-y-1">
+                  <p
+                    className="text-sm text-muted-foreground"
+                    data-testid="objects-master-header"
+                  >
+                    Master sheet:{" "}
+                    <span className="font-medium text-foreground">
+                      {canonicalLoading || drawingsLoading
+                        ? "Loading…"
+                        : masterDrawingName ??
+                          "No canonical master sheet — upload a drawing on the Dashboard first."}
+                    </span>
+                  </p>
+                  {selectedMasterDrawingId != null && indexInProgress ? (
+                    <p
+                      className="flex items-center gap-2 text-xs text-muted-foreground"
+                      data-testid="objects-index-status-banner"
+                    >
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Indexing…
+                    </p>
+                  ) : null}
+                  {selectedMasterDrawingId != null && indexSummary ? (
+                    <p
+                      className="text-xs text-muted-foreground"
+                      data-testid="objects-index-summary"
+                    >
+                      {indexSummary}
+                    </p>
+                  ) : null}
+                  {selectedMasterDrawingId != null &&
+                  drawingIndexQuery.data?.status === "failed" ? (
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="text-destructive" data-testid="objects-index-error">
+                        Index failed{drawingIndexQuery.data.error
+                          ? `: ${drawingIndexQuery.data.error}`
+                          : ""}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        data-testid="objects-reindex-button"
+                        disabled={reindexPending}
+                        onClick={() => void handleReindexDrawing()}
+                      >
+                        {reindexPending ? "Reindexing…" : "Reindex drawing"}
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
             </div>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:flex-1 sm:justify-end">

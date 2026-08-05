@@ -15,7 +15,7 @@ from ai.pipelines.pdf_link_follower import LinkFollowResult, follow_pdf_links
 from models.document_extraction import DocumentExtraction
 from models.models import EvidenceRecord
 from services.evidence_linking import replace_evidence_drawing_links
-from services.inspection_matching_jobs import maybe_enqueue_inspection_match_job
+from services.inspection_matching_jobs import maybe_enqueue_inspection_match_after_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -116,8 +116,9 @@ def ingest_evidence_document_extraction(
         return None
 
     if extraction is not None and match_context is not None:
-        maybe_enqueue_inspection_match_job(
+        maybe_enqueue_inspection_match_after_extraction(
             session,
+            evidence_id=evidence_id,
             project_id=match_context.project_id,
             inspection_id=str(evidence_id),
             master_drawing_id=match_context.master_drawing_id,

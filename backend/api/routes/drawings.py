@@ -6,15 +6,24 @@ from sqlalchemy.orm import Session
 from api.dependencies import get_db, get_idempotency_key
 from models.models import Drawing
 from models.schemas import (
+    DrawingIndexStatusResponse,
     DrawingOverlayResponse,
+    DrawingReindexResponse,
     DrawingResponse,
     DrawingSummary,
+    DrawingTextElementListResponse,
     EvidenceContextMatch,
     EvidenceContextResponse,
     EvidenceMatchReason,
     EvidenceRecordResponse,
     EvidenceDrawingLinkResponse,
     ProjectDrawingsListResponse,
+)
+from config import settings
+from services.drawing_index_jobs import enqueue_drawing_index_job
+from services.drawing_index_api import (
+    drawing_index_status_response,
+    list_drawing_text_elements,
 )
 from services.drawing_render_jobs import enqueue_drawing_render_job
 from services.drawings import DrawingService
@@ -148,6 +157,89 @@ def get_drawing(
     if not drawing:
         raise HTTPException(status_code=404, detail="Drawing not found")
     return DrawingResponse.model_validate(drawing)
+
+
+@router.get(
+    "/api/projects/{project_id}/drawings/{drawing_id}/index-status",
+    response_model=DrawingIndexStatusResponse,
+)
+def get_drawing_index_status(
+    project_id: int,
+    drawing_id: int,
+    db: Session = Depends(get_db),
+) -> DrawingIndexStatusResponse:
+    """Return master drawing auto-index status, stats, scale, and errors."""
+    service = StorageService(db)
+    drawing = service.get_drawing(project_id, drawing_id)
+    if not drawing:
+        raise HTTPException(status_code=404, detail="Drawing not found")
+    return drawing_index_status_response(drawing)
+
+
+@router.post(
+    "/api/projects/{project_id}/drawings/{drawing_id}/reindex",
+    response_model=DrawingReindexResponse,
+)
+def reindex_drawing(
+    project_id: int,
+    drawing_id: int,
+    db: Session = Depends(get_db),
+) -> DrawingReindexResponse:
+    """Enqueue a manual re-index after legend updates or failed runs."""
+    if not settings.drawing_index_enabled:
+        raise HTTPException(status_code=400, detail="Drawing index is disabled")
+
+    service = StorageService(db)
+    drawing = service.get_drawing(project_id, drawing_id)
+    if not drawing:
+        raise HTTPException(status_code=404, detail="Drawing not found")
+
+    if cast(str, drawing.processing_status) != "ready":
+        raise HTTPException(
+            status_code=409,
+            detail="Drawing render is not ready; wait for processing to finish",
+        )
+
+    job = enqueue_drawing_index_job(db, project_id=project_id, drawing_id=drawing_id)
+    drawing.index_status = "pending"  # type: ignore[assignment]
+    drawing.index_error = None  # type: ignore[assignment]
+    db.commit()
+
+    return DrawingReindexResponse(
+        job_id=cast(int, job.id),
+        index_status="pending",
+    )
+
+
+@router.get(
+    "/api/projects/{project_id}/drawings/{drawing_id}/text-elements",
+    response_model=DrawingTextElementListResponse,
+)
+def list_drawing_text_elements_route(
+    project_id: int,
+    drawing_id: int,
+    page: int = Query(1, ge=1),
+    limit: int = Query(500, ge=1, le=500),
+    db: Session = Depends(get_db),
+) -> DrawingTextElementListResponse:
+    """Debug/admin listing of OCR text elements for a master drawing page."""
+    service = StorageService(db)
+    drawing = service.get_drawing(project_id, drawing_id)
+    if not drawing:
+        raise HTTPException(status_code=404, detail="Drawing not found")
+
+    items, total = list_drawing_text_elements(
+        db,
+        master_drawing_id=drawing_id,
+        page=page,
+        limit=limit,
+    )
+    return DrawingTextElementListResponse(
+        items=items,
+        total=total,
+        page=page,
+        limit=limit,
+    )
 
 
 @router.get(

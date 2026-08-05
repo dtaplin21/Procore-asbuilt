@@ -32,6 +32,7 @@ export default function InspectionUploadForm({
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [indexPendingMessage, setIndexPendingMessage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
   const {
@@ -63,6 +64,7 @@ export default function InspectionUploadForm({
     if (!file || !resolvedMasterDrawingId) return;
 
     setUploadError(null);
+    setIndexPendingMessage(null);
     setUploading(true);
 
     void (async () => {
@@ -100,6 +102,18 @@ export default function InspectionUploadForm({
           title: "Inspection uploaded",
           description: `Run #${run.id}: ${parts.join(" · ")}`,
         });
+
+        if (!response.master_index_ready) {
+          const indexMessage =
+            response.master_index_status === "processing"
+              ? "Master drawing is still being indexed. Location matching will run when indexing finishes."
+              : "Master drawing is still being indexed…";
+          setIndexPendingMessage(indexMessage);
+          toast({
+            title: "Master drawing indexing",
+            description: indexMessage,
+          });
+        }
 
         onUploaded?.({
           runId: run.id,
@@ -147,6 +161,15 @@ export default function InspectionUploadForm({
         {uploadError ? (
           <p className="text-xs text-destructive" data-testid="inspection-upload-error">
             {uploadError}
+          </p>
+        ) : null}
+        {indexPendingMessage ? (
+          <p
+            className="text-xs text-amber-800"
+            data-testid="inspection-upload-index-pending-banner"
+            role="status"
+          >
+            {indexPendingMessage}
           </p>
         ) : null}
       </div>

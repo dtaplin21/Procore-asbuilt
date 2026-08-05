@@ -26,7 +26,8 @@ from services.evidence_file_storage import (
 from services.file_storage import get_file_path, read_and_validate_upload, save_upload_from_bytes, sha256_bytes
 from services.idempotency import begin_idempotent_operation, finish_idempotent_operation
 from services.overlay_storage import create_drawing_overlays, flag_unresolved_evidence
-from services.region_index_loader import build_region_index
+from services.master_drawing_index_readiness import get_master_drawing_index_readiness
+from services.drawing_index_jobs import maybe_enqueue_drawing_index_job
 from services.storage import StorageService
 from fastapi.responses import FileResponse
 
@@ -89,6 +90,7 @@ async def upload_inspection_run_evidence(
 
     master_drawing_id = cast(int, run.master_drawing_id)
     run_id = cast(int, run.id)
+    index_readiness = get_master_drawing_index_readiness(db, master_drawing_id)
 
     try:
         if not file.filename:
@@ -130,6 +132,9 @@ async def upload_inspection_run_evidence(
             setattr(run, "evidence_id", evidence_id)
             db.commit()
             db.refresh(run)
+
+        if not index_readiness.is_ready_for_matching:
+            maybe_enqueue_drawing_index_job(db, project_id=project_id, drawing_id=master_drawing_id)
 
         ingest_evidence_document_extraction(
             db,
@@ -193,6 +198,8 @@ async def upload_inspection_run_evidence(
             unresolved_count=len(unresolved),
             untagged_region_count=region_load.untagged_region_count,
             overlay_ids=[cast(int, overlay.id) for overlay in saved_overlays],
+            master_index_status=index_readiness.upload_response_status,
+            master_index_ready=index_readiness.is_ready_for_matching,
         )
     except HTTPException as exc:
         _fail_inspection_run_on_upload_error(storage, run_id, str(exc.detail))

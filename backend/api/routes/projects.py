@@ -270,6 +270,10 @@ def get_project_drawing(
         height_px=serialized.get("heightPx"),
         processing_status=serialized.get("processingStatus", "pending"),
         processing_error=serialized.get("processingError"),
+        index_status=serialized.get("indexStatus"),
+        index_error=serialized.get("indexError"),
+        scale_json=serialized.get("scaleJson"),
+        index_stats_json=serialized.get("indexStatsJson"),
         project_id=serialized.get("projectId"),
         source=serialized.get("source"),
     )

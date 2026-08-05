@@ -20,6 +20,7 @@ import {
   useDrawingRegions,
 } from "@/hooks/use-drawing-regions";
 import type { CreateDrawingRegionInput, RegionTagFormValues } from "@/lib/drawing-regions/types";
+import { regionSourceLabel } from "@/lib/drawing-regions/region_source";
 
 export interface RegionEditorProps {
   projectId: number | string;
@@ -152,6 +153,18 @@ export function RegionEditor({
             >
               <span>
                 {region.label}
+                {regionSourceLabel(region) ? (
+                  <span
+                    style={{
+                      marginLeft: 6,
+                      fontSize: "0.75rem",
+                      color: "#64748B",
+                    }}
+                    data-testid={`region-editor-source-${region.id}`}
+                  >
+                    [{regionSourceLabel(region)}]
+                  </span>
+                ) : null}
                 {" — "}
                 {region.inspection_type_tags.join(", ") || "(no type)"}
                 {" / "}

@@ -31,6 +31,20 @@ describe("MatchAlertBanner", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("shows index_pending message", () => {
+    useInspectionMatchStatusMock.mockReturnValue({
+      inspection_id: "test",
+      match_status: "index_pending",
+      bbox: null,
+    });
+
+    render(<MatchAlertBanner inspectionId="test" />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Master drawing is still being indexed",
+    );
+  });
+
   it("shows needs_review message without confidence numbers", () => {
     useInspectionMatchStatusMock.mockReturnValue({
       inspection_id: "test",

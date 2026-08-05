@@ -16,10 +16,14 @@ from models.drawing_overlay import DrawingOverlay
 from models.drawing_match_candidate import DrawingMatchCandidate
 from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
-from models.models import Company, Drawing, EvidenceRecord, Project
+from models.models import Company, Drawing, EvidenceRecord, JobQueue, Project
 from models.inspection_run import InspectionRun
 from services.inspection_matching_jobs import (
+    DEFERRED_MATCH_META_KEY,
+    JOB_TYPE_INSPECTION_MATCH,
     MATCH_SCORE_THRESHOLD,
+    flush_deferred_inspection_matches_for_drawing,
+    maybe_enqueue_inspection_match_after_extraction,
     run_inspection_match_job,
 )
 
@@ -371,3 +375,87 @@ def test_run_inspection_match_job_uses_explicit_run_id_over_id_collision(
         .count()
         == 0
     )
+
+
+def _match_job_count_for_inspection(db: Session, inspection_id: str) -> int:
+    jobs = (
+        db.query(JobQueue)
+        .filter(JobQueue.job_type == JOB_TYPE_INSPECTION_MATCH)
+        .all()
+    )
+    count = 0
+    for job in jobs:
+        input_data = getattr(job, "input_data", None)
+        if isinstance(input_data, dict) and str(input_data.get("inspection_id")) == inspection_id:
+            count += 1
+    return count
+
+
+def test_maybe_enqueue_inspection_match_after_extraction_defers_when_index_not_ready(
+    db: Session,
+) -> None:
+    run, file_id = _seed_run(db)
+    drawing_id = cast(int, run.master_drawing_id)
+    project_id = cast(int, run.project_id)
+    evidence_id = int(file_id)
+
+    job = maybe_enqueue_inspection_match_after_extraction(
+        db,
+        evidence_id=evidence_id,
+        project_id=project_id,
+        inspection_id=file_id,
+        master_drawing_id=drawing_id,
+        inspection_run_id=cast(int, run.id),
+    )
+
+    assert job is None
+    evidence = db.query(EvidenceRecord).filter(EvidenceRecord.id == evidence_id).one()
+    meta = cast(dict, evidence.meta)
+    assert DEFERRED_MATCH_META_KEY in meta
+
+    overlay = (
+        db.query(DrawingOverlay)
+        .filter(DrawingOverlay.inspection_run_id == run.id)
+        .one()
+    )
+    overlay_meta = cast(dict, overlay.meta)
+    assert overlay_meta["match_status"] == "index_pending"
+    assert _match_job_count_for_inspection(db, file_id) == 0
+
+
+def test_flush_deferred_inspection_matches_enqueues_after_index(db: Session) -> None:
+    run, file_id = _seed_run(db)
+    drawing_id = cast(int, run.master_drawing_id)
+    project_id = cast(int, run.project_id)
+    evidence_id = int(file_id)
+
+    maybe_enqueue_inspection_match_after_extraction(
+        db,
+        evidence_id=evidence_id,
+        project_id=project_id,
+        inspection_id=file_id,
+        master_drawing_id=drawing_id,
+        inspection_run_id=cast(int, run.id),
+    )
+
+    drawing = db.query(Drawing).filter(Drawing.id == drawing_id).one()
+    setattr(drawing, "index_status", "ready")
+    from services.storage import StorageService
+
+    storage = StorageService(db)
+    storage.create_drawing_region(
+        drawing_id,
+        label="COLO",
+        geometry={"type": "rect", "x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2},
+        location_tags=["COLO"],
+    )
+    db.commit()
+
+    before = _match_job_count_for_inspection(db, file_id)
+    enqueued = flush_deferred_inspection_matches_for_drawing(db, drawing_id)
+
+    assert enqueued == 1
+    evidence = db.query(EvidenceRecord).filter(EvidenceRecord.id == evidence_id).one()
+    meta = cast(dict, evidence.meta or {})
+    assert DEFERRED_MATCH_META_KEY not in meta
+    assert _match_job_count_for_inspection(db, file_id) == before + 1

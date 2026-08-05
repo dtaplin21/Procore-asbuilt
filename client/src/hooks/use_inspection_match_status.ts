@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { resolveFetchUrl } from "@/lib/api/http";
 
-export type MatchStatus = "matched" | "needs_review" | "no_match";
+export type MatchStatus = "matched" | "needs_review" | "no_match" | "index_pending";
 
 export interface MatchStatusResponse {
   inspection_id: string;
