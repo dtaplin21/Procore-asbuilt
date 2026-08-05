@@ -32,8 +32,16 @@ def run_document_extraction(
     session: Session,
     file_id: str,
     content: str,
+    *,
+    classification_content: str | None = None,
 ) -> DocumentExtraction:
-    classification = classify_document(content)
+    """Run extraction on ``content``.
+
+    When ``classification_content`` is set (e.g. base inspection PDF text without
+    followed hyperlink supplements), classification uses that slice so linked
+    install drawings do not override ``inspection_report`` typing.
+    """
+    classification = classify_document(classification_content or content)
 
     if classification.document_type == DocumentType.UNKNOWN:
         add_to_review_queue(

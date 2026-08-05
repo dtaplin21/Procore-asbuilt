@@ -323,6 +323,11 @@ class Drawing(Base):
         cascade="all, delete-orphan",
     )
     regions = relationship("DrawingRegion", back_populates="master_drawing", cascade="all, delete-orphan")
+    text_elements = relationship(
+        "DrawingTextElement",
+        back_populates="master_drawing",
+        cascade="all, delete-orphan",
+    )
     overlays = relationship("DrawingOverlay", back_populates="master_drawing", cascade="all, delete-orphan")
     inspection_runs = relationship("InspectionRun", back_populates="master_drawing", cascade="all, delete-orphan")
     unresolved_evidence = relationship(

@@ -132,6 +132,7 @@ def enqueue_inspection_match_job(
         "inspection_id": str(inspection_id),
         "drawing_id": str(drawing_id),
         "page": int(page),
+        "project_id": int(project_id),
     }
     if inspection_run_id is not None:
         input_data["inspection_run_id"] = int(inspection_run_id)
@@ -193,6 +194,13 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
     inspection_id = str(payload["inspection_id"])
     drawing_id = payload["drawing_id"]
     page = int(payload.get("page", 1))
+    project_id: int | None = None
+    raw_project_id = payload.get("project_id")
+    if raw_project_id is not None:
+        try:
+            project_id = int(raw_project_id)
+        except (TypeError, ValueError):
+            project_id = None
     run_id_hint: int | None = None
     raw_run_id = payload.get("inspection_run_id")
     if raw_run_id is not None:
@@ -233,15 +241,34 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
         page=page,
         clues=clues,
         limit=20,
+        project_id=project_id,
     )
 
     if not candidates:
+        logger.info(
+            "inspection_match_no_candidates",
+            extra={
+                "inspection_id": inspection_id,
+                "drawing_id": drawing_id,
+                "page": page,
+                "project_id": project_id,
+                "clue_count": len(clues),
+                "location_clue_count": sum(
+                    1 for clue in clues if getattr(clue, "location_relevant", False)
+                ),
+            },
+        )
         _persist(status="needs_review", bbox=None, page=page)
         return "needs_review"
 
     scored_candidates: list[tuple[float, CandidateTile]] = []
     for rank, tile in enumerate(candidates, start=1):
-        internal_score = compute_tile_match_score(tile, clues)
+        internal_score = compute_tile_match_score(
+            tile,
+            clues,
+            session=session,
+            project_id=project_id,
+        )
         scored_candidates.append((internal_score, tile))
         record_internal_match_candidate(
             session,

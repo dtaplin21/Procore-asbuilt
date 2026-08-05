@@ -105,6 +105,7 @@ def ingest_evidence_document_extraction(
             session,
             file_id=str(evidence_id),
             content=content,
+            classification_content=base or None,
         )
     except Exception:
         logger.exception(

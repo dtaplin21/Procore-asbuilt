@@ -10,6 +10,7 @@ from .base import Base
 from .document_clue import DocumentClue
 from .document_extraction import DocumentExtraction
 from .drawing_match_candidate import DrawingMatchCandidate
+from .drawing_text_element import DrawingTextElement
 from .drawing_overlay import DrawingOverlay, UnresolvedEvidence
 from .drawing_region import DrawingRegion
 from .inspection_run import InspectionRun
@@ -28,6 +29,7 @@ __all__ = [
     "DrawingLegendLineType",
     "DrawingLegendSymbol",
     "DrawingMatchCandidate",
+    "DrawingTextElement",
     "DrawingRegion",
     "DrawingOverlay",
     "UnresolvedEvidence",
