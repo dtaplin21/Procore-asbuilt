@@ -21,6 +21,7 @@ from ai.pipelines.document_text_extraction import (
     SourceFormat,
     extract_document,
 )
+from ai.pipelines.drawing_scale_parser import parse_scale_from_words
 from config import settings
 from models.drawing_text_element import DrawingTextElement
 from models.models import Drawing, DrawingRendition
@@ -200,8 +201,17 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         extracted.source_format,
     )
 
+    first_page_meta = page_meta_json[0] if page_meta_json else None
+    scale_json = parse_scale_from_words(
+        extracted.words,
+        page=1,
+        page_meta=first_page_meta,
+    )
+
     return IndexResult(
         pages=extracted.page_count,
         text_elements=text_elements,
+        scale_found=scale_json is not None,
+        scale_json=scale_json,
         page_meta_json=page_meta_json,
     )
