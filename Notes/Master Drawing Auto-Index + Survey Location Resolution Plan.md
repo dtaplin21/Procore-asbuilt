@@ -275,6 +275,8 @@ UI: index spinner, stats line, distinguish `index_pending` vs `no_match`.
 
 **Priority:** Highest. Rotation-invariant. Implements user step **#1 (N/E coordinate OCR as first-class match key)**.
 
+**Default text scope — full document, no assumed region:** Most evidence is a full inspection form, photo-with-caption, or dense install sheet (e.g. C4.20) — not a pre-cropped highlight. N/E, station, and structure-label regexes must run across the **entire evidence document every time**. Do not assume upstream pipeline has already scoped text to "the relevant part." Optional scoping (click point, highlight bbox) may **boost** matches only; when absent, degrade gracefully to full-document scan (§9f).
+
 #### 9a. New table: `drawing_survey_points`
 
 ```python
@@ -304,9 +306,11 @@ Indexes: `(drawing_id, page)`, `(northing, easting)` — use application-level t
 
 **New file:** `backend/ai/pipelines/survey_point_extractor.py`
 
-**Input:** `list[PositionedWord]` or `list[DrawingTextElement]` for one page, plus **`scale_json`** and **`page_meta_json`** for that page (required for pairing gates).
+**Input (master index path):** `list[PositionedWord]` or `list[DrawingTextElement]` for one page, plus **`scale_json`** and **`page_meta_json`** for that page (required for pairing gates).
 
-**Why physical feet, not normalized fractions:** A fixed normalized gap (e.g. `0.15` page width) represents ~600 ft on a `1"=40'` site plan but ~15 ft on a `1"=1'-0"` detail. Pairing gates must be in **real-world feet on the sheet** using `real_feet_per_paper_inch` from `scale_json`, not page fractions.
+**Input (evidence path — §9d/§9f):** full evidence file via `extract_document()` → **all pages**, all positioned words; or merged `evidence.text_content` + linked supplemental text when positioned bboxes unavailable. Never require a pre-scoped text slice or highlight region.
+
+**Why physical feet, not normalized fractions:** A fixed normalized gap (e.g. `0.15` page width) represents ~600 ft on a `1"=40'` site plan but ~15 ft on a `1"=1'-0"` detail. With §9f full-document evidence (any scale, uncropped page), normalized gates misfire **more often** than on tight crops. Pairing gates must use **`real_feet_per_paper_inch` from `scale_json` on both master and evidence sides** when scale is extractable; normalized-fraction gates are **last resort only** (see scale resolution below).
 
 **Regex patterns (compile once):**
 
@@ -341,15 +345,66 @@ _STRUCTURE_RE = re.compile(
 ```python
 POINTS_PER_INCH = 72.0
 
-# Pairing gates — real-world feet on the sheet (not normalized fractions)
+# Pairing gates — real-world feet on the sheet (preferred mode)
 NE_PAIR_MAX_DISTANCE_FT = 15.0        # hard reject N↔E pairing beyond this
 NE_PAIR_HORIZONTAL_MAX_FT = 12.0      # N and E usually on same line (side-by-side)
 NE_PAIR_VERTICAL_MAX_FT = 8.0         # or stacked on adjacent lines
 STATION_ATTACH_MAX_FT = 25.0          # station callout may sit slightly farther
 STRUCTURE_ATTACH_MAX_FT = 25.0        # SSMH/MH label near coordinate block
 
-# Fallback when scale unknown (low confidence or missing)
-SCALE_FALLBACK_REAL_FEET_PER_PAPER_INCH = 10.0  # UCSF campus default; log warning
+# Last-resort normalized gates — ONLY when no scale extractable (see resolve_pairing_scale)
+NE_PAIR_MAX_DISTANCE_NORM = 0.12        # deprecated primary path; fallback only
+NE_PAIR_HORIZONTAL_MAX_NORM = 0.15
+NE_PAIR_VERTICAL_MAX_NORM = 0.05
+STATION_ATTACH_MAX_NORM = 0.08
+STRUCTURE_ATTACH_MAX_NORM = 0.08
+
+SCALE_FALLBACK_REAL_FEET_PER_PAPER_INCH = 10.0  # UCSF campus default when evidence scale unparseable but page dims known
+
+@dataclass(frozen=True)
+class PairingScaleContext:
+    mode: Literal["physical", "normalized_fallback"]
+    scale_json: dict | None
+    page_meta: dict
+    real_feet_per_paper_inch: float | None
+    scale_source: str  # "evidence_title_block" | "linked_drawing" | "master_index" | "campus_default" | "none"
+
+def resolve_pairing_scale(
+    *,
+    scale_json: dict | None,
+    page_meta: dict,
+    scale_source: str,
+) -> PairingScaleContext:
+    """
+    Evidence-side scale resolution (call before pairing on every page):
+      1. scale_json parsed from evidence PDF title block (parse_scale_from_words at upload)
+      2. Else scale_json from linked auxiliary drawing (C4.20 via EvidenceDrawingLink)
+      3. Else campus default (10.0 ft/in) IF page_meta has width_pt/height_pt
+      4. Else mode = normalized_fallback (no real_feet_per_paper_inch available)
+    """
+    if scale_json and float(scale_json.get("confidence", 0)) >= 0.50:
+        return PairingScaleContext(
+            mode="physical",
+            scale_json=scale_json,
+            page_meta=page_meta,
+            real_feet_per_paper_inch=float(scale_json["real_feet_per_paper_inch"]),
+            scale_source=scale_source,
+        )
+    if page_meta.get("width_pt") and page_meta.get("height_pt"):
+        return PairingScaleContext(
+            mode="physical",
+            scale_json=None,
+            page_meta=page_meta,
+            real_feet_per_paper_inch=SCALE_FALLBACK_REAL_FEET_PER_PAPER_INCH,
+            scale_source="campus_default",
+        )
+    return PairingScaleContext(
+        mode="normalized_fallback",
+        scale_json=None,
+        page_meta=page_meta,
+        real_feet_per_paper_inch=None,
+        scale_source="none",
+    )
 
 def normalized_delta_to_feet(
     dx_norm: float,
@@ -366,45 +421,74 @@ def normalized_delta_to_feet(
     dy_ft = abs(dy_norm) * page_height_in * real_feet_per_paper_inch
     return dx_ft, dy_ft
 
-def pairing_distance_ft(
+def pairing_passes_gates(
     ax: float, ay: float, bx: float, by: float,
-    *, page_meta: dict, scale_json: dict | None,
-) -> float:
-    dx_norm = bx - ax
-    dy_norm = by - ay
-    real_feet_per_in = float(
-        (scale_json or {}).get("real_feet_per_paper_inch")
-        or SCALE_FALLBACK_REAL_FEET_PER_PAPER_INCH
+    *,
+    ctx: PairingScaleContext,
+    horizontal_max_ft: float = NE_PAIR_HORIZONTAL_MAX_FT,
+    vertical_max_ft: float = NE_PAIR_VERTICAL_MAX_FT,
+    max_distance_ft: float = NE_PAIR_MAX_DISTANCE_FT,
+) -> tuple[bool, float]:
+    """Returns (passes, distance_metric). distance_metric is feet or normalized depending on mode."""
+    dx_norm = abs(bx - ax)
+    dy_norm = abs(by - ay)
+    dist_norm = math.hypot(dx_norm, dy_norm)
+
+    if ctx.mode == "physical":
+        assert ctx.real_feet_per_paper_inch is not None
+        dx_ft, dy_ft = normalized_delta_to_feet(
+            dx_norm, dy_norm,
+            page_width_pt=float(ctx.page_meta["width_pt"]),
+            page_height_pt=float(ctx.page_meta["height_pt"]),
+            real_feet_per_paper_inch=ctx.real_feet_per_paper_inch,
+        )
+        dist_ft = math.hypot(dx_ft, dy_ft)
+        ok = (
+            dx_ft <= horizontal_max_ft
+            and dy_ft <= vertical_max_ft
+            and dist_ft <= max_distance_ft
+        )
+        return ok, dist_ft
+
+    # Last resort: normalized fractions (plain-text extraction w/ no page dims)
+    ok = (
+        dx_norm <= NE_PAIR_HORIZONTAL_MAX_NORM
+        and dy_norm <= NE_PAIR_VERTICAL_MAX_NORM
+        and dist_norm <= NE_PAIR_MAX_DISTANCE_NORM
     )
-    dx_ft, dy_ft = normalized_delta_to_feet(
-        dx_norm, dy_norm,
-        page_width_pt=float(page_meta["width_pt"]),
-        page_height_pt=float(page_meta["height_pt"]),
-        real_feet_per_paper_inch=real_feet_per_in,
-    )
-    return math.hypot(dx_ft, dy_ft)
+    return ok, dist_norm
 ```
+
+**Evidence-side scale (`resolve_scale_for_evidence` in §9d):** parse scale from each evidence page's title block during upload (reuse `drawing_scale_parser.parse_scale_from_words`). For inspection forms whose coordinates live on a **linked install sheet** (C4.20), inherit `scale_json` from the linked `Drawing` row when evidence file has no parseable scale. Store per-page context on `DocumentExtraction.meta_json["pairing_scale_by_page"]`.
 
 **Pairing algorithm (deterministic):**
 
-For each page, collect token matches with bboxes. Use token **centroids** in normalized space for distance, but evaluate all gates in **feet** via `pairing_distance_ft()`.
+For each page, collect token matches with bboxes. Resolve `PairingScaleContext` once per page via `resolve_pairing_scale()`. Use token **centroids** in normalized space; evaluate gates via `pairing_passes_gates()`.
 
 1. For each `N` token at centroid `(n_x, n_y)` with value `n_val`:
-2. Find `E` token candidates where **both** hold (using `page_meta` + `scale_json` for this page):
-   - `dx_ft, dy_ft = normalized_delta_to_feet(n_x - e_x, n_y - e_y, ...)`
-   - `dx_ft <= NE_PAIR_HORIZONTAL_MAX_FT` (12.0 ft)
-   - `dy_ft <= NE_PAIR_VERTICAL_MAX_FT` (8.0 ft)
-   - `pairing_distance_ft(n, e, ...) <= NE_PAIR_MAX_DISTANCE_FT` (15.0 ft)
-3. If multiple E candidates pass gates, pick minimum `pairing_distance_ft` (feet, not normalized).
-4. Reject pair if no E candidate within `NE_PAIR_MAX_DISTANCE_FT`.
-5. Attach nearest `_STATION_RE` token where `pairing_distance_ft(n, station) <= STATION_ATTACH_MAX_FT` (25.0 ft).
-6. Attach nearest `_STRUCTURE_RE` token where `pairing_distance_ft(n, structure) <= STRUCTURE_ATTACH_MAX_FT` (25.0 ft).
+2. Find `E` token candidates where `pairing_passes_gates(n, e, ctx=ctx)` returns `True`.
+3. If multiple E candidates pass, pick minimum distance metric (feet in `physical` mode, normalized in fallback mode).
+4. Reject pair if no E candidate passes gates.
+5. Attach nearest `_STATION_RE` token using same gate function with `STATION_ATTACH_MAX_FT` (physical) or `STATION_ATTACH_MAX_NORM` (fallback).
+6. Attach nearest `_STRUCTURE_RE` token similarly.
 7. `ocr_confidence = min(n_conf, e_conf)`.
 8. Reject point if `ocr_confidence < 0.40`.
 
-Store `meta_json.pairing_distance_ft` (feet) on each persisted survey point for debugging.
+Store on each survey point `meta_json`:
+- `pairing_distance_ft` when `mode == "physical"`
+- `pairing_distance_norm` when `mode == "normalized_fallback"`
+- `pairing_scale_source`, `pairing_scale_mode`
 
-**Scale missing / low confidence:** if `scale_json is None` or `scale_json["confidence"] < 0.50`, use `SCALE_FALLBACK_REAL_FEET_PER_PAPER_INCH = 10.0` and set `meta_json.scale_fallback = true`. Do **not** fall back to normalized-fraction gates.
+**Scale resolution priority (master + evidence):**
+
+| Priority | Source | Mode |
+|----------|--------|------|
+| 1 | `scale_json` from same document title block (`confidence >= 0.50`) | `physical` |
+| 2 | `scale_json` from linked auxiliary drawing (C4.20) | `physical` |
+| 3 | Page dims known, scale unparseable → campus default `10.0` ft/in | `physical` |
+| 4 | No scale and no page dims (plain-text-only extraction) | `normalized_fallback` |
+
+Set `meta_json.scale_fallback = true` when priority ≥ 3. Log warning when `mode == "normalized_fallback"`.
 
 **Output:** `list[SurveyPointRecord]`.
 
@@ -469,7 +553,7 @@ If evidence has station `S` and master has station `S'` where normalized station
 
 #### 9d. Index integration
 
-In `master_drawing_indexer.py`, after text element persist:
+**Master index** — in `master_drawing_indexer.py`, after text element persist:
 
 ```python
 survey_points = extract_survey_points_from_elements(
@@ -480,9 +564,80 @@ survey_points = extract_survey_points_from_elements(
 persist_survey_points(db, drawing_id, survey_points, source="auto_index")
 ```
 
-**Also index linked evidence drawings:** when `EvidenceDrawingLink` points to project drawing (e.g. C4.20), run survey extraction on that drawing's `drawing_text_elements` if `index_status == "ready"`, OR run lightweight OCR+extract on linked PDF text stored in `evidence.text_content` using positioned words from evidence extraction pass.
+**Evidence upload (default: full document)** — in `evidence_document_extraction.py` / match orchestrator, **always** run survey extraction over the complete evidence corpus:
 
-For evidence-only text (no separate drawing row): store ephemeral survey points in `document_extraction.meta_json["survey_points"]` during evidence upload.
+```python
+def extract_survey_points_from_evidence(
+    session,
+    evidence: EvidenceRecord,
+    *,
+    optional_hint_bbox: tuple[float, float, float, float] | None = None,
+) -> list[SurveyPointRecord]:
+    """
+    Default: scan ENTIRE evidence — not a highlight crop, not title-block-only,
+    not first-2000-chars. Merge all text sources before regex pass.
+    """
+    document = extract_document(evidence.storage_path)  # every page
+    words = document.all_positioned_words()
+    merged_text = build_full_evidence_text(evidence)
+    linked_drawings = load_linked_drawings(session, evidence.id)
+    auxiliary_points = load_linked_drawing_survey_points(session, evidence.id)
+
+    scale_json = resolve_scale_for_evidence(evidence, linked_drawings)
+    page_meta_json = resolve_page_meta_for_evidence(document)
+
+    points_from_words = extract_survey_points_from_elements(
+        words,
+        scale_json=scale_json,
+        page_meta_json=page_meta_json,
+        optional_hint_bbox=optional_hint_bbox,
+    )
+    points_from_text = extract_survey_points_from_plain_text(
+        merged_text,
+        pairing_ctx=PairingScaleContext(mode="normalized_fallback", ...),  # no bboxes
+    )
+    return dedupe_survey_points(points_from_words + points_from_text + auxiliary_points)
+
+
+def resolve_scale_for_evidence(
+    evidence: EvidenceRecord,
+    linked_drawings: list[Drawing],
+) -> dict | None:
+    """
+    1. DocumentExtraction.meta_json["scale_json"] if parsed at upload from evidence PDF
+    2. First linked drawing with index_status=ready and scale_json (e.g. C4.20 at 1"=10')
+    3. None → resolve_pairing_scale falls through to campus default or normalized_fallback
+    """
+    ...
+```
+
+Persist on `DocumentExtraction.meta_json["survey_points"]` and `meta_json["pairing_scale_by_page"]` at upload time. Match job reads this — do not re-scan a truncated subset at match time.
+
+**Linked drawings:** when `EvidenceDrawingLink` points to project drawing (e.g. C4.20), include that drawing's indexed `drawing_survey_points` in the evidence candidate set (already full-sheet indexed).
+
+#### 9f. Full-document text scan — pipeline rule
+
+| Rule | Detail |
+|------|--------|
+| **Default** | Scan entire `evidence.text_content` + linked supplemental text + all OCR pages |
+| **Never assume** | That evidence text is pre-scoped to a highlight, click point, or "relevant paragraph" |
+| **Optional scoping** | If `optional_hint_bbox` or user pin exists → rank/boost tokens inside hint; **still scan full document** |
+| **Degrade gracefully** | When no hint exists (common case) → full-document behavior with no code-path change |
+
+**Pipeline audit — remove implicit subset assumptions:**
+
+| File | Current behavior | Required change |
+|------|------------------|-----------------|
+| `backend/services/evidence_document_extraction.py` | Runs full-file extraction + linked merge | Ensure `meta_json["survey_points"]` populated from **full** scan (§9d) |
+| `backend/services/inspection_matching_jobs.py` | Reads `DocumentClue` from full extraction | OK — verify clues/survey points not filtered by page or bbox before match |
+| `backend/services/evidence_linking.py` | `extract_sheet_refs(evidence.text_content)` on full text | **Pattern to follow** — sheet refs already full-document |
+| `backend/ai/pipelines/inspection_mapping.py` | `map_document_to_overlays()` uses full `extract_document()` | OK for document path |
+| `backend/ai/pipelines/inspection_mapping.py` | `EvidenceInput.bbox` for manual pin path only | OK — bbox is overlay anchor, **not** text scope; do not use to filter OCR/terms |
+| `backend/ai/pipelines/inspection_mapping.py` | `_extract_outcomes_llm()` uses `text[:2000]` | OK for LLM outcome summary only — **must not** be the survey/sheet-ref text source |
+| `backend/ai/pipelines/inspection_mapping.py` | `_extract_vocabulary_tags()` uses full `text_content` | OK — keep full text |
+| `backend/services/match_candidate_scope.py` (new) | — | `build_match_scope()` runs sheet-ref regex on **full** merged evidence text, not first page |
+
+**Anti-pattern to eliminate:** any helper that accepts `evidence_text: str` where callers pass `text_content[:N]`, `text_near_bbox(...)`, or page-1-only OCR without a explicit full-document fallback when hint/bbox is `None`.
 
 #### 9e. Tests
 
@@ -491,10 +646,15 @@ For evidence-only text (no separate drawing row): store ephemeral survey points 
 | `test_survey_point_extractor_pairs_n_e` | `"N 2131764.84"` + `"E 6051541.82"` within 15 ft at `1"=10'` → one point |
 | `test_survey_point_extractor_rejects_distant_e` | E token > 15 ft away at same scale → no pair |
 | `test_survey_point_pairing_scale_invariant` | same normalized gap pairs at `1"=10'` but rejects at `1"=40'` when gap > 15 ft real |
-| `test_survey_point_extractor_uses_scale_fallback` | missing `scale_json` → uses 10.0 ft/in fallback, sets `meta_json.scale_fallback` |
+| `test_survey_point_evidence_uses_linked_drawing_scale` | form has no scale; linked C4.20 has `1"=10'` → evidence pairing uses physical ft |
+| `test_survey_point_extractor_campus_default` | evidence has page dims, no parseable scale → `10.0` ft/in, `scale_fallback=true` |
+| `test_survey_point_extractor_normalized_last_resort` | plain-text only, no page dims → `pairing_scale_mode=normalized_fallback` |
 | `test_survey_point_matcher_3ft` | delta 2.5 ft → confidence 0.96 |
 | `test_survey_point_matcher_rejects_6ft` | delta 6.0 ft → no match |
 | `test_ucsf_run435_coordinate_match` | evidence 357 coords match master 661 corridor point; if this fails with two candidates within 3 ft, investigate greedy swap → Hungarian (§9c) |
+| `test_survey_points_from_full_evidence_text` | N/E in linked C4.20 supplemental text (not page 1 of form) → extracted |
+| `test_survey_points_no_hint_scans_all_pages` | multi-page evidence PDF → points found on page 2+ when absent from page 1 |
+| `test_survey_points_hint_boost_not_filter` | hint_bbox set → points outside hint still extracted, lower rank |
 
 ---
 
@@ -502,20 +662,38 @@ For evidence-only text (no separate drawing row): store ephemeral survey points 
 
 **Implements user step #4 (cross-reference text extraction).** Cheap, high-confidence search-space reduction.
 
+**Default text scope:** Same as §9f — scan **full merged evidence text** for sheet refs and cross-refs. `build_match_scope()` must not assume evidence text is pre-scoped to a highlight or form header only.
+
 #### 10a. Existing code (reuse, do not rewrite)
 
-`backend/services/evidence_linking.py`:
+`backend/services/evidence_linking.py` — already scans full `evidence.text_content` (correct pattern):
+
+```python
+refs = extract_sheet_refs(cast(Optional[str], evidence.text_content))
+```
+
+**Extend to full merged corpus** (not base `text_content` alone when linked PDFs present):
+
+```python
+def build_full_evidence_text(evidence: EvidenceRecord) -> str:
+    """Base upload text + linked supplemental (install sheets). Same merge as extraction pipeline."""
+    base = evidence.text_content or ""
+    # Include linked attachment OCR already merged into text_content at upload;
+    # if stored separately in meta, merge here. Never truncate for sheet-ref scan.
+    return base.strip()
+
+def extract_sheet_refs_from_evidence(evidence: EvidenceRecord) -> list[str]:
+    return extract_sheet_refs(build_full_evidence_text(evidence))
+```
+
+Also extract from `drawing_text_elements` on master (full indexed text, all pages): `"SEE SHEET"`, `"REFER TO SHEET"`, `"ON SHEET"` followed by sheet ref:
 
 ```python
 SHEET_REF_PATTERNS = (
     re.compile(r"\b([A-Z]{1,3}-?\d{2,4}[A-Z]?)\b", re.IGNORECASE),
     re.compile(r"\b((?:[A-Z]\d+\.)?[A-Z]\d+\.\d{2,4})\b", re.IGNORECASE),
 )
-```
 
-Also extract from `drawing_text_elements` on master: `"SEE SHEET"`, `"REFER TO SHEET"`, `"ON SHEET"` followed by sheet ref — new regex:
-
-```python
 _CROSS_REF_RE = re.compile(
     r"\b(?:SEE|REFER\s+TO|ON|DETAIL\s+ON)\s+SHEET\s+"
     r"((?:[A-Z]\d+\.)?[A-Z]\d+\.\d{2,4})\b",
@@ -537,9 +715,10 @@ class MatchScope:
 
 def build_match_scope(session, *, evidence_id, master_drawing_id) -> MatchScope:
     """
-    1. evidence_linking refs → auxiliary_drawing_ids
-    2. master OCR cross-refs mentioning evidence sheet refs → boost
-    3. If no refs: auxiliary_drawing_ids = ()
+    1. extract_sheet_refs_from_evidence() on FULL merged evidence text (§10a)
+    2. evidence_linking refs → auxiliary_drawing_ids
+    3. master OCR cross-refs (all pages) mentioning evidence sheet refs → boost
+    4. If no refs: auxiliary_drawing_ids = ()
     """
 ```
 
@@ -557,8 +736,9 @@ In `run_inspection_match_job()`:
 
 | Test | Assert |
 |------|--------|
-| `test_build_match_scope_c420` | evidence with C4.20 ref → auxiliary drawing id resolved |
+| `test_build_match_scope_c420` | evidence with C4.20 ref in **linked supplemental text** → auxiliary drawing id resolved |
 | `test_cross_ref_extract_on_master` | master text "SEE SHEET C4.20" → ref extracted |
+| `test_sheet_refs_full_document_not_truncated` | ref appears after char 2000 in merged text → still found |
 
 ---
 
@@ -594,21 +774,73 @@ In `run_inspection_match_job()`:
 
 | Step | Method | `true_north_source` | Confidence |
 |------|--------|---------------------|------------|
-| 1 | OCR text: `\bNORTH\s+POINTING\s+(UP|DOWN|LEFT|RIGHT)\b` | `orientation_text` | `0.85` |
+| 1 | OCR orientation callout (loose regex + direction extract) | `orientation_text` | `0.85` |
 | 2 | Keyplan CV in title block | `keyplan_cv` | `0.80` |
 | 3 | PyMuPDF `page.rotation` mapped to degrees | `pdf_rotation` | `0.60` |
 | 4 | Default | `assumed_up` | `0.50`, `true_north_rotation_deg = 0.0` |
 
-**Text mapping (step 1):**
+**Text orientation (step 1) — primary fallback when keyplan CV fails §3b audit:**
+
+Title blocks use many phrasings, not just `"NORTH POINTING DOWN"`. Observed on UCSF sheets (including U1.C4.20 callout box):
+
+- `NORTH POINTING DOWN`
+- `NORTH ARROW POINTS DOWN`
+- `SHEET ORIENTED WITH NORTH DOWN`
+- `VIEW ORIENTATION: NORTH POINTING SOUTH`
+
+Use a **two-pass** text detector — cheap and high-value; prefer this over pdf_rotation when CV is unavailable.
 
 ```python
+# Pass 1: loose match — NORTH near a direction/orientation keyword (within 20 chars)
+_ORIENTATION_LOOSE_RE = re.compile(
+    r"\bNORTH\b.{0,20}\b(POINT(?:S|ING)?|ORIENTED|ORIENTATION|ARROW|VIEW)\b",
+    re.IGNORECASE,
+)
+
+# Also match "oriented with north <dir>" / "north <dir>" without POINTING
+_ORIENTATION_WITH_DIR_RE = re.compile(
+    r"\b(?:SHEET\s+)?ORIENTED\s+WITH\s+NORTH\s+(UP|DOWN|LEFT|RIGHT|SOUTH|NORTH|EAST|WEST)\b",
+    re.IGNORECASE,
+)
+
+# Pass 2: extract cardinal direction word from the matched span (or full line)
+_DIRECTION_WORD_RE = re.compile(
+    r"\b(UP|DOWN|LEFT|RIGHT|SOUTH|NORTH|EAST|WEST)\b",
+    re.IGNORECASE,
+)
+
 ORIENTATION_TEXT_TO_DEG = {
     "UP": 0.0,
+    "NORTH": 0.0,       # "north pointing north" = sheet upright
     "DOWN": 180.0,
-    "LEFT": 90.0,    # sheet north points left → rotate +90 to normalize
+    "SOUTH": 180.0,     # "north pointing south" (U1.C4.20) = upside down
+    "LEFT": 90.0,
+    "WEST": 90.0,
     "RIGHT": 270.0,
+    "EAST": 270.0,
 }
+
+def detect_orientation_from_text(page_text: str) -> OrientationResult | None:
+    """
+    1. Try _ORIENTATION_WITH_DIR_RE first (explicit direction capture).
+    2. Else find _ORIENTATION_LOOSE_RE matches; for each, run _DIRECTION_WORD_RE
+       on the matched substring and take the LAST direction word (closest to end of phrase).
+    3. Map direction → true_north_rotation_deg via ORIENTATION_TEXT_TO_DEG.
+    4. Store full matched string in orientation_text for audit.
+    """
 ```
+
+**Examples:**
+
+| OCR snippet | Extracted direction | `true_north_rotation_deg` |
+|-------------|--------------------|-----------------------------|
+| `NORTH POINTING DOWN` | DOWN | `180.0` |
+| `NORTH ARROW POINTS DOWN` | DOWN | `180.0` |
+| `SHEET ORIENTED WITH NORTH DOWN` | DOWN | `180.0` |
+| `VIEW ORIENTATION: NORTH POINTING SOUTH` | SOUTH | `180.0` |
+| `NORTH POINTING UP` | UP | `0.0` |
+
+Scan full page OCR text (not title-block crop only) — orientation callouts on install sheets (C4.20) may sit outside `{x >= 0.75, y >= 0.75}`.
 
 **Keyplan CV (step 2) — discrete 4-way template matching (not minAreaRect):**
 
@@ -727,7 +959,11 @@ If audit fails: rely on step 1 (`NORTH POINTING DOWN` text) + manual `true_north
 
 | Test | Assert |
 |------|--------|
-| `test_orientation_text_down` | "NORTH POINTING DOWN" → `180.0` deg |
+| `test_orientation_text_down` | `"NORTH POINTING DOWN"` → `180.0` deg |
+| `test_orientation_text_arrow_points_down` | `"NORTH ARROW POINTS DOWN"` → `180.0` deg |
+| `test_orientation_text_oriented_with_north_down` | `"SHEET ORIENTED WITH NORTH DOWN"` → `180.0` deg |
+| `test_orientation_text_north_pointing_south` | `"VIEW ORIENTATION: NORTH POINTING SOUTH"` (U1.C4.20) → `180.0` deg |
+| `test_orientation_text_loose_no_direction` | loose match with no direction word → `None` (fall through to CV/pdf) |
 | `test_rotate_bbox_180` | `(0.1,0.1,0.2,0.2)` → symmetric flip around center |
 | `test_registration_transform_with_rotation` | 180° registration maps evidence bbox to master |
 | `test_keyplan_ncc_picks_180` | synthetic crop with keyplan flipped 180° → `true_north_rotation_deg == 180`, score ≥ `0.70` |
@@ -739,6 +975,10 @@ If audit fails: rely on step 1 (`NORTH POINTING DOWN` text) + manual `true_north
 ### Phase 12 — Landmark contour fingerprinting
 
 **Implements user step #3 (landmark contour fingerprinting).** Fallback only — runs when Phase 9 returns zero matches.
+
+**Least-trustworthy signal in this plan.** Utility pipe lines on UCSF sheets cross directly through tank and building outlines, corrupting Canny edge detection and Hu-moment fingerprints. Contour matching may suggest a bbox for human review but must **never** auto-promote to `matched` until real accuracy data exists.
+
+**Evidence-type gate (required):** Contour/Hu-moment matching is only valid when the **evidence document itself** is line-art (a scanned or marked-up drawing sheet). It is **not** valid for field photographs — a photo of a trench has no clean vector outlines to match against plan landmarks. See §12f and §13a — do not invoke `landmark_matcher` unless `evidence_kind == "drawing_scan"`.
 
 #### 12a. New table: `drawing_landmarks`
 
@@ -762,12 +1002,33 @@ class DrawingLandmark(Base):
 
 **New file:** `backend/ai/pipelines/landmark_extractor.py`
 
-**Input:** rendition PNG + `page_meta_json` (with true-north rotation applied to pixel space before contour extraction).
+**Two call sites — same algorithm, different inputs:**
+
+| Call site | When | Scope |
+|-----------|------|--------|
+| **Master index** (`master_drawing_indexer.py`) | On `drawing_index` job | Full page (minus exclusion zones) → persist to `drawing_landmarks` |
+| **Evidence match** (`landmark_matcher.py`) | On contour fallback for `evidence_kind == "drawing_scan"` | **Full evidence page** (minus same exclusion zones) — **not** a pre-cropped highlight region |
+
+**Input:** evidence or master rendition PNG + `page_meta_json` (true-north rotation applied in pixel space before contour extraction).
+
+```python
+def extract_landmarks_from_page(
+    rendition_png,
+    page_meta: dict,
+    *,
+    optional_hint_bbox: tuple[float, float, float, float] | None = None,
+) -> list[LandmarkRecord]:
+    """
+    Always scan the full plan body. optional_hint_bbox is NEVER required.
+    If provided (rare: evidence is pre-highlighted), boost contours overlapping
+    hint by +0.05 internal rank — do not restrict extraction to hint alone.
+    """
+```
 
 **Detection (deterministic v1 — no ML):**
 
-1. Exclude title block `{x >= 0.75, y >= 0.75}` and legend block `{x <= 0.35, 0.20 <= y <= 0.85}` (same as region builder).
-2. Canny `(30, 100)` on plan body.
+1. Exclude title block `{x >= 0.75, y >= 0.75}` and legend block `{x <= 0.35, 0.20 <= y <= 0.85}` (same as region builder) — on **both** master and evidence pages.
+2. Canny `(30, 100)` on remaining plan body.
 3. Keep closed contours with area:
    - `>= 0.0002 * page_area_normalized` (large enough = building/tank)
    - `<= 0.05 * page_area_normalized` (exclude page border)
@@ -776,7 +1037,7 @@ class DrawingLandmark(Base):
    - `ratio > 1.5` or `ratio < 0.67` → `building`
    - else → `structure`
 5. Compute Hu moments: `cv2.HuMoments(cv2.moments(contour)).flatten()` then `-sign(x)*log10(abs(x))` for each.
-6. Store bbox in **true-north-normalized** coordinates using `normalize_to_true_north()`.
+6. Store each landmark's **own** bbox in true-north-normalized coordinates via `normalize_to_true_north()`. The matched landmark bbox is the region of interest — it is an **output**, not an input assumption.
 
 #### 12c. Matching
 
@@ -787,23 +1048,43 @@ HU_MATCH_THRESHOLD = 0.15   # cv2.matchShapes I2 metric — lower is better
 MIN_LANDMARK_MATCHES = 2    # require at least 2 landmark pairs
 MIN_SPATIAL_SEPARATION = 0.05  # normalized — matched pairs must be > 5% page apart
 
-def hu_distance(m1: list[float], m2: list[float]) -> float:
-    return cv2.matchShapes(np.array(m1), np.array(m2), cv2.CONTOURS_MATCH_I2, 0.0)
+def run_landmark_matcher(
+    *,
+    master_landmarks: list[LandmarkRecord],       # from drawing_landmarks index
+    evidence_rendition_png,
+    evidence_page_meta: dict,
+    optional_hint_bbox: tuple[float, float, float, float] | None = None,
+) -> ContourMatchResult | None:
+    """
+    Evidence-side: extract landmarks from FULL evidence page via extract_landmarks_from_page().
+    Do NOT accept a required pre-known highlight bbox — most evidence (e.g. full C4.20 sheet)
+    has no upstream highlight region.
+    """
+    evidence_landmarks = extract_landmarks_from_page(
+        evidence_rendition_png,
+        evidence_page_meta,
+        optional_hint_bbox=optional_hint_bbox,  # filter/boost only, never required
+    )
+    ...
 ```
 
 Algorithm:
 
-1. Normalize all evidence and master landmarks to true north.
-2. Build cost matrix of Hu distances (evidence × master).
-3. Greedy assign pairs where `hu_distance <= 0.15`.
-4. Require ≥ `2` pairs with consistent relative displacement:
+1. Extract evidence landmarks from **full page** (§12b); load master landmarks from index.
+2. Normalize all evidence and master landmarks to true north.
+3. Build cost matrix of Hu distances (evidence × master).
+4. Greedy assign pairs where `hu_distance <= 0.15`.
+5. Require ≥ `2` pairs with consistent relative displacement:
    - Compute vector from evidence landmark A to B: `Δ_ev`
    - Compute vector from master landmark A' to B': `Δ_master`
    - `vector_error = hypot(Δ_ev.x - Δ_master.x, Δ_ev.y - Δ_master.y)`
    - Accept set if `vector_error <= 0.03` normalized for all pairs.
-5. Derive implied translation offset from matched pairs (median of `master_centroid - evidence_centroid`).
-6. Apply offset to evidence highlight bbox → master overlay bbox.
-7. Confidence: `0.70` if 2 pairs; `0.78` if 3+ pairs. Status: `needs_review` unless combined with clue match ≥ `0.75`.
+6. **Output bbox (no input highlight assumed):** derive master overlay region from **matched master landmark bboxes** — union of matched master landmarks' `bbox_json`, expanded by `0.01` normalized per side. Do **not** translate a pre-existing evidence highlight bbox; the matched landmarks *are* the region of interest.
+   - Optional: if `optional_hint_bbox` was provided and overlaps matched evidence landmarks, add `+0.02` to internal confidence (boost only).
+7. Internal confidence (ranking only — **never** `matched` status):
+   - `0.70` if 2 landmark pairs
+   - `0.72` if 3+ landmark pairs (cap below `MATCH_SCORE_THRESHOLD`; no auto-promotion)
+8. Frontend status: **`needs_review` always** for `CONTOUR_MATCH`, regardless of pair count or internal score.
 
 #### 12d. Resolver extension
 
@@ -823,7 +1104,7 @@ class ResolutionMethod(str, Enum):
 
 Replace priority-ladder routing with **score-first selection**. `detect_resolution_case()` becomes a thin wrapper; the real logic lives in `select_best_location_match()` (§13e).
 
-**Do not** return the first method that passes a threshold — that lets a lower-confidence method win because it appears earlier in an if-chain (e.g. REFERENCE_LOOKUP at `0.75` beating CONTOUR_MATCH at `0.78`, or ALIGNMENT at priority-2 beating a coordinate match at `0.80` at priority-3).
+**Do not** return the first method that passes a threshold — that lets a lower-confidence method win because it appears earlier in an if-chain (e.g. ALIGNMENT at priority-3 beating a coordinate match at `0.80` at priority-0 when scores are mishandled).
 
 ```python
 @dataclass(frozen=True)
@@ -866,14 +1147,100 @@ def detect_resolution_case(candidates: list[MethodCandidate]) -> ResolutionMetho
 
 Final winner selection is defined in §13e (max confidence; priority ladder is **tie-break only**).
 
-#### 12e. Tests
+#### 12f. Evidence kind gate (contour eligibility)
+
+Contour matching runs **only** when evidence is line-art. Add before any call to `landmark_matcher` in `resolve_evidence_location()` (§13a).
+
+**New enum** (or module-level constants in `location_match_orchestrator.py`):
+
+```python
+EvidenceKind = Literal["drawing_scan", "photo", "form"]
+```
+
+**Classification** — `classify_evidence_kind(session, evidence_id) -> EvidenceKind`:
+
+| `evidence_kind` | Meaning | Contour eligible? |
+|-----------------|---------|-------------------|
+| `drawing_scan` | Scanned/marked-up drawing sheet (vector or raster line-art) | **Yes** |
+| `photo` | Field photograph (trench, manhole, etc.) | **No** |
+| `form` | Inspection report / PDF form (text extraction, no drawable outlines on evidence file) | **No** |
+
+**Reuse existing pipeline where possible:**
+
+```python
+# Primary: DocumentExtraction.document_type from upload/extraction pipeline
+# backend/ai/schemas/document_extraction_schemas.py — DocumentType enum already exists:
+#   inspection_report | field_photo | master_drawing | unknown
+
+DOCUMENT_TYPE_TO_EVIDENCE_KIND: dict[str, EvidenceKind] = {
+    "field_photo": "photo",
+    "master_drawing": "drawing_scan",
+    "inspection_report": "form",       # default; override with heuristic below
+    "unknown": "form",                # conservative — no contour
+}
+
+# Heuristic override for inspection_report uploads that are actually drawing PDFs:
+# If native PDF text density >= 50 positioned words on page 1 OR mime is application/pdf
+# with linked install-sheet attachment (EvidenceDrawingLink), upgrade to "drawing_scan".
+NATIVE_TEXT_DENSITY_THRESHOLD = 50    # words on page 1 from extract_document()
+```
+
+Store resolved kind on `DocumentExtraction.meta_json["evidence_kind"]` at extraction time (persist once, read in match job).
+
+**Gate logic in orchestrator:**
+
+```python
+NON_CONTOUR_METHODS = (
+    COORDINATE_LOOKUP, STATION_LOOKUP, REFERENCE_LOOKUP, ALIGNMENT,  # + clue tile as separate source
+)
+
+def resolve_evidence_location(...) -> LocationMatchResult:
+    evidence_kind = classify_evidence_kind(session, evidence_id)
+
+    # Steps 1–3: run all non-contour matchers (survey, clue, reference, alignment)
+    candidates = collect_non_contour_candidates(...)
+
+    winner = select_best_location_match(candidates)
+    if winner is not None and winner.confidence > 0.0:
+        return winner
+
+    # Gate: no contour for photos/forms
+    if evidence_kind != "drawing_scan":
+        return LocationMatchResult(
+            method=UNRESOLVED,
+            confidence=0.0,
+            bbox_fractional=None,
+            notes=(
+                f"No coordinate/station/reference match for evidence_kind={evidence_kind!r}. "
+                "Contour matching skipped (not line-art). Surface evidence for manual placement."
+            ),
+        )
+
+    # Step 4: drawing_scan only — landmark_matcher (contour fallback; full-page evidence extract)
+    contour = run_landmark_matcher(
+        master_landmarks=load_master_landmarks(...),
+        evidence_rendition_png=...,
+        evidence_page_meta=...,
+        optional_hint_bbox=None,  # or evidence highlight if present — never required
+    )
+```
+
+**Frontend behavior when gated:** `match_status = "no_match"`, no overlay bbox — evidence panel shows full uploaded file for manual pin placement. Do not emit a low-quality contour guess on photos.
+
+#### 12g. Tests
 
 | Test | Assert |
 |------|--------|
 | `test_landmark_extractor_finds_tank` | synthetic rectangle contour → type `tank` |
+| `test_landmark_extractor_full_page_evidence` | extraction runs on full page, not gated on input bbox |
+| `test_landmark_matcher_output_from_master_bboxes` | overlay bbox = union of matched **master** landmarks, not translated evidence highlight |
+| `test_landmark_matcher_optional_hint_boost_only` | hint_bbox provided → rank boost; hint absent → still extracts full page |
 | `test_landmark_matcher_hu_threshold` | identical shapes → distance 0.0 |
 | `test_landmark_matcher_requires_two_pairs` | 1 pair only → no match |
-| `test_select_best_contour_beats_reference` | CONTOUR `0.78` + REFERENCE location-only `0.75` → contour wins |
+| `test_contour_match_always_needs_review` | 3+ pairs at internal score `0.72` → `match_status == "needs_review"` |
+| `test_contour_skipped_for_photo_evidence` | `evidence_kind == "photo"`, coords/reference all fail → `UNRESOLVED`, landmark_matcher not called |
+| `test_contour_runs_for_drawing_scan` | `evidence_kind == "drawing_scan"`, no higher signal → contour candidate returned |
+| `test_select_best_reference_beats_contour` | REFERENCE location-only `0.75` + CONTOUR `0.72` (3+ pairs) → reference wins |
 | `test_select_best_alignment_beats_weak_coordinate` | ALIGNMENT `0.90` + coordinate tier `0.80` → alignment wins |
 | `test_tiebreak_coordinate_over_contour` | both `0.96` within epsilon → COORDINATE_LOOKUP wins tie-break |
 
@@ -901,16 +1268,19 @@ class LocationMatchResult:
 
 def resolve_evidence_location(session, *, evidence_id, master_drawing_id, page=1) -> LocationMatchResult:
     """
-    Step 0: build_match_scope()
-    Step 1: Run ALL applicable matchers (no early exit):
+    Step 0: build_match_scope()          # full merged evidence text for sheet refs
+    Step 0b: evidence_kind = classify_evidence_kind(session, evidence_id)
+    Step 1: Run ALL non-contour matchers (no early exit):
+              - extract_survey_points_from_evidence() — **full document** (§9f)
               - survey_point_matcher (master + auxiliary + evidence meta)
               - find_candidate_tiles_from_clues → best clue tile score
               - resolve_document_location (REFERENCE_LOOKUP)
               - alignment path if registration_transform present
-              - landmark_matcher (contour fallback)
-    Step 2: Score each result per §13d
-    Step 3: select_best_location_match() — max confidence; tie-break per §13e
-    Step 4: return winner, or UNRESOLVED if all scores == 0.0
+    Step 2: Score each result per §13d; select_best_location_match()
+    Step 3: If winner.confidence > 0 → return winner
+    Step 4: If evidence_kind != "drawing_scan" → UNRESOLVED (skip Phase 12; manual placement)
+    Step 5: drawing_scan only → landmark_matcher (contour fallback)
+    Step 6: return winner or UNRESOLVED
     """
 ```
 
@@ -922,9 +1292,18 @@ Replace direct `find_candidate_tiles_from_clues` loop with:
 
 ```python
 result = resolve_evidence_location(session, evidence_id=..., master_drawing_id=...)
-status = "matched" if result.confidence >= 0.75 else "needs_review" if result.confidence > 0 else "no_match"
+status = match_status_from_result(result)  # see §13d — CONTOUR_MATCH always needs_review
 persist_inspection_match_overlay(..., status=status, bbox=result.bbox_fractional, ...)
 record_internal_match_candidate(..., source=result.source, score=result.confidence)
+```
+
+```python
+def match_status_from_result(result: LocationMatchResult) -> MatchStatus:
+    if result.confidence <= 0:
+        return "no_match"
+    if result.method == ResolutionMethod.CONTOUR_MATCH:
+        return "needs_review"  # never auto-promote — pipe lines corrupt contour inputs
+    return "matched" if result.confidence >= MATCH_SCORE_THRESHOLD else "needs_review"
 ```
 
 Keep `DrawingMatchCandidate` rows for **all** scored method candidates (sorted by confidence desc), not only the winner.
@@ -949,17 +1328,19 @@ Every applicable method produces an `internal_score`. The orchestrator picks **`
 | Alignment, overlapping region found | `0.90` | `matched` |
 | Alignment, no overlapping region | `0.75` | `matched` |
 | Clue tile (existing formula) | `tile.conf + clue.conf` | `matched` if ≥ `0.75` |
-| Contour 2 pairs | `0.70` | `needs_review` |
-| Contour 3+ pairs | `0.78` | `matched` |
+| Contour ≥ 2 pairs | `0.70` (2 pairs) / `0.72` (3+ pairs) | **`needs_review` always** |
 | No signal | `0.0` | `no_match` |
 
 Threshold constant: `MATCH_SCORE_THRESHOLD = 0.75` (unchanged).
 
+**CONTOUR_MATCH rule:** Internal scores are capped at `0.72` (below threshold) for ranking/audit only. `match_status_from_result()` returns `needs_review` for any `CONTOUR_MATCH` winner — no exception for 3+ pairs. Revisit only after labeled accuracy data from `LocationMatchLabel` proves contour precision is production-ready.
+
 **Examples (score wins, not list order):**
 
-- CONTOUR_MATCH `0.78` beats REFERENCE_LOOKUP location-only `0.75` → contour wins.
+- REFERENCE_LOOKUP location-only `0.75` beats CONTOUR_MATCH `0.72` (3+ pairs) → reference wins bbox **and** status.
 - ALIGNMENT with region `0.90` beats coordinate tier `0.80` → alignment wins.
 - COORDINATE_LOOKUP `0.96` beats everything else → coordinate wins.
+- CONTOUR_MATCH wins argmax but no method ≥ `0.75` → overlay bbox from contour, status **`needs_review`** (not `matched`).
 
 #### 13e. Tie-breaker (when scores are equal within epsilon)
 
@@ -991,35 +1372,137 @@ def select_best_location_match(candidates: list[MethodCandidate]) -> MethodCandi
 
 ---
 
-### Phase 14 — Golden regression & operator tooling
+### Phase 14 — Labeled eval set, regression & operator tooling
 
-#### 14a. End-to-end test
+> **Threshold freeze policy:** Constants below are **provisional** — tuned against a single golden case (run 435 / evidence 357 / master 661). **Do not finalize** until the labeled eval set (§14b–§14d) has ≥ `5` rows and the eval script passes. Adjust only after reviewing per-case failures.
+
+| Constant | Provisional value | File |
+|----------|-------------------|------|
+| `COORD_MATCH_TOLERANCE_FT` | `3.0` | `survey_point_matcher.py` |
+| `NE_PAIR_MAX_DISTANCE_FT` | `15.0` | `survey_point_extractor.py` |
+| `NE_PAIR_MAX_DISTANCE_NORM` | `0.12` (fallback only) | `survey_point_extractor.py` |
+| `KEYPLAN_NCC_THRESHOLD` | `0.70` | `sheet_orientation_detector.py` |
+| `HU_MATCH_THRESHOLD` | `0.15` | `landmark_matcher.py` |
+| `MATCH_SCORE_THRESHOLD` | `0.75` | `inspection_match_persistence.py` |
+
+#### 14a. Golden regression test (eval case #1)
 
 **New file:** `backend/tests/test_ucsf_survey_location_e2e.py`
+
+This is **one row** in the labeled eval set — not sufficient alone to lock thresholds.
 
 Fixture requirements:
 
 - Master PDF excerpt with known N/E near Future Hospital Building corridor on drawing 661
 - Evidence text snippet from C4.20 with matching N/E within `3.0 ft`
+- Sheet rotation ~`180°` between evidence install sheet and master site plan
 - Assert: `resolve_evidence_location()` returns `method=COORDINATE_LOOKUP`, `confidence >= 0.96`, bbox IoU with human-labeled master bbox ≥ `0.30`
 
-#### 14b. Human-labeled pairs table (new)
+#### 14b. Human-labeled pairs table
+
+**New file:** `backend/models/location_match_label.py`
 
 ```python
-# backend/models/location_match_label.py  (training / eval only)
 class LocationMatchLabel(Base):
-    evidence_id: int
+    __tablename__ = "location_match_labels"
+
+    id: int PK
+    label_id: str                    # stable slug, e.g. "ucsf-435-ss-corridor"
+    project_id: int
+    evidence_id: int | None          # nullable if fixture-only (synthetic PDF path)
+    inspection_run_id: int | None
     master_drawing_id: int
-    evidence_bbox_json: dict | None
-    master_bbox_json: dict          # ground truth
-    rotation_deg: float | None
+    evidence_fixture_path: str | None  # backend/tests/fixtures/... when not in DB
+
+    # Ground truth
+    master_bbox_json: dict           # {x0,y0,x1,y1} normalized — required
+    evidence_bbox_json: dict | None  # optional; evidence-side region if known
+    expected_method: str             # COORDINATE_LOOKUP | STATION_LOOKUP | REFERENCE_LOOKUP | UNRESOLVED | ...
+    expected_match_status: str       # matched | needs_review | no_match
+    rotation_deg: float | None       # known true-north offset between evidence and master (e.g. 180.0)
+
+    # Signal profile (for stratified eval)
+    has_coordinate_signal: bool      # True if N/E present on evidence or linked sheet
+    has_station_signal: bool
+    has_reference_signal: bool       # inspection type + location term
+    evidence_kind: str               # drawing_scan | photo | form
+
     notes: str
-    created_by: int
+    created_by: int | None
+    created_at: datetime
 ```
 
-Seed row for run 435 / evidence 357 when human confirms black circle location.
+**Seed target: 5–10 labeled pairs minimum** before locking thresholds. Store seed rows in:
 
-#### 14c. Debug endpoints
+`backend/tests/fixtures/location_match_labels.json`
+
+Load via `backend/scripts/seed_location_match_labels.py` (dev/CI) or insert through admin UI (PR-G).
+
+#### 14c. Required eval set composition
+
+| # | Label slug (example) | Must include | `has_coordinate_signal` | `rotation_deg` | Expected outcome |
+|---|----------------------|--------------|-------------------------|----------------|------------------|
+| 1 | `ucsf-435-ss-corridor` | Golden case — run 435, evidence 357, master 661, linked C4.20 | `true` | `180` | `COORDINATE_LOOKUP`, `matched` |
+| 2 | `ucsf-rotated-detail` | Second **180°** pair (different sheet pair than #1) | `true` or `false` | `180` | method per human label |
+| 3 | `ucsf-no-coords-clue-only` | **Zero coordinate signal** — clue/reference only | `false` | `0` or `null` | `REFERENCE_LOOKUP` or `needs_review` |
+| 4 | `ucsf-no-coords-unresolved` | **Zero coordinate signal** — ambiguous/no match | `false` | any | `UNRESOLVED`, `no_match` |
+| 5 | `ucsf-station-only` | Station + structure, no N/E on one side | `false` | any | `STATION_LOOKUP` if matchable |
+| 6–10 | (expand) | Mix: photo (`form`/`photo` → no contour), drawing_scan contour candidate, multi-sheet ref | vary | vary | per human label |
+
+**Hard requirements before threshold freeze:**
+
+- [ ] ≥ `5` rows with `master_bbox_json` confirmed by a human
+- [ ] ≥ `1` row with `rotation_deg == 180` (excluding duplicates of same sheet pair as #1)
+- [ ] ≥ `1` row with `has_coordinate_signal == false` and expected `UNRESOLVED` or non-coordinate method
+- [ ] Eval script (§14d) run on all rows; review failures before changing constants
+
+#### 14d. Eval script
+
+**New file:** `backend/scripts/eval_location_match.py`
+
+```bash
+# Run against DB labels + fixtures (CI-friendly)
+python backend/scripts/eval_location_match.py \
+  --labels backend/tests/fixtures/location_match_labels.json \
+  --min-iou 0.30 \
+  --output /tmp/location_match_eval.json
+```
+
+```python
+@dataclass
+class EvalCaseResult:
+    label_id: str
+    expected_method: str
+    actual_method: str
+    expected_status: str
+    actual_status: str
+    bbox_iou: float | None
+    passed: bool
+    failure_reasons: list[str]
+
+def run_eval(labels: list[LocationMatchLabel], session) -> list[EvalCaseResult]:
+    """
+    For each label:
+      1. resolve_evidence_location(...) or load fixture
+      2. Compare method, match_status, bbox IoU vs master_bbox_json
+      3. Record pass/fail + deltas for threshold tuning
+    """
+
+def print_eval_summary(results: list[EvalCaseResult]) -> None:
+    """
+    Report:
+      - pass rate overall and by stratum (has_coordinate_signal, rotation_deg != 0)
+      - false positives on zero-coordinate cases
+      - IoU distribution (p50, min)
+    Fail CI if pass_rate < 0.80 OR any zero-coordinate case produces matched coordinate/contour false positive
+    """
+```
+
+**New test:** `backend/tests/test_location_match_eval.py` — loads fixture JSON, runs eval script, asserts ≥ `80%` pass rate once ≥ `5` labels exist (skip with `@pytest.mark.skip` until labels seeded).
+
+**Workflow:** After adding/changing thresholds in §9b/§11/§12, re-run eval script and attach `/tmp/location_match_eval.json` summary to PR description.
+
+#### 14e. Debug endpoints
 
 | Endpoint | Returns |
 |----------|---------|
@@ -1028,7 +1511,7 @@ Seed row for run 435 / evidence 357 when human confirms black circle location.
 | `GET /drawings/{id}/orientation` | `page_meta_json` orientation fields |
 | `POST /drawings/{id}/orientation` | Manual override `{page, true_north_rotation_deg}` |
 
-#### 14d. Reindex behavior
+#### 14f. Reindex behavior
 
 On reindex: replace `source="auto_index"` rows in `drawing_survey_points` and `drawing_landmarks`; preserve `source="manual"`.
 
@@ -1057,7 +1540,7 @@ Inspect pages 1 of sheets: `C0.00`, `C4.20`, master `661`, `C4.21`, `C6.00`.
 
 Record per sheet:
 
-| Sheet | Keyplan present (Y/N) | Bbox corner (x0,y0) | "NORTH POINTING" text (Y/N) | PyMuPDF rotation |
+| Sheet | Keyplan present (Y/N) | Bbox corner (x0,y0) | Orientation callout text (Y/N + snippet) | PyMuPDF rotation |
 |-------|----------------------|---------------------|------------------------------|------------------|
 
 **Proceed with CV if:** keyplan present on ≥ `80%` of audited sheets in `{x >= 0.65, y >= 0.65}` **and** discrete 4-way template match (not contour angle) scores ≥ `0.70` on ≥ 4/5 audited sheets at the correct cardinal rotation.
@@ -1075,8 +1558,8 @@ Record per sheet:
 | **PR-C** | 11 | `sheet_orientation_detector.py` (discrete 4-way keyplan NCC), `coordinate_frame.py`, fix `RegistrationTransform.apply()` | Rotation-normalized geometry |
 | **PR-D** | 12 | `drawing_landmark.py`, `landmark_extractor.py`, `landmark_matcher.py` | Contour fallback |
 | **PR-E** | 13 | `location_match_orchestrator.py`, unify `inspection_mapping.py` | Single pipeline |
-| **PR-F** | 14 + UI | e2e test, debug APIs, match-status polling | Run 435 regression |
-| **PR-G** | Labels | `location_match_label.py`, admin UI | Training eval |
+| **PR-F** | 14a + 14d test | e2e golden test, eval script, match-status polling | Run 435 regression |
+| **PR-G** | 14b–14c | `location_match_label.py`, fixture JSON (5–10 rows), seed script, admin UI | **Threshold validation** — block threshold changes until eval passes |
 
 **Do not start PR-C (keyplan CV) until checklist 3b passes.**
 
@@ -1086,6 +1569,9 @@ Record per sheet:
 
 - Do not use sheet identifiers as master region lookup keys (unchanged design rule).
 - Do not run contour matching before true-north normalization (Phase 11 before Phase 12).
+- Do not run contour matching when `evidence_kind` is `photo` or `form` — return `UNRESOLVED` for manual placement.
+- Do not require a pre-cropped evidence highlight bbox for contour matching — extract landmarks from the full evidence page; output bbox comes from matched master landmarks.
+- Do not scope survey-point, station, structure-label, or sheet-ref regex passes to a highlight crop, click vicinity, or `text_content[:N]` truncation — **full document is the default**; optional hints boost only.
 - Do not expose `confidence_score`, Hu distances, or OCR confidence to frontend.
 - Do not delete human-drawn regions or manual survey points on reindex.
 - Do not OCR on upload request thread (keep async jobs).
@@ -1099,18 +1585,25 @@ Record per sheet:
 | NEW | `backend/models/drawing_survey_point.py` |
 | NEW | `backend/models/drawing_landmark.py` |
 | NEW | `backend/models/location_match_label.py` |
+| NEW | `backend/tests/fixtures/location_match_labels.json` |
+| NEW | `backend/scripts/eval_location_match.py` |
+| NEW | `backend/scripts/seed_location_match_labels.py` |
+| NEW | `backend/tests/test_location_match_eval.py` |
 | NEW | `backend/ai/pipelines/survey_point_extractor.py` |
 | NEW | `backend/ai/pipelines/survey_point_matcher.py` |
 | NEW | `backend/ai/pipelines/sheet_orientation_detector.py` |
 | NEW | `backend/ai/pipelines/coordinate_frame.py` |
 | NEW | `backend/ai/pipelines/landmark_extractor.py` |
 | NEW | `backend/ai/pipelines/landmark_matcher.py` |
+| NEW | `backend/ai/pipelines/evidence_kind_classifier.py` |
 | NEW | `backend/ai/pipelines/location_match_orchestrator.py` |
 | NEW | `backend/services/match_candidate_scope.py` |
 | MOD | `backend/ai/pipelines/master_drawing_indexer.py` |
 | MOD | `backend/ai/pipelines/drawing_location_resolver.py` |
-| MOD | `backend/services/inspection_matching_jobs.py` |
-| MOD | `backend/ai/pipelines/inspection_mapping.py` |
+| MOD | `backend/services/evidence_document_extraction.py` (full-document survey points at upload) |
+| MOD | `backend/services/inspection_matching_jobs.py` (verify no text subset before match) |
+| MOD | `backend/ai/pipelines/inspection_mapping.py` (audit: bbox ≠ text scope) |
+| MOD | `backend/services/evidence_linking.py` (`build_full_evidence_text` helper) |
 | MOD | `backend/services/drawing_index_api.py` |
 | MOD | `client/src/hooks/useInspectionMatchStatus.ts` (poll) |
 | MOD | `client/src/components/drawing-workspace/inspection_runs_panel.tsx` (evidence id) |
@@ -1123,7 +1616,9 @@ Record per sheet:
 2. Coordinate match alone succeeds when N/E present within `3.0 ft` even if sheet is rotated `180°`.
 3. Clue-only fallback still works for evidence without coordinates (existing tests pass).
 4. `index_status=processing` shows `index_pending` in UI; auto-retries match when ready.
-5. Full backend suite passes; new e2e test `test_ucsf_survey_location_e2e.py` passes.
+5. Full backend suite passes; `test_ucsf_survey_location_e2e.py` passes (golden case #1).
+6. **Labeled eval set:** ≥ `5` rows in `location_match_labels.json` meeting §14c composition; `eval_location_match.py` pass rate ≥ `80%`; zero-coordinate cases do not false-positive to `matched`.
+7. Threshold constants (§14 threshold table) updated only with eval summary attached to PR — not on single-fixture tuning alone.
 
 ---
 
