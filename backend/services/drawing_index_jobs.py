@@ -18,6 +18,7 @@ from ai.pipelines.master_drawing_indexer import IndexResult, index_master_drawin
 from ai.pipelines.master_drawing_region_builder import AUTO_INDEX_REGION_SOURCE
 from config import settings
 from models.drawing_region import DrawingRegion
+from models.drawing_landmark import DrawingLandmark
 from models.drawing_survey_point import DrawingSurveyPoint
 from models.drawing_text_element import DrawingTextElement
 from models.models import Drawing, JobQueue, Project, User, UserCompany
@@ -71,6 +72,11 @@ def clear_drawing_index_artifacts(session: Session, drawing_id: int) -> None:
     session.query(DrawingSurveyPoint).filter(
         DrawingSurveyPoint.drawing_id == drawing_id,
         DrawingSurveyPoint.source == "auto_index",
+    ).delete(synchronize_session=False)
+
+    session.query(DrawingLandmark).filter(
+        DrawingLandmark.drawing_id == drawing_id,
+        DrawingLandmark.source == "auto_index",
     ).delete(synchronize_session=False)
 
     auto_regions = [

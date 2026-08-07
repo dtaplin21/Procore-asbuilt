@@ -44,6 +44,18 @@ def _word(text: str, page_index: int = 0) -> PositionedWord:
     )
 
 
+def test_index_result_stats_includes_landmarks() -> None:
+    result = IndexResult(pages=2, text_elements=100, survey_points=3, landmarks=7)
+    assert result.to_stats_json() == {
+        "pages": 2,
+        "text_elements": 100,
+        "regions": 0,
+        "survey_points": 3,
+        "landmarks": 7,
+        "scale_found": False,
+    }
+
+
 def test_normalize_token_text() -> None:
     assert normalize_token_text("  SS-3  ") == "ss-3"
 

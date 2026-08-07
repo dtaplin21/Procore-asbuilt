@@ -100,17 +100,19 @@ def test_run_drawing_index_job_sets_ready_status(
     db_session.refresh(seeded_ready_pdf_drawing)
     assert result.pages >= 1
     assert result.text_elements >= 1
-    assert seeded_ready_pdf_drawing.index_status == "ready"
+    assert cast(str, seeded_ready_pdf_drawing.index_status) == "ready"
     assert seeded_ready_pdf_drawing.index_error is None
     assert seeded_ready_pdf_drawing.indexed_at is not None
-    assert seeded_ready_pdf_drawing.index_stats_json == {
+    assert cast(dict[str, object], seeded_ready_pdf_drawing.index_stats_json) == {
         "pages": result.pages,
         "text_elements": result.text_elements,
         "regions": 0,
+        "survey_points": result.survey_points,
+        "landmarks": result.landmarks,
         "scale_found": False,
     }
-    assert seeded_ready_pdf_drawing.page_meta_json is not None
-    assert len(seeded_ready_pdf_drawing.page_meta_json) >= 1
+    page_meta = cast(list[object], seeded_ready_pdf_drawing.page_meta_json)
+    assert len(page_meta) >= 1
 
 
 def test_clear_drawing_index_artifacts_keeps_manual_regions(
@@ -169,7 +171,7 @@ def test_clear_drawing_index_artifacts_keeps_manual_regions(
     )
 
     assert len(regions) == 1
-    assert regions[0].label == "Manual COLO"
+    assert cast(str, regions[0].label) == "Manual COLO"
     assert not is_auto_index_region(regions[0])
     assert text_count == 0
 

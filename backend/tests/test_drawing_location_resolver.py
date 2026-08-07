@@ -118,6 +118,27 @@ class TestAlignmentResolution:
         assert x1 == pytest.approx(0.30)
         assert y1 == pytest.approx(0.30)
 
+    def test_rotation_is_applied_before_scale_and_translate(self) -> None:
+        terms = [_term(VocabCategory.INSPECTION_STATUS, "Rejected", x=0, y=0, w=100, h=100)]
+        transform = RegistrationTransform(
+            scale_x=1.0,
+            scale_y=1.0,
+            translate_x=0.0,
+            translate_y=0.0,
+            rotation_degrees=180.0,
+        )
+        result = resolve_document_location(
+            document_terms=terms,
+            master_drawing_id="master_1",
+            region_index=[],
+            registration_transform=transform,
+        )
+        x0, y0, x1, y1 = result.bbox_fractional or (0, 0, 0, 0)
+        assert x0 == pytest.approx(0.9)
+        assert y0 == pytest.approx(0.9)
+        assert x1 == pytest.approx(1.0)
+        assert y1 == pytest.approx(1.0)
+
     def test_alignment_annotates_with_overlapping_master_region(self) -> None:
         terms = [_term(VocabCategory.INSPECTION_STATUS, "Rejected", x=0, y=0, w=100, h=100)]
         region = _region(

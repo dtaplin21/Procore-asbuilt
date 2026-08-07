@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, Sequence
 
 POINTS_PER_INCH = 72.0
 NE_PAIR_MAX_DISTANCE_FT = 15.0
@@ -202,7 +202,7 @@ def _valid_bbox(bbox: Any) -> dict[str, float] | None:
 
 
 def extract_survey_points_from_elements(
-    elements: list[_TextElementLike],
+    elements: Sequence[_TextElementLike],
     *,
     scale_json: dict[str, Any] | None,
     page_meta_json: list[dict[str, Any]],

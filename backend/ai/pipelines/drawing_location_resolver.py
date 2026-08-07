@@ -42,6 +42,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from ai.pipelines.coordinate_frame import rotate_bbox
 from ai.pipelines.document_text_extraction import BoundingBox
 from ai.pipelines.positioned_term_extractor import PositionedTerm
 from services.inspection_vocabulary import VocabCategory
@@ -92,15 +93,14 @@ class RegistrationTransform:
     rotation_degrees: float = 0.0
 
     def apply(self, x0: float, y0: float, x1: float, y1: float) -> tuple[float, float, float, float]:
-        """Apply to a fractional bbox (rotation ignored for v1 — square-on
-        captures are the common case per the OCR/photo answer; rotated
-        registration can be added when that case is observed in practice).
-        """
-        nx0 = x0 * self.scale_x + self.translate_x
-        ny0 = y0 * self.scale_y + self.translate_y
-        nx1 = x1 * self.scale_x + self.translate_x
-        ny1 = y1 * self.scale_y + self.translate_y
-        return (nx0, ny0, nx1, ny1)
+        """Apply rotation, then scale and translate in master fractional space."""
+        rx0, ry0, rx1, ry1 = rotate_bbox((x0, y0, x1, y1), self.rotation_degrees)
+        return (
+            rx0 * self.scale_x + self.translate_x,
+            ry0 * self.scale_y + self.translate_y,
+            rx1 * self.scale_x + self.translate_x,
+            ry1 * self.scale_y + self.translate_y,
+        )
 
 
 @dataclass(frozen=True)

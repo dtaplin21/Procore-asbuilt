@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from ai.pipelines.document_extraction_orchestrator import run_document_extraction
 from ai.pipelines.document_text_extraction import extract_document
+from ai.pipelines.evidence_kind_classifier import classify_and_persist_evidence_kind
 from ai.pipelines.pdf_link_follower import LinkFollowResult, follow_pdf_links
 from models.document_extraction import DocumentExtraction
 from models.models import EvidenceRecord
@@ -132,6 +133,21 @@ def ingest_evidence_document_extraction(
         )
         session.rollback()
         return None
+
+    if extraction is not None and evidence is not None:
+        try:
+            classify_and_persist_evidence_kind(
+                session,
+                evidence,
+                document_type=str(extraction.document_type),
+                file_path=file_path,
+            )
+            session.flush()
+        except Exception:
+            logger.exception(
+                "evidence_kind_classification_failed",
+                extra={"evidence_id": evidence_id, "file_path": str(file_path)},
+            )
 
     if extraction is not None and match_context is not None:
         maybe_enqueue_inspection_match_after_extraction(
