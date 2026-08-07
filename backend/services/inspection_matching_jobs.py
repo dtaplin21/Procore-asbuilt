@@ -1,6 +1,6 @@
 """Inspection matching job.
 
-Uses extracted clues to find candidate master drawing locations.
+Uses the unified location-match orchestrator to resolve evidence on master drawings.
 Internal confidence/score values never leave the backend.
 """
 
@@ -9,25 +9,21 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any, Literal, Optional, cast
+from typing import Any, Optional, cast
 
 from sqlalchemy.orm import Session
 
-from ai.pipelines.candidate_tile_selector import (
-    CandidateTile,
-    compute_tile_match_score,
-    find_candidate_tiles_from_clues,
+from ai.pipelines.drawing_location_resolver import ResolutionMethod
+from ai.pipelines.location_match_orchestrator import (
+    match_status_from_result,
+    resolve_evidence_location,
 )
 from models.drawing_overlay import DrawingOverlay
-from models.document_clue import DocumentClue
-from models.document_extraction import DocumentExtraction
 from models.inspection_run import InspectionRun
 from models.models import Drawing, EvidenceRecord, JobQueue, Project, User, UserCompany
 from services.inspection_match_persistence import (
-    MATCH_SCORE_THRESHOLD,
     InternalMatchCandidate,
     MatchStatus,
-    match_status_from_internal_score,
     persist_inspection_match_overlay,
     record_internal_match_candidate,
     resolve_inspection_run_id,
@@ -121,42 +117,6 @@ def _parse_optional_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
-
-
-def _resolve_project_id_for_match(
-    session: Session,
-    *,
-    payload: dict[str, Any],
-    drawing_id: str | int,
-    inspection_id: str,
-    inspection_run_id: int | None,
-) -> int | None:
-    """Resolve project scope for legend expansion during clue matching."""
-    project_id = _parse_optional_int(payload.get("project_id"))
-    if project_id is not None:
-        return project_id
-
-    master_drawing_id = _parse_optional_int(drawing_id)
-    if master_drawing_id is not None:
-        drawing = session.query(Drawing).filter(Drawing.id == master_drawing_id).first()
-        if drawing is not None:
-            drawing_project_id = getattr(drawing, "project_id", None)
-            if drawing_project_id is not None:
-                return int(cast(int, drawing_project_id))
-
-    run_id = resolve_inspection_run_id(
-        session,
-        inspection_id,
-        inspection_run_id=inspection_run_id,
-    )
-    if run_id is not None:
-        run = session.query(InspectionRun).filter(InspectionRun.id == run_id).first()
-        if run is not None:
-            run_project_id = getattr(run, "project_id", None)
-            if run_project_id is not None:
-                return int(cast(int, run_project_id))
-
-    return None
 
 
 def enqueue_inspection_match_job(
@@ -383,13 +343,8 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
     drawing_id = payload["drawing_id"]
     page = int(payload.get("page", 1))
     run_id_hint = _parse_optional_int(payload.get("inspection_run_id"))
-    project_id = _resolve_project_id_for_match(
-        session,
-        payload=payload,
-        drawing_id=drawing_id,
-        inspection_id=inspection_id,
-        inspection_run_id=run_id_hint,
-    )
+    evidence_id = _parse_optional_int(inspection_id)
+    master_drawing_id = _parse_optional_int(drawing_id)
 
     def _persist(**kwargs: Any) -> None:
         persist_inspection_match_overlay(
@@ -400,81 +355,52 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
             **kwargs,
         )
 
-    extraction = (
-        session.query(DocumentExtraction)
-        .filter_by(file_id=inspection_id)
-        .order_by(DocumentExtraction.created_at.desc())
-        .first()
-    )
-
-    if extraction is None:
+    if evidence_id is None or master_drawing_id is None:
         _persist(status="needs_review", bbox=None, page=page)
         return "needs_review"
 
-    clues = (
-        session.query(DocumentClue)
-        .filter_by(document_extraction_id=extraction.id)
-        .all()
-    )
-
-    candidates = find_candidate_tiles_from_clues(
-        session=session,
-        drawing_id=drawing_id,
+    result = resolve_evidence_location(
+        session,
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
         page=page,
-        clues=clues,
-        limit=20,
-        project_id=project_id,
     )
+    status = match_status_from_result(result)
 
-    if not candidates:
-        logger.info(
-            "inspection_match_no_candidates",
-            extra={
-                "inspection_id": inspection_id,
-                "drawing_id": drawing_id,
-                "page": page,
-                "project_id": project_id,
-                "clue_count": len(clues),
-                "location_clue_count": sum(
-                    1 for clue in clues if getattr(clue, "location_relevant", False)
-                ),
-            },
-        )
-        _persist(status="needs_review", bbox=None, page=page)
-        return "needs_review"
-
-    scored_candidates: list[tuple[float, CandidateTile]] = []
-    for rank, tile in enumerate(candidates, start=1):
-        internal_score = compute_tile_match_score(
-            tile,
-            clues,
-            session=session,
-            project_id=project_id,
-        )
-        scored_candidates.append((internal_score, tile))
+    if result.method != ResolutionMethod.UNRESOLVED:
         record_internal_match_candidate(
             session,
             inspection_id=inspection_id,
             drawing_id=drawing_id,
             candidate=InternalMatchCandidate(
-                score=internal_score,
-                bbox=tile.bbox_normalized,
-                page=tile.page,
-                region_id=tile.region_id,
-                source="clue_match",
-                rank=rank,
+                score=result.confidence,
+                bbox=result.bbox_fractional,
+                page=result.page,
+                region_id=result.region_id,
+                source=result.method.value,
+                rank=1,
             ),
             inspection_run_id=run_id_hint,
         )
-    session.commit()
+        session.commit()
 
-    best_score, best = max(scored_candidates, key=lambda item: item[0])
-    status = match_status_from_internal_score(best_score)
+    if result.method == ResolutionMethod.UNRESOLVED:
+        logger.info(
+            "inspection_match_unresolved",
+            extra={
+                "inspection_id": inspection_id,
+                "drawing_id": drawing_id,
+                "page": page,
+                "evidence_id": evidence_id,
+                "notes": result.notes,
+            },
+        )
+
     _persist(
         status=status,
-        bbox=best.bbox_normalized if status == "matched" else None,
-        page=best.page,
-        region_id=best.region_id,
+        bbox=result.bbox_fractional if status == "matched" else None,
+        page=result.page,
+        region_id=result.region_id,
     )
     return status
 

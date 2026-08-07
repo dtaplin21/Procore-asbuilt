@@ -14,6 +14,25 @@ SHEET_REF_PATTERNS = (
 _AUTO_LINK_SOURCES = ("regex", "pdf_link")
 
 
+def load_linked_drawings(session: Session, evidence_id: int) -> list[Drawing]:
+    links = (
+        session.query(EvidenceDrawingLink)
+        .filter(EvidenceDrawingLink.evidence_id == evidence_id)
+        .all()
+    )
+    drawings: list[Drawing] = []
+    seen: set[int] = set()
+    for link in links:
+        drawing_id = int(link.drawing_id)
+        if drawing_id in seen:
+            continue
+        seen.add(drawing_id)
+        drawing = session.get(Drawing, drawing_id)
+        if drawing is not None:
+            drawings.append(drawing)
+    return drawings
+
+
 def extract_sheet_refs(text: Optional[str]) -> List[str]:
     if not text:
         return []

@@ -8,7 +8,7 @@ from typing import Any, Literal, cast
 
 from sqlalchemy.orm import Session
 
-from ai.pipelines.inspection_mapping import UNMAPPED_GEOMETRY
+from services.overlay_geometry import UNMAPPED_GEOMETRY
 from models.drawing_match_candidate import DrawingMatchCandidate
 from models.drawing_overlay import DrawingOverlay
 from models.inspection_run import InspectionRun

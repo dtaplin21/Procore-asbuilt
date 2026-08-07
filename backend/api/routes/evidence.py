@@ -162,7 +162,7 @@ async def upload_inspection_run_evidence(
         )
 
         try:
-            overlays, unresolved = map_document_to_overlays(evidence_input)
+            overlays, unresolved = map_document_to_overlays(evidence_input, session=db)
         except Exception:
             logger.exception(
                 "map_document_to_overlays failed for evidence_id=%s run_id=%s drawing_id=%s",

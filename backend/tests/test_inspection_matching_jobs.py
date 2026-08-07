@@ -10,7 +10,8 @@ from unittest.mock import patch
 import pytest
 from sqlalchemy.orm import Session
 
-from ai.pipelines.candidate_tile_selector import CandidateTile
+from ai.pipelines.drawing_location_resolver import ResolutionMethod
+from ai.pipelines.location_match_orchestrator import LocationMatchResult
 from database import SessionLocal
 from models.drawing_overlay import DrawingOverlay
 from models.drawing_match_candidate import DrawingMatchCandidate
@@ -18,10 +19,10 @@ from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
 from models.models import Company, Drawing, EvidenceRecord, JobQueue, Project
 from models.inspection_run import InspectionRun
+from services.inspection_match_persistence import MATCH_SCORE_THRESHOLD
 from services.inspection_matching_jobs import (
     DEFERRED_MATCH_META_KEY,
     JOB_TYPE_INSPECTION_MATCH,
-    MATCH_SCORE_THRESHOLD,
     flush_deferred_inspection_matches_for_drawing,
     maybe_enqueue_inspection_match_after_extraction,
     run_inspection_match_job,
@@ -118,85 +119,55 @@ def _seed_run(db: Session) -> tuple[InspectionRun, str]:
     return run, file_id
 
 
-def _candidate(confidence: float = 0.75) -> CandidateTile:
-    return CandidateTile(
-        drawing_id="1",
+def _matched_result(master_drawing_id: int) -> LocationMatchResult:
+    return LocationMatchResult(
+        master_drawing_id=master_drawing_id,
+        method=ResolutionMethod.COORDINATE_LOOKUP,
+        confidence=MATCH_SCORE_THRESHOLD + 0.1,
+        bbox_fractional=(0.1, 0.2, 0.4, 0.5),
         page=1,
-        text="COLO PARKING LOT SANITARY SEWER",
-        confidence=confidence,
-        bbox_normalized=(0.1, 0.2, 0.4, 0.5),
         region_id=99,
     )
 
 
-@patch("services.inspection_matching_jobs.compute_tile_match_score")
-@patch("services.inspection_matching_jobs.find_candidate_tiles_from_clues")
-def test_run_inspection_match_job_passes_project_id_to_candidate_selector(
-    mock_find,
-    mock_score,
+@patch("services.inspection_matching_jobs.resolve_evidence_location")
+def test_run_inspection_match_job_calls_orchestrator(
+    mock_resolve,
     db: Session,
 ):
     run, file_id = _seed_run(db)
-    mock_find.return_value = [_candidate()]
-    mock_score.return_value = MATCH_SCORE_THRESHOLD + 0.1
-    project_id = cast(int, run.project_id)
+    master_drawing_id = cast(int, run.master_drawing_id)
+    mock_resolve.return_value = _matched_result(master_drawing_id)
 
     status = run_inspection_match_job(
         {
             "inspection_id": file_id,
-            "drawing_id": str(run.master_drawing_id),
+            "drawing_id": str(master_drawing_id),
             "page": 1,
-            "project_id": project_id,
+            "project_id": cast(int, run.project_id),
         },
         db,
     )
 
     assert status == "matched"
-    mock_find.assert_called_once()
-    assert mock_find.call_args.kwargs["project_id"] == project_id
-    mock_score.assert_called_once()
-    assert mock_score.call_args.kwargs["project_id"] == project_id
-
-
-@patch("services.inspection_matching_jobs.compute_tile_match_score")
-@patch("services.inspection_matching_jobs.find_candidate_tiles_from_clues")
-def test_run_inspection_match_job_resolves_project_id_from_drawing(
-    mock_find,
-    mock_score,
-    db: Session,
-):
-    run, file_id = _seed_run(db)
-    mock_find.return_value = [_candidate()]
-    mock_score.return_value = MATCH_SCORE_THRESHOLD + 0.1
-    project_id = cast(int, run.project_id)
-
-    status = run_inspection_match_job(
-        {
-            "inspection_id": file_id,
-            "drawing_id": str(run.master_drawing_id),
-            "page": 1,
-        },
+    mock_resolve.assert_called_once_with(
         db,
+        evidence_id=int(file_id),
+        master_drawing_id=master_drawing_id,
+        page=1,
     )
 
-    assert status == "matched"
-    mock_find.assert_called_once()
-    assert mock_find.call_args.kwargs["project_id"] == project_id
-    mock_score.assert_called_once()
-    assert mock_score.call_args.kwargs["project_id"] == project_id
 
-
-@patch("services.inspection_matching_jobs.compute_tile_match_score")
-@patch("services.inspection_matching_jobs.find_candidate_tiles_from_clues")
-def test_run_inspection_match_job_matched(mock_find, mock_score, db: Session):
+@patch("services.inspection_matching_jobs.resolve_evidence_location")
+def test_run_inspection_match_job_matched(mock_resolve, db: Session):
     run, file_id = _seed_run(db)
-    mock_find.return_value = [_candidate()]
-    mock_score.return_value = MATCH_SCORE_THRESHOLD + 0.1
+    master_drawing_id = cast(int, run.master_drawing_id)
+    mock_resolve.return_value = _matched_result(master_drawing_id)
 
     status = run_inspection_match_job(
         {
             "inspection_id": file_id,
-            "drawing_id": str(run.master_drawing_id),
+            "drawing_id": str(master_drawing_id),
             "page": 1,
         },
         db,
@@ -221,19 +192,25 @@ def test_run_inspection_match_job_matched(mock_find, mock_score, db: Session):
     )
     assert candidate is not None
     assert float(cast(float, candidate.score)) >= MATCH_SCORE_THRESHOLD
+    assert cast(str, candidate.source) == ResolutionMethod.COORDINATE_LOOKUP.value
 
 
-@patch("services.inspection_matching_jobs.compute_tile_match_score")
-@patch("services.inspection_matching_jobs.find_candidate_tiles_from_clues")
-def test_run_inspection_match_job_weak_clues_needs_review(mock_find, mock_score, db: Session):
+@patch("services.inspection_matching_jobs.resolve_evidence_location")
+def test_run_inspection_match_job_weak_match_needs_review(mock_resolve, db: Session):
     run, file_id = _seed_run(db)
-    mock_find.return_value = [_candidate(confidence=0.2)]
-    mock_score.return_value = MATCH_SCORE_THRESHOLD - 0.2
+    master_drawing_id = cast(int, run.master_drawing_id)
+    mock_resolve.return_value = LocationMatchResult(
+        master_drawing_id=master_drawing_id,
+        method=ResolutionMethod.REFERENCE_LOOKUP,
+        confidence=MATCH_SCORE_THRESHOLD - 0.2,
+        bbox_fractional=(0.1, 0.2, 0.4, 0.5),
+        page=1,
+    )
 
     status = run_inspection_match_job(
         {
             "inspection_id": file_id,
-            "drawing_id": str(run.master_drawing_id),
+            "drawing_id": str(master_drawing_id),
             "page": 1,
         },
         db,
@@ -249,38 +226,39 @@ def test_run_inspection_match_job_weak_clues_needs_review(mock_find, mock_score,
     assert meta["match_status"] == "needs_review"
 
 
-@patch("services.inspection_matching_jobs.find_candidate_tiles_from_clues")
-def test_run_inspection_match_job_no_candidates_needs_review(mock_find, db: Session):
+@patch("services.inspection_matching_jobs.resolve_evidence_location")
+def test_run_inspection_match_job_unresolved_is_no_match(mock_resolve, db: Session):
     run, file_id = _seed_run(db)
-    mock_find.return_value = []
+    master_drawing_id = cast(int, run.master_drawing_id)
+    mock_resolve.return_value = LocationMatchResult.unresolved(master_drawing_id)
 
     status = run_inspection_match_job(
         {
             "inspection_id": file_id,
-            "drawing_id": str(run.master_drawing_id),
+            "drawing_id": str(master_drawing_id),
             "page": 1,
             "inspection_run_id": run.id,
         },
         db,
     )
 
-    assert status == "needs_review"
+    assert status == "no_match"
     overlay = (
         db.query(DrawingOverlay)
         .filter(DrawingOverlay.inspection_run_id == run.id)
         .one()
     )
     meta = cast(dict, overlay.meta)
-    assert meta["match_status"] == "needs_review"
+    assert meta["match_status"] == "no_match"
 
 
-@patch("services.inspection_matching_jobs.find_candidate_tiles_from_clues")
+@patch("services.inspection_matching_jobs.resolve_evidence_location")
 def test_run_inspection_match_job_uses_explicit_run_id_over_id_collision(
-    mock_find,
+    mock_resolve,
     db: Session,
 ):
     """Evidence id equal to an older run id must not attach overlays to that run."""
-    mock_find.return_value = []
+    mock_resolve.return_value = LocationMatchResult.unresolved(1)
     target_id = 80000 + int(uuid.uuid4().hex[:4], 16) % 10000
 
     company = Company(name=f"Co {uuid.uuid4().hex[:8]}", procore_company_id=f"pc-{uuid.uuid4().hex[:8]}")
@@ -362,7 +340,7 @@ def test_run_inspection_match_job_uses_explicit_run_id_over_id_collision(
         db,
     )
 
-    assert status == "needs_review"
+    assert status == "no_match"
     assert (
         db.query(DrawingOverlay)
         .filter(DrawingOverlay.inspection_run_id == new_run.id)

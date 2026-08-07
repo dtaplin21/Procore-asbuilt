@@ -53,6 +53,10 @@ from ai.pipelines.drawing_location_resolver import (
     ResolvedLocation,
     resolve_locations_per_term,
 )
+from ai.pipelines.location_match_orchestrator import (
+    LocationMatchResult,
+    resolve_evidence_location,
+)
 from ai.pipelines.positioned_term_extractor import PositionedTerm, extract_positioned_terms
 from ai.pipelines.term_extractor import (
     ExtractedTerm,
@@ -63,17 +67,10 @@ from models.models import Drawing, DrawingRegion, EvidenceRecord, InspectionRun,
 from services.file_storage import get_file_path
 from services.inspection_vocabulary import VocabCategory
 from services.storage import StorageService
+from services.overlay_geometry import UNMAPPED_GEOMETRY
+from ai.pipelines.resolution_vocab import RESOLUTION_VOCAB_CATEGORIES
 
 logger = logging.getLogger(__name__)
-
-# Categories used for overlay tag extraction and location resolution.
-# Sheet identifiers remain extractable elsewhere but are excluded here.
-_RESOLUTION_VOCAB_CATEGORIES: tuple[VocabCategory, ...] = tuple(
-    category
-    for category in VocabCategory
-    if category
-    not in (VocabCategory.SHEET_IDENTIFIER, VocabCategory.CONFIDENCE_LABEL)
-)
 
 # ---------------------------------------------------------------------------
 # Illustrative overlay mapping (text + document paths)
@@ -188,7 +185,7 @@ def normalize_evidence_text(note_text: str) -> NormalizedEvidenceTags:
     controlled-vocabulary extractor and bucket results into the
     NormalizedEvidenceTags shape consumed by overlay/finding construction.
     """
-    terms = extract_terms(note_text, categories=_RESOLUTION_VOCAB_CATEGORIES)
+    terms = extract_terms(note_text, categories=RESOLUTION_VOCAB_CATEGORIES)
     grouped: dict[str, list[ExtractedTerm]] = {}
     for term in terms:
         grouped.setdefault(term.category.value, []).append(term)
@@ -325,8 +322,42 @@ def _tags_from_positioned_terms(
     return tags
 
 
+def _build_overlay_from_location_result(
+    evidence: DocumentEvidenceInput,
+    terms: list[PositionedTerm],
+    result: LocationMatchResult,
+    inspection_date: date | None,
+    uploaded_at: datetime,
+) -> DrawingOverlayRecord:
+    """Build one overlay from the unified orchestrator result."""
+    tags = _tags_from_positioned_terms(terms)
+    severity = _severity_from_tags(tags)
+
+    label = tags.inspection_types[0] if tags.inspection_types else "Inspection finding"
+    if tags.locations:
+        label = f"{label} — {tags.locations[0]}"
+
+    region_id_str = str(result.region_id) if result.region_id is not None else None
+
+    return DrawingOverlayRecord(
+        id=f"overlay_{evidence.evidence_id}_{region_id_str or result.method.value}",
+        drawing_id=evidence.master_drawing_id,
+        inspection_run_id=evidence.inspection_run_id,
+        bbox=result.bbox_fractional,
+        label=label,
+        severity=severity,
+        tags=tags,
+        inspection_date=inspection_date,
+        uploaded_at=uploaded_at,
+        region_id=region_id_str,
+    )
+
+
 def map_document_to_overlays(
     evidence: DocumentEvidenceInput,
+    *,
+    session: Session | None = None,
+    page: int = 1,
 ) -> tuple[list[DrawingOverlayRecord], list[UnresolvedEvidenceRecord]]:
     """Full pipeline entry point for an uploaded document (PDF, scanned
     PDF, or photo): extract text, find vocabulary terms with positions,
@@ -341,13 +372,49 @@ def map_document_to_overlays(
     """
     document: ExtractedDocument = extract_document(evidence.file_path)
     positioned_terms = extract_positioned_terms(
-        document, categories=_RESOLUTION_VOCAB_CATEGORIES
+        document, categories=RESOLUTION_VOCAB_CATEGORIES
     )
 
     # Performed-on date from document text; upload moment shared by all
     # overlays produced from this single submission.
     inspection_date = extract_inspection_date(document)
     uploaded_at = datetime.now(timezone.utc)
+
+    if session is not None and evidence.evidence_id.isdigit() and evidence.master_drawing_id.isdigit():
+        result = resolve_evidence_location(
+            session,
+            evidence_id=int(evidence.evidence_id),
+            master_drawing_id=int(evidence.master_drawing_id),
+            page=page,
+        )
+        if result.method != ResolutionMethod.UNRESOLVED and result.bbox_fractional is not None:
+            return [
+                _build_overlay_from_location_result(
+                    evidence,
+                    positioned_terms,
+                    result,
+                    inspection_date,
+                    uploaded_at,
+                )
+            ], []
+
+        reason = result.notes or "Could not resolve a location on the master drawing."
+        if not positioned_terms:
+            reason = (
+                "No controlled-vocabulary terms found in the document "
+                "(extraction/OCR may have failed, or the document "
+                "genuinely contains no recognizable inspection "
+                "terminology)."
+            )
+        return [], [
+            UnresolvedEvidenceRecord(
+                evidence_id=evidence.evidence_id,
+                inspection_run_id=evidence.inspection_run_id,
+                master_drawing_id=evidence.master_drawing_id,
+                reason=reason,
+                extracted_terms=positioned_terms,
+            )
+        ]
 
     if not positioned_terms:
         return [], [
@@ -926,7 +993,7 @@ def _extract_vocabulary_tags(ctx: Dict[str, Any]) -> list[ExtractedTerm]:
     if not str(text).strip():
         return []
 
-    return extract_terms(str(text), categories=_RESOLUTION_VOCAB_CATEGORIES)
+    return extract_terms(str(text), categories=RESOLUTION_VOCAB_CATEGORIES)
 
 
 def _vocabulary_meta(terms: list[ExtractedTerm]) -> Dict[str, Any]:
@@ -942,17 +1009,6 @@ def _vocabulary_meta(terms: list[ExtractedTerm]) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Step 4 — Map Areas to Master Drawing Coordinates
 # ---------------------------------------------------------------------------
-
-# Unknown/unmapped geometry: full-page rect (normalized 0-1)
-UNMAPPED_GEOMETRY: Dict[str, Any] = {
-    "page": 1,
-    "type": "rect",
-    "x": 0.0,
-    "y": 0.0,
-    "width": 1.0,
-    "height": 1.0,
-    "label": "unmapped",
-}
 
 
 def _resolve_region_geometries(

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from ai.pipelines.document_text_extraction import ExtractedDocument, SourceFormat, extract_document
 from ai.schemas.document_extraction_schemas import DocumentType
 from models.models import EvidenceRecord
-from services.evidence_survey_extraction import load_linked_drawings
+from services.evidence_linking import load_linked_drawings
 
 MIN_NATIVE_PAGE1_WORDS = 50
 

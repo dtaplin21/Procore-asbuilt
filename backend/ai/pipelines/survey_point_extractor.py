@@ -312,3 +312,49 @@ def extract_survey_points_from_elements(
             )
 
     return results
+
+
+def extract_survey_points_from_plain_text(
+    text: str,
+    *,
+    page: int = 1,
+    scale_source: str = "plain_text_fallback",
+) -> list[SurveyPointRecord]:
+    """Fallback when OCR tokens split ``N``/``E`` labels away from numeric values."""
+    n_matches = [(match.start(), float(match.group(1))) for match in _NORTHING_RE.finditer(text)]
+    e_matches = [(match.start(), float(match.group(1))) for match in _EASTING_RE.finditer(text)]
+    if not n_matches or not e_matches:
+        return []
+
+    pairs: list[tuple[float, float]] = []
+    for e_pos, e_val in sorted(e_matches, key=lambda item: item[0]):
+        preceding = [item for item in n_matches if item[0] < e_pos]
+        if not preceding:
+            continue
+        n_pos, n_val = max(preceding, key=lambda item: item[0])
+        if e_pos - n_pos > 160:
+            continue
+        pairs.append((n_val, e_val))
+        break
+
+    if not pairs:
+        return []
+
+    northing, easting = pairs[0]
+    return [
+        SurveyPointRecord(
+            page=page,
+            northing=northing,
+            easting=easting,
+            station=None,
+            structure_label=None,
+            label_bbox_json={"x0": 0.0, "y0": 0.0, "x1": 0.01, "y1": 0.01},
+            northing_bbox_json=None,
+            easting_bbox_json=None,
+            ocr_confidence=0.75,
+            meta_json={
+                "pairing_scale_source": scale_source,
+                "plain_text_fallback": True,
+            },
+        )
+    ]

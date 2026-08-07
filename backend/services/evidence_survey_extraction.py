@@ -11,8 +11,14 @@ from sqlalchemy.orm import Session
 
 from ai.pipelines.document_text_extraction import ExtractedDocument, PositionedWord, extract_document
 from ai.pipelines.drawing_scale_parser import parse_scale_from_words
-from ai.pipelines.survey_point_extractor import SurveyPointRecord, extract_survey_points_from_elements
-from models.models import Drawing, EvidenceDrawingLink, EvidenceRecord
+from ai.pipelines.survey_point_extractor import (
+    SurveyPointRecord,
+    extract_survey_points_from_elements,
+    extract_survey_points_from_plain_text,
+)
+from services.evidence_text import build_full_evidence_text
+from models.models import Drawing, EvidenceRecord
+from services.evidence_linking import load_linked_drawings
 
 
 class _WordElement:
@@ -77,23 +83,45 @@ def build_page_meta_from_path(file_path: Path, page_count: int) -> list[dict[str
     return [{"page": 1, "width_pt": None, "height_pt": None, "rotation": 0}]
 
 
-def load_linked_drawings(session: Session, evidence_id: int) -> list[Drawing]:
-    links = (
-        session.query(EvidenceDrawingLink)
-        .filter(EvidenceDrawingLink.evidence_id == evidence_id)
-        .all()
-    )
-    drawings: list[Drawing] = []
-    seen: set[int] = set()
-    for link in links:
-        drawing_id = int(link.drawing_id)
-        if drawing_id in seen:
+def _words_from_linked_pdfs(file_path: Path) -> list[PositionedWord]:
+    """OCR external PDF hyperlinks so install-drawing coords enter survey extraction."""
+    import tempfile
+
+    from ai.pipelines.document_text_extraction import extract_document_via_ocr
+    from ai.pipelines.pdf_link_follower import PdfLinkKind, _extract_hyperlinks
+    from services.safe_url_fetch import _link_follow_ocr_max_pages, fetch_allowed_url
+
+    if file_path.suffix.lower() != ".pdf":
+        return []
+
+    words: list[PositionedWord] = []
+    for link in _extract_hyperlinks(file_path):
+        if link.kind != PdfLinkKind.EXTERNAL_URI or not link.uri:
             continue
-        seen.add(drawing_id)
-        drawing = session.get(Drawing, drawing_id)
-        if drawing is not None:
-            drawings.append(drawing)
-    return drawings
+        fetched = fetch_allowed_url(link.uri)
+        if not fetched.ok:
+            continue
+        body = fetched.body
+        content_type = (fetched.content_type or "").lower()
+        if not (content_type == "application/pdf" or body.startswith(b"%PDF")):
+            continue
+        tmp_path: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                tmp.write(body)
+                tmp.flush()
+                tmp_path = tmp.name
+            document = extract_document_via_ocr(
+                tmp_path,
+                max_pages=_link_follow_ocr_max_pages(),
+            )
+            words.extend(document.words)
+        except Exception:
+            continue
+        finally:
+            if tmp_path:
+                Path(tmp_path).unlink(missing_ok=True)
+    return words
 
 
 def resolve_scale_for_evidence(
@@ -135,21 +163,27 @@ def extract_survey_points_from_evidence(
     """Scan the full evidence file (all pages) for paired N/E survey points."""
     path = Path(file_path)
     document: ExtractedDocument = extract_document(path)
+    all_words = list(document.words) + _words_from_linked_pdfs(path)
     page_meta_json = build_page_meta_from_path(path, document.page_count)
     linked_drawings = load_linked_drawings(session, int(evidence.id))
     scale_json = resolve_scale_for_evidence(
         evidence,
         linked_drawings,
-        document_words=document.words,
+        document_words=all_words,
         page_meta_json=page_meta_json,
     )
 
     points = extract_survey_points_from_elements(
-        words_to_pseudo_elements(document.words),
+        words_to_pseudo_elements(all_words),
         scale_json=scale_json,
         page_meta_json=page_meta_json,
         scale_source="evidence_extract",
     )
+    if not points:
+        points = extract_survey_points_from_plain_text(
+            build_full_evidence_text(evidence),
+            scale_source="evidence_text_fallback",
+        )
     return points, scale_json
 
 

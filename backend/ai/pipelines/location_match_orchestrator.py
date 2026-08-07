@@ -29,7 +29,7 @@ from ai.pipelines.evidence_kind_classifier import (
     contour_matching_enabled,
     has_linked_install_sheet,
 )
-from ai.pipelines.inspection_mapping import _RESOLUTION_VOCAB_CATEGORIES
+from ai.pipelines.resolution_vocab import RESOLUTION_VOCAB_CATEGORIES
 from ai.pipelines.landmark_extractor import LandmarkRecord
 from ai.pipelines.landmark_matcher import run_landmark_matcher
 from ai.pipelines.positioned_term_extractor import extract_positioned_terms
@@ -456,7 +456,7 @@ def _reference_lookup_candidate(
     document = extract_document(file_path)
     positioned_terms = extract_positioned_terms(
         document,
-        categories=_RESOLUTION_VOCAB_CATEGORIES,
+        categories=RESOLUTION_VOCAB_CATEGORIES,
     )
     region_index = build_region_index(session, master_drawing_id).regions
     resolved = resolve_document_location(
