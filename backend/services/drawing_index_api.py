@@ -6,9 +6,14 @@ from typing import Any, cast
 
 from sqlalchemy.orm import Session
 
+from models.drawing_survey_point import DrawingSurveyPoint
 from models.drawing_text_element import DrawingTextElement
 from models.models import Drawing
-from models.schemas import DrawingIndexStatusResponse, DrawingTextElementResponse
+from models.schemas import (
+    DrawingIndexStatusResponse,
+    DrawingSurveyPointResponse,
+    DrawingTextElementResponse,
+)
 
 
 def drawing_index_status_response(drawing: Drawing) -> DrawingIndexStatusResponse:
@@ -57,6 +62,50 @@ def list_drawing_text_elements(
             bbox_json=dict(row.bbox_json) if isinstance(row.bbox_json, dict) else {},
             legend_expansion=getattr(row, "legend_expansion", None),
             legend_codes_json=row.legend_codes_json if isinstance(row.legend_codes_json, list) else None,
+            source=str(row.source),
+        )
+        for row in rows
+    ]
+    return items, total
+
+
+def list_drawing_survey_points(
+    session: Session,
+    *,
+    drawing_id: int,
+    page: int,
+    limit: int,
+) -> tuple[list[DrawingSurveyPointResponse], int]:
+    query = session.query(DrawingSurveyPoint).filter(
+        DrawingSurveyPoint.drawing_id == drawing_id,
+        DrawingSurveyPoint.page == page,
+    )
+
+    total = query.count()
+    rows = (
+        query.order_by(
+            DrawingSurveyPoint.page.asc(),
+            DrawingSurveyPoint.id.asc(),
+        )
+        .offset(0)
+        .limit(limit)
+        .all()
+    )
+    items = [
+        DrawingSurveyPointResponse(
+            id=cast(int, row.id),
+            northing=cast(float, row.northing),
+            easting=cast(float, row.easting),
+            station=cast(str, row.station) if row.station is not None else None,
+            structure_label=(
+                cast(str, row.structure_label) if row.structure_label is not None else None
+            ),
+            label_bbox_json=(
+                dict(row.label_bbox_json)
+                if isinstance(row.label_bbox_json, dict)
+                else {}
+            ),
+            page=cast(int, row.page),
             source=str(row.source),
         )
         for row in rows

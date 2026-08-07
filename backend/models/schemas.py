@@ -372,6 +372,24 @@ class DrawingTextElementListResponse(BaseModel):
     limit: int
 
 
+class DrawingSurveyPointResponse(BaseModel):
+    id: int
+    northing: float
+    easting: float
+    station: Optional[str] = None
+    structure_label: Optional[str] = None
+    label_bbox_json: dict[str, Any]
+    page: int
+    source: str
+
+
+class DrawingSurveyPointListResponse(BaseModel):
+    items: List[DrawingSurveyPointResponse]
+    total: int
+    page: int
+    limit: int
+
+
 class DrawingCompareRequest(BaseModel):
     sub_drawing_id: int = Field(
         ...,

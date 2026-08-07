@@ -48,6 +48,15 @@ vi.mock("@/hooks/use-inspection-runs", () => ({
   refreshInspectionWorkspaceQueries: vi.fn(),
 }));
 
+const useInspectionMatchStatusMock = vi.fn();
+
+vi.mock("@/hooks/use_inspection_match_status", () => ({
+  useInspectionMatchStatus: (
+    evidenceId: string,
+    options?: { drawingId?: string; runId?: string | null },
+  ) => useInspectionMatchStatusMock(evidenceId, options),
+}));
+
 function renderPanel(ui: ReactElement) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -73,6 +82,7 @@ describe("InspectionRunsPanel", () => {
     runMutate.mockClear();
     createRunAsync.mockReset();
     uploadRunEvidenceAsync.mockReset();
+    useInspectionMatchStatusMock.mockReturnValue(null);
     createRunAsync.mockResolvedValue({ id: 7, status: "queued" });
     uploadRunEvidenceAsync.mockResolvedValue({
       evidence_id: 99,
@@ -108,6 +118,17 @@ describe("InspectionRunsPanel", () => {
     expect(screen.getByTestId("inspection-run-row-1")).toBeInTheDocument();
     expect(screen.getByTestId("inspection-run-overlay-list")).toBeInTheDocument();
     expect(screen.getByText("Final — Roof")).toBeInTheDocument();
+  });
+
+  it("polls match status by evidence id for the selected run", () => {
+    renderPanel(
+      <InspectionRunsPanel projectId={2} masterDrawingId={10} selectedRunId={1} />
+    );
+
+    expect(useInspectionMatchStatusMock).toHaveBeenCalledWith("5", {
+      drawingId: "10",
+      runId: "1",
+    });
   });
 
   it("uploads evidence to the document pipeline for the selected run", async () => {

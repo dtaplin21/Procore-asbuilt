@@ -6,40 +6,48 @@ import { MatchAlertBanner } from "@/components/drawing-workspace/match_alert_ban
 const useInspectionMatchStatusMock = vi.fn();
 
 vi.mock("@/hooks/use_inspection_match_status", () => ({
-  useInspectionMatchStatus: (inspectionId: string) =>
-    useInspectionMatchStatusMock(inspectionId),
+  useInspectionMatchStatus: (
+    evidenceId: string,
+    options?: { drawingId?: string; runId?: string | null },
+  ) => useInspectionMatchStatusMock(evidenceId, options),
 }));
 
 describe("MatchAlertBanner", () => {
   it("renders nothing while loading", () => {
     useInspectionMatchStatusMock.mockReturnValue(null);
 
-    const { container } = render(<MatchAlertBanner inspectionId="inspection-123" />);
+    const { container } = render(<MatchAlertBanner evidenceId="357" />);
 
     expect(container).toBeEmptyDOMElement();
   });
 
   it("renders nothing when match status is matched", () => {
     useInspectionMatchStatusMock.mockReturnValue({
-      inspection_id: "inspection-123",
+      inspection_id: "357",
       match_status: "matched",
       bbox: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
     });
 
-    const { container } = render(<MatchAlertBanner inspectionId="inspection-123" />);
+    const { container } = render(<MatchAlertBanner evidenceId="357" />);
 
     expect(container).toBeEmptyDOMElement();
   });
 
   it("shows index_pending message", () => {
     useInspectionMatchStatusMock.mockReturnValue({
-      inspection_id: "test",
+      inspection_id: "357",
       match_status: "index_pending",
       bbox: null,
     });
 
-    render(<MatchAlertBanner inspectionId="test" />);
+    render(
+      <MatchAlertBanner evidenceId="357" drawingId="661" runId="435" />,
+    );
 
+    expect(useInspectionMatchStatusMock).toHaveBeenCalledWith("357", {
+      drawingId: "661",
+      runId: "435",
+    });
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Master drawing is still being indexed",
     );
@@ -47,12 +55,12 @@ describe("MatchAlertBanner", () => {
 
   it("shows needs_review message without confidence numbers", () => {
     useInspectionMatchStatusMock.mockReturnValue({
-      inspection_id: "test",
+      inspection_id: "357",
       match_status: "needs_review",
       bbox: null,
     });
 
-    render(<MatchAlertBanner inspectionId="test" />);
+    render(<MatchAlertBanner evidenceId="357" />);
 
     const banner = screen.getByRole("alert");
     expect(banner).toHaveTextContent(
@@ -65,12 +73,12 @@ describe("MatchAlertBanner", () => {
 
   it("shows no_match message", () => {
     useInspectionMatchStatusMock.mockReturnValue({
-      inspection_id: "test",
+      inspection_id: "357",
       match_status: "no_match",
       bbox: null,
     });
 
-    render(<MatchAlertBanner inspectionId="test" />);
+    render(<MatchAlertBanner evidenceId="357" />);
 
     expect(screen.getByRole("alert")).toHaveTextContent(
       "No likely location was found on the master drawing for this inspection.",
@@ -79,12 +87,12 @@ describe("MatchAlertBanner", () => {
 
   it("ucsf needs_review shows alert without numeric scores", () => {
     useInspectionMatchStatusMock.mockReturnValue({
-      inspection_id: "ucsf-evidence-1",
+      inspection_id: "357",
       match_status: "needs_review",
       bbox: null,
     });
 
-    render(<MatchAlertBanner inspectionId="ucsf-evidence-1" />);
+    render(<MatchAlertBanner evidenceId="357" />);
 
     const banner = screen.getByRole("alert");
     expect(banner).toHaveTextContent("could not be automatically placed");

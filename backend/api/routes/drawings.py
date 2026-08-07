@@ -11,6 +11,7 @@ from models.schemas import (
     DrawingReindexResponse,
     DrawingResponse,
     DrawingSummary,
+    DrawingSurveyPointListResponse,
     DrawingTextElementListResponse,
     EvidenceContextMatch,
     EvidenceContextResponse,
@@ -23,6 +24,7 @@ from config import settings
 from services.drawing_index_jobs import enqueue_drawing_index_job
 from services.drawing_index_api import (
     drawing_index_status_response,
+    list_drawing_survey_points,
     list_drawing_text_elements,
 )
 from services.drawing_render_jobs import enqueue_drawing_render_job
@@ -235,6 +237,37 @@ def list_drawing_text_elements_route(
         limit=limit,
     )
     return DrawingTextElementListResponse(
+        items=items,
+        total=total,
+        page=page,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/api/projects/{project_id}/drawings/{drawing_id}/survey-points",
+    response_model=DrawingSurveyPointListResponse,
+)
+def list_drawing_survey_points_route(
+    project_id: int,
+    drawing_id: int,
+    page: int = Query(1, ge=1),
+    limit: int = Query(500, ge=1, le=500),
+    db: Session = Depends(get_db),
+) -> DrawingSurveyPointListResponse:
+    """Debug listing of indexed N/E survey points for coordinate matching."""
+    service = StorageService(db)
+    drawing = service.get_drawing(project_id, drawing_id)
+    if not drawing:
+        raise HTTPException(status_code=404, detail="Drawing not found")
+
+    items, total = list_drawing_survey_points(
+        db,
+        drawing_id=drawing_id,
+        page=page,
+        limit=limit,
+    )
+    return DrawingSurveyPointListResponse(
         items=items,
         total=total,
         page=page,

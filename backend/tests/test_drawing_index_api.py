@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import cast
 from unittest.mock import patch
 
+from models.drawing_survey_point import DrawingSurveyPoint
 from models.drawing_text_element import DrawingTextElement
 from models.models import Drawing, JobQueue
 from services.drawing_index_jobs import JOB_TYPE
@@ -138,3 +139,58 @@ def test_list_drawing_text_elements(client, db_session, project) -> None:
     assert len(body["items"]) == 2
     texts = {item["text"] for item in body["items"]}
     assert texts == {"SS", "COLO"}
+
+
+def test_list_drawing_survey_points(client, db_session, project) -> None:
+    project_id, drawing_id = _drawing_base(db_session, project)
+    db_session.add_all(
+        [
+            DrawingSurveyPoint(
+                drawing_id=drawing_id,
+                page=1,
+                northing=2131764.84,
+                easting=6051541.82,
+                station="12+50",
+                structure_label="SS-1",
+                label_bbox_json={"x0": 0.1, "y0": 0.1, "x1": 0.2, "y1": 0.15},
+                source="auto_index",
+            ),
+            DrawingSurveyPoint(
+                drawing_id=drawing_id,
+                page=1,
+                northing=2131800.0,
+                easting=6051600.0,
+                station=None,
+                structure_label=None,
+                label_bbox_json={"x0": 0.3, "y0": 0.3, "x1": 0.4, "y1": 0.35},
+                source="auto_index",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/api/projects/{project_id}/drawings/{drawing_id}/survey-points?page=1&limit=500"
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 2
+    assert body["page"] == 1
+    assert len(body["items"]) == 2
+
+    first = body["items"][0]
+    assert first["northing"] == 2131764.84
+    assert first["easting"] == 6051541.82
+    assert first["station"] == "12+50"
+    assert first["structure_label"] == "SS-1"
+    assert first["label_bbox_json"]["x0"] == 0.1
+    assert first["page"] == 1
+    assert first["source"] == "auto_index"
+
+
+def test_list_drawing_survey_points_not_found(client, db_session, project) -> None:
+    project_id, _drawing_id = _drawing_base(db_session, project)
+    response = client.get(
+        f"/api/projects/{project_id}/drawings/999999/survey-points"
+    )
+    assert response.status_code == 404

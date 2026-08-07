@@ -1,0 +1,122 @@
+[
+  {
+    "label_id": "ucsf-435-ss-corridor",
+    "project_id": 2,
+    "evidence_id": 357,
+    "inspection_run_id": 435,
+    "master_drawing_id": 661,
+    "evidence_fixture_path": null,
+    "master_bbox_json": {
+      "type": "rect",
+      "page": 1,
+      "x": 0.518,
+      "y": 0.472,
+      "width": 0.048,
+      "height": 0.042
+    },
+    "expected_method": "coordinate_lookup",
+    "expected_match_status": "matched",
+    "rotation_deg": 180,
+    "has_coordinate_signal": true,
+    "has_station_signal": false,
+    "has_reference_signal": true,
+    "evidence_kind": "form",
+    "notes": "Golden UCSF run 435 — underground SS corridor pin at COLO parking lot (N/E 2131764.84 / 6051541.82)."
+  },
+  {
+    "label_id": "ucsf-rotated-detail",
+    "project_id": 2,
+    "evidence_id": null,
+    "inspection_run_id": null,
+    "master_drawing_id": 661,
+    "evidence_fixture_path": "tests/fixtures/evidence/ucsf-c4-20-detail-rotated.pdf",
+    "master_bbox_json": {
+      "type": "rect",
+      "page": 1,
+      "x": 0.724,
+      "y": 0.186,
+      "width": 0.052,
+      "height": 0.058
+    },
+    "expected_method": "coordinate_lookup",
+    "expected_match_status": "matched",
+    "rotation_deg": 180,
+    "has_coordinate_signal": true,
+    "has_station_signal": false,
+    "has_reference_signal": true,
+    "evidence_kind": "drawing_scan",
+    "notes": "Second 180 deg pair — C4.20 install detail with survey coords; pin on detail callout viewport."
+  },
+  {
+    "label_id": "ucsf-no-coords-clue-only",
+    "project_id": 2,
+    "evidence_id": null,
+    "inspection_run_id": null,
+    "master_drawing_id": 661,
+    "evidence_fixture_path": "tests/fixtures/evidence/ucsf-clue-only-report.pdf",
+    "master_bbox_json": {
+      "type": "rect",
+      "page": 1,
+      "x": 0.512,
+      "y": 0.468,
+      "width": 0.055,
+      "height": 0.046
+    },
+    "expected_method": "reference_lookup",
+    "expected_match_status": "needs_review",
+    "rotation_deg": null,
+    "has_coordinate_signal": false,
+    "has_station_signal": false,
+    "has_reference_signal": true,
+    "evidence_kind": "form",
+    "notes": "Inspection report names COLO / SS but carries no N/E pair — clue tile only, no coordinate match."
+  },
+  {
+    "label_id": "ucsf-no-coords-unresolved",
+    "project_id": 2,
+    "evidence_id": null,
+    "inspection_run_id": null,
+    "master_drawing_id": 661,
+    "evidence_fixture_path": "tests/fixtures/evidence/ucsf-field-photo.jpg",
+    "master_bbox_json": {
+      "type": "rect",
+      "page": 1,
+      "x": 0.0,
+      "y": 0.0,
+      "width": 0.0,
+      "height": 0.0
+    },
+    "expected_method": "unresolved",
+    "expected_match_status": "no_match",
+    "rotation_deg": null,
+    "has_coordinate_signal": false,
+    "has_station_signal": false,
+    "has_reference_signal": false,
+    "evidence_kind": "photo",
+    "notes": "Field photo with no coords, station, or vocabulary clues — must not false-positive via coordinate/contour."
+  },
+  {
+    "label_id": "ucsf-station-only",
+    "project_id": 2,
+    "evidence_id": null,
+    "inspection_run_id": null,
+    "master_drawing_id": 661,
+    "evidence_fixture_path": "tests/fixtures/evidence/ucsf-station-report.pdf",
+    "master_bbox_json": {
+      "type": "rect",
+      "page": 1,
+      "x": 0.338,
+      "y": 0.612,
+      "width": 0.044,
+      "height": 0.038
+    },
+    "expected_method": "station_lookup",
+    "expected_match_status": "matched",
+    "rotation_deg": null,
+    "has_coordinate_signal": false,
+    "has_station_signal": true,
+    "has_reference_signal": false,
+    "evidence_kind": "form",
+    "notes": "Chainage/station label (12+50) on master aligns with evidence station text; no N/E coordinates."
+  }
+]

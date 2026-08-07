@@ -21,6 +21,7 @@ from .legend_reference import (
     DrawingLegendLineType,
     DrawingLegendSymbol,
 )
+from .location_match_label import LocationMatchLabel
 from .review_queue_item import ReviewQueueItem
 
 __all__ = [
@@ -38,6 +39,7 @@ __all__ = [
     "DrawingOverlay",
     "UnresolvedEvidence",
     "InspectionRun",
+    "LocationMatchLabel",
     "ReviewQueueItem",
 ]
 

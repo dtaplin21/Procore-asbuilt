@@ -1,11 +1,13 @@
 import { useInspectionMatchStatus } from "@/hooks/use_inspection_match_status";
 
 interface Props {
-  inspectionId: string;
+  evidenceId: string;
+  drawingId?: string;
+  runId?: string | null;
 }
 
-export function MatchAlertBanner({ inspectionId }: Props) {
-  const status = useInspectionMatchStatus(inspectionId);
+export function MatchAlertBanner({ evidenceId, drawingId, runId }: Props) {
+  const status = useInspectionMatchStatus(evidenceId, { drawingId, runId });
 
   if (!status || status.match_status === "matched") {
     return null;

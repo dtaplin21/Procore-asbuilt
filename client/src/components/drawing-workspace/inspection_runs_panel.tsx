@@ -110,10 +110,15 @@ export default function InspectionRunsPanel({
     [overlays]
   );
 
-  const matchInspectionId = useMemo(() => {
-    if (selectedRunId == null) return null;
-    return String(selectedRunId);
-  }, [selectedRunId]);
+  const selectedRun = useMemo(
+    () => (selectedRunId != null ? runs.find((r) => r.id === selectedRunId) ?? null : null),
+    [runs, selectedRunId],
+  );
+
+  const matchEvidenceId = useMemo(() => {
+    if (selectedRun?.evidence_id == null) return null;
+    return String(selectedRun.evidence_id);
+  }, [selectedRun]);
 
   const evidenceLabelById = useMemo(() => {
     const map = new Map<number, string>();
@@ -366,8 +371,12 @@ export default function InspectionRunsPanel({
 
       {selectedRunId != null ? (
         <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
-          {matchInspectionId ? (
-            <MatchAlertBanner inspectionId={matchInspectionId} />
+          {matchEvidenceId ? (
+            <MatchAlertBanner
+              evidenceId={matchEvidenceId}
+              drawingId={String(masterDrawingId)}
+              runId={selectedRunId != null ? String(selectedRunId) : null}
+            />
           ) : null}
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
