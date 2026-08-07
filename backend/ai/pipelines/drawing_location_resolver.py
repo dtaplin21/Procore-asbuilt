@@ -49,8 +49,11 @@ from services.inspection_vocabulary import VocabCategory
 
 
 class ResolutionMethod(str, Enum):
+    COORDINATE_LOOKUP = "coordinate_lookup"  # N/E survey coordinate match
+    STATION_LOOKUP = "station_lookup"  # chainage/station label match
     ALIGNMENT = "alignment"  # Case A — geometric registration to master
     REFERENCE_LOOKUP = "reference_lookup"  # Case B — named-location lookup
+    CONTOUR_MATCH = "contour_match"  # Hu-moment landmark fallback
     UNRESOLVED = "unresolved"  # neither path produced a location
 
 

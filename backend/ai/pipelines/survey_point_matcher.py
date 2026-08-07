@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, Sequence
 
 COORD_MATCH_TOLERANCE_FT = 3.0
 COORD_MATCH_HIGH_CONF_FT = 1.0
@@ -12,9 +12,14 @@ COORD_MATCH_REJECT_FT = 5.0
 
 
 class _SurveyPointLike(Protocol):
-    northing: float
-    easting: float
-    ocr_confidence: float
+    @property
+    def northing(self) -> float: ...
+
+    @property
+    def easting(self) -> float: ...
+
+    @property
+    def ocr_confidence(self) -> float: ...
 
 
 @dataclass(frozen=True)
@@ -40,8 +45,8 @@ def confidence_for_distance(distance_ft: float) -> float:
 
 
 def match_survey_points(
-    evidence_points: list[_SurveyPointLike],
-    master_points: list[_SurveyPointLike],
+    evidence_points: Sequence[_SurveyPointLike],
+    master_points: Sequence[_SurveyPointLike],
 ) -> SurveyPointMatch | None:
     """Greedy v1: return the best single evidence/master pair for overlay placement."""
     if not evidence_points or not master_points:
