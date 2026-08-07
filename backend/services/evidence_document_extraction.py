@@ -15,6 +15,10 @@ from ai.pipelines.pdf_link_follower import LinkFollowResult, follow_pdf_links
 from models.document_extraction import DocumentExtraction
 from models.models import EvidenceRecord
 from services.evidence_linking import replace_evidence_drawing_links
+from services.evidence_survey_extraction import (
+    extract_survey_points_from_evidence,
+    persist_evidence_survey_meta,
+)
 from services.inspection_matching_jobs import maybe_enqueue_inspection_match_after_extraction
 
 logger = logging.getLogger(__name__)
@@ -98,6 +102,20 @@ def ingest_evidence_document_extraction(
                 logger.exception(
                     "evidence_drawing_link_sync_failed",
                     extra={"evidence_id": evidence_id},
+                )
+
+            try:
+                survey_points, scale_json = extract_survey_points_from_evidence(
+                    session,
+                    evidence,
+                    file_path,
+                )
+                persist_evidence_survey_meta(evidence, survey_points, scale_json)
+                session.flush()
+            except Exception:
+                logger.exception(
+                    "evidence_survey_point_extraction_failed",
+                    extra={"evidence_id": evidence_id, "file_path": str(file_path)},
                 )
 
     try:

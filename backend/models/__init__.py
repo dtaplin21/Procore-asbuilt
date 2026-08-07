@@ -10,6 +10,7 @@ from .base import Base
 from .document_clue import DocumentClue
 from .document_extraction import DocumentExtraction
 from .drawing_match_candidate import DrawingMatchCandidate
+from .drawing_survey_point import DrawingSurveyPoint
 from .drawing_text_element import DrawingTextElement
 from .drawing_overlay import DrawingOverlay, UnresolvedEvidence
 from .drawing_region import DrawingRegion
@@ -29,6 +30,7 @@ __all__ = [
     "DrawingLegendLineType",
     "DrawingLegendSymbol",
     "DrawingMatchCandidate",
+    "DrawingSurveyPoint",
     "DrawingTextElement",
     "DrawingRegion",
     "DrawingOverlay",

@@ -23,11 +23,13 @@ from ai.pipelines.document_text_extraction import (
 )
 from ai.pipelines.drawing_scale_parser import page_size_inches_from_points, parse_scale_from_words
 from ai.pipelines.master_drawing_region_builder import build_auto_regions_from_text_elements
+from ai.pipelines.survey_point_extractor import extract_survey_points_from_elements
 from config import settings
 from models.drawing_text_element import DrawingTextElement
 from models.models import Drawing, DrawingRendition
 from services.master_drawing_legend_tagger import enrich_text_elements_with_legend
 from services.storage import open_storage_path
+from services.survey_point_storage import persist_survey_points
 
 _WHITESPACE_RE = re.compile(r"\s+")
 
@@ -37,6 +39,7 @@ class IndexResult:
     pages: int = 0
     text_elements: int = 0
     regions: int = 0
+    survey_points: int = 0
     scale_found: bool = False
     scale_json: dict[str, Any] | None = None
     page_meta_json: list[dict[str, Any]] | None = None
@@ -46,6 +49,7 @@ class IndexResult:
             "pages": self.pages,
             "text_elements": self.text_elements,
             "regions": self.regions,
+            "survey_points": self.survey_points,
             "scale_found": self.scale_found,
         }
 
@@ -223,10 +227,29 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         page_meta=first_page_meta,
     )
 
+    indexed_text_elements = (
+        session.query(DrawingTextElement)
+        .filter(DrawingTextElement.master_drawing_id == drawing_id)
+        .all()
+    )
+    survey_point_records = extract_survey_points_from_elements(
+        indexed_text_elements,
+        scale_json=scale_json,
+        page_meta_json=page_meta_json,
+        scale_source="master_index",
+    )
+    survey_points = persist_survey_points(
+        session,
+        drawing_id,
+        survey_point_records,
+        source="auto_index",
+    )
+
     return IndexResult(
         pages=extracted.page_count,
         text_elements=text_elements,
         regions=regions,
+        survey_points=survey_points,
         scale_found=scale_json is not None,
         scale_json=scale_json,
         page_meta_json=page_meta_json,
