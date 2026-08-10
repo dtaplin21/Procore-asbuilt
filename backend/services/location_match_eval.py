@@ -1,7 +1,8 @@
-"""Location-match evaluation helpers for PR-G eval set."""
+"""Location-match evaluation helpers for multi-suite eval labels."""
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -15,7 +16,7 @@ from ai.pipelines.location_match_orchestrator import (
     resolve_evidence_location,
 )
 from models.location_match_label import LocationMatchLabel
-from scripts.seed_location_match_labels import load_fixture, validate_entry
+from services.location_match_label_io import load_fixture_path, validate_entry
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,7 @@ class EvalLabel:
 @dataclass
 class LabelEvalResult:
     label_id: str
+    suite: str = ""
     skipped: bool = False
     skip_reason: str | None = None
     passed: bool = False
@@ -66,6 +68,7 @@ class EvalSummary:
     min_iou: float
     coordinate_false_positives: int
     passed_gate: bool
+    pass_rate_by_suite: dict[str, float] = field(default_factory=dict)
     results: list[LabelEvalResult] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -126,21 +129,47 @@ def eval_label_from_row(row: LocationMatchLabel) -> EvalLabel:
     )
 
 
-def load_eval_labels_from_json(fixture_path: str | Path) -> list[EvalLabel]:
-    entries = load_fixture(Path(fixture_path))
+def filter_eval_labels(
+    labels: list[EvalLabel],
+    *,
+    suite: str | None = None,
+    project_id: int | None = None,
+) -> list[EvalLabel]:
+    filtered = labels
+    if suite is not None:
+        filtered = [label for label in filtered if label.suite == suite]
+    if project_id is not None:
+        filtered = [label for label in filtered if label.project_id == project_id]
+    return filtered
+
+
+def load_eval_labels_from_json(
+    fixture_path: str | Path,
+    *,
+    suite: str | None = None,
+    project_id: int | None = None,
+) -> list[EvalLabel]:
+    path = Path(fixture_path)
+    entries = load_fixture_path(path, suite=suite)
     labels: list[EvalLabel] = []
     for index, entry in enumerate(entries):
         validate_entry(entry, index)
         labels.append(eval_label_from_json(entry))
-    return labels
+    return filter_eval_labels(labels, suite=suite, project_id=project_id)
 
 
-def load_eval_labels_from_db(session: Session) -> list[EvalLabel]:
-    rows = (
-        session.query(LocationMatchLabel)
-        .order_by(LocationMatchLabel.label_id.asc())
-        .all()
-    )
+def load_eval_labels_from_db(
+    session: Session,
+    *,
+    suite: str | None = None,
+    project_id: int | None = None,
+) -> list[EvalLabel]:
+    query = session.query(LocationMatchLabel)
+    if suite is not None:
+        query = query.filter(LocationMatchLabel.suite == suite)
+    if project_id is not None:
+        query = query.filter(LocationMatchLabel.project_id == project_id)
+    rows = query.order_by(LocationMatchLabel.label_id.asc()).all()
     return [eval_label_from_row(row) for row in rows]
 
 
@@ -206,6 +235,7 @@ def evaluate_label_result(
 ) -> LabelEvalResult:
     outcome = LabelEvalResult(
         label_id=label.label_id,
+        suite=label.suite,
         expected_method=label.expected_method,
         actual_method=result.method.value,
         expected_match_status=label.expected_match_status,
@@ -272,6 +302,7 @@ def evaluate_label(
     if label.evidence_id is None:
         return LabelEvalResult(
             label_id=label.label_id,
+            suite=label.suite,
             skipped=True,
             skip_reason="missing evidence_id (fixture-only label)",
             expected_method=label.expected_method,
@@ -295,6 +326,20 @@ def evaluate_label(
         actual_status,
         min_iou=min_iou,
     )
+
+
+def _pass_rate_by_suite(results: list[LabelEvalResult]) -> dict[str, float]:
+    evaluated_by_suite: dict[str, list[LabelEvalResult]] = defaultdict(list)
+    for result in results:
+        if result.skipped:
+            continue
+        evaluated_by_suite[result.suite or "default"].append(result)
+
+    rates: dict[str, float] = {}
+    for suite_name, suite_results in sorted(evaluated_by_suite.items()):
+        passed = sum(1 for result in suite_results if result.passed)
+        rates[suite_name] = passed / len(suite_results) if suite_results else 0.0
+    return rates
 
 
 def evaluate_labels(
@@ -330,5 +375,6 @@ def evaluate_labels(
         min_iou=min_iou,
         coordinate_false_positives=coordinate_false_positives,
         passed_gate=passed_gate,
+        pass_rate_by_suite=_pass_rate_by_suite(results),
         results=results,
     )

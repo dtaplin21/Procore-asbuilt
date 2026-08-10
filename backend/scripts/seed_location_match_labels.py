@@ -5,8 +5,9 @@ Usage (from ``backend/``)::
 
     cd backend
     ./venv/bin/python scripts/seed_location_match_labels.py
+    ./venv/bin/python scripts/seed_location_match_labels.py --suite ucsf
     ./venv/bin/python scripts/seed_location_match_labels.py \\
-        --fixture tests/fixtures/location_match_labels.json
+        --fixture tests/fixtures/location_match_labels/synthetic.json
 
 Idempotent: upserts by ``label_id``.
 """
@@ -14,7 +15,6 @@ Idempotent: upserts by ``label_id``.
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 from pathlib import Path
@@ -26,60 +26,31 @@ if _BACKEND_ROOT not in sys.path:
 
 from database import SessionLocal  # noqa: E402
 from models.location_match_label import LocationMatchLabel  # noqa: E402
-
-REQUIRED_FIELDS = (
-    "label_id",
-    "suite",
-    "project_id",
-    "master_drawing_id",
-    "master_bbox_json",
-    "expected_method",
-    "expected_match_status",
-    "has_coordinate_signal",
-    "has_station_signal",
-    "has_reference_signal",
-    "evidence_kind",
+from services.location_match_label_io import (  # noqa: E402
+    REQUIRED_FIELDS,
+    list_suite_files,
+    load_fixture,
+    load_fixture_dir,
+    load_fixture_path,
+    validate_entry,
 )
 
-DEFAULT_FIXTURE = Path(_BACKEND_ROOT) / "tests/fixtures/location_match_labels.json"
+# Re-export IO helpers for scripts/tests that import from this module.
+__all__ = [
+    "REQUIRED_FIELDS",
+    "DEFAULT_FIXTURE_DIR",
+    "list_suite_files",
+    "load_fixture",
+    "load_fixture_dir",
+    "load_fixture_path",
+    "validate_entry",
+    "upsert_label",
+    "seed_labels_from_entries",
+    "seed_labels_from_fixture",
+    "main",
+]
 
-
-def load_fixture(fixture_path: Path) -> list[dict[str, Any]]:
-    with open(fixture_path, encoding="utf-8") as handle:
-        data = json.load(handle)
-    if not isinstance(data, list):
-        raise ValueError(
-            f"Expected a JSON array in {fixture_path}, got {type(data).__name__}"
-        )
-    return data
-
-
-def validate_entry(entry: dict[str, Any], index: int) -> None:
-    if not isinstance(entry, dict):
-        raise ValueError(f"Fixture entry {index} must be an object")
-
-    for field in REQUIRED_FIELDS:
-        if field not in entry:
-            raise ValueError(f"Fixture entry {index} missing required field {field!r}")
-
-    label_id = entry["label_id"]
-    if not isinstance(label_id, str) or not label_id.strip():
-        raise ValueError(f"Fixture entry {index} label_id must be a non-empty string")
-
-    suite = entry["suite"]
-    if not isinstance(suite, str) or not suite.strip():
-        raise ValueError(f"Fixture entry {index} suite must be a non-empty string")
-
-    bbox = entry["master_bbox_json"]
-    if not isinstance(bbox, dict):
-        raise ValueError(f"Fixture entry {index} master_bbox_json must be an object")
-    if bbox.get("type") != "rect":
-        raise ValueError(
-            f"Fixture entry {index} master_bbox_json.type must be 'rect' (got {bbox.get('type')!r})"
-        )
-    for key in ("x", "y", "width", "height"):
-        if key not in bbox:
-            raise ValueError(f"Fixture entry {index} master_bbox_json missing {key!r}")
+DEFAULT_FIXTURE_DIR = Path(_BACKEND_ROOT) / "tests/fixtures/location_match_labels"
 
 
 def _optional_int(value: Any) -> int | None:
@@ -120,8 +91,7 @@ def upsert_label(session, entry: dict[str, Any]) -> LocationMatchLabel:
     return row
 
 
-def seed_labels_from_fixture(session, fixture_path: Path) -> int:
-    entries = load_fixture(fixture_path)
+def seed_labels_from_entries(session, entries: list[dict[str, Any]]) -> int:
     for index, entry in enumerate(entries):
         validate_entry(entry, index)
         upsert_label(session, entry)
@@ -129,13 +99,32 @@ def seed_labels_from_fixture(session, fixture_path: Path) -> int:
     return len(entries)
 
 
+def seed_labels_from_fixture(
+    session,
+    fixture_path: Path,
+    *,
+    suite: str | None = None,
+) -> int:
+    entries = load_fixture_path(fixture_path, suite=suite)
+    return seed_labels_from_entries(session, entries)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--fixture",
         type=Path,
-        default=DEFAULT_FIXTURE,
-        help=f"Path to labels JSON (default: {DEFAULT_FIXTURE.relative_to(_BACKEND_ROOT)})",
+        default=DEFAULT_FIXTURE_DIR,
+        help=(
+            "Path to labels JSON file or suite directory "
+            f"(default: {DEFAULT_FIXTURE_DIR.relative_to(_BACKEND_ROOT)})"
+        ),
+    )
+    parser.add_argument(
+        "--suite",
+        type=str,
+        default=None,
+        help="Optional suite filter (e.g. ucsf, synthetic)",
     )
     args = parser.parse_args()
 
@@ -144,13 +133,14 @@ def main() -> None:
         fixture_path = Path(_BACKEND_ROOT) / fixture_path
 
     if not fixture_path.exists():
-        print(f"Fixture file not found: {fixture_path}", file=sys.stderr)
+        print(f"Fixture path not found: {fixture_path}", file=sys.stderr)
         sys.exit(1)
 
     db = SessionLocal()
     try:
-        count = seed_labels_from_fixture(db, fixture_path)
-        print(f"Seeded {count} location match labels from {fixture_path}.")
+        count = seed_labels_from_fixture(db, fixture_path, suite=args.suite)
+        suite_note = f" suite={args.suite}" if args.suite else ""
+        print(f"Seeded {count} location match labels from {fixture_path}{suite_note}.")
     except ValueError as exc:
         db.rollback()
         print(str(exc), file=sys.stderr)

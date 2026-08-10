@@ -1,0 +1,52 @@
+[
+  {
+    "label_id": "synthetic-coord-matched",
+    "suite": "synthetic",
+    "project_id": 1,
+    "evidence_id": null,
+    "inspection_run_id": null,
+    "master_drawing_id": 1,
+    "evidence_fixture_path": null,
+    "master_bbox_json": {
+      "type": "rect",
+      "page": 1,
+      "x": 0.40,
+      "y": 0.40,
+      "width": 0.05,
+      "height": 0.05
+    },
+    "expected_method": "coordinate_lookup",
+    "expected_match_status": "matched",
+    "rotation_deg": null,
+    "has_coordinate_signal": true,
+    "has_station_signal": false,
+    "has_reference_signal": false,
+    "evidence_kind": "form",
+    "notes": "Schema-only synthetic coordinate case; evidence_id null so eval skips until wired."
+  },
+  {
+    "label_id": "synthetic-no-match",
+    "suite": "synthetic",
+    "project_id": 1,
+    "evidence_id": null,
+    "inspection_run_id": null,
+    "master_drawing_id": 1,
+    "evidence_fixture_path": null,
+    "master_bbox_json": {
+      "type": "rect",
+      "page": 1,
+      "x": 0.0,
+      "y": 0.0,
+      "width": 0.0,
+      "height": 0.0
+    },
+    "expected_method": "unresolved",
+    "expected_match_status": "no_match",
+    "rotation_deg": null,
+    "has_coordinate_signal": false,
+    "has_station_signal": false,
+    "has_reference_signal": false,
+    "evidence_kind": "photo",
+    "notes": "Schema-only synthetic no-match case; evidence_id null so eval skips until wired."
+  }
+]

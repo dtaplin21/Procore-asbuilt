@@ -15,7 +15,9 @@ from scripts.seed_location_match_labels import (
     validate_entry,
 )
 
-FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "location_match_labels.json"
+FIXTURE_PATH = (
+    Path(__file__).resolve().parent / "fixtures" / "location_match_labels" / "ucsf.json"
+)
 
 
 def test_fixture_has_minimum_eval_rows() -> None:

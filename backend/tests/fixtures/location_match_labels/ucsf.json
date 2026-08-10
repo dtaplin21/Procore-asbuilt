@@ -22,7 +22,7 @@
     "has_station_signal": false,
     "has_reference_signal": true,
     "evidence_kind": "form",
-    "notes": "Golden UCSF run 435 \u2014 underground SS corridor pin at COLO parking lot (N/E 2131764.84 / 6051541.82)."
+    "notes": "Golden UCSF run 435 — underground SS corridor pin at COLO parking lot (N/E 2131764.84 / 6051541.82)."
   },
   {
     "label_id": "ucsf-rotated-detail",
@@ -47,7 +47,7 @@
     "has_station_signal": false,
     "has_reference_signal": true,
     "evidence_kind": "drawing_scan",
-    "notes": "Second 180 deg pair \u2014 C4.20 install detail with survey coords; pin on detail callout viewport."
+    "notes": "Second 180 deg pair — C4.20 install detail with survey coords; pin on detail callout viewport."
   },
   {
     "label_id": "ucsf-no-coords-clue-only",
@@ -72,7 +72,7 @@
     "has_station_signal": false,
     "has_reference_signal": true,
     "evidence_kind": "form",
-    "notes": "Inspection report names COLO / SS but carries no N/E pair \u2014 clue tile only, no coordinate match."
+    "notes": "Inspection report names COLO / SS but carries no N/E pair — clue tile only, no coordinate match."
   },
   {
     "label_id": "ucsf-no-coords-unresolved",
@@ -97,7 +97,7 @@
     "has_station_signal": false,
     "has_reference_signal": false,
     "evidence_kind": "photo",
-    "notes": "Field photo with no coords, station, or vocabulary clues \u2014 must not false-positive via coordinate/contour."
+    "notes": "Field photo with no coords, station, or vocabulary clues — must not false-positive via coordinate/contour."
   },
   {
     "label_id": "ucsf-station-only",

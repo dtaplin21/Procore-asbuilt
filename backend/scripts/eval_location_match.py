@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate location-match orchestrator against PR-G ground-truth labels."""
+"""Evaluate location-match orchestrator against multi-suite ground-truth labels."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from services.location_match_eval import (  # noqa: E402
     load_eval_labels_from_json,
 )
 
-DEFAULT_LABELS = BACKEND_ROOT / "tests/fixtures/location_match_labels.json"
+DEFAULT_LABELS = BACKEND_ROOT / "tests/fixtures/location_match_labels"
 
 
 def main() -> int:
@@ -30,7 +30,19 @@ def main() -> int:
         "--labels",
         type=Path,
         default=DEFAULT_LABELS,
-        help="Path to labels JSON fixture",
+        help="Path to labels JSON file or suite directory",
+    )
+    parser.add_argument(
+        "--suite",
+        type=str,
+        default=None,
+        help="Optional suite filter (e.g. ucsf, synthetic)",
+    )
+    parser.add_argument(
+        "--project-id",
+        type=int,
+        default=None,
+        help="Optional project_id filter",
     )
     parser.add_argument(
         "--from-db",
@@ -50,15 +62,23 @@ def main() -> int:
     db = SessionLocal()
     try:
         if args.from_db:
-            labels = load_eval_labels_from_db(db)
+            labels = load_eval_labels_from_db(
+                db,
+                suite=args.suite,
+                project_id=args.project_id,
+            )
         else:
             labels_path = args.labels
             if not labels_path.is_absolute():
                 labels_path = BACKEND_ROOT / labels_path
             if not labels_path.exists():
-                print(f"Labels file not found: {labels_path}", file=sys.stderr)
+                print(f"Labels path not found: {labels_path}", file=sys.stderr)
                 return 1
-            labels = load_eval_labels_from_json(str(labels_path))
+            labels = load_eval_labels_from_json(
+                labels_path,
+                suite=args.suite,
+                project_id=args.project_id,
+            )
 
         if not labels:
             print("No labels to evaluate.", file=sys.stderr)
@@ -84,6 +104,12 @@ def main() -> int:
             f"(min {summary.min_pass_rate:.0%}); "
             f"coordinate_false_positives={summary.coordinate_false_positives}"
         )
+        if summary.pass_rate_by_suite:
+            suite_bits = ", ".join(
+                f"{name}={rate:.2%}"
+                for name, rate in summary.pass_rate_by_suite.items()
+            )
+            print(f"pass_rate_by_suite: {suite_bits}")
 
         for result in summary.results:
             if result.skipped:

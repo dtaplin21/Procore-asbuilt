@@ -117,6 +117,7 @@ def test_evaluate_labels_fails_below_pass_rate(db_session) -> None:
         passed = label.label_id == "pass"
         return LabelEvalResult(
             label_id=label.label_id,
+            suite=label.suite,
             passed=passed,
             expected_method=label.expected_method,
             actual_method="coordinate_lookup" if passed else "reference_lookup",
@@ -132,6 +133,33 @@ def test_evaluate_labels_fails_below_pass_rate(db_session) -> None:
     assert summary.passed == 1
     assert summary.pass_rate == pytest.approx(0.5)
     assert summary.passed_gate is False
+    assert summary.pass_rate_by_suite["test"] == pytest.approx(0.5)
+
+
+def test_pass_rate_by_suite_in_summary(db_session) -> None:
+    labels = [
+        _label(label_id="a-pass", suite="alpha"),
+        _label(label_id="a-fail", suite="alpha"),
+        _label(label_id="b-pass", suite="beta"),
+    ]
+
+    def fake_evaluate(session, label, *, min_iou):
+        from services.location_match_eval import LabelEvalResult
+
+        passed = "fail" not in label.label_id
+        return LabelEvalResult(
+            label_id=label.label_id,
+            suite=label.suite,
+            passed=passed,
+            min_iou=min_iou,
+        )
+
+    with patch("services.location_match_eval.evaluate_label", side_effect=fake_evaluate):
+        summary = evaluate_labels(db_session, labels, min_pass_rate=0.50)
+
+    assert summary.pass_rate_by_suite["alpha"] == pytest.approx(0.5)
+    assert summary.pass_rate_by_suite["beta"] == pytest.approx(1.0)
+    assert "pass_rate_by_suite" in summary.to_dict()
 
 
 def test_evaluate_labels_skips_fixture_only_rows(db_session) -> None:
