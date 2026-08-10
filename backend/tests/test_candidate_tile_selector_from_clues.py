@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from ai.pipelines.candidate_tile_selector import (
     CandidateTile,
+    bbox_on_page,
+    compute_tile_match_score,
     _bbox_overlap_ratio,
     _clue_matches_row,
     _load_candidate_tiles,
@@ -59,13 +61,17 @@ def test_clue_matching_uses_literal_substrings_not_regex() -> None:
     assert _clue_matches_row(paren_clue, "(zone-a) parking lot") is True
 
 
-def _tile(text: str, confidence: float = 0.75) -> CandidateTile:
+def _tile(
+    text: str,
+    confidence: float = 0.75,
+    bbox: tuple[float, float, float, float] = (0.1, 0.2, 0.3, 0.4),
+) -> CandidateTile:
     return CandidateTile(
         drawing_id="10",
         page=1,
         text=text,
         confidence=confidence,
-        bbox_normalized=(0.1, 0.2, 0.3, 0.4),
+        bbox_normalized=bbox,
         region_id=1,
     )
 
@@ -383,3 +389,53 @@ def test_overlapping_region_dropped_when_text_element_covers_same_bbox(
     assert len(tiles) == 1
     assert tiles[0].text_element_id is not None
     assert tiles[0].region_id is None
+
+
+def test_bbox_on_page_rejects_off_page_tiles() -> None:
+    assert bbox_on_page((0.1, 0.2, 0.3, 0.4)) is True
+    assert bbox_on_page((0.6, 1.15, 0.61, 1.19)) is False
+
+
+@patch("ai.pipelines.candidate_tile_selector._load_candidate_tiles")
+def test_off_page_utility_tiles_are_ignored(mock_load) -> None:
+    mock_load.return_value = [
+        _tile("UTILITY", bbox=(0.600, 1.150, 0.608, 1.193)),
+        _tile("Utility MR Corridor", bbox=(0.50, 0.45, 0.58, 0.52)),
+    ]
+    clues = [
+        _clue("Utility", confidence=0.90),
+        _clue("Utility MR", confidence=0.85),
+    ]
+
+    results = find_candidate_tiles_from_clues(
+        session=_mock_session(),
+        drawing_id="10",
+        page=1,
+        clues=clues,
+    )
+
+    assert len(results) == 1
+    assert results[0].text == "Utility MR Corridor"
+    assert compute_tile_match_score(results[0], clues) > 0
+
+
+@patch("ai.pipelines.candidate_tile_selector._load_candidate_tiles")
+def test_generic_utility_clue_demoted_when_specific_clue_exists(mock_load) -> None:
+    mock_load.return_value = [
+        _tile("UTILITY", confidence=0.95),
+        _tile("Utility MR", confidence=0.80),
+    ]
+    clues = [
+        _clue("Utility", confidence=0.95),
+        _clue("Utility MR", confidence=0.80),
+    ]
+
+    results = find_candidate_tiles_from_clues(
+        session=_mock_session(),
+        drawing_id="10",
+        page=1,
+        clues=clues,
+    )
+
+    assert results
+    assert results[0].text == "Utility MR"

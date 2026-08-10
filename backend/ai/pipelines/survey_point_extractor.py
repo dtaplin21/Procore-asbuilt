@@ -314,6 +314,21 @@ def extract_survey_points_from_elements(
     return results
 
 
+def extract_stations_from_text(text: str) -> list[str]:
+    """Return normalized station strings found in free text (e.g. ``10+90.95``)."""
+    if not text:
+        return []
+    seen: set[str] = set()
+    stations: list[str] = []
+    for match in _STATION_RE.finditer(text):
+        station = match.group(1).strip().upper()
+        if not station or station in seen:
+            continue
+        seen.add(station)
+        stations.append(station)
+    return stations
+
+
 def extract_survey_points_from_plain_text(
     text: str,
     *,
@@ -326,7 +341,7 @@ def extract_survey_points_from_plain_text(
     if not n_matches or not e_matches:
         return []
 
-    pairs: list[tuple[float, float]] = []
+    pairs: list[tuple[float, float, int, int]] = []
     for e_pos, e_val in sorted(e_matches, key=lambda item: item[0]):
         preceding = [item for item in n_matches if item[0] < e_pos]
         if not preceding:
@@ -334,20 +349,29 @@ def extract_survey_points_from_plain_text(
         n_pos, n_val = max(preceding, key=lambda item: item[0])
         if e_pos - n_pos > 160:
             continue
-        pairs.append((n_val, e_val))
+        pairs.append((n_val, e_val, n_pos, e_pos))
         break
 
     if not pairs:
         return []
 
-    northing, easting = pairs[0]
+    northing, easting, n_pos, e_pos = pairs[0]
+    window_start = max(0, min(n_pos, e_pos) - 80)
+    window_end = min(len(text), max(n_pos, e_pos) + 80)
+    nearby = text[window_start:window_end]
+    stations = extract_stations_from_text(nearby) or extract_stations_from_text(text)
+    structures = [
+        match.group(1).upper()
+        for match in _STRUCTURE_RE.finditer(nearby)
+    ]
+
     return [
         SurveyPointRecord(
             page=page,
             northing=northing,
             easting=easting,
-            station=None,
-            structure_label=None,
+            station=stations[0] if stations else None,
+            structure_label=structures[0] if structures else None,
             label_bbox_json={"x0": 0.0, "y0": 0.0, "x1": 0.01, "y1": 0.01},
             northing_bbox_json=None,
             easting_bbox_json=None,

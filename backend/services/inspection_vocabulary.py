@@ -139,7 +139,15 @@ VOCABULARY: dict[VocabCategory, VocabCategoryDef] = {
         category=VocabCategory.LOCATION_TERM,
         strategy=MatchStrategy.PHRASE,
         terms=(
-            VocabTerm("Utility MR", aliases=("Utility Mechanical Room",)),
+            VocabTerm(
+                "Utility MR",
+                aliases=(
+                    "Utility Mechanical Room",
+                    "UTILITY MR",
+                    "Utility/MR",
+                    "Util MR",
+                ),
+            ),
             VocabTerm("Mechanical Room", aliases=("Mech Room", "MR")),
             VocabTerm("Equipment Room"),
             VocabTerm("Site"),
@@ -289,6 +297,57 @@ def category_def(category: VocabCategory) -> VocabCategoryDef:
 def canonical_terms(category: VocabCategory) -> tuple[str, ...]:
     """Canonical term strings for a category (PHRASE categories only)."""
     return tuple(t.canonical for t in VOCABULARY[category].terms)
+
+
+def canonicalize_vocab_term(text: str, category: VocabCategory) -> str | None:
+    """Map a surface form to its canonical term for ``category``, if known."""
+    needle = " ".join(text.strip().lower().split())
+    if not needle:
+        return None
+    for term in VOCABULARY[category].terms:
+        candidates = (term.canonical, *term.aliases)
+        for candidate in candidates:
+            if " ".join(candidate.strip().lower().split()) == needle:
+                return term.canonical
+    return None
+
+
+def location_labels_compatible(doc_location: str, region_labels: tuple[str, ...]) -> bool:
+    """True when a document location term matches region tags (exact, alias, or tokens)."""
+    doc = " ".join(doc_location.strip().lower().split())
+    if not doc or not region_labels:
+        return False
+
+    doc_canonical = (
+        canonicalize_vocab_term(doc_location, VocabCategory.LOCATION_TERM) or doc_location
+    )
+    doc_canonical_norm = " ".join(doc_canonical.strip().lower().split())
+    doc_tokens = [token for token in doc_canonical_norm.split() if token]
+
+    label_norms = [" ".join(label.strip().lower().split()) for label in region_labels if label]
+    joined = " ".join(label_norms)
+    joined_compact = "".join(label_norms)
+
+    for label in label_norms:
+        if label == doc or label == doc_canonical_norm:
+            return True
+        label_canonical = canonicalize_vocab_term(label, VocabCategory.LOCATION_TERM)
+        if label_canonical and " ".join(label_canonical.lower().split()) == doc_canonical_norm:
+            return True
+
+    if doc_canonical_norm in joined or doc in joined:
+        return True
+    if doc_canonical_norm.replace(" ", "") in joined_compact:
+        return True
+
+    # OCR often splits "Utility MR" into separate tags ["UTILITY", "MR"].
+    if len(doc_tokens) >= 2 and all(
+        any(token == label or token in label.split() for label in label_norms)
+        for token in doc_tokens
+    ):
+        return True
+
+    return False
 
 
 # ---------------------------------------------------------------------------

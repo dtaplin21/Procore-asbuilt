@@ -21,6 +21,22 @@ from models.drawing_text_element import DrawingTextElement
 from services.region_index_loader import geometry_to_bounding_box
 
 _BBOX_OVERLAP_THRESHOLD = 0.5
+_BBOX_PAGE_EPSILON = 0.02
+_GENERIC_LOCATION_CLUES = frozenset(
+    {
+        "utility",
+        "site",
+        "level",
+        "floor",
+        "corridor",
+        "yard",
+        "roof",
+        "exterior",
+        "interior",
+        "area",
+        "building",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -90,6 +106,34 @@ def _bbox_from_json(bbox_json: object) -> tuple[float, float, float, float] | No
         height = float(bbox_json["height"])
         return x, y, x + width, y + height
     return None
+
+
+def bbox_on_page(
+    bbox: tuple[float, float, float, float] | None,
+    *,
+    epsilon: float = _BBOX_PAGE_EPSILON,
+) -> bool:
+    """True when a fractional bbox lies within the page (0–1) with small slack."""
+    if bbox is None:
+        return False
+    x0, y0, x1, y1 = bbox
+    if x1 <= x0 or y1 <= y0:
+        return False
+    lo = -epsilon
+    hi = 1.0 + epsilon
+    return lo <= x0 <= hi and lo <= y0 <= hi and lo <= x1 <= hi and lo <= y1 <= hi
+
+
+def _is_generic_location_clue(value: str) -> bool:
+    tokens = value.strip().lower().split()
+    return len(tokens) == 1 and tokens[0] in _GENERIC_LOCATION_CLUES
+
+
+def _clue_specificity_bonus(value: str) -> float:
+    tokens = [token for token in value.strip().split() if token]
+    if len(tokens) <= 1:
+        return 0.0
+    return min(0.35, 0.12 * (len(tokens) - 1))
 
 
 def _bbox_overlap_ratio(
@@ -275,6 +319,66 @@ def _load_candidate_tiles(
     return _merge_candidate_tiles(text_element_tiles, region_tiles)
 
 
+def _usable_location_clues(clues: Sequence[Any]) -> list[Any]:
+    location_clues = [
+        clue
+        for clue in clues
+        if _is_location_relevant(clue) and _clue_value(clue)
+    ]
+    if not location_clues:
+        return []
+
+    specific_values = {
+        (_clue_value(clue) or "").strip().lower()
+        for clue in location_clues
+        if not _is_generic_location_clue(_clue_value(clue) or "")
+    }
+    if not specific_values:
+        return location_clues
+
+    # Prefer "Utility MR" over bare "Utility" when both are present.
+    filtered: list[Any] = []
+    for clue in location_clues:
+        value = (_clue_value(clue) or "").strip()
+        if not _is_generic_location_clue(value):
+            filtered.append(clue)
+            continue
+        token = value.lower()
+        if any(token in specific and specific != token for specific in specific_values):
+            continue
+        filtered.append(clue)
+    return filtered or location_clues
+
+
+def _match_score_for_tile(
+    tile: CandidateTile,
+    location_clues: Sequence[Any],
+    *,
+    session: Session | None = None,
+    project_id: int | None = None,
+) -> float:
+    if not bbox_on_page(tile.bbox_normalized):
+        return 0.0
+
+    row_text = tile.text.lower()
+    matched = [
+        clue
+        for clue in location_clues
+        if _clue_matches_row(clue, row_text, session=session, project_id=project_id)
+    ]
+    if not matched:
+        return 0.0
+
+    best = 0.0
+    for clue in matched:
+        value = _clue_value(clue) or ""
+        score = tile.confidence + _clue_confidence(clue) + _clue_specificity_bonus(value)
+        if _is_generic_location_clue(value):
+            score -= 0.25
+        best = max(best, score)
+    return best
+
+
 def find_candidate_tiles_from_clues(
     session: Session,
     drawing_id: str | int,
@@ -283,12 +387,7 @@ def find_candidate_tiles_from_clues(
     limit: int = 20,
     project_id: int | None = None,
 ) -> list[CandidateTile]:
-    location_clues = [
-        clue
-        for clue in clues
-        if _is_location_relevant(clue) and _clue_value(clue)
-    ]
-
+    location_clues = _usable_location_clues(clues)
     if not location_clues:
         return []
 
@@ -299,17 +398,14 @@ def find_candidate_tiles_from_clues(
     scored: list[tuple[float, CandidateTile]] = []
 
     for tile in tiles:
-        row_text = tile.text.lower()
-        matched = [
-            clue
-            for clue in location_clues
-            if _clue_matches_row(clue, row_text, session=session, project_id=project_id)
-        ]
-        if not matched:
+        internal_score = _match_score_for_tile(
+            tile,
+            location_clues,
+            session=session,
+            project_id=project_id,
+        )
+        if internal_score <= 0:
             continue
-
-        strongest_clue_confidence = max(_clue_confidence(clue) for clue in matched)
-        internal_score = tile.confidence + strongest_clue_confidence
         scored.append((internal_score, tile))
 
     scored.sort(key=lambda item: -item[0])
@@ -324,22 +420,12 @@ def compute_tile_match_score(
     project_id: int | None = None,
 ) -> float:
     """Backend-only score used to choose matched vs needs_review."""
-    location_clues = [
-        clue
-        for clue in clues
-        if _is_location_relevant(clue) and _clue_value(clue)
-    ]
+    location_clues = _usable_location_clues(clues)
     if not location_clues:
         return 0.0
-
-    row_text = tile.text.lower()
-    matched = [
-        clue
-        for clue in location_clues
-        if _clue_matches_row(clue, row_text, session=session, project_id=project_id)
-    ]
-    if not matched:
-        return 0.0
-
-    strongest_clue_confidence = max(_clue_confidence(clue) for clue in matched)
-    return tile.confidence + strongest_clue_confidence
+    return _match_score_for_tile(
+        tile,
+        location_clues,
+        session=session,
+        project_id=project_id,
+    )

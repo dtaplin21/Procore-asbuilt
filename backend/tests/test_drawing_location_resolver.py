@@ -205,6 +205,24 @@ class TestReferenceLookupResolution:
         )
         assert result.matched_region is not None
 
+    def test_location_matches_split_ocr_tags(self) -> None:
+        terms = [_term(VocabCategory.LOCATION_TERM, "Utility MR")]
+        region = _region("region_a", location_labels=("UTILITY", "MR", "52ND"))
+        result = resolve_document_location(
+            document_terms=terms, master_drawing_id="master_1", region_index=[region]
+        )
+        assert result.matched_region is not None
+        assert result.matched_region.region_id == "region_a"
+        assert result.confidence_score == pytest.approx(0.75)
+
+    def test_location_matches_vocab_alias(self) -> None:
+        terms = [_term(VocabCategory.LOCATION_TERM, "Utility MR")]
+        region = _region("region_a", location_labels=("Utility Mechanical Room",))
+        result = resolve_document_location(
+            document_terms=terms, master_drawing_id="master_1", region_index=[region]
+        )
+        assert result.matched_region is not None
+
     def test_type_and_location_match_requires_same_region(self) -> None:
         terms = [
             _term(VocabCategory.INSPECTION_TYPE, "Final"),

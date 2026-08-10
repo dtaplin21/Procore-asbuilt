@@ -45,7 +45,7 @@ from enum import Enum
 from ai.pipelines.coordinate_frame import rotate_bbox
 from ai.pipelines.document_text_extraction import BoundingBox
 from ai.pipelines.positioned_term_extractor import PositionedTerm
-from services.inspection_vocabulary import VocabCategory
+from services.inspection_vocabulary import VocabCategory, location_labels_compatible
 
 
 class ResolutionMethod(str, Enum):
@@ -264,9 +264,8 @@ def _resolve_via_reference_lookup(
 
     def _location_match(region: MasterRegion) -> bool:
         return any(
-            loc.lower() == known.lower()
+            location_labels_compatible(loc, region.location_labels)
             for loc in doc_locations
-            for known in region.location_labels
         )
 
     if doc_types and doc_locations:

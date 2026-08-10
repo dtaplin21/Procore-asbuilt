@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from ai.pipelines.candidate_tile_selector import (
     CandidateTile,
+    bbox_on_page,
     compute_tile_match_score,
     find_candidate_tiles_from_clues,
 )
@@ -33,7 +34,11 @@ from ai.pipelines.resolution_vocab import RESOLUTION_VOCAB_CATEGORIES
 from ai.pipelines.landmark_extractor import LandmarkRecord
 from ai.pipelines.landmark_matcher import run_landmark_matcher
 from ai.pipelines.positioned_term_extractor import extract_positioned_terms
-from ai.pipelines.survey_point_extractor import SurveyPointRecord
+from ai.pipelines.survey_point_extractor import (
+    SurveyPointRecord,
+    extract_stations_from_text,
+    extract_survey_points_from_elements,
+)
 from ai.pipelines.survey_point_matcher import (
     COORD_MATCH_TOLERANCE_FT,
     SurveyPointMatch,
@@ -44,11 +49,14 @@ from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
 from models.drawing_landmark import DrawingLandmark
 from models.drawing_survey_point import DrawingSurveyPoint
+from models.drawing_text_element import DrawingTextElement
 from models.models import Drawing, EvidenceRecord
+from services.evidence_text import build_full_evidence_text
 from services.file_storage import get_file_path
 from services.inspection_match_persistence import MATCH_SCORE_THRESHOLD, MatchStatus
 from services.match_candidate_scope import MatchScope, build_match_scope
 from services.region_index_loader import build_region_index
+from services.survey_point_storage import persist_survey_points
 
 logger = logging.getLogger(__name__)
 
@@ -242,6 +250,80 @@ def _meta_survey_points(evidence: EvidenceRecord) -> list[SurveyPointRecord]:
     return points
 
 
+def _scoped_point_from_row(row: DrawingSurveyPoint) -> _ScopedSurveyPoint | None:
+    label_bbox = cast(dict[str, float] | None, row.label_bbox_json)
+    if not isinstance(label_bbox, dict):
+        return None
+    return _ScopedSurveyPoint(
+        drawing_id=cast(int, row.drawing_id),
+        page=cast(int, row.page),
+        northing=cast(float, row.northing),
+        easting=cast(float, row.easting),
+        station=cast(str | None, row.station),
+        structure_label=cast(str | None, row.structure_label),
+        label_bbox_json=label_bbox,
+        ocr_confidence=cast(float, row.ocr_confidence),
+    )
+
+
+def _lazy_extract_drawing_survey_points(
+    session: Session,
+    drawing_id: int,
+) -> list[_ScopedSurveyPoint]:
+    """Extract N/E points from indexed OCR text when drawing_survey_points is empty."""
+    drawing = session.get(Drawing, drawing_id)
+    if drawing is None:
+        return []
+
+    elements: list[DrawingTextElement] = (
+        session.query(DrawingTextElement)
+        .filter(DrawingTextElement.master_drawing_id == drawing_id)
+        .order_by(DrawingTextElement.id.asc())
+        .all()
+    )
+    if not elements:
+        return []
+
+    page_meta_json = cast(list[dict[str, Any]] | None, drawing.page_meta_json) or []
+    scale_json = cast(dict[str, Any] | None, drawing.scale_json)
+    records = extract_survey_points_from_elements(
+        elements,
+        scale_json=scale_json,
+        page_meta_json=page_meta_json,
+        scale_source="lazy_match",
+    )
+    if not records:
+        return []
+
+    try:
+        persist_survey_points(
+            session,
+            drawing_id,
+            records,
+            source="lazy_match",
+        )
+    except Exception:
+        logger.exception(
+            "lazy_survey_point_persist_failed",
+            extra={"drawing_id": drawing_id},
+        )
+
+    return [
+        _ScopedSurveyPoint(
+            drawing_id=drawing_id,
+            page=record.page,
+            northing=record.northing,
+            easting=record.easting,
+            station=record.station,
+            structure_label=record.structure_label,
+            label_bbox_json=record.label_bbox_json,
+            ocr_confidence=record.ocr_confidence,
+        )
+        for record in records
+        if isinstance(record.label_bbox_json, dict)
+    ]
+
+
 def _load_scoped_survey_points(
     session: Session,
     drawing_ids: Sequence[int],
@@ -256,23 +338,62 @@ def _load_scoped_survey_points(
         .all()
     )
     points: list[_ScopedSurveyPoint] = []
+    drawings_with_rows: set[int] = set()
     for row in rows:
-        label_bbox = cast(dict[str, float] | None, row.label_bbox_json)
-        if not isinstance(label_bbox, dict):
+        scoped = _scoped_point_from_row(row)
+        if scoped is None:
             continue
-        points.append(
-            _ScopedSurveyPoint(
-                drawing_id=cast(int, row.drawing_id),
-                page=cast(int, row.page),
-                northing=cast(float, row.northing),
-                easting=cast(float, row.easting),
-                station=cast(str | None, row.station),
-                structure_label=cast(str | None, row.structure_label),
-                label_bbox_json=label_bbox,
-                ocr_confidence=cast(float, row.ocr_confidence),
+        drawings_with_rows.add(scoped.drawing_id)
+        points.append(scoped)
+
+    for drawing_id in drawing_ids:
+        if int(drawing_id) in drawings_with_rows:
+            continue
+        points.extend(_lazy_extract_drawing_survey_points(session, int(drawing_id)))
+    return points
+
+
+def _enrich_evidence_stations(
+    points: Sequence[SurveyPointRecord],
+    *,
+    clues: Sequence[DocumentClue],
+    evidence_text: str,
+) -> list[SurveyPointRecord]:
+    """Fill missing station fields from clues / evidence text (plain-text fallback path)."""
+    if not points:
+        return []
+
+    clue_text = " ".join(
+        str(getattr(clue, "clue_value", None) or getattr(clue, "value", "") or "")
+        for clue in clues
+    )
+    stations = extract_stations_from_text(clue_text) or extract_stations_from_text(
+        evidence_text
+    )
+    if not stations:
+        return list(points)
+
+    enriched: list[SurveyPointRecord] = []
+    for index, point in enumerate(points):
+        if point.station:
+            enriched.append(point)
+            continue
+        station = stations[min(index, len(stations) - 1)]
+        enriched.append(
+            SurveyPointRecord(
+                page=point.page,
+                northing=point.northing,
+                easting=point.easting,
+                station=station,
+                structure_label=point.structure_label,
+                label_bbox_json=point.label_bbox_json,
+                northing_bbox_json=point.northing_bbox_json,
+                easting_bbox_json=point.easting_bbox_json,
+                ocr_confidence=point.ocr_confidence,
+                meta_json={**point.meta_json, "station_enriched_from_text": True},
             )
         )
-    return points
+    return enriched
 
 
 def _prefer_master_scoped_point(
@@ -421,7 +542,12 @@ def _clue_tile_candidates(
                 best_score = score
                 best_tile = tile
 
-        if best_tile is None or best_score <= 0 or best_tile.bbox_normalized is None:
+        if (
+            best_tile is None
+            or best_score <= 0
+            or best_tile.bbox_normalized is None
+            or not bbox_on_page(best_tile.bbox_normalized)
+        ):
             continue
 
         candidates.append(
@@ -695,7 +821,11 @@ def resolve_evidence_location(
 
     drawing_ids = (scope.master_drawing_id, *scope.auxiliary_drawing_ids)
     scoped_points = _load_scoped_survey_points(session, drawing_ids)
-    evidence_points = _meta_survey_points(evidence)
+    evidence_points = _enrich_evidence_stations(
+        _meta_survey_points(evidence),
+        clues=clues,
+        evidence_text=build_full_evidence_text(evidence),
+    )
     project_id = cast(int | None, evidence.project_id)
     registration_transform = _load_registration_transform(evidence)
 

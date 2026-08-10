@@ -29,6 +29,7 @@ from models.location_match_label import LocationMatchLabel  # noqa: E402
 
 REQUIRED_FIELDS = (
     "label_id",
+    "suite",
     "project_id",
     "master_drawing_id",
     "master_bbox_json",
@@ -65,6 +66,10 @@ def validate_entry(entry: dict[str, Any], index: int) -> None:
     if not isinstance(label_id, str) or not label_id.strip():
         raise ValueError(f"Fixture entry {index} label_id must be a non-empty string")
 
+    suite = entry["suite"]
+    if not isinstance(suite, str) or not suite.strip():
+        raise ValueError(f"Fixture entry {index} suite must be a non-empty string")
+
     bbox = entry["master_bbox_json"]
     if not isinstance(bbox, dict):
         raise ValueError(f"Fixture entry {index} master_bbox_json must be an object")
@@ -88,6 +93,7 @@ def upsert_label(session, entry: dict[str, Any]) -> LocationMatchLabel:
     row = session.get(LocationMatchLabel, label_id)
 
     payload = {
+        "suite": str(entry["suite"]).strip(),
         "project_id": int(entry["project_id"]),
         "evidence_id": _optional_int(entry.get("evidence_id")),
         "inspection_run_id": _optional_int(entry.get("inspection_run_id")),

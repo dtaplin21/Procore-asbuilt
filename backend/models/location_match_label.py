@@ -12,6 +12,7 @@ class LocationMatchLabel(Base):
     __tablename__ = "location_match_labels"
 
     label_id = Column(String, primary_key=True)
+    suite = Column(String, nullable=False, server_default="default", index=True)
     project_id = Column(
         Integer,
         ForeignKey("projects.id", ondelete="CASCADE"),

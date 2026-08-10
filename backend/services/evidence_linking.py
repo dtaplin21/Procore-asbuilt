@@ -61,23 +61,38 @@ def find_project_drawings_for_refs(
 ) -> List[Dict[str, Any]]:
     drawings = db.query(Drawing).filter(Drawing.project_id == project_id).all()
     matches: List[Dict[str, Any]] = []
+    seen: set[tuple[int, str]] = set()
 
     for drawing in drawings:
         name_raw = cast(Optional[str], drawing.name)
-        drawing_name = _normalize_name(name_raw or "")
+        filename_raw = cast(Optional[str], getattr(drawing, "original_filename", None))
+        haystacks = [
+            _normalize_name(name_raw or ""),
+            _normalize_name(filename_raw or ""),
+        ]
         for ref in refs:
             normalized_ref = _normalize_name(ref)
-            if normalized_ref in drawing_name or drawing_name.startswith(normalized_ref):
-                matches.append(
-                    {
-                        "drawing_id": cast(int, drawing.id),
-                        "drawing_name": name_raw,
-                        "matched_text": ref,
-                        "confidence": 0.9,
-                        "source": "regex",
-                        "link_type": "sheet_ref",
-                    }
-                )
+            if not normalized_ref:
+                continue
+            if not any(
+                haystack and (normalized_ref in haystack or haystack.startswith(normalized_ref))
+                for haystack in haystacks
+            ):
+                continue
+            key = (cast(int, drawing.id), ref)
+            if key in seen:
+                continue
+            seen.add(key)
+            matches.append(
+                {
+                    "drawing_id": cast(int, drawing.id),
+                    "drawing_name": name_raw,
+                    "matched_text": ref,
+                    "confidence": 0.9,
+                    "source": "regex",
+                    "link_type": "sheet_ref",
+                }
+            )
     return matches
 
 

@@ -46,6 +46,7 @@ def test_golden_label_points_at_ucsf_evidence_and_master() -> None:
 def _sample_label(project_id: int) -> dict[str, Any]:
     return {
         "label_id": "test-label-seed",
+        "suite": "test",
         "project_id": project_id,
         "evidence_id": None,
         "inspection_run_id": None,
@@ -102,6 +103,7 @@ def test_validate_entry_rejects_missing_bbox_fields() -> None:
         validate_entry(
             {
                 "label_id": "bad",
+                "suite": "test",
                 "project_id": 1,
                 "master_drawing_id": 1,
                 "master_bbox_json": {"type": "rect", "x": 0, "y": 0, "height": 1},
