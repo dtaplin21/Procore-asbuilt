@@ -23,6 +23,8 @@ from services.safe_url_fetch import (
     fetch_url_attachment_with_error,
     is_allowed_external_url,
 )
+from observability.linked_drawing_logging import log_linked_drawing_fetch_capture
+from observability.location_match_logging import location_match_debug_enabled
 
 MAX_SUPPLEMENTAL_TEXT_CHARS = 2_000_000
 _TRUNCATION_SUFFIX = "\n...[linked content truncated]"
@@ -45,6 +47,16 @@ class PdfHyperlink:
     anchor_text: str | None  # visible link label if available
 
 
+@dataclass(frozen=True)
+class FetchedLinkedPdf:
+    url: str
+    filename: str
+    body: bytes
+    pages: int
+    content_type: str
+    text: str
+
+
 @dataclass
 class LinkFollowResult:
     supplemental_text: str = ""
@@ -52,6 +64,7 @@ class LinkFollowResult:
     followed_count: int = 0
     skipped_count: int = 0
     errors: list[str] = field(default_factory=list)
+    fetched_pdfs: list[FetchedLinkedPdf] = field(default_factory=list)
 
 
 def follow_pdf_links(file_path: str | Path) -> LinkFollowResult:
@@ -80,6 +93,7 @@ def follow_pdf_links(file_path: str | Path) -> LinkFollowResult:
             "links_found": len(links),
             "followed": result.followed_count,
             "skipped": result.skipped_count,
+            "fetched_pdf_count": len(result.fetched_pdfs),
         },
     )
     return result
@@ -179,6 +193,11 @@ def _follow_links(file_path: Path, links: list[PdfHyperlink]) -> LinkFollowResul
         try:
             fetched = fetch_url_attachment_with_error(uri)
             external_fetches += 1
+            body = fetched.body
+            content_type = (fetched.content_type or "").lower()
+            is_pdf = bool(body) and (
+                content_type == "application/pdf" or body.startswith(b"%PDF")
+            )
             if fetched.text.strip():
                 word_count = len(fetched.text.split())
                 attachments.append(
@@ -190,6 +209,35 @@ def _follow_links(file_path: Path, links: list[PdfHyperlink]) -> LinkFollowResul
                         pages=fetched.pages or 1,
                     )
                 )
+                if is_pdf:
+                    result.fetched_pdfs.append(
+                        FetchedLinkedPdf(
+                            url=uri,
+                            filename=fetched.filename,
+                            body=body,
+                            pages=fetched.pages or 1,
+                            content_type=content_type or "application/pdf",
+                            text=fetched.text,
+                        )
+                    )
+                    log_linked_drawing_fetch_capture(
+                        url=uri,
+                        linked_filename=fetched.filename,
+                        body_bytes=len(body),
+                        text_words=word_count,
+                        pages=fetched.pages or 1,
+                        captured=True,
+                    )
+                else:
+                    log_linked_drawing_fetch_capture(
+                        url=uri,
+                        linked_filename=fetched.filename,
+                        body_bytes=len(body),
+                        text_words=word_count,
+                        pages=fetched.pages or 1,
+                        captured=False,
+                        skip_reason="empty_pdf_body" if not body else "not_pdf",
+                    )
                 logger.info(
                     "pdf_link_fetch_ocr_complete",
                     extra={
@@ -202,6 +250,26 @@ def _follow_links(file_path: Path, links: list[PdfHyperlink]) -> LinkFollowResul
             elif fetched.error:
                 result.errors.append(f"{uri}: {fetched.error}")
                 result.skipped_count += 1
+                log_linked_drawing_fetch_capture(
+                    url=uri,
+                    linked_filename=fetched.filename,
+                    body_bytes=len(body),
+                    text_words=0,
+                    pages=fetched.pages or 0,
+                    captured=False,
+                    skip_reason=f"fetch_error:{fetched.error}",
+                )
+            else:
+                result.skipped_count += 1
+                log_linked_drawing_fetch_capture(
+                    url=uri,
+                    linked_filename=fetched.filename,
+                    body_bytes=len(body),
+                    text_words=0,
+                    pages=fetched.pages or 0,
+                    captured=False,
+                    skip_reason="empty_ocr_text",
+                )
             parsed = parse_procore_url(uri)
             if parsed:
                 result.cross_refs.append(

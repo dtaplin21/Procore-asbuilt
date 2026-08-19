@@ -20,7 +20,15 @@ from ai.pipelines.location_match_orchestrator import (
 )
 from models.drawing_overlay import DrawingOverlay
 from models.inspection_run import InspectionRun
-from models.models import Drawing, EvidenceRecord, JobQueue, Project, User, UserCompany
+from models.models import (
+    Drawing,
+    EvidenceDrawingLink,
+    EvidenceRecord,
+    JobQueue,
+    Project,
+    User,
+    UserCompany,
+)
 from services.inspection_match_persistence import (
     InternalMatchCandidate,
     MatchStatus,
@@ -29,6 +37,12 @@ from services.inspection_match_persistence import (
     resolve_inspection_run_id,
 )
 from services.master_drawing_index_readiness import get_master_drawing_index_readiness
+from observability.location_match_logging import (
+    log_inspection_match_persisted,
+    log_inspection_match_result,
+    log_inspection_match_started,
+    log_inspection_upload_match_summary,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -264,9 +278,20 @@ def maybe_enqueue_inspection_match_after_extraction(
                 "region_count": readiness.region_count,
             },
         )
+        log_inspection_upload_match_summary(
+            evidence_id=evidence_id,
+            project_id=project_id,
+            master_drawing_id=int(master_drawing_id),
+            inspection_run_id=inspection_run_id or 0,
+            master_index_ready=False,
+            master_index_status=readiness.upload_response_status,
+            match_deferred=True,
+            index_status=readiness.index_status,
+            region_count=readiness.region_count,
+        )
         return None
 
-    return maybe_enqueue_inspection_match_job(
+    job = maybe_enqueue_inspection_match_job(
         db,
         project_id=project_id,
         inspection_id=inspection_id,
@@ -275,6 +300,20 @@ def maybe_enqueue_inspection_match_after_extraction(
         user_id=user_id,
         inspection_run_id=inspection_run_id,
     )
+    if job is not None and inspection_run_id is not None:
+        log_inspection_upload_match_summary(
+            evidence_id=evidence_id,
+            project_id=project_id,
+            master_drawing_id=int(master_drawing_id),
+            inspection_run_id=inspection_run_id,
+            master_index_ready=True,
+            master_index_status=readiness.upload_response_status,
+            match_job_id=int(cast(int, job.id)),
+            match_deferred=False,
+            index_status=readiness.index_status,
+            region_count=readiness.region_count,
+        )
+    return job
 
 
 def flush_deferred_inspection_matches_for_drawing(
@@ -338,16 +377,82 @@ def flush_deferred_inspection_matches_for_drawing(
     return enqueued
 
 
+def flush_inspection_matches_for_linked_auxiliary_drawing(
+    session: Session,
+    auxiliary_drawing_id: int,
+) -> int:
+    """Re-enqueue inspection matches after an auxiliary install sheet finishes indexing."""
+    drawing = session.get(Drawing, auxiliary_drawing_id)
+    if drawing is None or cast(str, drawing.index_status) != "ready":
+        return 0
+
+    project_id = cast(int, drawing.project_id)
+    project = session.get(Project, project_id)
+    master_drawing_id = getattr(project, "master_drawing_id", None) if project else None
+    if master_drawing_id is not None and int(master_drawing_id) == auxiliary_drawing_id:
+        return 0
+
+    links = (
+        session.query(EvidenceDrawingLink)
+        .filter(EvidenceDrawingLink.drawing_id == auxiliary_drawing_id)
+        .all()
+    )
+    if not links:
+        return 0
+
+    enqueued = 0
+    seen_runs: set[int] = set()
+
+    for link in links:
+        evidence_id = cast(int, link.evidence_id)
+        runs = (
+            session.query(InspectionRun)
+            .filter(
+                InspectionRun.project_id == project_id,
+                InspectionRun.evidence_id == evidence_id,
+            )
+            .order_by(InspectionRun.id.desc())
+            .all()
+        )
+        for run in runs:
+            run_id = cast(int, run.id)
+            if run_id in seen_runs:
+                continue
+            seen_runs.add(run_id)
+
+            master_id = cast(int, run.master_drawing_id)
+            readiness = get_master_drawing_index_readiness(session, master_id)
+            if not readiness.is_ready_for_matching:
+                continue
+
+            job = maybe_enqueue_inspection_match_job(
+                session,
+                project_id=project_id,
+                inspection_id=str(evidence_id),
+                master_drawing_id=master_id,
+                page=1,
+                inspection_run_id=run_id,
+            )
+            if job is not None:
+                enqueued += 1
+
+    if enqueued:
+        session.commit()
+    return enqueued
+
+
 def run_inspection_match_job(payload: dict[str, Any], session: Session) -> MatchStatus:
     inspection_id = str(payload["inspection_id"])
     drawing_id = payload["drawing_id"]
     page = int(payload.get("page", 1))
     run_id_hint = _parse_optional_int(payload.get("inspection_run_id"))
+    project_id = _parse_optional_int(payload.get("project_id"))
+    job_id = _parse_optional_int(payload.get("job_id"))
     evidence_id = _parse_optional_int(inspection_id)
     master_drawing_id = _parse_optional_int(drawing_id)
 
-    def _persist(**kwargs: Any) -> None:
-        persist_inspection_match_overlay(
+    def _persist(**kwargs: Any) -> int | None:
+        return persist_inspection_match_overlay(
             session=session,
             inspection_id=inspection_id,
             drawing_id=drawing_id,
@@ -356,8 +461,26 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
         )
 
     if evidence_id is None or master_drawing_id is None:
-        _persist(status="needs_review", bbox=None, page=page)
+        overlay_id = _persist(status="needs_review", bbox=None, page=page)
+        log_inspection_match_persisted(
+            evidence_id=evidence_id or 0,
+            master_drawing_id=master_drawing_id or 0,
+            match_status="needs_review",
+            overlay_id=overlay_id,
+            bbox=None,
+            page=page,
+            inspection_run_id=run_id_hint,
+        )
         return "needs_review"
+
+    log_inspection_match_started(
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+        page=page,
+        inspection_run_id=run_id_hint,
+        project_id=project_id,
+        job_id=job_id,
+    )
 
     result = resolve_evidence_location(
         session,
@@ -384,22 +507,28 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
         )
         session.commit()
 
-    if result.method == ResolutionMethod.UNRESOLVED:
-        logger.info(
-            "inspection_match_unresolved",
-            extra={
-                "inspection_id": inspection_id,
-                "drawing_id": drawing_id,
-                "page": page,
-                "evidence_id": evidence_id,
-                "notes": result.notes,
-            },
-        )
+    log_inspection_match_result(
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+        result=result,
+        match_status=status,
+        inspection_run_id=run_id_hint,
+    )
 
-    _persist(
+    overlay_id = _persist(
         status=status,
         bbox=result.bbox_fractional if status == "matched" else None,
         page=result.page,
+        region_id=result.region_id,
+    )
+    log_inspection_match_persisted(
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+        match_status=status,
+        overlay_id=overlay_id,
+        bbox=result.bbox_fractional if status == "matched" else None,
+        page=result.page,
+        inspection_run_id=run_id_hint,
         region_id=result.region_id,
     )
     return status

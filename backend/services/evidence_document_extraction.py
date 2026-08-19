@@ -16,6 +16,7 @@ from ai.pipelines.pdf_link_follower import LinkFollowResult, follow_pdf_links
 from models.document_extraction import DocumentExtraction
 from models.models import EvidenceRecord
 from services.evidence_linking import replace_evidence_drawing_links
+from services.linked_drawing_registration import register_linked_pdfs_as_auxiliary_drawings
 from services.evidence_survey_extraction import (
     extract_survey_points_from_evidence,
     persist_evidence_survey_meta,
@@ -97,6 +98,18 @@ def ingest_evidence_document_extraction(
             }
             evidence.meta = meta  # type: ignore[assignment]
             session.flush()
+            try:
+                register_linked_pdfs_as_auxiliary_drawings(
+                    session,
+                    project_id=cast(int, evidence.project_id),
+                    link_result=link_result,
+                    evidence_id=evidence_id,
+                )
+            except Exception:
+                logger.exception(
+                    "linked_drawing_registration_failed",
+                    extra={"evidence_id": evidence_id},
+                )
             try:
                 replace_evidence_drawing_links(session, evidence, commit=False)
             except Exception:

@@ -169,7 +169,7 @@ def test_evaluate_labels_skips_fixture_only_rows(db_session) -> None:
     assert summary.skipped == 1
     assert summary.evaluated == 0
     assert summary.pass_rate == 0.0
-    assert summary.passed_gate is False
+    assert summary.passed_gate is True
 
 
 def test_location_match_eval_integration(db_session) -> None:

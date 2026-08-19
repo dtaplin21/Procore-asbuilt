@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from database import SessionLocal
 from models.models import JobQueue
+from observability.logging_config import configure_logging
 from observability.workflow_logging import log_job_status_transition
 from services.job_input_data import coerce_job_int
 from services.drawing_render_jobs import (
@@ -65,6 +66,7 @@ async def handle_job(job: JobQueue) -> None:
             job_project_id = getattr(job, "project_id", None)
             if job_project_id is not None:
                 input_data = {**input_data, "project_id": int(cast(int, job_project_id))}
+        input_data = {**input_data, "job_id": int(cast(int, job.id))}
         await process_inspection_match_job(input_data)
         return
 
@@ -185,7 +187,7 @@ async def run_worker_loop(poll_interval_seconds: float = 2.0) -> None:
 def main() -> None:
     import os
 
-    logging.basicConfig(level=logging.INFO)
+    configure_logging()
     poll = float(os.getenv("JOB_WORKER_POLL_SECONDS", "2"))
     asyncio.run(run_worker_loop(poll_interval_seconds=poll))
 

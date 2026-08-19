@@ -43,9 +43,9 @@ def seed(
             .one_or_none()
         )
         if existing:
-            existing.expansion = expansion
-            existing.category = category
-            existing.source_sheet = source_sheet
+            setattr(existing, "expansion", expansion)
+            setattr(existing, "category", category)
+            setattr(existing, "source_sheet", source_sheet)
         else:
             session.add(
                 DrawingLegendAbbreviation(
@@ -64,9 +64,9 @@ def seed(
             .one_or_none()
         )
         if existing:
-            existing.abbreviation_code = code
-            existing.category = category
-            existing.source_sheet = source_sheet
+            setattr(existing, "abbreviation_code", code)
+            setattr(existing, "category", category)
+            setattr(existing, "source_sheet", source_sheet)
         else:
             session.add(
                 DrawingLegendLineType(
@@ -85,9 +85,9 @@ def seed(
             .one_or_none()
         )
         if existing:
-            existing.abbreviation_code = code
-            existing.category = category
-            existing.source_sheet = source_sheet
+            setattr(existing, "abbreviation_code", code)
+            setattr(existing, "category", category)
+            setattr(existing, "source_sheet", source_sheet)
         else:
             session.add(
                 DrawingLegendSymbol(

@@ -167,7 +167,7 @@ FILES:
 
 # U-3 — Generalize verify script
 
-- [ ] **U-3.1** Replace UCSF-only verify script
+- [x] **U-3.1** Replace UCSF-only verify script
 
 **PROMPT — copy below:**
 
@@ -199,7 +199,7 @@ U-3.1: Generalize verify_golden_location_match.py
 
 # U-4 — Export label helper (new projects)
 
-- [ ] **U-4.1** Add export script
+- [x] **U-4.1** Add export script
 
 **PROMPT — copy below:**
 
@@ -236,7 +236,7 @@ No DB required for export (file-only).
 
 # U-5 — Tests + anti-hardcode guard
 
-- [ ] **U-5.1** Update seed/eval tests for suites
+- [x] **U-5.1** Update seed/eval tests for suites
 
 **PROMPT — copy below:**
 
@@ -263,7 +263,7 @@ FILES:
 
 ---
 
-- [ ] **U-5.2** Guard: no hard-coded UCSF IDs in match pipeline
+- [x] **U-5.2** Guard: no hard-coded UCSF IDs in match pipeline
 
 **PROMPT — copy below:**
 
@@ -295,7 +295,7 @@ Assert scanned pipeline file contents do not contain those literals.
 
 # U-6 — Docs
 
-- [ ] **U-6.1** Retitle PR-G golden language
+- [x] **U-6.1** Retitle PR-G golden language
 
 **PROMPT — copy below:**
 
@@ -317,7 +317,7 @@ Do not rewrite PR-A through PR-F.
 
 # U-7 — Definition of done
 
-- [ ] **U-7.1** Verify
+- [x] **U-7.1** Verify
 
 **PROMPT — copy below:**
 
@@ -335,11 +335,11 @@ cd backend
 ./venv/bin/python scripts/eval_location_match.py --labels tests/fixtures/location_match_labels --suite synthetic --min-iou 0.30
 
 Confirm:
-- [ ] location_match_labels.json root file gone
-- [ ] ucsf.json + synthetic.json exist with suite field
-- [ ] eval prints pass_rate_by_suite
-- [ ] verify_golden_location_match.py gone; verify_location_match_label.py has no default 357/661
-- [ ] matcher/orchestrator files have no hard-coded UCSF N/E or IDs
+- [x] location_match_labels.json root file gone
+- [x] ucsf.json + synthetic.json exist with suite field
+- [x] eval prints pass_rate_by_suite
+- [x] verify_golden_location_match.py gone; verify_location_match_label.py has no default 357/661
+- [x] matcher/orchestrator files have no hard-coded UCSF N/E or IDs
 ```
 
 ---

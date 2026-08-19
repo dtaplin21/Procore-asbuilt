@@ -2,10 +2,10 @@
   {
     "label_id": "synthetic-coord-matched",
     "suite": "synthetic",
-    "project_id": 1,
+    "project_id": 2,
     "evidence_id": null,
     "inspection_run_id": null,
-    "master_drawing_id": 1,
+    "master_drawing_id": 661,
     "evidence_fixture_path": null,
     "master_bbox_json": {
       "type": "rect",
@@ -22,15 +22,15 @@
     "has_station_signal": false,
     "has_reference_signal": false,
     "evidence_kind": "form",
-    "notes": "Schema-only synthetic coordinate case; evidence_id null so eval skips until wired."
+    "notes": "Synthetic suite row (fixture-only). Uses project 2 / drawing 661 for FK seedability; evidence_id null so eval skips."
   },
   {
     "label_id": "synthetic-no-match",
     "suite": "synthetic",
-    "project_id": 1,
+    "project_id": 2,
     "evidence_id": null,
     "inspection_run_id": null,
-    "master_drawing_id": 1,
+    "master_drawing_id": 661,
     "evidence_fixture_path": null,
     "master_bbox_json": {
       "type": "rect",
@@ -47,6 +47,6 @@
     "has_station_signal": false,
     "has_reference_signal": false,
     "evidence_kind": "photo",
-    "notes": "Schema-only synthetic no-match case; evidence_id null so eval skips until wired."
+    "notes": "Synthetic suite no-match row (fixture-only). evidence_id null so eval skips."
   }
 ]

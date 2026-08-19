@@ -9,19 +9,20 @@ from typing import Any, cast
 import pytest
 
 from models.location_match_label import LocationMatchLabel
+from models.models import Drawing
 from scripts.seed_location_match_labels import (
     load_fixture,
     seed_labels_from_fixture,
     validate_entry,
 )
 
-FIXTURE_PATH = (
-    Path(__file__).resolve().parent / "fixtures" / "location_match_labels" / "ucsf.json"
-)
+FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "location_match_labels"
+UCSF_FIXTURE_PATH = FIXTURE_DIR / "ucsf.json"
+SYNTHETIC_FIXTURE_PATH = FIXTURE_DIR / "synthetic.json"
 
 
 def test_fixture_has_minimum_eval_rows() -> None:
-    entries = load_fixture(FIXTURE_PATH)
+    entries = load_fixture(UCSF_FIXTURE_PATH)
     assert len(entries) >= 5
     label_ids = {entry["label_id"] for entry in entries}
     assert "ucsf-435-ss-corridor" in label_ids
@@ -29,11 +30,22 @@ def test_fixture_has_minimum_eval_rows() -> None:
     assert "ucsf-no-coords-clue-only" in label_ids
     assert "ucsf-no-coords-unresolved" in label_ids
     assert "ucsf-station-only" in label_ids
+    assert all(entry["suite"] == "ucsf" for entry in entries)
 
 
-def test_golden_label_points_at_ucsf_evidence_and_master() -> None:
-    entries = load_fixture(FIXTURE_PATH)
+def test_synthetic_suite_exists() -> None:
+    entries = load_fixture(SYNTHETIC_FIXTURE_PATH)
+    assert len(entries) >= 2
+    assert all(entry["suite"] == "synthetic" for entry in entries)
+    label_ids = {entry["label_id"] for entry in entries}
+    assert "synthetic-coord-matched" in label_ids
+    assert "synthetic-no-match" in label_ids
+
+
+def test_ucsf_corridor_label_fields() -> None:
+    entries = load_fixture(UCSF_FIXTURE_PATH)
     golden = next(e for e in entries if e["label_id"] == "ucsf-435-ss-corridor")
+    assert golden["suite"] == "ucsf"
     assert golden["evidence_id"] == 357
     assert golden["master_drawing_id"] == 661
     assert golden["inspection_run_id"] == 435
@@ -45,14 +57,14 @@ def test_golden_label_points_at_ucsf_evidence_and_master() -> None:
     assert bbox["width"] > 0
 
 
-def _sample_label(project_id: int) -> dict[str, Any]:
-    return {
+def _sample_label(project_id: int, master_drawing_id: int, **overrides: Any) -> dict[str, Any]:
+    payload = {
         "label_id": "test-label-seed",
         "suite": "test",
         "project_id": project_id,
         "evidence_id": None,
         "inspection_run_id": None,
-        "master_drawing_id": 661,
+        "master_drawing_id": master_drawing_id,
         "evidence_fixture_path": "tests/fixtures/evidence/ucsf-field-photo.jpg",
         "master_bbox_json": {
             "type": "rect",
@@ -71,25 +83,43 @@ def _sample_label(project_id: int) -> dict[str, Any]:
         "evidence_kind": "photo",
         "notes": "seed test row",
     }
+    payload.update(overrides)
+    return payload
+
+
+def _master_drawing(db_session, project) -> Drawing:
+    drawing = Drawing(
+        project_id=project.id,
+        source="upload",
+        name="eval-master.pdf",
+        content_type="application/pdf",
+        processing_status="pending",
+    )
+    db_session.add(drawing)
+    db_session.commit()
+    db_session.refresh(drawing)
+    return drawing
 
 
 def test_seed_location_match_labels_upserts(db_session, project, tmp_path: Path) -> None:
     project_id = cast(int, project.id)
-    payload = [_sample_label(project_id)]
-    fixture = tmp_path / "labels.json"
-    fixture.write_text(json.dumps(payload), encoding="utf-8")
+    master_drawing_id = cast(int, _master_drawing(db_session, project).id)
+    payload = [_sample_label(project_id, master_drawing_id)]
+    fixture_path = tmp_path / "labels.json"
+    fixture_path.write_text(json.dumps(payload), encoding="utf-8")
 
-    count = seed_labels_from_fixture(db_session, fixture)
+    count = seed_labels_from_fixture(db_session, fixture_path)
     assert count == 1
 
     row = db_session.get(LocationMatchLabel, "test-label-seed")
     assert row is not None
     assert cast(int, row.project_id) == project_id
+    assert cast(str, row.suite) == "test"
     assert cast(str, row.expected_method) == "unresolved"
 
     payload[0]["notes"] = "updated note"
-    fixture.write_text(json.dumps(payload), encoding="utf-8")
-    seed_labels_from_fixture(db_session, fixture)
+    fixture_path.write_text(json.dumps(payload), encoding="utf-8")
+    seed_labels_from_fixture(db_session, fixture_path)
     db_session.refresh(row)
     assert cast(str, row.notes) == "updated note"
     assert (
@@ -98,6 +128,48 @@ def test_seed_location_match_labels_upserts(db_session, project, tmp_path: Path)
         .count()
         == 1
     )
+
+
+def test_seed_loads_directory_with_suite_filter(
+    db_session, project, tmp_path: Path
+) -> None:
+    import uuid
+
+    project_id = cast(int, project.id)
+    master_drawing_id = cast(int, _master_drawing(db_session, project).id)
+    suite_dir = tmp_path / "location_match_labels"
+    suite_dir.mkdir()
+    suffix = uuid.uuid4().hex[:8]
+    alpha_id = f"alpha-{suffix}"
+    beta_id = f"beta-{suffix}"
+
+    alpha = [
+        _sample_label(
+            project_id,
+            master_drawing_id,
+            label_id=alpha_id,
+            suite="alpha",
+        )
+    ]
+    beta = [
+        _sample_label(
+            project_id,
+            master_drawing_id,
+            label_id=beta_id,
+            suite="beta",
+        )
+    ]
+    (suite_dir / "alpha.json").write_text(json.dumps(alpha), encoding="utf-8")
+    (suite_dir / "beta.json").write_text(json.dumps(beta), encoding="utf-8")
+
+    count = seed_labels_from_fixture(db_session, suite_dir, suite="alpha")
+    assert count == 1
+    assert db_session.get(LocationMatchLabel, alpha_id) is not None
+    assert db_session.get(LocationMatchLabel, beta_id) is None
+
+    count_all = seed_labels_from_fixture(db_session, suite_dir)
+    assert count_all == 2
+    assert db_session.get(LocationMatchLabel, beta_id) is not None
 
 
 def test_validate_entry_rejects_missing_bbox_fields() -> None:

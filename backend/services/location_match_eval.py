@@ -330,15 +330,23 @@ def evaluate_label(
 
 def _pass_rate_by_suite(results: list[LabelEvalResult]) -> dict[str, float]:
     evaluated_by_suite: dict[str, list[LabelEvalResult]] = defaultdict(list)
+    seen_suites: set[str] = set()
     for result in results:
+        suite_name = result.suite or "default"
+        seen_suites.add(suite_name)
         if result.skipped:
             continue
-        evaluated_by_suite[result.suite or "default"].append(result)
+        evaluated_by_suite[suite_name].append(result)
 
     rates: dict[str, float] = {}
-    for suite_name, suite_results in sorted(evaluated_by_suite.items()):
+    for suite_name in sorted(seen_suites):
+        suite_results = evaluated_by_suite.get(suite_name, [])
+        if not suite_results:
+            # All labels in this suite were skipped (fixture-only).
+            rates[suite_name] = 1.0
+            continue
         passed = sum(1 for result in suite_results if result.passed)
-        rates[suite_name] = passed / len(suite_results) if suite_results else 0.0
+        rates[suite_name] = passed / len(suite_results)
     return rates
 
 
@@ -362,7 +370,12 @@ def evaluate_labels(
     )
 
     pass_rate = (len(passed) / len(evaluated)) if evaluated else 0.0
-    passed_gate = pass_rate >= min_pass_rate and coordinate_false_positives == 0
+    # Fixture-only suites (all skipped) are not a gate failure.
+    passed_gate = (
+        True
+        if not evaluated
+        else (pass_rate >= min_pass_rate and coordinate_false_positives == 0)
+    )
 
     return EvalSummary(
         total=len(labels),

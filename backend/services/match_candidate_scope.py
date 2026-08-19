@@ -42,7 +42,7 @@ def build_match_scope(
             .all()
         )
         for link in linked_rows:
-            auxiliary.append(int(link.drawing_id))
+            auxiliary.append(cast(int, link.drawing_id))
 
     auxiliary_ids = tuple(
         drawing_id

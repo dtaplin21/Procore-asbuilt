@@ -104,12 +104,11 @@ def main() -> int:
             f"(min {summary.min_pass_rate:.0%}); "
             f"coordinate_false_positives={summary.coordinate_false_positives}"
         )
-        if summary.pass_rate_by_suite:
-            suite_bits = ", ".join(
-                f"{name}={rate:.2%}"
-                for name, rate in summary.pass_rate_by_suite.items()
-            )
-            print(f"pass_rate_by_suite: {suite_bits}")
+        suite_bits = ", ".join(
+            f"{name}={rate:.2%}"
+            for name, rate in summary.pass_rate_by_suite.items()
+        ) or "(none)"
+        print(f"pass_rate_by_suite: {suite_bits}")
 
         for result in summary.results:
             if result.skipped:

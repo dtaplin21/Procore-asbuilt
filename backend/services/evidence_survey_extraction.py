@@ -165,7 +165,7 @@ def extract_survey_points_from_evidence(
     document: ExtractedDocument = extract_document(path)
     all_words = list(document.words) + _words_from_linked_pdfs(path)
     page_meta_json = build_page_meta_from_path(path, document.page_count)
-    linked_drawings = load_linked_drawings(session, int(evidence.id))
+    linked_drawings = load_linked_drawings(session, cast(int, evidence.id))
     scale_json = resolve_scale_for_evidence(
         evidence,
         linked_drawings,

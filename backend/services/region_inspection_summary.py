@@ -17,7 +17,7 @@ import json
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy.orm import Session
 
@@ -180,18 +180,18 @@ def build_region_inspection_summary(
             latest_overlay_by_region[rid] = overlay
 
     run_ids = {
-        int(o.inspection_run_id)
+        cast(int, o.inspection_run_id)
         for o in latest_overlay_by_region.values()
         if getattr(o, "inspection_run_id", None) is not None
     }
     runs_by_id: dict[int, InspectionRun] = {}
     if run_ids:
         runs = db.query(InspectionRun).filter(InspectionRun.id.in_(run_ids)).all()
-        runs_by_id = {int(r.id): r for r in runs}
+        runs_by_id = {cast(int, r.id): r for r in runs}
 
     entries: list[RegionInspectionSummaryEntry] = []
     for region in regions:
-        rid = int(region.id)
+        rid = cast(int, region.id)
         location_tags = _normalize_tag_tuple(getattr(region, "location_tags", None))
         inspection_type_tags = _normalize_tag_tuple(
             getattr(region, "inspection_type_tags", None)
@@ -214,7 +214,7 @@ def build_region_inspection_summary(
             )
             continue
 
-        run_id = int(latest_overlay.inspection_run_id)
+        run_id = cast(int, latest_overlay.inspection_run_id)
         run = runs_by_id.get(run_id)
         entries.append(
             RegionInspectionSummaryEntry(
@@ -225,7 +225,7 @@ def build_region_inspection_summary(
                 bbox=bbox,
                 location_tags=location_tags,
                 inspection_type_tags=inspection_type_tags,
-                latest_overlay_id=int(latest_overlay.id),
+                latest_overlay_id=cast(int, latest_overlay.id),
                 latest_inspection_run_id=run_id,
                 inspection_type=_inspection_type_display(
                     latest_overlay, run, inspection_type_tags

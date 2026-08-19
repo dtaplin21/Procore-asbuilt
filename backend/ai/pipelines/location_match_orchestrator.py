@@ -57,6 +57,7 @@ from services.inspection_match_persistence import MATCH_SCORE_THRESHOLD, MatchSt
 from services.match_candidate_scope import MatchScope, build_match_scope
 from services.region_index_loader import build_region_index
 from services.survey_point_storage import persist_survey_points
+from observability.location_match_logging import log_inspection_match_candidates
 
 logger = logging.getLogger(__name__)
 
@@ -876,6 +877,22 @@ def resolve_evidence_location(
         if alignment is not None and alignment.method == ResolutionMethod.ALIGNMENT:
             candidates.append(alignment)
 
+    match_detail = {
+        "evidence_kind": evidence_kind.value,
+        "evidence_point_count": len(evidence_points),
+        "scoped_point_count": len(scoped_points),
+        "auxiliary_drawing_ids": list(scope.auxiliary_drawing_ids),
+        "clue_count": len(clues),
+        "coordinate_lookup_skipped": not evidence_points or not scoped_points,
+        "has_registration_transform": registration_transform is not None,
+    }
+    log_inspection_match_candidates(
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+        candidates=candidates,
+        match_detail=match_detail,
+    )
+
     winner = select_best_location_match(candidates)
     if winner is not None:
         return LocationMatchResult.from_candidate(master_drawing_id, winner)
@@ -893,6 +910,12 @@ def resolve_evidence_location(
         page=page,
     )
     if contour is not None:
+        log_inspection_match_candidates(
+            evidence_id=evidence_id,
+            master_drawing_id=master_drawing_id,
+            candidates=[*candidates, contour],
+            match_detail={**match_detail, "contour_fallback": True},
+        )
         return LocationMatchResult.from_candidate(master_drawing_id, contour)
 
     return LocationMatchResult.unresolved(master_drawing_id)

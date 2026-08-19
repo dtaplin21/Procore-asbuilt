@@ -49,6 +49,8 @@ class UrlAttachmentFetch:
     error: str | None
     filename: str
     pages: int
+    body: bytes = b""
+    content_type: str = ""
 
 
 def is_allowed_external_url(url: str) -> bool:
@@ -165,8 +167,17 @@ def fetch_url_attachment_with_error(url: str) -> UrlAttachmentFetch:
                 error="pdf OCR text extraction returned empty",
                 filename=filename,
                 pages=pages,
+                body=body,
+                content_type=content_type or "application/pdf",
             )
-        return UrlAttachmentFetch(text=text, error=None, filename=filename, pages=pages)
+        return UrlAttachmentFetch(
+            text=text,
+            error=None,
+            filename=filename,
+            pages=pages,
+            body=body,
+            content_type=content_type or "application/pdf",
+        )
     if content_type.startswith("image/") or _looks_like_image(body):
         text, pages = _image_bytes_to_text(body, content_type)
         if not text.strip():

@@ -9,7 +9,7 @@ with models.drawing_region.DrawingRegion — not separate pixel columns.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy.orm import Session
 
@@ -150,25 +150,32 @@ def update_drawing_region(
     if row is None:
         return None
 
-    next_geometry = geometry if geometry is not None else row.geometry
-    next_polygon = row.polygon_points if polygon_points is ... else polygon_points
+    next_geometry: dict[str, Any] = (
+        geometry if geometry is not None else cast(dict[str, Any], row.geometry)
+    )
+    if polygon_points is ...:
+        next_polygon: list[list[float]] | None = cast(
+            list[list[float]] | None, row.polygon_points
+        )
+    else:
+        next_polygon = cast(list[list[float]] | None, polygon_points)
     if geometry is not None or polygon_points is not ...:
         validate_region_geometry(next_geometry, polygon_points=next_polygon)
 
     if label is not None:
-        row.label = label
+        setattr(row, "label", label)
     if page is not None:
-        row.page = page
+        setattr(row, "page", page)
     if geometry is not None:
-        row.geometry = geometry
+        setattr(row, "geometry", geometry)
     if polygon_points is not ...:
-        row.polygon_points = polygon_points
+        setattr(row, "polygon_points", next_polygon)
     if inspection_type_tags is not None:
-        row.inspection_type_tags = _normalize_tag_list(inspection_type_tags)
+        setattr(row, "inspection_type_tags", _normalize_tag_list(inspection_type_tags))
     if location_tags is not None:
-        row.location_tags = _normalize_tag_list(location_tags)
+        setattr(row, "location_tags", _normalize_tag_list(location_tags))
 
-    row.updated_at = datetime.now(timezone.utc)
+    setattr(row, "updated_at", datetime.now(timezone.utc))
     try:
         db.commit()
     except Exception:

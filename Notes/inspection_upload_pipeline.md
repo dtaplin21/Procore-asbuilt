@@ -529,7 +529,12 @@ Wire optional UI or curl-only for dev.
 
 ---
 
-# PR-G — Eval set
+# PR-G — Eval set (multi-suite)
+
+Eval uses multi-suite labels under `tests/fixtures/location_match_labels/`.
+`ucsf.json` is the first suite, not the only one. New project = new `<suite>.json`
+via `export_location_match_label.py` + seed + eval. See also
+`Notes/universal_location_match_eval.md`.
 
 - [ ] **G-1** Model `location_match_label.py` + migration
 
@@ -538,29 +543,33 @@ Wire optional UI or curl-only for dev.
 ```
 PR-G step G-1: Create location_match_labels table.
 
-Fields: label_id, project_id, evidence_id, inspection_run_id, master_drawing_id, evidence_fixture_path,
+Fields: label_id, suite, project_id, evidence_id, inspection_run_id, master_drawing_id, evidence_fixture_path,
 master_bbox_json (required ground truth), expected_method, expected_match_status, rotation_deg,
 has_coordinate_signal, has_station_signal, has_reference_signal, evidence_kind, notes.
 ```
 
 ---
 
-- [ ] **G-2** Seed fixture JSON (5–10 rows)
+- [ ] **G-2** Seed fixture JSON (multi-suite)
 
 **PROMPT — copy below:**
 
 ```
-PR-G step G-2: Create backend/tests/fixtures/location_match_labels.json with minimum:
+PR-G step G-2: Create suite fixtures under backend/tests/fixtures/location_match_labels/
 
-1. ucsf-435-ss-corridor — evidence 357, master 661, rotation_deg 180, expected coordinate_lookup matched
-2. ucsf-rotated-detail — second 180 deg pair
-3. ucsf-no-coords-clue-only — has_coordinate_signal false
-4. ucsf-no-coords-unresolved — photo, expected no_match
-5. ucsf-station-only — station lookup case
+- ucsf.json — first suite (not product truth); include:
+  1. ucsf-435-ss-corridor — coordinate_lookup matched
+  2. ucsf-rotated-detail — second 180 deg pair
+  3. ucsf-no-coords-clue-only — has_coordinate_signal false
+  4. ucsf-no-coords-unresolved — photo, expected no_match
+  5. ucsf-station-only — station lookup case
+- synthetic.json — second suite (schema-only / fixture-only rows OK)
 
-Fill master_bbox_json from human-labeled pins on drawing 661.
+Every row must include "suite". Seed via:
+  cd backend && ./venv/bin/python scripts/seed_location_match_labels.py
+  cd backend && ./venv/bin/python scripts/seed_location_match_labels.py --suite ucsf
 
-Create backend/scripts/seed_location_match_labels.py to load JSON into DB.
+Add a new project suite with scripts/export_location_match_label.py → <slug>.json
 ```
 
 ---
@@ -575,11 +584,13 @@ PR-G step G-3: Create backend/scripts/eval_location_match.py
 For each label: run resolve_evidence_location, compare method, match_status, bbox IoU vs master_bbox_json (min 0.30).
 
 Fail if pass_rate < 0.80 OR any zero-coordinate case gets matched via coordinate/contour false positive.
+Report pass_rate_by_suite.
 
 Create backend/tests/test_location_match_eval.py — skip until >= 5 labels seeded.
 
 Run:
-cd backend && python scripts/eval_location_match.py --labels tests/fixtures/location_match_labels.json --min-iou 0.30 --output /tmp/location_match_eval.json
+cd backend && python scripts/eval_location_match.py --labels tests/fixtures/location_match_labels --min-iou 0.30 --output /tmp/location_match_eval.json
+cd backend && python scripts/eval_location_match.py --suite ucsf --min-iou 0.30
 ```
 
 ---
@@ -591,11 +602,14 @@ cd backend && python scripts/eval_location_match.py --labels tests/fixtures/loca
 ```
 PR-G step G-4: Confirm all done criteria:
 
-[ ] Evidence 357 → master 661 matched, IoU >= 0.30 vs human bbox
+[ ] Multi-suite fixtures under tests/fixtures/location_match_labels/ (ucsf.json + at least one other suite)
+[ ] ucsf suite corridor label (or equivalent) matched with IoU >= 0.30 vs human bbox when evidence is available
 [ ] Coordinate match works at 180 deg rotation within 3 ft
 [ ] Photo/form no coords → no_match, no contour false positive
-[ ] Eval >= 5 labels, pass rate >= 80%
+[ ] Eval >= 5 labels, pass rate >= 80%; pass_rate_by_suite printed
+[ ] New project path documented: export_location_match_label.py → seed → eval --suite <slug>
 [ ] UI polls match status with evidence id
+[ ] No hard-coded UCSF N/E or evidence/drawing IDs in match pipeline code
 ```
 
 ---
@@ -605,4 +619,4 @@ PR-G step G-4: Confirm all done criteria:
 - Sheet refs (C4.20) narrow search — they do not place pins directly
 - Contour only for `drawing_scan`; always `needs_review`
 - Full document text for survey/sheet-ref scans — no truncation
-- Do not lock thresholds until PR-G eval passes
+- Do not lock thresholds until PR-G eval passes (multi-suite)

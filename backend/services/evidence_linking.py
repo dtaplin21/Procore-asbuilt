@@ -23,7 +23,7 @@ def load_linked_drawings(session: Session, evidence_id: int) -> list[Drawing]:
     drawings: list[Drawing] = []
     seen: set[int] = set()
     for link in links:
-        drawing_id = int(link.drawing_id)
+        drawing_id = cast(int, link.drawing_id)
         if drawing_id in seen:
             continue
         seen.add(drawing_id)

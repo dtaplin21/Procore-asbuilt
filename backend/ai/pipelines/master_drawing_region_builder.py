@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy.orm import Session
 
@@ -77,7 +77,7 @@ def is_junk_text_element(row: DrawingTextElement) -> bool:
     text = str(row.text).strip()
     if not text:
         return True
-    if float(row.ocr_confidence) < _MIN_OCR_CONFIDENCE:
+    if float(cast(float, row.ocr_confidence)) < _MIN_OCR_CONFIDENCE:
         return True
     if _SINGLE_DIGIT_RE.fullmatch(text):
         return True

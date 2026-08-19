@@ -338,6 +338,36 @@ class StorageService:
         self.db.refresh(drawing)
         return drawing
 
+    def create_auxiliary_drawing(
+        self,
+        project_id: int,
+        *,
+        source: str,
+        name: str,
+        storage_key: str,
+        content_type: str,
+        original_filename: str,
+        page_count: Optional[int] = None,
+    ) -> Drawing:
+        """Persist a linked install-sheet drawing without changing the project master."""
+        drawing = Drawing(
+            project_id=project_id,
+            source=source,
+            name=name,
+            storage_key=storage_key,
+            content_type=content_type,
+            page_count=page_count,
+            original_filename=original_filename,
+        )
+        self.db.add(drawing)
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+        self.db.refresh(drawing)
+        return drawing
+
     def list_drawings(self, project_id: int) -> List[Drawing]:
         return (
             self.db.query(Drawing)

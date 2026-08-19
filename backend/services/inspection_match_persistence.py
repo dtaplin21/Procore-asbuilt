@@ -76,7 +76,7 @@ def persist_inspection_match_overlay(
     page: int = 1,
     region_id: int | None = None,
     inspection_run_id: int | None = None,
-) -> None:
+) -> int | None:
     """Write frontend-safe overlay state: match_status and optional bbox only."""
     run_id = resolve_inspection_run_id(
         session,
@@ -88,7 +88,7 @@ def persist_inspection_match_overlay(
             "inspection_match_missing_run",
             extra={"inspection_id": inspection_id, "match_status": status},
         )
-        return
+        return None
 
     master_drawing_id = int(drawing_id)
     meta_patch = {"match_status": status}
@@ -111,7 +111,7 @@ def persist_inspection_match_overlay(
             if region_id is not None:
                 setattr(overlay, "region_id", region_id)
         session.commit()
-        return
+        return cast(int, overlay.id)
 
     geometry = bbox_to_geometry(bbox if status == "matched" else None, page=page)
     storage = StorageService(session)
@@ -126,6 +126,7 @@ def persist_inspection_match_overlay(
     if region_id is not None:
         setattr(created, "region_id", region_id)
         session.commit()
+    return cast(int, created.id)
 
 
 def finalize_inspection_match_from_internal_candidate(

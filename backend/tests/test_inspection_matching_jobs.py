@@ -17,13 +17,14 @@ from models.drawing_overlay import DrawingOverlay
 from models.drawing_match_candidate import DrawingMatchCandidate
 from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
-from models.models import Company, Drawing, EvidenceRecord, JobQueue, Project
+from models.models import Company, Drawing, EvidenceDrawingLink, EvidenceRecord, JobQueue, Project
 from models.inspection_run import InspectionRun
 from services.inspection_match_persistence import MATCH_SCORE_THRESHOLD
 from services.inspection_matching_jobs import (
     DEFERRED_MATCH_META_KEY,
     JOB_TYPE_INSPECTION_MATCH,
     flush_deferred_inspection_matches_for_drawing,
+    flush_inspection_matches_for_linked_auxiliary_drawing,
     maybe_enqueue_inspection_match_after_extraction,
     run_inspection_match_job,
 )
@@ -436,4 +437,55 @@ def test_flush_deferred_inspection_matches_enqueues_after_index(db: Session) -> 
     evidence = db.query(EvidenceRecord).filter(EvidenceRecord.id == evidence_id).one()
     meta = cast(dict, evidence.meta or {})
     assert DEFERRED_MATCH_META_KEY not in meta
+    assert _match_job_count_for_inspection(db, file_id) == before + 1
+
+
+def test_flush_linked_auxiliary_drawing_re_enqueues_match(db: Session) -> None:
+    run, file_id = _seed_run(db)
+    master_id = cast(int, run.master_drawing_id)
+    project_id = cast(int, run.project_id)
+    evidence_id = int(file_id)
+
+    master = db.query(Drawing).filter(Drawing.id == master_id).one()
+    setattr(master, "index_status", "ready")
+    from services.storage import StorageService
+
+    storage = StorageService(db)
+    storage.create_drawing_region(
+        master_id,
+        label="COLO",
+        geometry={"type": "rect", "x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2},
+        location_tags=["COLO"],
+    )
+
+    auxiliary = Drawing(
+        project_id=project_id,
+        source="linked_evidence",
+        name="U1.C4.20.pdf",
+        original_filename="7.20-7.24 U1.C4.20 6.00 Sanitary Sewer Install.pdf",
+        storage_key=f"linked/{_unique()}.pdf",
+        index_status="ready",
+    )
+    db.add(auxiliary)
+    db.flush()
+
+    db.add(
+        EvidenceDrawingLink(
+            project_id=project_id,
+            evidence_id=evidence_id,
+            drawing_id=auxiliary.id,
+            link_type="sheet_ref",
+            matched_text="C4.20",
+            confidence=0.9,
+            source="pdf_link",
+        )
+    )
+    db.commit()
+
+    before = _match_job_count_for_inspection(db, file_id)
+    enqueued = flush_inspection_matches_for_linked_auxiliary_drawing(
+        db, cast(int, auxiliary.id)
+    )
+
+    assert enqueued == 1
     assert _match_job_count_for_inspection(db, file_id) == before + 1
