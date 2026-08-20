@@ -52,7 +52,7 @@ from models.drawing_survey_point import DrawingSurveyPoint
 from models.drawing_text_element import DrawingTextElement
 from models.models import Drawing, EvidenceRecord
 from services.evidence_text import build_full_evidence_text
-from services.file_storage import get_file_path
+from services.file_storage import resolve_stored_file_path
 from services.inspection_match_persistence import MATCH_SCORE_THRESHOLD, MatchStatus
 from services.match_candidate_scope import MatchScope, build_match_scope
 from services.region_index_loader import build_region_index
@@ -573,11 +573,8 @@ def _reference_lookup_candidate(
     registration_transform: RegistrationTransform | None,
 ) -> MethodCandidate | None:
     storage_key = cast(str | None, evidence.storage_key)
-    if not storage_key:
-        return None
-
-    file_path = get_file_path(storage_key)
-    if not file_path.exists():
+    file_path = resolve_stored_file_path(storage_key)
+    if file_path is None:
         return None
 
     document = extract_document(file_path)
@@ -682,11 +679,8 @@ def _contour_match_candidate(
     page: int,
 ) -> MethodCandidate | None:
     storage_key = cast(str | None, evidence.storage_key)
-    if not storage_key:
-        return None
-
-    file_path = get_file_path(storage_key)
-    if not file_path.exists():
+    file_path = resolve_stored_file_path(storage_key)
+    if file_path is None:
         return None
 
     master_landmarks = _load_master_landmarks(session, master_drawing_id, page)
@@ -733,21 +727,19 @@ def _load_evidence_kind(
 
     document_type = str(getattr(extraction, "document_type", "") or "unknown")
     native_words = 0
-    storage_key = cast(str | None, evidence.storage_key)
-    if storage_key:
-        file_path = get_file_path(storage_key)
-        if file_path.exists():
-            try:
-                native_words = sum(
-                    1
-                    for word in extract_document(file_path).words
-                    if word.page_index == 0 and word.text.strip()
-                )
-            except Exception:
-                logger.exception(
-                    "evidence_kind_native_word_count_failed",
-                    extra={"evidence_id": evidence.id},
-                )
+    file_path = resolve_stored_file_path(cast(str | None, evidence.storage_key))
+    if file_path is not None:
+        try:
+            native_words = sum(
+                1
+                for word in extract_document(file_path).words
+                if word.page_index == 0 and word.text.strip()
+            )
+        except Exception:
+            logger.exception(
+                "evidence_kind_native_word_count_failed",
+                extra={"evidence_id": evidence.id},
+            )
 
     return classify_evidence_kind(
         document_type,

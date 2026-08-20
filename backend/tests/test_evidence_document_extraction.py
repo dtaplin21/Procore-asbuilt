@@ -85,6 +85,7 @@ def evidence_upload_setup(
         name="master.pdf",
         storage_key=None,
         content_type="application/pdf",
+        index_status="ready",
     )
     db_session.add(drawing)
     db_session.commit()
@@ -408,7 +409,10 @@ def test_ingest_without_match_context_does_not_enqueue(
 
     job_count = (
         db_session.query(JobQueue)
-        .filter(JobQueue.job_type == JOB_TYPE_INSPECTION_MATCH)
+        .filter(
+            JobQueue.job_type == JOB_TYPE_INSPECTION_MATCH,
+            JobQueue.project_id == cast(int, project.id),
+        )
         .count()
     )
     assert job_count == 0

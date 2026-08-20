@@ -1,0 +1,92 @@
+{
+  "total": 5,
+  "evaluated": 1,
+  "skipped": 4,
+  "passed": 1,
+  "failed": 0,
+  "pass_rate": 1.0,
+  "min_pass_rate": 0.8,
+  "min_iou": 0.3,
+  "coordinate_false_positives": 0,
+  "passed_gate": true,
+  "pass_rate_by_suite": {
+    "ucsf": 1.0
+  },
+  "results": [
+    {
+      "label_id": "ucsf-435-ss-corridor",
+      "suite": "ucsf",
+      "skipped": false,
+      "skip_reason": null,
+      "passed": true,
+      "expected_method": "coordinate_lookup",
+      "actual_method": "coordinate_lookup",
+      "expected_match_status": "matched",
+      "actual_match_status": "matched",
+      "iou": 0.9999999999999996,
+      "min_iou": 0.3,
+      "coordinate_false_positive": false,
+      "notes": "IoU 1.000 >= 0.30."
+    },
+    {
+      "label_id": "ucsf-rotated-detail",
+      "suite": "ucsf",
+      "skipped": true,
+      "skip_reason": "missing evidence_id (fixture-only label)",
+      "passed": false,
+      "expected_method": "coordinate_lookup",
+      "actual_method": null,
+      "expected_match_status": "matched",
+      "actual_match_status": null,
+      "iou": null,
+      "min_iou": 0.3,
+      "coordinate_false_positive": false,
+      "notes": ""
+    },
+    {
+      "label_id": "ucsf-no-coords-clue-only",
+      "suite": "ucsf",
+      "skipped": true,
+      "skip_reason": "missing evidence_id (fixture-only label)",
+      "passed": false,
+      "expected_method": "reference_lookup",
+      "actual_method": null,
+      "expected_match_status": "needs_review",
+      "actual_match_status": null,
+      "iou": null,
+      "min_iou": 0.3,
+      "coordinate_false_positive": false,
+      "notes": ""
+    },
+    {
+      "label_id": "ucsf-no-coords-unresolved",
+      "suite": "ucsf",
+      "skipped": true,
+      "skip_reason": "missing evidence_id (fixture-only label)",
+      "passed": false,
+      "expected_method": "unresolved",
+      "actual_method": null,
+      "expected_match_status": "no_match",
+      "actual_match_status": null,
+      "iou": null,
+      "min_iou": 0.3,
+      "coordinate_false_positive": false,
+      "notes": ""
+    },
+    {
+      "label_id": "ucsf-station-only",
+      "suite": "ucsf",
+      "skipped": true,
+      "skip_reason": "missing evidence_id (fixture-only label)",
+      "passed": false,
+      "expected_method": "station_lookup",
+      "actual_method": null,
+      "expected_match_status": "matched",
+      "actual_match_status": null,
+      "iou": null,
+      "min_iou": 0.3,
+      "coordinate_false_positive": false,
+      "notes": ""
+    }
+  ]
+}

@@ -94,8 +94,14 @@ def _words_from_linked_pdfs(file_path: Path) -> list[PositionedWord]:
     if file_path.suffix.lower() != ".pdf":
         return []
 
+    try:
+        links = _extract_hyperlinks(file_path)
+    except Exception:
+        # Corrupt / stub PDFs must not abort survey extraction on the main file.
+        return []
+
     words: list[PositionedWord] = []
-    for link in _extract_hyperlinks(file_path):
+    for link in links:
         if link.kind != PdfLinkKind.EXTERNAL_URI or not link.uri:
             continue
         fetched = fetch_allowed_url(link.uri)

@@ -77,7 +77,8 @@ def test_evaluate_label_result_passes_on_method_status_and_iou() -> None:
         master_drawing_id=661,
         method=ResolutionMethod.COORDINATE_LOOKUP,
         confidence=MATCH_SCORE_THRESHOLD,
-        bbox_fractional=(0.5, 0.5, 0.1, 0.1),
+        # Orchestrator format: (x0, y0, x1, y1) matching label xywh 0.5/0.5/0.1/0.1
+        bbox_fractional=(0.5, 0.5, 0.6, 0.6),
         page=1,
     )
     outcome = evaluate_label_result(label, result, "matched", min_iou=0.30)

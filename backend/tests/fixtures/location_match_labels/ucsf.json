@@ -3,8 +3,8 @@
     "label_id": "ucsf-435-ss-corridor",
     "suite": "ucsf",
     "project_id": 2,
-    "evidence_id": 357,
-    "inspection_run_id": 435,
+    "evidence_id": 377,
+    "inspection_run_id": 447,
     "master_drawing_id": 661,
     "evidence_fixture_path": null,
     "master_bbox_json": {
@@ -22,7 +22,7 @@
     "has_station_signal": false,
     "has_reference_signal": true,
     "evidence_kind": "form",
-    "notes": "Golden UCSF run 435 — underground SS corridor pin at COLO parking lot (N/E 2131764.84 / 6051541.82)."
+    "notes": "Golden UCSF run 447 / evidence 377 — underground SS corridor pin at COLO parking lot (N/E 2131764.84 / 6051541.82). Label id kept as ucsf-435-ss-corridor for continuity."
   },
   {
     "label_id": "ucsf-rotated-detail",

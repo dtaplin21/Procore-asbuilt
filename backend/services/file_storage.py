@@ -120,6 +120,25 @@ def get_file_path(storage_key: str) -> Path:
     return p
 
 
+def resolve_stored_file_path(storage_key: str | None) -> Path | None:
+    """Resolve a DB storage key to an on-disk path without raising.
+
+    Evidence keys may be absolute when ``EVIDENCE_STORAGE_ROOT`` sits outside
+    ``BASE_UPLOAD_DIR`` (tests and some deployments). Relative keys still go
+    through ``get_file_path`` path-traversal checks.
+    """
+    if not storage_key:
+        return None
+    candidate = Path(storage_key)
+    if candidate.is_absolute():
+        return candidate if candidate.exists() else None
+    try:
+        path = get_file_path(storage_key)
+    except HTTPException:
+        return None
+    return path if path.exists() else None
+
+
 def range_file_response(
     path: Path,
     request: Request,

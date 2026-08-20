@@ -16,6 +16,7 @@ from ai.pipelines.location_match_orchestrator import (
     resolve_evidence_location,
 )
 from models.location_match_label import LocationMatchLabel
+from models.models import EvidenceRecord
 from services.location_match_label_io import load_fixture_path, validate_entry
 
 
@@ -211,6 +212,14 @@ def rect_iou(
     return intersection / union
 
 
+def xywh_from_xyxy(
+    bbox: tuple[float, float, float, float],
+) -> tuple[float, float, float, float]:
+    """Convert orchestrator ``(x0, y0, x1, y1)`` fractional bbox to ``(x, y, w, h)``."""
+    x0, y0, x1, y1 = bbox
+    return (x0, y0, max(x1 - x0, 0.0), max(y1 - y0, 0.0))
+
+
 def is_coordinate_false_positive(
     label: EvalLabel,
     result: LocationMatchResult,
@@ -283,7 +292,8 @@ def evaluate_label_result(
         outcome.notes = "Expected bbox for IoU check but matcher returned none."
         return outcome
 
-    outcome.iou = rect_iou(result.bbox_fractional, truth_rect)
+    # Orchestrator bboxes are (x0, y0, x1, y1); labels store (x, y, width, height).
+    outcome.iou = rect_iou(xywh_from_xyxy(result.bbox_fractional), truth_rect)
     if outcome.iou >= min_iou:
         outcome.passed = True
         outcome.notes = f"IoU {outcome.iou:.3f} >= {min_iou:.2f}."
@@ -305,6 +315,17 @@ def evaluate_label(
             suite=label.suite,
             skipped=True,
             skip_reason="missing evidence_id (fixture-only label)",
+            expected_method=label.expected_method,
+            expected_match_status=label.expected_match_status,
+            min_iou=min_iou,
+        )
+
+    if session.get(EvidenceRecord, label.evidence_id) is None:
+        return LabelEvalResult(
+            label_id=label.label_id,
+            suite=label.suite,
+            skipped=True,
+            skip_reason=f"evidence_id {label.evidence_id} not found in DB",
             expected_method=label.expected_method,
             expected_match_status=label.expected_match_status,
             min_iou=min_iou,
