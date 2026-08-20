@@ -8,6 +8,7 @@ from typing import cast
 from sqlalchemy.orm import Session
 
 from ai.agents.evidence_dossier import EvidenceDossier, build_evidence_dossier
+from ai.agents.tools.master_search import expand_term_with_legend
 from ai.pipelines.drawing_location_resolver import MasterRegion
 from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
@@ -18,6 +19,16 @@ from services.storage import StorageService
 
 def _unique() -> str:
     return uuid.uuid4().hex[:12]
+
+
+def test_expand_term_with_legend_ss_to_sanitary_sewer(db_session: Session) -> None:
+    seed(db_session, project_id=None)
+    db_session.commit()
+
+    terms = expand_term_with_legend(db_session, "SS", project_id=None)
+
+    assert "SS" in terms
+    assert "SANITARY SEWER" in terms
 
 
 def test_build_evidence_dossier_expands_clues_and_loads_master_context(

@@ -67,6 +67,21 @@ class LinkFollowResult:
     fetched_pdfs: list[FetchedLinkedPdf] = field(default_factory=list)
 
 
+def extract_pdf_hyperlinks(file_path: str | Path) -> list[PdfHyperlink]:
+    """Enumerate deduplicated hyperlinks in a PDF (public API for agent tools)."""
+    path = Path(file_path)
+    if path.suffix.lower() != ".pdf":
+        return []
+    try:
+        return _dedupe_links(_extract_hyperlinks(path))
+    except Exception:
+        logger.exception(
+            "pdf_hyperlink_extraction_failed",
+            extra={"file_path": str(path)},
+        )
+        return []
+
+
 def follow_pdf_links(file_path: str | Path) -> LinkFollowResult:
     """Enumerate and follow hyperlinks in a PDF. Non-PDF files return empty result."""
     if not settings.pdf_link_follow_enabled:

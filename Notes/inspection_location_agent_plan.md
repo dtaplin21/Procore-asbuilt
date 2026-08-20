@@ -235,7 +235,7 @@ ADD backend/tests/test_evidence_dossier.py
 
 ---
 
-- [ ] **A-3** Master search tool wrapper
+- [x] **A-3** Master search tool wrapper
 
 **PROMPT — copy below:**
 
@@ -282,9 +282,9 @@ ADD backend/tests/test_evidence_dossier.py test for expand_term_with_legend SS -
 
 ---
 
-# PR-B — PDF link investigation tools
+# PR-B — PDF link investigation too
 
-- [ ] **B-1** PDF investigation tool module
+- [x] **B-1** PDF investigation tool module
 
 **PROMPT — copy below:**
 
