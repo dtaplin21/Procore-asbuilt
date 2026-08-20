@@ -118,7 +118,7 @@ Notes to restore this baseline if DB is wiped:
 
 # PR-A — Evidence Dossier (DB case file)
 
-- [ ] **A-1** Create dossier dataclasses
+- [x] **A-1** Create dossier dataclasses
 
 **PROMPT — copy below:**
 
@@ -196,7 +196,7 @@ UPDATE backend/ai/agents/__init__.py to export EvidenceDossier, build_evidence_d
 
 ---
 
-- [ ] **A-2** Implement `build_evidence_dossier`
+- [x] **A-2** Implement `build_evidence_dossier`
 
 **PROMPT — copy below:**
 
