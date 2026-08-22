@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,10 @@ from models.drawing_overlay import DrawingOverlay
 from models.inspection_run import InspectionRun
 from models.models import EvidenceRecord
 from services.storage import StorageService
+
+if TYPE_CHECKING:
+    from ai.pipelines.clue_fusion_scorer import FusedCandidateScore
+    from ai.pipelines.scope_geometry import ScopeGeometry
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +34,17 @@ class InternalMatchCandidate:
     region_id: int | None = None
     source: str = "clue_match"
     rank: int | None = None
+    meta_json: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class AgentMatchResult:
+    status: MatchStatus
+    scope: ScopeGeometry | None
+    region_id: int | None
+    page: int
+    rationale: str
+    fused_score: float | None
 
 
 def match_status_from_internal_score(internal_score: float) -> MatchStatus:
@@ -60,6 +75,7 @@ def record_internal_match_candidate(
         bbox_json=list(candidate.bbox) if candidate.bbox is not None else None,
         source=candidate.source,
         rank=candidate.rank,
+        meta_json=dict(candidate.meta_json) if candidate.meta_json is not None else None,
     )
     session.add(row)
     session.flush()
@@ -76,8 +92,9 @@ def persist_inspection_match_overlay(
     page: int = 1,
     region_id: int | None = None,
     inspection_run_id: int | None = None,
+    scope: ScopeGeometry | None = None,
 ) -> int | None:
-    """Write frontend-safe overlay state: match_status and optional bbox only."""
+    """Write frontend-safe overlay state: match_status and optional geometry."""
     run_id = resolve_inspection_run_id(
         session,
         inspection_id,
@@ -92,6 +109,9 @@ def persist_inspection_match_overlay(
 
     master_drawing_id = int(drawing_id)
     meta_patch = {"match_status": status}
+    has_resolved_geometry = status in ("matched", "needs_review") and (
+        scope is not None or bbox is not None
+    )
 
     overlay = (
         session.query(DrawingOverlay)
@@ -106,14 +126,26 @@ def persist_inspection_match_overlay(
     if overlay is not None:
         current_meta = overlay.meta if isinstance(overlay.meta, dict) else {}
         setattr(overlay, "meta", {**current_meta, **meta_patch})
-        if status == "matched" and bbox is not None:
-            setattr(overlay, "geometry", bbox_to_geometry(bbox, page=page))
+        if has_resolved_geometry:
+            setattr(
+                overlay,
+                "geometry",
+                scope_to_geometry(
+                    scope,
+                    fallback_bbox=bbox,
+                    page=page,
+                ),
+            )
             if region_id is not None:
                 setattr(overlay, "region_id", region_id)
         session.commit()
         return cast(int, overlay.id)
 
-    geometry = bbox_to_geometry(bbox if status == "matched" else None, page=page)
+    geometry = scope_to_geometry(
+        scope if status in ("matched", "needs_review") else None,
+        fallback_bbox=bbox if status in ("matched", "needs_review") else None,
+        page=page,
+    )
     storage = StorageService(session)
     created = storage.create_drawing_overlay(
         master_drawing_id,
@@ -221,6 +253,26 @@ def resolve_inspection_run_id(
     return None
 
 
+def scope_to_geometry(
+    scope: ScopeGeometry | None,
+    *,
+    fallback_bbox: tuple[float, float, float, float] | None = None,
+    page: int,
+) -> dict[str, Any]:
+    """Prefer ScopeGeometry; fall back to rect from bbox; else UNMAPPED_GEOMETRY."""
+    if scope is not None:
+        geometry = scope.to_geometry_json()
+        geometry["label"] = "inspection_match"
+        return geometry
+
+    if fallback_bbox is not None:
+        return bbox_to_geometry(fallback_bbox, page=page)
+
+    geometry = dict(UNMAPPED_GEOMETRY)
+    geometry["page"] = page
+    return geometry
+
+
 def bbox_to_geometry(
     bbox: tuple[float, float, float, float] | None,
     *,
@@ -241,3 +293,122 @@ def bbox_to_geometry(
         "height": y1 - y0,
         "label": "inspection_match",
     }
+
+
+def persist_agent_match_result(
+    session: Session,
+    *,
+    evidence_id: int,
+    master_drawing_id: int,
+    result: AgentMatchResult,
+    ranked_scores: list[FusedCandidateScore],
+    page: int = 1,
+    inspection_run_id: int | None = None,
+) -> int | None:
+    """Persist fused candidates (with rationale meta) and frontend-safe overlay scope."""
+    inspection_id = str(evidence_id)
+    bbox = _fallback_bbox_for_persist(result, ranked_scores)
+
+    for rank, fused in enumerate(ranked_scores, start=1):
+        record_internal_match_candidate(
+            session,
+            inspection_id=inspection_id,
+            drawing_id=master_drawing_id,
+            candidate=InternalMatchCandidate(
+                score=float(fused.fused_score),
+                bbox=fused.candidate.bbox_fractional,
+                page=int(fused.candidate.page),
+                region_id=fused.candidate.region_id,
+                source="inspection_location_agent",
+                rank=rank,
+                meta_json=_fused_score_to_candidate_meta(fused),
+            ),
+            inspection_run_id=inspection_run_id,
+        )
+
+    overlay_id = persist_inspection_match_overlay(
+        session,
+        inspection_id=inspection_id,
+        drawing_id=master_drawing_id,
+        status=result.status,
+        bbox=bbox if result.status in ("matched", "needs_review") else None,
+        page=page,
+        region_id=result.region_id,
+        inspection_run_id=inspection_run_id,
+        scope=result.scope if result.status in ("matched", "needs_review") else None,
+    )
+    if overlay_id is None:
+        return None
+
+    overlay = session.get(DrawingOverlay, overlay_id)
+    if overlay is None:
+        return overlay_id
+
+    current_meta = overlay.meta if isinstance(overlay.meta, dict) else {}
+    agent_meta = {
+        **current_meta,
+        "match_status": result.status,
+        "agent_rationale": result.rationale,
+        "agent_fused_score": result.fused_score,
+        "agent_candidates": [
+            {"rank": rank, **_fused_score_to_candidate_meta(fused)}
+            for rank, fused in enumerate(ranked_scores, start=1)
+        ],
+    }
+    setattr(overlay, "meta", agent_meta)
+    session.commit()
+    return overlay_id
+
+
+def _fused_score_to_candidate_meta(fused: FusedCandidateScore) -> dict[str, Any]:
+    return {
+        "rationale": fused.rationale,
+        "clue_hits": [
+            {
+                "clue_value": hit.clue_value,
+                "dimension": hit.dimension,
+                "weight": hit.weight,
+            }
+            for hit in fused.clue_hits
+        ],
+        "conflicts": list(fused.conflicts),
+        "fused_score": fused.fused_score,
+    }
+
+
+def _fallback_bbox_for_persist(
+    result: AgentMatchResult,
+    ranked_scores: list[FusedCandidateScore],
+) -> tuple[float, float, float, float] | None:
+    if result.scope is not None:
+        scope = result.scope
+        if (
+            scope.type == "rect"
+            and scope.x is not None
+            and scope.y is not None
+            and scope.width is not None
+            and scope.height is not None
+        ):
+            return (
+                scope.x,
+                scope.y,
+                scope.x + scope.width,
+                scope.y + scope.height,
+            )
+        envelope = _bbox_from_polyline_scope(scope)
+        if envelope is not None:
+            return envelope
+
+    if ranked_scores:
+        return ranked_scores[0].candidate.bbox_fractional
+    return None
+
+
+def _bbox_from_polyline_scope(
+    scope: ScopeGeometry,
+) -> tuple[float, float, float, float] | None:
+    if scope.type != "polyline" or not scope.points:
+        return None
+    xs = [point[0] for point in scope.points]
+    ys = [point[1] for point in scope.points]
+    return (min(xs), min(ys), max(xs), max(ys))

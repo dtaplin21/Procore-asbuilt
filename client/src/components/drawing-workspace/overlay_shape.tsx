@@ -20,7 +20,7 @@ type Props = {
   label?: string | null;
 };
 
-/** SVG rect/polygon for one normalized overlay region (master drawing space). */
+/** SVG rect, polygon, or polyline for one normalized overlay region (master drawing space). */
 export default function OverlayShape({
   region,
   viewerSize,
@@ -63,6 +63,41 @@ export default function OverlayShape({
           <text
             x={rect.x + 4}
             y={Math.max(12, rect.y - 6)}
+            fill={stroke}
+            fontSize={11}
+            fontWeight={600}
+            data-testid={`overlay-label-${index}`}
+          >
+            {caption}
+          </text>
+        ) : null}
+      </g>
+    );
+  }
+
+  if (region.kind === "polyline") {
+    const points = normalizedPointsToPixels(region.points, viewerSize);
+    const pointsString = polygonPointsToSvgString(points);
+
+    return (
+      <g
+        data-testid={`overlay-group-${index}`}
+        data-overlay-id={regionId != null ? String(regionId) : undefined}
+        data-focused={selected ? "true" : "false"}
+      >
+        <polyline
+          points={pointsString}
+          fill="none"
+          stroke={stroke}
+          strokeWidth={strokeWidth + 1}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          data-testid={`overlay-polyline-${index}`}
+        />
+        {caption && points[0] ? (
+          <text
+            x={points[0].x + 4}
+            y={Math.max(12, points[0].y - 6)}
             fill={stroke}
             fontSize={11}
             fontWeight={600}

@@ -344,7 +344,7 @@ ADD backend/tests/test_pdf_investigation_tools.py
 
 ---
 
-- [ ] **B-2** Wire investigation into dossier builder
+- [x] **B-2** Wire investigation into dossier builder
 
 **PROMPT — copy below:**
 
@@ -370,7 +370,7 @@ Run: cd backend && pytest tests/test_evidence_dossier.py tests/test_pdf_investig
 
 # PR-C — Multi-candidate generator
 
-- [ ] **C-1** Extend orchestrator to emit candidate list
+- [x] **C-1** Extend orchestrator to emit candidate list
 
 **PROMPT — copy below:**
 
@@ -422,7 +422,7 @@ ADD tests in backend/tests/test_inspection_matching_jobs.py or new test_location
 
 # PR-D — Clue fusion scorer
 
-- [ ] **D-1** Deterministic fusion scorer
+- [x] **D-1** Deterministic fusion scorer
 
 **PROMPT — copy below:**
 
@@ -497,7 +497,7 @@ ADD backend/tests/test_clue_fusion_scorer.py
 
 ---
 
-- [ ] **D-2** Optional LLM fusion tie-breaker
+- [x] **D-2** Optional LLM fusion tie-breaker
 
 **PROMPT — copy below:**
 
@@ -527,7 +527,7 @@ Never return matched status from LLM directly — only reorder/score candidates.
 
 # PR-E — Scope geometry (precise line / polyline)
 
-- [ ] **E-1** Scope geometry schema + validation
+- [x] **E-1** Scope geometry schema + validation
 
 **PROMPT — copy below:**
 
@@ -588,7 +588,7 @@ ADD backend/tests/test_scope_geometry.py
 
 ---
 
-- [ ] **E-2** Scope type classifier
+- [x] **E-2** Scope type classifier
 
 **PROMPT — copy below:**
 
@@ -613,7 +613,7 @@ ADD tests with dossier fixtures for SS install, COLO corridor, coord-only.
 
 ---
 
-- [ ] **E-3** Line tracer pipeline
+- [x] **E-3** Line tracer pipeline
 
 **PROMPT — copy below:**
 
@@ -662,7 +662,7 @@ ADD backend/tests/test_scope_line_tracer.py
 
 ---
 
-- [ ] **E-4** Persist scope geometry on overlay
+- [x] **E-4** Persist scope geometry on overlay
 
 **PROMPT — copy below:**
 
@@ -702,7 +702,7 @@ Run: cd backend && pytest tests/test_scope_geometry.py tests/test_inspection_mat
 
 # PR-F — Frontend polyline rendering
 
-- [ ] **F-1** TypeScript polyline types
+- [x] **F-1** TypeScript polyline types
 
 **PROMPT — copy below:**
 
@@ -731,7 +731,7 @@ ADD client/src/tests/unit/overlay_polyline.test.ts
 
 ---
 
-- [ ] **F-2** Render polyline in overlay layer
+- [x] **F-2** Render polyline in overlay layer
 
 **PROMPT — copy below:**
 
@@ -764,7 +764,7 @@ Manual check: mock overlay with polyline points displays on workspace viewer.
 
 # PR-G — Vision location reasoner
 
-- [ ] **G-1** Vision reasoner module
+- [x] **G-1** Vision reasoner module
 
 **PROMPT — copy below:**
 

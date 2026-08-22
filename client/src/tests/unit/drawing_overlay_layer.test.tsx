@@ -67,6 +67,51 @@ describe("DrawingOverlayLayer", () => {
     expect(screen.getByTestId("overlay-polygon-0")).toBeInTheDocument();
   });
 
+  it("renders polyline overlays through resolveOverlayRegion", () => {
+    const regions: OverlayRegion[] = [
+      {
+        id: 42,
+        kind: "inspection",
+        sourceId: 357,
+        label: "Sanitary sewer run",
+        severity: "low",
+        bbox: { x: 0.41, y: 0.38, width: 0.04, height: 0.02 },
+        shape: {
+          shapeType: "polyline",
+          scopeKind: "utility_line",
+          points: [
+            { x: 0.41, y: 0.38 },
+            { x: 0.43, y: 0.39 },
+            { x: 0.45, y: 0.4 },
+          ],
+        },
+        reviewBadge: "changed",
+      },
+    ];
+
+    render(
+      <DrawingOverlayLayer
+        regions={regions}
+        viewerSize={{ width: 1000, height: 800 }}
+        focusedOverlayId="999"
+      />,
+    );
+
+    const polyline = screen.getByTestId("overlay-polyline-0");
+    expect(polyline).toBeInTheDocument();
+    expect(polyline).toHaveAttribute("fill", "none");
+    expect(polyline).toHaveAttribute("stroke-linecap", "round");
+    expect(polyline).toHaveAttribute("stroke-linejoin", "round");
+    expect(polyline).toHaveAttribute("stroke-width", "3");
+    expect(polyline).toHaveAttribute(
+      "points",
+      "410,304 430,312 450,320",
+    );
+    expect(screen.getByTestId("overlay-label-0")).toHaveTextContent(
+      "Sanitary sewer run",
+    );
+  });
+
   it("renders nothing when regions is empty", () => {
     const { container } = render(
       <DrawingOverlayLayer

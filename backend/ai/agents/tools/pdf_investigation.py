@@ -33,6 +33,15 @@ _IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}
 
 
 @dataclass(frozen=True)
+class PdfInvestigationResult:
+    summaries: tuple[LinkedAttachmentSummary, ...]
+    links_followed: int
+    pages_rendered: int
+    ocr_word_counts: dict[str, int]
+    errors: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class RenderedPdfPage:
     page: int  # 1-based
     png_path: Path
@@ -125,13 +134,17 @@ def _text_preview(text: str) -> str:
     return stripped[:_TEXT_PREVIEW_CHARS]
 
 
-def _summary_from_fetched(fetched: FetchedLinkedPdf) -> LinkedAttachmentSummary:
+def _summary_from_fetched(
+    fetched: FetchedLinkedPdf,
+) -> tuple[LinkedAttachmentSummary, int]:
     preview = _text_preview(fetched.text)
+    word_count = len(fetched.text.split())
     if fetched.body:
         temp_path = _write_pdf_bytes(fetched.body, filename_hint=fetched.filename)
         try:
             clues = extract_page_clues(temp_path, page=1)
             page_text = str(clues.get("text", "") or "")
+            word_count = int(clues.get("word_count", word_count))
             if page_text.strip():
                 preview = _text_preview(page_text)
         except Exception:
@@ -142,29 +155,32 @@ def _summary_from_fetched(fetched: FetchedLinkedPdf) -> LinkedAttachmentSummary:
         finally:
             temp_path.unlink(missing_ok=True)
 
-    return LinkedAttachmentSummary(
+    summary = LinkedAttachmentSummary(
         url=fetched.url,
         filename=fetched.filename,
         page_count=fetched.pages,
         text_preview=preview,
         drawing_id=None,
     )
+    return summary, word_count
 
 
 def _summary_from_internal_page(
     file_path: Path,
     *,
     target_page: int,
-) -> LinkedAttachmentSummary:
+) -> tuple[LinkedAttachmentSummary, int]:
     page_num = target_page + 1
     clues = extract_page_clues(file_path, page=page_num)
-    return LinkedAttachmentSummary(
+    word_count = int(clues.get("word_count", 0))
+    summary = LinkedAttachmentSummary(
         url=f"internal:page-{page_num}",
         filename=f"{file_path.stem}-page-{page_num}.pdf",
         page_count=1,
         text_preview=_text_preview(str(clues.get("text", ""))),
         drawing_id=None,
     )
+    return summary, word_count
 
 
 def _write_pdf_bytes(body: bytes, *, filename_hint: str) -> Path:
@@ -175,22 +191,29 @@ def _write_pdf_bytes(body: bytes, *, filename_hint: str) -> Path:
     return Path(temp_file.name)
 
 
-def investigate_pdf_links(
+def run_pdf_investigation(
     file_path: Path,
     *,
     max_links: int = 10,
-) -> list[LinkedAttachmentSummary]:
-    """Autonomously follow PDF links, render pages, and extract clue summaries.
-
-    Sheet numbers in filenames are for listing only — never used for master placement.
-    """
+) -> PdfInvestigationResult:
+    """Follow PDF links, render pages, extract clues, and return investigation meta."""
     if file_path.suffix.lower() != ".pdf":
-        return []
+        return PdfInvestigationResult(
+            summaries=(),
+            links_followed=0,
+            pages_rendered=0,
+            ocr_word_counts={},
+            errors=(),
+        )
 
     summaries: list[LinkedAttachmentSummary] = []
+    ocr_word_counts: dict[str, int] = {}
+    errors: list[str] = []
+    pages_rendered = 0
     seen_keys: set[str] = set()
 
-    def _append(summary: LinkedAttachmentSummary) -> None:
+    def _append(summary: LinkedAttachmentSummary, word_count: int) -> None:
+        nonlocal pages_rendered
         if len(summaries) >= max_links:
             return
         key = summary.url or summary.filename
@@ -198,13 +221,17 @@ def investigate_pdf_links(
             return
         seen_keys.add(key)
         summaries.append(summary)
+        ocr_word_counts[key] = word_count
+        pages_rendered += 1
 
     link_result = follow_and_capture_links(file_path)
+    errors.extend(link_result.errors)
 
     for fetched in link_result.fetched_pdfs:
         if len(summaries) >= max_links:
             break
-        _append(_summary_from_fetched(fetched))
+        summary, word_count = _summary_from_fetched(fetched)
+        _append(summary, word_count)
 
     hyperlinks = list_pdf_hyperlinks(file_path)
     internal_targets: list[int] = []
@@ -222,11 +249,34 @@ def investigate_pdf_links(
         if len(summaries) >= max_links:
             break
         try:
-            _append(_summary_from_internal_page(file_path, target_page=target_page))
+            summary, word_count = _summary_from_internal_page(
+                file_path,
+                target_page=target_page,
+            )
+            _append(summary, word_count)
         except Exception:
             logger.exception(
                 "pdf_investigation_internal_page_failed",
                 extra={"file_path": str(file_path), "target_page": target_page + 1},
             )
+            errors.append(f"internal page {target_page + 1} investigation failed")
 
-    return summaries
+    return PdfInvestigationResult(
+        summaries=tuple(summaries),
+        links_followed=link_result.followed_count,
+        pages_rendered=pages_rendered,
+        ocr_word_counts=ocr_word_counts,
+        errors=tuple(errors),
+    )
+
+
+def investigate_pdf_links(
+    file_path: Path,
+    *,
+    max_links: int = 10,
+) -> list[LinkedAttachmentSummary]:
+    """Autonomously follow PDF links, render pages, and extract clue summaries.
+
+    Sheet numbers in filenames are for listing only — never used for master placement.
+    """
+    return list(run_pdf_investigation(file_path, max_links=max_links).summaries)

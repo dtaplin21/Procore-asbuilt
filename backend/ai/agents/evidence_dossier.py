@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -24,6 +25,8 @@ from services.file_storage import resolve_stored_file_path
 from services.legend_lookup import find_codes_for_term
 from services.match_candidate_scope import build_match_scope
 from services.region_index_loader import build_region_index
+
+logger = logging.getLogger(__name__)
 
 _IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
 _LINKED_CONTENT_SECTION = re.compile(
@@ -129,6 +132,12 @@ def build_evidence_dossier(
         meta=meta,
         auxiliary_drawings=auxiliary_drawings,
     )
+    pdf_investigation_meta: dict[str, Any] = {}
+    investigated_attachments, pdf_investigation_meta = _pdf_investigation_for_evidence(evidence)
+    linked_attachments = _merge_linked_attachment_summaries(
+        linked_attachments,
+        investigated_attachments,
+    )
 
     region_index = build_region_index(session, master_drawing_id)
     drawing_ids = (master_drawing_id, *scope.auxiliary_drawing_ids)
@@ -167,6 +176,7 @@ def build_evidence_dossier(
         "auxiliary_drawing_ids": list(scope.auxiliary_drawing_ids),
         "preferred_pages": list(scope.preferred_pages),
         "pdfLinkFollow": meta.get("pdfLinkFollow"),
+        **pdf_investigation_meta,
     }
 
     return EvidenceDossier(
@@ -331,6 +341,80 @@ def _linked_attachments(
         )
 
     return tuple(by_drawing.values()) + tuple(extras)
+
+
+def _attachment_summary_key(summary: LinkedAttachmentSummary) -> str:
+    if summary.drawing_id is not None:
+        return f"drawing:{summary.drawing_id}"
+    return summary.url or summary.filename
+
+
+def _merge_linked_attachment_summaries(
+    base: tuple[LinkedAttachmentSummary, ...],
+    investigated: tuple[LinkedAttachmentSummary, ...],
+) -> tuple[LinkedAttachmentSummary, ...]:
+    """Merge DB/link summaries with PDF investigation results."""
+    merged: dict[str, LinkedAttachmentSummary] = {
+        _attachment_summary_key(item): item for item in base
+    }
+
+    for item in investigated:
+        key = _attachment_summary_key(item)
+        existing = merged.get(key)
+        if existing is None:
+            merged[key] = item
+            continue
+        preview = item.text_preview or existing.text_preview
+        merged[key] = LinkedAttachmentSummary(
+            url=item.url or existing.url,
+            filename=item.filename or existing.filename,
+            page_count=item.page_count or existing.page_count,
+            text_preview=preview,
+            drawing_id=existing.drawing_id or item.drawing_id,
+        )
+
+    return tuple(merged.values())
+
+
+def _pdf_investigation_for_evidence(
+    evidence: EvidenceRecord,
+) -> tuple[tuple[LinkedAttachmentSummary, ...], dict[str, Any]]:
+    """Run PDF link investigation when the evidence file is a PDF."""
+    empty_meta: dict[str, Any] = {
+        "links_followed": 0,
+        "pages_rendered": 0,
+        "ocr_word_counts": {},
+        "pdf_investigation_errors": [],
+    }
+
+    storage_key = cast(str | None, evidence.storage_key)
+    if not storage_key:
+        return (), empty_meta
+
+    file_path = resolve_stored_file_path(storage_key)
+    if file_path is None or file_path.suffix.lower() != ".pdf":
+        return (), empty_meta
+
+    try:
+        from ai.agents.tools.pdf_investigation import run_pdf_investigation
+
+        result = run_pdf_investigation(file_path)
+    except Exception as exc:
+        logger.exception(
+            "evidence_dossier_pdf_investigation_failed",
+            extra={"evidence_id": evidence.id, "file_path": str(file_path)},
+        )
+        return (), {
+            **empty_meta,
+            "pdf_investigation_errors": [str(exc)],
+        }
+
+    return result.summaries, {
+        "links_followed": result.links_followed,
+        "pages_rendered": result.pages_rendered,
+        "ocr_word_counts": dict(result.ocr_word_counts),
+        "pdf_investigation_errors": list(result.errors),
+    }
 
 
 def _photo_paths(evidence: EvidenceRecord, kind: EvidenceKind) -> tuple[Path, ...]:

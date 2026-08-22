@@ -209,6 +209,25 @@ export function overlayGeometryToDiffRegion(
     typeof geometry.label === "string" && geometry.label.trim()
       ? geometry.label.trim()
       : null;
+  const scopeKind =
+    typeof geometry.scope_kind === "string" && geometry.scope_kind.trim()
+      ? geometry.scope_kind.trim()
+      : null;
+  const geometryType =
+    typeof geometry.type === "string" ? geometry.type.trim().toLowerCase() : null;
+
+  if (geometryType === "polyline") {
+    const points = parseNormalizedPoints(geometry.points);
+    if (points.length >= 2) {
+      return {
+        shapeType: "polyline",
+        points,
+        page,
+        note: label,
+        scopeKind,
+      };
+    }
+  }
 
   const rect = rectFromGeometry(geometry);
   if (rect) {
@@ -235,12 +254,23 @@ export function overlayGeometryToDiffRegion(
   }
 
   const points = parseNormalizedPoints(geometry.points);
+  if (geometryType === "polygon" && points.length >= 3) {
+    return {
+      shapeType: "polygon",
+      points,
+      page,
+      note: label,
+      scopeKind,
+    };
+  }
+
   if (points.length >= 3) {
     return {
       shapeType: "polygon",
       points,
       page,
       note: label,
+      scopeKind,
     };
   }
 

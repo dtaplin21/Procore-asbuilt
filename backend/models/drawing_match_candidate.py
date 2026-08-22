@@ -38,4 +38,5 @@ class DrawingMatchCandidate(Base):
     bbox_json = Column(JSON, nullable=True)
     source = Column(String, nullable=False, server_default="clue_match")
     rank = Column(Integer, nullable=True)
+    meta_json = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

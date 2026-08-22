@@ -23,6 +23,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from ai.pipelines.inspection_mapping import DrawingOverlayRecord, UnresolvedEvidenceRecord
+from ai.pipelines.scope_geometry import ScopeKind, bbox_to_scope_rect
+from services.inspection_match_persistence import scope_to_geometry
 from models.drawing_overlay import DrawingOverlay, UnresolvedEvidence
 from models.models import EvidenceRecord
 
@@ -55,16 +57,10 @@ def _bbox_to_geometry(
     *,
     label: str,
 ) -> dict[str, Any]:
-    x0, y0, x1, y1 = bbox
-    return {
-        "page": 1,
-        "type": "rect",
-        "x": x0,
-        "y": y0,
-        "width": x1 - x0,
-        "height": y1 - y0,
-        "label": label,
-    }
+    scope = bbox_to_scope_rect(bbox, page=1, scope_kind=ScopeKind.AREA)
+    geometry = scope_to_geometry(scope, page=1)
+    geometry["label"] = label
+    return geometry
 
 
 def _build_overlay_row(record: DrawingOverlayRecord) -> DrawingOverlay:

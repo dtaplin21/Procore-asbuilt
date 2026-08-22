@@ -32,6 +32,14 @@ export function normalizePoints(points: NormalizedPoint[]): NormalizedPoint[] {
 }
 
 export function resolveOverlayRegion(region: DrawingDiffRegion): ResolvedOverlayRegion | null {
+  if (region.shapeType === "polyline" && region.points && region.points.length >= 2) {
+    return {
+      kind: "polyline",
+      points: normalizePoints(region.points),
+      source: region,
+    };
+  }
+
   if (region.shapeType === "polygon" && region.points && region.points.length >= 3) {
     return {
       kind: "polygon",

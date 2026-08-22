@@ -20,6 +20,7 @@ from ai.pipelines.candidate_tile_selector import (
 from ai.pipelines.coordinate_frame import normalize_to_true_north
 from ai.pipelines.document_text_extraction import extract_document
 from ai.pipelines.drawing_location_resolver import (
+    MasterRegion,
     RegistrationTransform,
     ResolutionMethod,
     resolve_document_location,
@@ -73,6 +74,11 @@ METHOD_TIEBREAK_PRIORITY: tuple[ResolutionMethod, ...] = (
 
 STATION_MATCH_CONFIDENCE = 0.88
 _STATION_NORMALIZE_RE = re.compile(r"\s+")
+_REGION_CLUSTER_LIMIT = 3
+_SHEET_REF_TOKEN_RE = re.compile(
+    r"^(?:[A-Z]{1,3}-?\d{2,4}[A-Z]?|[A-Z]\d+\.[A-Z]\d+\.\d{2,4}|[A-Z]\d+\.\d{2,4})$",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -83,6 +89,19 @@ class MethodCandidate:
     page: int = 1
     region_id: int | None = None
     source_drawing_id: int | None = None
+    notes: str = ""
+
+
+@dataclass(frozen=True)
+class LocationMatchCandidate:
+    method: ResolutionMethod
+    confidence: float
+    bbox_fractional: tuple[float, float, float, float] | None
+    page: int
+    region_id: int | None = None
+    source_drawing_id: int | None = None
+    supporting_clues: tuple[str, ...] = ()
+    contradicting_signals: tuple[str, ...] = ()
     notes: str = ""
 
 
@@ -117,7 +136,7 @@ class LocationMatchResult:
     def from_candidate(
         cls,
         master_drawing_id: int,
-        candidate: MethodCandidate,
+        candidate: MethodCandidate | LocationMatchCandidate,
     ) -> LocationMatchResult:
         return cls(
             master_drawing_id=master_drawing_id,
@@ -128,6 +147,126 @@ class LocationMatchResult:
             region_id=candidate.region_id,
             notes=candidate.notes,
         )
+
+
+def method_candidate_from_location(
+    candidate: LocationMatchCandidate,
+) -> MethodCandidate:
+    return MethodCandidate(
+        method=candidate.method,
+        confidence=candidate.confidence,
+        bbox_fractional=candidate.bbox_fractional,
+        page=candidate.page,
+        region_id=candidate.region_id,
+        source_drawing_id=candidate.source_drawing_id,
+        notes=candidate.notes,
+    )
+
+
+def _is_sheet_ref_token(value: str) -> bool:
+    cleaned = value.strip().upper().replace(" ", "")
+    if not cleaned:
+        return False
+    return bool(_SHEET_REF_TOKEN_RE.match(cleaned))
+
+
+def _clue_display_value(clue: DocumentClue) -> str:
+    return str(getattr(clue, "clue_value", None) or getattr(clue, "value", "") or "").strip()
+
+
+def _non_sheet_supporting_clues(clues: Sequence[str]) -> tuple[str, ...]:
+    return tuple(
+        clue
+        for clue in clues
+        if not _is_sheet_ref_token(clue.split(":", 1)[-1])
+    )
+
+
+def _filter_sheet_only_candidates(
+    candidates: Sequence[LocationMatchCandidate],
+) -> list[LocationMatchCandidate]:
+    """Drop candidates whose only supporting signals are sheet-number tokens."""
+    kept: list[LocationMatchCandidate] = []
+    for candidate in candidates:
+        if not candidate.supporting_clues:
+            kept.append(candidate)
+            continue
+        if _non_sheet_supporting_clues(candidate.supporting_clues):
+            kept.append(candidate)
+    return kept
+
+
+def _region_clue_hits(
+    region: MasterRegion,
+    clues: Sequence[DocumentClue],
+) -> tuple[str, ...]:
+    location_labels = {label.lower() for label in region.location_labels}
+    inspection_types = {tag.lower() for tag in region.inspection_types}
+    hits: list[str] = []
+    for clue in clues:
+        if getattr(clue, "location_relevant", True) is False:
+            continue
+        value = _clue_display_value(clue)
+        if not value or _is_sheet_ref_token(value):
+            continue
+        lower = value.lower()
+        if any(lower in label or label in lower for label in location_labels):
+            hits.append(f"location:{value}")
+        if any(lower in tag or tag in lower for tag in inspection_types):
+            hits.append(f"inspection_type:{value}")
+    return tuple(dict.fromkeys(hits))
+
+
+def _region_cluster_candidates(
+    session: Session,
+    *,
+    master_drawing_id: int,
+    clues: Sequence[DocumentClue],
+    page: int,
+    limit: int = _REGION_CLUSTER_LIMIT,
+) -> list[LocationMatchCandidate]:
+    regions = build_region_index(session, master_drawing_id).regions
+    scored: list[tuple[float, MasterRegion, tuple[str, ...]]] = []
+    for region in regions:
+        hits = _region_clue_hits(region, clues)
+        if not hits:
+            continue
+        score = min(0.45 + 0.12 * len(hits), 0.88)
+        scored.append((score, region, hits))
+    scored.sort(key=lambda item: (-item[0], item[1].region_id))
+
+    candidates: list[LocationMatchCandidate] = []
+    for score, region, hits in scored[:limit]:
+        bbox = region.bbox_on_master.to_fractional()
+        region_id = int(region.region_id) if region.region_id.isdigit() else None
+        candidates.append(
+            LocationMatchCandidate(
+                method=ResolutionMethod.REFERENCE_LOOKUP,
+                confidence=score,
+                bbox_fractional=bbox,
+                page=page,
+                region_id=region_id,
+                source_drawing_id=master_drawing_id,
+                supporting_clues=hits,
+                notes=f"Region cluster overlap ({', '.join(hits)}).",
+            )
+        )
+    return candidates
+
+
+def _clue_hits_for_tile(
+    tile: CandidateTile,
+    clues: Sequence[DocumentClue],
+) -> tuple[str, ...]:
+    haystack = tile.text.upper()
+    hits: list[str] = []
+    for clue in clues:
+        value = _clue_display_value(clue)
+        if not value or _is_sheet_ref_token(value):
+            continue
+        if value.upper() in haystack:
+            hits.append(f"clue:{value}")
+    return tuple(dict.fromkeys(hits))
 
 
 @dataclass(frozen=True)
@@ -424,7 +563,7 @@ def _coordinate_lookup_candidates(
     evidence_points: Sequence[SurveyPointRecord],
     scoped_points: Sequence[_ScopedSurveyPoint],
     master_drawing_id: int,
-) -> list[MethodCandidate]:
+) -> list[LocationMatchCandidate]:
     if not evidence_points or not scoped_points:
         return []
 
@@ -446,13 +585,18 @@ def _coordinate_lookup_candidates(
         scoped.page,
         _bbox_from_json(scoped.label_bbox_json),
     )
+    supporting = (
+        f"coordinate:n={match.evidence.northing},e={match.evidence.easting}",
+        f"survey_distance:{match.distance_ft:.2f}ft",
+    )
     return [
-        MethodCandidate(
+        LocationMatchCandidate(
             method=ResolutionMethod.COORDINATE_LOOKUP,
             confidence=match.confidence,
             bbox_fractional=bbox,
             page=scoped.page,
             source_drawing_id=scoped.drawing_id,
+            supporting_clues=supporting,
             notes=(
                 f"Survey coordinate match at {match.distance_ft:.2f} ft "
                 f"on drawing {scoped.drawing_id}."
@@ -467,7 +611,7 @@ def _station_lookup_candidates(
     evidence_points: Sequence[SurveyPointRecord],
     scoped_points: Sequence[_ScopedSurveyPoint],
     master_drawing_id: int,
-) -> list[MethodCandidate]:
+) -> list[LocationMatchCandidate]:
     evidence_stations: set[str] = {
         station
         for point in evidence_points
@@ -476,7 +620,7 @@ def _station_lookup_candidates(
     if not evidence_stations:
         return []
 
-    candidates: list[MethodCandidate] = []
+    candidates: list[LocationMatchCandidate] = []
     for station in sorted(evidence_stations):
         master_matches = [
             point
@@ -497,12 +641,13 @@ def _station_lookup_candidates(
             _bbox_from_json(preferred.label_bbox_json),
         )
         candidates.append(
-            MethodCandidate(
+            LocationMatchCandidate(
                 method=ResolutionMethod.STATION_LOOKUP,
                 confidence=STATION_MATCH_CONFIDENCE,
                 bbox_fractional=bbox,
                 page=preferred.page,
                 source_drawing_id=preferred.drawing_id,
+                supporting_clues=(f"station:{station}",),
                 notes=f"Station match for {station!r} on drawing {preferred.drawing_id}.",
             )
         )
@@ -516,8 +661,8 @@ def _clue_tile_candidates(
     page: int,
     clues: Sequence[DocumentClue],
     project_id: int | None,
-) -> list[MethodCandidate]:
-    candidates: list[MethodCandidate] = []
+) -> list[LocationMatchCandidate]:
+    candidates: list[LocationMatchCandidate] = []
     for drawing_id in drawing_ids:
         tiles = find_candidate_tiles_from_clues(
             session=session,
@@ -551,14 +696,19 @@ def _clue_tile_candidates(
         ):
             continue
 
+        supporting = _clue_hits_for_tile(best_tile, clues)
+        if not supporting:
+            continue
+
         candidates.append(
-            MethodCandidate(
+            LocationMatchCandidate(
                 method=ResolutionMethod.REFERENCE_LOOKUP,
                 confidence=min(best_score, 0.94),
                 bbox_fractional=best_tile.bbox_normalized,
                 page=best_tile.page,
                 region_id=best_tile.region_id,
                 source_drawing_id=int(drawing_id),
+                supporting_clues=supporting,
                 notes=f"Clue tile match on drawing {drawing_id}.",
             )
         )
@@ -571,7 +721,7 @@ def _reference_lookup_candidate(
     evidence: EvidenceRecord,
     master_drawing_id: int,
     registration_transform: RegistrationTransform | None,
-) -> MethodCandidate | None:
+) -> LocationMatchCandidate | None:
     storage_key = cast(str | None, evidence.storage_key)
     file_path = resolve_stored_file_path(storage_key)
     if file_path is None:
@@ -596,13 +746,25 @@ def _reference_lookup_candidate(
     if resolved.matched_region is not None and resolved.matched_region.region_id.isdigit():
         region_id = int(resolved.matched_region.region_id)
 
-    return MethodCandidate(
+    supporting: list[str] = []
+    for term in positioned_terms:
+        category = getattr(term.term, "category", None)
+        canonical = str(getattr(term.term, "canonical", "") or "").strip()
+        if not canonical or _is_sheet_ref_token(canonical):
+            continue
+        if category is not None:
+            supporting.append(f"{category.value}:{canonical}")
+        else:
+            supporting.append(f"term:{canonical}")
+
+    return LocationMatchCandidate(
         method=resolved.method,
         confidence=resolved.confidence_score,
         bbox_fractional=resolved.bbox_fractional,
         page=1,
         region_id=region_id,
         source_drawing_id=master_drawing_id,
+        supporting_clues=tuple(dict.fromkeys(supporting)),
         notes=resolved.notes,
     )
 
@@ -677,7 +839,7 @@ def _contour_match_candidate(
     evidence: EvidenceRecord,
     master_drawing_id: int,
     page: int,
-) -> MethodCandidate | None:
+) -> LocationMatchCandidate | None:
     storage_key = cast(str | None, evidence.storage_key)
     file_path = resolve_stored_file_path(storage_key)
     if file_path is None:
@@ -701,12 +863,13 @@ def _contour_match_candidate(
     if contour is None:
         return None
 
-    return MethodCandidate(
+    return LocationMatchCandidate(
         method=ResolutionMethod.CONTOUR_MATCH,
         confidence=contour.confidence,
         bbox_fractional=contour.bbox_fractional,
         page=page,
         source_drawing_id=master_drawing_id,
+        supporting_clues=("contour:landmark_match",),
         notes=contour.notes,
     )
 
@@ -790,28 +953,24 @@ def _load_document_extraction(
     return extraction, clues
 
 
-def resolve_evidence_location(
+def generate_all_location_candidates(
     session: Session,
+    *,
     evidence_id: int,
     master_drawing_id: int,
     page: int = 1,
-) -> LocationMatchResult:
-    """Run all location matchers and return the best resolved pin on the master drawing."""
+) -> list[LocationMatchCandidate]:
+    """Run all non-contour matchers and emit provenance-rich candidates."""
     evidence = session.get(EvidenceRecord, evidence_id)
     if evidence is None:
-        return LocationMatchResult.unresolved(
-            master_drawing_id,
-            notes=f"Evidence {evidence_id} not found.",
-        )
+        return []
 
-    scope: MatchScope = build_match_scope(
+    scope = build_match_scope(
         session,
         evidence_id=evidence_id,
         master_drawing_id=master_drawing_id,
     )
-    extraction, clues = _load_document_extraction(session, evidence_id)
-    evidence_kind = _load_evidence_kind(session, evidence, extraction)
-
+    _extraction, clues = _load_document_extraction(session, evidence_id)
     drawing_ids = (scope.master_drawing_id, *scope.auxiliary_drawing_ids)
     scoped_points = _load_scoped_survey_points(session, drawing_ids)
     evidence_points = _enrich_evidence_stations(
@@ -822,8 +981,7 @@ def resolve_evidence_location(
     project_id = cast(int | None, evidence.project_id)
     registration_transform = _load_registration_transform(evidence)
 
-    candidates: list[MethodCandidate] = []
-
+    candidates: list[LocationMatchCandidate] = []
     candidates.extend(
         _coordinate_lookup_candidates(
             session,
@@ -849,6 +1007,14 @@ def resolve_evidence_location(
             project_id=project_id,
         )
     )
+    candidates.extend(
+        _region_cluster_candidates(
+            session,
+            master_drawing_id=master_drawing_id,
+            clues=clues,
+            page=page,
+        )
+    )
 
     reference = _reference_lookup_candidate(
         session,
@@ -869,6 +1035,50 @@ def resolve_evidence_location(
         if alignment is not None and alignment.method == ResolutionMethod.ALIGNMENT:
             candidates.append(alignment)
 
+    return _filter_sheet_only_candidates(candidates)
+
+
+def resolve_evidence_location(
+    session: Session,
+    evidence_id: int,
+    master_drawing_id: int,
+    page: int = 1,
+) -> LocationMatchResult:
+    """Run all location matchers and return the best resolved pin on the master drawing."""
+    evidence = session.get(EvidenceRecord, evidence_id)
+    if evidence is None:
+        return LocationMatchResult.unresolved(
+            master_drawing_id,
+            notes=f"Evidence {evidence_id} not found.",
+        )
+
+    scope = build_match_scope(
+        session,
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+    )
+    extraction, clues = _load_document_extraction(session, evidence_id)
+    evidence_kind = _load_evidence_kind(session, evidence, extraction)
+
+    drawing_ids = (scope.master_drawing_id, *scope.auxiliary_drawing_ids)
+    scoped_points = _load_scoped_survey_points(session, drawing_ids)
+    evidence_points = _enrich_evidence_stations(
+        _meta_survey_points(evidence),
+        clues=clues,
+        evidence_text=build_full_evidence_text(evidence),
+    )
+
+    location_candidates = generate_all_location_candidates(
+        session,
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+        page=page,
+    )
+    method_candidates = [
+        method_candidate_from_location(candidate)
+        for candidate in location_candidates
+    ]
+
     match_detail = {
         "evidence_kind": evidence_kind.value,
         "evidence_point_count": len(evidence_points),
@@ -876,16 +1086,17 @@ def resolve_evidence_location(
         "auxiliary_drawing_ids": list(scope.auxiliary_drawing_ids),
         "clue_count": len(clues),
         "coordinate_lookup_skipped": not evidence_points or not scoped_points,
-        "has_registration_transform": registration_transform is not None,
+        "has_registration_transform": _load_registration_transform(evidence) is not None,
+        "candidate_count": len(location_candidates),
     }
     log_inspection_match_candidates(
         evidence_id=evidence_id,
         master_drawing_id=master_drawing_id,
-        candidates=candidates,
+        candidates=method_candidates,
         match_detail=match_detail,
     )
 
-    winner = select_best_location_match(candidates)
+    winner = select_best_location_match(method_candidates)
     if winner is not None:
         return LocationMatchResult.from_candidate(master_drawing_id, winner)
 
@@ -902,10 +1113,11 @@ def resolve_evidence_location(
         page=page,
     )
     if contour is not None:
+        contour_method = method_candidate_from_location(contour)
         log_inspection_match_candidates(
             evidence_id=evidence_id,
             master_drawing_id=master_drawing_id,
-            candidates=[*candidates, contour],
+            candidates=[*method_candidates, contour_method],
             match_detail={**match_detail, "contour_fallback": True},
         )
         return LocationMatchResult.from_candidate(master_drawing_id, contour)

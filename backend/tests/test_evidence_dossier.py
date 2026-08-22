@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 from typing import cast
+from unittest.mock import patch
 
 from sqlalchemy.orm import Session
 
-from ai.agents.evidence_dossier import EvidenceDossier, build_evidence_dossier
+from ai.agents.evidence_dossier import EvidenceDossier, LinkedAttachmentSummary, build_evidence_dossier
 from ai.agents.tools.master_search import expand_term_with_legend
+from ai.agents.tools.pdf_investigation import PdfInvestigationResult
 from ai.pipelines.drawing_location_resolver import MasterRegion
 from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
@@ -203,3 +206,74 @@ def test_build_evidence_dossier_missing_evidence_raises(
         raise AssertionError("expected ValueError")
     except ValueError as exc:
         assert "not found" in str(exc).lower()
+
+
+@patch("ai.agents.evidence_dossier.resolve_stored_file_path")
+@patch("ai.agents.tools.pdf_investigation.run_pdf_investigation")
+def test_build_evidence_dossier_merges_pdf_investigation(
+    mock_run_pdf: object,
+    mock_resolve_path: object,
+    db_session: Session,
+    project,
+) -> None:
+    seed(db_session, project_id=None)
+    db_session.commit()
+
+    storage = StorageService(db_session)
+    master = Drawing(
+        project_id=project.id,
+        source="upload",
+        name="Master.pdf",
+        storage_key=f"drawings/{_unique()}.pdf",
+        content_type="application/pdf",
+        index_status="ready",
+    )
+    db_session.add(master)
+    db_session.flush()
+
+    evidence = storage.create_evidence_record(
+        project_id=cast(int, project.id),
+        type="inspection_doc",
+        trade="33-Sanitary Sewerage",
+        spec_section=None,
+        title="Inspection report",
+        storage_key=f"evidence/{_unique()}.pdf",
+        content_type="application/pdf",
+        text_content="Underground Sanitary Sewer at COLO parking lot",
+        meta={"evidence_kind": "form"},
+    )
+    db_session.commit()
+
+    mock_resolve_path.return_value = Path("/tmp/evidence.pdf")
+    mock_run_pdf.return_value = PdfInvestigationResult(
+        summaries=(
+            LinkedAttachmentSummary(
+                url="https://example.com/install.pdf",
+                filename="install.pdf",
+                page_count=1,
+                text_preview="Location: COLO STA 10+50",
+                drawing_id=None,
+            ),
+        ),
+        links_followed=1,
+        pages_rendered=1,
+        ocr_word_counts={"https://example.com/install.pdf": 42},
+        errors=(),
+    )
+
+    dossier = build_evidence_dossier(
+        db_session,
+        evidence_id=cast(int, evidence.id),
+        master_drawing_id=cast(int, master.id),
+    )
+
+    assert dossier.investigation_meta["links_followed"] == 1
+    assert dossier.investigation_meta["pages_rendered"] == 1
+    assert dossier.investigation_meta["ocr_word_counts"]["https://example.com/install.pdf"] == 42
+    assert any(
+        att.url == "https://example.com/install.pdf"
+        for att in dossier.linked_attachments
+    )
+    assert any(
+        "COLO" in att.text_preview for att in dossier.linked_attachments
+    )
