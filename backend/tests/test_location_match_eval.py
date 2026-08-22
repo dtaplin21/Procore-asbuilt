@@ -12,9 +12,12 @@ from models.location_match_label import LocationMatchLabel
 from services.inspection_match_persistence import MATCH_SCORE_THRESHOLD
 from services.location_match_eval import (
     EvalLabel,
+    endpoint_error_norm,
     evaluate_label_result,
     evaluate_labels,
+    hausdorff_distance_norm,
     is_coordinate_false_positive,
+    path_overlap_ratio,
     rect_iou,
 )
 
@@ -56,6 +59,96 @@ def test_rect_iou_identical_rects() -> None:
 
 def test_rect_iou_disjoint_rects() -> None:
     assert rect_iou((0.0, 0.0, 0.1, 0.1), (0.5, 0.5, 0.1, 0.1)) == 0.0
+
+
+def test_path_overlap_ratio_identical_polyline() -> None:
+    line = [[0.51, 0.47], [0.54, 0.48], [0.56, 0.49]]
+    assert path_overlap_ratio(line, line) == pytest.approx(1.0)
+
+
+def test_endpoint_error_norm_identical_polyline() -> None:
+    line = [[0.51, 0.47], [0.54, 0.48], [0.56, 0.49]]
+    assert endpoint_error_norm(line, line) == pytest.approx(0.0)
+
+
+def test_hausdorff_distance_norm_identical_polyline() -> None:
+    line = [[0.51, 0.47], [0.54, 0.48], [0.56, 0.49]]
+    assert hausdorff_distance_norm(line, line) == pytest.approx(0.0)
+
+
+def test_evaluate_label_result_polyline_passes_on_overlap_and_endpoints() -> None:
+    truth = {
+        "type": "polyline",
+        "page": 1,
+        "points": [[0.51, 0.47], [0.54, 0.48], [0.56, 0.49]],
+        "scope_kind": "utility_line",
+    }
+    predicted = {
+        "type": "polyline",
+        "page": 1,
+        "points": [[0.51, 0.47], [0.54, 0.48], [0.56, 0.49]],
+    }
+    label = _label(
+        master_scope_geometry_json=truth,
+        master_bbox_json={
+            "type": "rect",
+            "page": 1,
+            "x": 0.51,
+            "y": 0.47,
+            "width": 0.05,
+            "height": 0.02,
+        },
+    )
+    result = LocationMatchResult(
+        master_drawing_id=661,
+        method=ResolutionMethod.COORDINATE_LOOKUP,
+        confidence=MATCH_SCORE_THRESHOLD,
+        bbox_fractional=(0.51, 0.47, 0.56, 0.49),
+        page=1,
+    )
+    outcome = evaluate_label_result(
+        label,
+        result,
+        "matched",
+        min_iou=0.30,
+        predicted_scope_geometry=predicted,
+    )
+    assert outcome.geometry_mode == "polyline"
+    assert outcome.passed is True
+    assert outcome.path_overlap == pytest.approx(1.0)
+    assert outcome.endpoint_error == pytest.approx(0.0)
+
+
+def test_evaluate_label_result_polyline_fails_when_endpoints_drift() -> None:
+    truth = {
+        "type": "polyline",
+        "page": 1,
+        "points": [[0.51, 0.47], [0.54, 0.48], [0.56, 0.49]],
+    }
+    predicted = {
+        "type": "polyline",
+        "page": 1,
+        "points": [[0.40, 0.40], [0.43, 0.41], [0.46, 0.42]],
+    }
+    label = _label(master_scope_geometry_json=truth)
+    result = LocationMatchResult(
+        master_drawing_id=661,
+        method=ResolutionMethod.COORDINATE_LOOKUP,
+        confidence=MATCH_SCORE_THRESHOLD,
+        bbox_fractional=(0.40, 0.40, 0.46, 0.42),
+        page=1,
+    )
+    outcome = evaluate_label_result(
+        label,
+        result,
+        "matched",
+        min_iou=0.30,
+        predicted_scope_geometry=predicted,
+    )
+    assert outcome.passed is False
+    assert outcome.path_overlap is not None
+    assert outcome.endpoint_error is not None
+    assert outcome.endpoint_error > 0.03
 
 
 def test_coordinate_false_positive_when_no_coord_signal() -> None:
@@ -134,7 +227,53 @@ def test_evaluate_labels_fails_below_pass_rate(db_session) -> None:
     assert summary.passed == 1
     assert summary.pass_rate == pytest.approx(0.5)
     assert summary.passed_gate is False
+    assert summary.rect_pass_rate == pytest.approx(0.5)
     assert summary.pass_rate_by_suite["test"] == pytest.approx(0.5)
+
+
+def test_geometry_pass_rates_split_rect_and_polyline(db_session) -> None:
+    labels = [
+        _label(label_id="rect-pass", suite="mixed"),
+        _label(
+            label_id="poly-pass",
+            suite="mixed",
+            master_scope_geometry_json={
+                "type": "polyline",
+                "page": 1,
+                "points": [[0.51, 0.47], [0.56, 0.49]],
+            },
+        ),
+    ]
+
+    def fake_evaluate(session, label, *, min_iou):
+        from services.location_match_eval import LabelEvalResult
+
+        if label.label_id == "rect-pass":
+            return LabelEvalResult(
+                label_id=label.label_id,
+                suite=label.suite,
+                passed=True,
+                geometry_mode="rect",
+                min_iou=min_iou,
+            )
+        return LabelEvalResult(
+            label_id=label.label_id,
+            suite=label.suite,
+            passed=False,
+            geometry_mode="polyline",
+            path_overlap=0.4,
+            endpoint_error=0.05,
+            min_iou=min_iou,
+        )
+
+    with patch("services.location_match_eval.evaluate_label", side_effect=fake_evaluate):
+        summary = evaluate_labels(db_session, labels, min_pass_rate=0.80)
+
+    assert summary.rect_evaluated == 1
+    assert summary.rect_pass_rate == pytest.approx(1.0)
+    assert summary.polyline_evaluated == 1
+    assert summary.polyline_pass_rate == pytest.approx(0.0)
+    assert summary.passed_gate is False
 
 
 def test_pass_rate_by_suite_in_summary(db_session) -> None:

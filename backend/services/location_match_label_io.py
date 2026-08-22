@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from ai.pipelines.scope_geometry import validate_scope_geometry
+
 REQUIRED_FIELDS = (
     "label_id",
     "suite",
@@ -68,6 +70,19 @@ def validate_entry(entry: dict[str, Any], index: int) -> None:
     for key in ("x", "y", "width", "height"):
         if key not in bbox:
             raise ValueError(f"Fixture entry {index} master_bbox_json missing {key!r}")
+
+    scope_geometry = entry.get("master_scope_geometry_json")
+    if scope_geometry is not None:
+        if not isinstance(scope_geometry, dict):
+            raise ValueError(
+                f"Fixture entry {index} master_scope_geometry_json must be an object"
+            )
+        try:
+            validate_scope_geometry(scope_geometry)
+        except ValueError as exc:
+            raise ValueError(
+                f"Fixture entry {index} master_scope_geometry_json invalid: {exc}"
+            ) from exc
 
 
 def load_fixture_dir(

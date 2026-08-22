@@ -45,6 +45,7 @@ class InspectionLocationAgent:
         evidence_id: int,
         master_drawing_id: int,
         page: int = 1,
+        inspection_run_id: int | None = None,
     ) -> AgentMatchResult:
         """Investigate evidence and resolve a scoped overlay on the master drawing."""
         readiness = get_master_drawing_index_readiness(session, master_drawing_id)
@@ -67,6 +68,7 @@ class InspectionLocationAgent:
                 result=result,
                 ranked_scores=[],
                 page=page,
+                inspection_run_id=inspection_run_id,
             )
             return result
 
@@ -93,6 +95,7 @@ class InspectionLocationAgent:
                 result=result,
                 ranked_scores=[],
                 page=page,
+                inspection_run_id=inspection_run_id,
             )
             return result
 
@@ -118,6 +121,7 @@ class InspectionLocationAgent:
                 result=result,
                 ranked_scores=[],
                 page=page,
+                inspection_run_id=inspection_run_id,
             )
             return result
 
@@ -147,6 +151,7 @@ class InspectionLocationAgent:
                 result=result,
                 ranked_scores=ranked_scores,
                 page=page,
+                inspection_run_id=inspection_run_id,
             )
             return result
 
@@ -189,6 +194,7 @@ class InspectionLocationAgent:
             result=result,
             ranked_scores=ranked_scores,
             page=page,
+            inspection_run_id=inspection_run_id,
         )
         return result
 

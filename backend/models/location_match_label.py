@@ -37,6 +37,7 @@ class LocationMatchLabel(Base):
     )
     evidence_fixture_path = Column(String, nullable=True)
     master_bbox_json = Column(JSON, nullable=False)
+    master_scope_geometry_json = Column(JSON, nullable=True)
     expected_method = Column(String, nullable=False)
     expected_match_status = Column(String, nullable=False)
     rotation_deg = Column(Integer, nullable=True)

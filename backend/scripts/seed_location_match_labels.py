@@ -71,6 +71,11 @@ def upsert_label(session, entry: dict[str, Any]) -> LocationMatchLabel:
         "master_drawing_id": int(entry["master_drawing_id"]),
         "evidence_fixture_path": entry.get("evidence_fixture_path"),
         "master_bbox_json": dict(entry["master_bbox_json"]),
+        "master_scope_geometry_json": (
+            dict(entry["master_scope_geometry_json"])
+            if isinstance(entry.get("master_scope_geometry_json"), dict)
+            else None
+        ),
         "expected_method": str(entry["expected_method"]),
         "expected_match_status": str(entry["expected_match_status"]),
         "rotation_deg": _optional_int(entry.get("rotation_deg")),

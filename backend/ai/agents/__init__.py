@@ -1,7 +1,6 @@
 """AI agent implementations."""
 
 from ai.agents.evidence_dossier import EvidenceDossier, build_evidence_dossier
-from ai.agents.inspection_location_agent import InspectionLocationAgent
 from ai.agents.tools.master_search import (
     expand_term_with_legend,
     load_master_regions,
@@ -19,3 +18,11 @@ __all__ = [
     "load_master_regions",
     "search_master_by_clues",
 ]
+
+
+def __getattr__(name: str):
+    if name == "InspectionLocationAgent":
+        from ai.agents.inspection_location_agent import InspectionLocationAgent
+
+        return InspectionLocationAgent
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

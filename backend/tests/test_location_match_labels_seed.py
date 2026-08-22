@@ -46,15 +46,84 @@ def test_ucsf_corridor_label_fields() -> None:
     entries = load_fixture(UCSF_FIXTURE_PATH)
     golden = next(e for e in entries if e["label_id"] == "ucsf-435-ss-corridor")
     assert golden["suite"] == "ucsf"
-    assert golden["evidence_id"] == 357
+    assert golden["evidence_id"] == 377
     assert golden["master_drawing_id"] == 661
-    assert golden["inspection_run_id"] == 435
+    assert golden["inspection_run_id"] == 447
     assert golden["rotation_deg"] == 180
     assert golden["expected_method"] == "coordinate_lookup"
     assert golden["expected_match_status"] == "matched"
     bbox = golden["master_bbox_json"]
     assert bbox["type"] == "rect"
     assert bbox["width"] > 0
+    scope = golden.get("master_scope_geometry_json")
+    assert scope is not None
+    assert scope["type"] == "polyline"
+    assert scope["scope_kind"] == "utility_line"
+    assert len(scope["points"]) >= 2
+
+
+def test_validate_entry_accepts_polyline_scope_geometry() -> None:
+    validate_entry(
+        {
+            "label_id": "utility-line",
+            "suite": "test",
+            "project_id": 1,
+            "master_drawing_id": 1,
+            "master_bbox_json": {
+                "type": "rect",
+                "page": 1,
+                "x": 0.5,
+                "y": 0.47,
+                "width": 0.05,
+                "height": 0.02,
+            },
+            "master_scope_geometry_json": {
+                "type": "polyline",
+                "page": 1,
+                "points": [[0.51, 0.47], [0.54, 0.48], [0.56, 0.49]],
+                "scope_kind": "utility_line",
+            },
+            "expected_method": "reference_lookup",
+            "expected_match_status": "matched",
+            "has_coordinate_signal": False,
+            "has_station_signal": False,
+            "has_reference_signal": True,
+            "evidence_kind": "form",
+        },
+        0,
+    )
+
+
+def test_validate_entry_rejects_invalid_polyline_scope() -> None:
+    with pytest.raises(ValueError, match="master_scope_geometry_json invalid"):
+        validate_entry(
+            {
+                "label_id": "bad-polyline",
+                "suite": "test",
+                "project_id": 1,
+                "master_drawing_id": 1,
+                "master_bbox_json": {
+                    "type": "rect",
+                    "page": 1,
+                    "x": 0.5,
+                    "y": 0.47,
+                    "width": 0.05,
+                    "height": 0.02,
+                },
+                "master_scope_geometry_json": {
+                    "type": "polyline",
+                    "page": 1,
+                    "points": [[0.51, 0.47]],
+                },
+                "expected_method": "reference_lookup",
+                "expected_match_status": "matched",
+                "has_coordinate_signal": False,
+                "has_station_signal": False,
+                "has_reference_signal": True,
+                "evidence_kind": "form",
+            },
+            0,
+        )
 
 
 def _sample_label(project_id: int, master_drawing_id: int, **overrides: Any) -> dict[str, Any]:
@@ -117,11 +186,19 @@ def test_seed_location_match_labels_upserts(db_session, project, tmp_path: Path)
     assert cast(str, row.suite) == "test"
     assert cast(str, row.expected_method) == "unresolved"
 
+    payload[0]["master_scope_geometry_json"] = {
+        "type": "polyline",
+        "page": 1,
+        "points": [[0.1, 0.2], [0.15, 0.22]],
+        "scope_kind": "utility_line",
+    }
     payload[0]["notes"] = "updated note"
     fixture_path.write_text(json.dumps(payload), encoding="utf-8")
     seed_labels_from_fixture(db_session, fixture_path)
     db_session.refresh(row)
     assert cast(str, row.notes) == "updated note"
+    scope = cast(dict, row.master_scope_geometry_json)
+    assert scope["type"] == "polyline"
     assert (
         db_session.query(LocationMatchLabel)
         .filter(LocationMatchLabel.label_id == "test-label-seed")

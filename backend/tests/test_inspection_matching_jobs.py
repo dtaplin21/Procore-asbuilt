@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from types import SimpleNamespace
 from typing import cast
 from unittest.mock import patch
 
 import pytest
 from sqlalchemy.orm import Session
 
-from ai.pipelines.drawing_location_resolver import ResolutionMethod
-from ai.pipelines.location_match_orchestrator import LocationMatchResult
+from ai.pipelines.scope_geometry import ScopeGeometry, ScopeKind
 from database import SessionLocal
 from models.drawing_overlay import DrawingOverlay
 from models.drawing_match_candidate import DrawingMatchCandidate
@@ -19,7 +19,11 @@ from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
 from models.models import Company, Drawing, EvidenceDrawingLink, EvidenceRecord, JobQueue, Project
 from models.inspection_run import InspectionRun
-from services.inspection_match_persistence import MATCH_SCORE_THRESHOLD
+from services.inspection_match_persistence import (
+    MATCH_SCORE_THRESHOLD,
+    AgentMatchResult,
+    persist_agent_match_result,
+)
 from services.inspection_matching_jobs import (
     DEFERRED_MATCH_META_KEY,
     JOB_TYPE_INSPECTION_MATCH,
@@ -120,25 +124,60 @@ def _seed_run(db: Session) -> tuple[InspectionRun, str]:
     return run, file_id
 
 
-def _matched_result(master_drawing_id: int) -> LocationMatchResult:
-    return LocationMatchResult(
-        master_drawing_id=master_drawing_id,
-        method=ResolutionMethod.COORDINATE_LOOKUP,
-        confidence=MATCH_SCORE_THRESHOLD + 0.1,
-        bbox_fractional=(0.1, 0.2, 0.4, 0.5),
-        page=1,
-        region_id=99,
+def _matched_agent_result(
+    *,
+    region_id: int = 99,
+    page: int = 1,
+) -> AgentMatchResult:
+    return AgentMatchResult(
+        status="matched",
+        scope=ScopeGeometry(
+            page=page,
+            type="rect",
+            x=0.1,
+            y=0.2,
+            width=0.3,
+            height=0.3,
+            scope_kind=ScopeKind.AREA,
+        ),
+        region_id=region_id,
+        page=page,
+        rationale="coordinate match",
+        fused_score=MATCH_SCORE_THRESHOLD + 0.1,
     )
 
 
-@patch("services.inspection_matching_jobs.resolve_evidence_location")
-def test_run_inspection_match_job_calls_orchestrator(
-    mock_resolve,
+def _agent_run_with_persist(
+    session: Session,
+    *,
+    evidence_id: int,
+    master_drawing_id: int,
+    page: int = 1,
+    inspection_run_id: int | None = None,
+    result: AgentMatchResult,
+    ranked_scores: list | None = None,
+) -> AgentMatchResult:
+    persist_agent_match_result(
+        session,
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+        result=result,
+        ranked_scores=ranked_scores or [],
+        page=page,
+        inspection_run_id=inspection_run_id,
+    )
+    return result
+
+
+@patch("services.inspection_matching_jobs.InspectionLocationAgent")
+def test_run_inspection_match_job_calls_agent(
+    mock_agent_cls,
     db: Session,
 ):
     run, file_id = _seed_run(db)
     master_drawing_id = cast(int, run.master_drawing_id)
-    mock_resolve.return_value = _matched_result(master_drawing_id)
+    mock_agent = mock_agent_cls.return_value
+    mock_agent.run.return_value = _matched_agent_result()
 
     status = run_inspection_match_job(
         {
@@ -151,19 +190,42 @@ def test_run_inspection_match_job_calls_orchestrator(
     )
 
     assert status == "matched"
-    mock_resolve.assert_called_once_with(
+    mock_agent.run.assert_called_once_with(
         db,
         evidence_id=int(file_id),
         master_drawing_id=master_drawing_id,
         page=1,
+        inspection_run_id=None,
     )
 
 
-@patch("services.inspection_matching_jobs.resolve_evidence_location")
-def test_run_inspection_match_job_matched(mock_resolve, db: Session):
+@patch("services.inspection_matching_jobs.InspectionLocationAgent")
+def test_run_inspection_match_job_matched(mock_agent_cls, db: Session):
     run, file_id = _seed_run(db)
     master_drawing_id = cast(int, run.master_drawing_id)
-    mock_resolve.return_value = _matched_result(master_drawing_id)
+    mock_agent = mock_agent_cls.return_value
+    matched = _matched_agent_result()
+    mock_agent.run.side_effect = lambda session, **kwargs: _agent_run_with_persist(
+        session,
+        evidence_id=kwargs["evidence_id"],
+        master_drawing_id=kwargs["master_drawing_id"],
+        page=kwargs.get("page", 1),
+        inspection_run_id=kwargs.get("inspection_run_id"),
+        result=matched,
+        ranked_scores=[
+            SimpleNamespace(
+                fused_score=matched.fused_score,
+                candidate=SimpleNamespace(
+                    bbox_fractional=(0.1, 0.2, 0.4, 0.5),
+                    page=1,
+                    region_id=99,
+                ),
+                rationale="coordinate match",
+                clue_hits=(),
+                conflicts=(),
+            )
+        ],
+    )
 
     status = run_inspection_match_job(
         {
@@ -193,19 +255,37 @@ def test_run_inspection_match_job_matched(mock_resolve, db: Session):
     )
     assert candidate is not None
     assert float(cast(float, candidate.score)) >= MATCH_SCORE_THRESHOLD
-    assert cast(str, candidate.source) == ResolutionMethod.COORDINATE_LOOKUP.value
+    assert cast(str, candidate.source) == "inspection_location_agent"
 
 
-@patch("services.inspection_matching_jobs.resolve_evidence_location")
-def test_run_inspection_match_job_weak_match_needs_review(mock_resolve, db: Session):
+@patch("services.inspection_matching_jobs.InspectionLocationAgent")
+def test_run_inspection_match_job_weak_match_needs_review(mock_agent_cls, db: Session):
     run, file_id = _seed_run(db)
     master_drawing_id = cast(int, run.master_drawing_id)
-    mock_resolve.return_value = LocationMatchResult(
-        master_drawing_id=master_drawing_id,
-        method=ResolutionMethod.REFERENCE_LOOKUP,
-        confidence=MATCH_SCORE_THRESHOLD - 0.2,
-        bbox_fractional=(0.1, 0.2, 0.4, 0.5),
+    mock_agent = mock_agent_cls.return_value
+    needs_review = AgentMatchResult(
+        status="needs_review",
+        scope=ScopeGeometry(
+            page=1,
+            type="rect",
+            x=0.1,
+            y=0.2,
+            width=0.3,
+            height=0.3,
+            scope_kind=ScopeKind.AREA,
+        ),
+        region_id=None,
         page=1,
+        rationale="borderline match",
+        fused_score=MATCH_SCORE_THRESHOLD - 0.2,
+    )
+    mock_agent.run.side_effect = lambda session, **kwargs: _agent_run_with_persist(
+        session,
+        evidence_id=kwargs["evidence_id"],
+        master_drawing_id=kwargs["master_drawing_id"],
+        page=kwargs.get("page", 1),
+        inspection_run_id=kwargs.get("inspection_run_id"),
+        result=needs_review,
     )
 
     status = run_inspection_match_job(
@@ -227,11 +307,27 @@ def test_run_inspection_match_job_weak_match_needs_review(mock_resolve, db: Sess
     assert meta["match_status"] == "needs_review"
 
 
-@patch("services.inspection_matching_jobs.resolve_evidence_location")
-def test_run_inspection_match_job_unresolved_is_no_match(mock_resolve, db: Session):
+@patch("services.inspection_matching_jobs.InspectionLocationAgent")
+def test_run_inspection_match_job_unresolved_is_no_match(mock_agent_cls, db: Session):
     run, file_id = _seed_run(db)
     master_drawing_id = cast(int, run.master_drawing_id)
-    mock_resolve.return_value = LocationMatchResult.unresolved(master_drawing_id)
+    mock_agent = mock_agent_cls.return_value
+    no_match = AgentMatchResult(
+        status="no_match",
+        scope=None,
+        region_id=None,
+        page=1,
+        rationale="No location candidates generated.",
+        fused_score=None,
+    )
+    mock_agent.run.side_effect = lambda session, **kwargs: _agent_run_with_persist(
+        session,
+        evidence_id=kwargs["evidence_id"],
+        master_drawing_id=kwargs["master_drawing_id"],
+        page=kwargs.get("page", 1),
+        inspection_run_id=kwargs.get("inspection_run_id"),
+        result=no_match,
+    )
 
     status = run_inspection_match_job(
         {
@@ -253,13 +349,29 @@ def test_run_inspection_match_job_unresolved_is_no_match(mock_resolve, db: Sessi
     assert meta["match_status"] == "no_match"
 
 
-@patch("services.inspection_matching_jobs.resolve_evidence_location")
+@patch("services.inspection_matching_jobs.InspectionLocationAgent")
 def test_run_inspection_match_job_uses_explicit_run_id_over_id_collision(
-    mock_resolve,
+    mock_agent_cls,
     db: Session,
 ):
     """Evidence id equal to an older run id must not attach overlays to that run."""
-    mock_resolve.return_value = LocationMatchResult.unresolved(1)
+    no_match = AgentMatchResult(
+        status="no_match",
+        scope=None,
+        region_id=None,
+        page=1,
+        rationale="No actionable fused candidate.",
+        fused_score=None,
+    )
+    mock_agent = mock_agent_cls.return_value
+    mock_agent.run.side_effect = lambda session, **kwargs: _agent_run_with_persist(
+        session,
+        evidence_id=kwargs["evidence_id"],
+        master_drawing_id=kwargs["master_drawing_id"],
+        page=kwargs.get("page", 1),
+        inspection_run_id=kwargs.get("inspection_run_id"),
+        result=no_match,
+    )
     target_id = 80000 + int(uuid.uuid4().hex[:4], 16) % 10000
 
     company = Company(name=f"Co {uuid.uuid4().hex[:8]}", procore_company_id=f"pc-{uuid.uuid4().hex[:8]}")

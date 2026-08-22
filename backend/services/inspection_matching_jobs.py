@@ -1,6 +1,6 @@
 """Inspection matching job.
 
-Uses the unified location-match orchestrator to resolve evidence on master drawings.
+Uses the Inspection Location Agent to resolve evidence on master drawings.
 Internal confidence/score values never leave the backend.
 """
 
@@ -9,15 +9,12 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, Optional, cast
 
 from sqlalchemy.orm import Session
 
-from ai.pipelines.drawing_location_resolver import ResolutionMethod
-from ai.pipelines.location_match_orchestrator import (
-    match_status_from_result,
-    resolve_evidence_location,
-)
+from ai.agents.inspection_location_agent import InspectionLocationAgent
 from models.drawing_overlay import DrawingOverlay
 from models.inspection_run import InspectionRun
 from models.models import (
@@ -30,10 +27,9 @@ from models.models import (
     UserCompany,
 )
 from services.inspection_match_persistence import (
-    InternalMatchCandidate,
+    AgentMatchResult,
     MatchStatus,
     persist_inspection_match_overlay,
-    record_internal_match_candidate,
     resolve_inspection_run_id,
 )
 from services.master_drawing_index_readiness import get_master_drawing_index_readiness
@@ -441,6 +437,68 @@ def flush_inspection_matches_for_linked_auxiliary_drawing(
     return enqueued
 
 
+def _bbox_from_agent_result(
+    result: AgentMatchResult,
+) -> tuple[float, float, float, float] | None:
+    scope = result.scope
+    if scope is not None:
+        if (
+            scope.type == "rect"
+            and scope.x is not None
+            and scope.y is not None
+            and scope.width is not None
+            and scope.height is not None
+        ):
+            return (
+                scope.x,
+                scope.y,
+                scope.x + scope.width,
+                scope.y + scope.height,
+            )
+        if scope.type == "polyline" and scope.points:
+            xs = [point[0] for point in scope.points]
+            ys = [point[1] for point in scope.points]
+            return (min(xs), min(ys), max(xs), max(ys))
+
+    return None
+
+
+def _agent_result_for_logging(result: AgentMatchResult) -> SimpleNamespace:
+    return SimpleNamespace(
+        method=SimpleNamespace(value="inspection_location_agent"),
+        confidence=float(result.fused_score or 0.0),
+        bbox_fractional=_bbox_from_agent_result(result),
+        page=result.page,
+        region_id=result.region_id,
+        notes=result.rationale,
+    )
+
+
+def _latest_overlay_id(
+    session: Session,
+    *,
+    inspection_id: str,
+    inspection_run_id: int | None,
+) -> int | None:
+    run_id = resolve_inspection_run_id(
+        session,
+        inspection_id,
+        inspection_run_id=inspection_run_id,
+    )
+    if run_id is None:
+        return None
+
+    overlay = (
+        session.query(DrawingOverlay)
+        .filter(DrawingOverlay.inspection_run_id == run_id)
+        .order_by(DrawingOverlay.id.desc())
+        .first()
+    )
+    if overlay is None:
+        return None
+    return cast(int, overlay.id)
+
+
 def run_inspection_match_job(payload: dict[str, Any], session: Session) -> MatchStatus:
     inspection_id = str(payload["inspection_id"])
     drawing_id = payload["drawing_id"]
@@ -482,51 +540,36 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
         job_id=job_id,
     )
 
-    result = resolve_evidence_location(
+    agent = InspectionLocationAgent()
+    result = agent.run(
         session,
         evidence_id=evidence_id,
         master_drawing_id=master_drawing_id,
         page=page,
+        inspection_run_id=run_id_hint,
     )
-    status = match_status_from_result(result)
-
-    if result.method != ResolutionMethod.UNRESOLVED:
-        record_internal_match_candidate(
-            session,
-            inspection_id=inspection_id,
-            drawing_id=drawing_id,
-            candidate=InternalMatchCandidate(
-                score=result.confidence,
-                bbox=result.bbox_fractional,
-                page=result.page,
-                region_id=result.region_id,
-                source=result.method.value,
-                rank=1,
-            ),
-            inspection_run_id=run_id_hint,
-        )
-        session.commit()
+    status = result.status
 
     log_inspection_match_result(
         evidence_id=evidence_id,
         master_drawing_id=master_drawing_id,
-        result=result,
+        result=_agent_result_for_logging(result),
         match_status=status,
         inspection_run_id=run_id_hint,
     )
 
-    overlay_id = _persist(
-        status=status,
-        bbox=result.bbox_fractional if status == "matched" else None,
-        page=result.page,
-        region_id=result.region_id,
+    overlay_id = _latest_overlay_id(
+        session,
+        inspection_id=inspection_id,
+        inspection_run_id=run_id_hint,
     )
+    log_bbox = _bbox_from_agent_result(result)
     log_inspection_match_persisted(
         evidence_id=evidence_id,
         master_drawing_id=master_drawing_id,
         match_status=status,
         overlay_id=overlay_id,
-        bbox=result.bbox_fractional if status == "matched" else None,
+        bbox=log_bbox if status in ("matched", "needs_review") else None,
         page=result.page,
         inspection_run_id=run_id_hint,
         region_id=result.region_id,

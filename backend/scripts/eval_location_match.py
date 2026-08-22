@@ -51,6 +51,8 @@ def main() -> int:
     )
     parser.add_argument("--min-iou", type=float, default=0.30)
     parser.add_argument("--min-pass-rate", type=float, default=0.80)
+    parser.add_argument("--min-path-overlap", type=float, default=0.70)
+    parser.add_argument("--min-polyline-pass-rate", type=float, default=0.70)
     parser.add_argument(
         "--output",
         type=Path,
@@ -89,6 +91,8 @@ def main() -> int:
             labels,
             min_iou=args.min_iou,
             min_pass_rate=args.min_pass_rate,
+            min_path_overlap=args.min_path_overlap,
+            min_polyline_pass_rate=args.min_polyline_pass_rate,
         )
         report = summary.to_dict()
 
@@ -102,6 +106,11 @@ def main() -> int:
             f"({summary.skipped} skipped); "
             f"pass_rate={summary.pass_rate:.2%} "
             f"(min {summary.min_pass_rate:.0%}); "
+            f"rect_pass_rate={summary.rect_pass_rate:.2%} "
+            f"({summary.rect_passed}/{summary.rect_evaluated}); "
+            f"polyline_pass_rate={summary.polyline_pass_rate:.2%} "
+            f"({summary.polyline_passed}/{summary.polyline_evaluated}, "
+            f"min {summary.min_polyline_pass_rate:.0%}); "
             f"coordinate_false_positives={summary.coordinate_false_positives}"
         )
         suite_bits = ", ".join(
@@ -115,10 +124,17 @@ def main() -> int:
                 print(f"  SKIP {result.label_id}: {result.skip_reason}")
                 continue
             status = "PASS" if result.passed else "FAIL"
-            iou_text = f" iou={result.iou:.3f}" if result.iou is not None else ""
+            if result.geometry_mode == "polyline":
+                metric_text = ""
+                if result.path_overlap is not None:
+                    metric_text += f" overlap={result.path_overlap:.3f}"
+                if result.endpoint_error is not None:
+                    metric_text += f" endpoint={result.endpoint_error:.3f}"
+            else:
+                metric_text = f" iou={result.iou:.3f}" if result.iou is not None else ""
             print(
                 f"  {status} {result.label_id}: "
-                f"{result.actual_method}/{result.actual_match_status}{iou_text} "
+                f"{result.actual_method}/{result.actual_match_status}{metric_text} "
                 f"— {result.notes}"
             )
 

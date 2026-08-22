@@ -15,6 +15,12 @@
       "width": 0.048,
       "height": 0.042
     },
+    "master_scope_geometry_json": {
+      "type": "polyline",
+      "page": 1,
+      "points": [[0.51, 0.47], [0.54, 0.48], [0.56, 0.49]],
+      "scope_kind": "utility_line"
+    },
     "expected_method": "coordinate_lookup",
     "expected_match_status": "matched",
     "rotation_deg": 180,
