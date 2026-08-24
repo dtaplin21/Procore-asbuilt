@@ -158,6 +158,34 @@ def log_inspection_match_persisted(
     )
 
 
+def log_inspection_investigation_complete(
+    *,
+    evidence_id: int,
+    master_drawing_id: int,
+    investigation_meta: dict[str, Any] | None,
+    inspection_run_id: int | None = None,
+) -> None:
+    raw = investigation_meta if isinstance(investigation_meta, dict) else {}
+    match_investigation = raw.get("matchInvestigation")
+    if not isinstance(match_investigation, dict):
+        match_investigation = {}
+    logger.info(
+        "inspection_investigation_complete",
+        extra={
+            "evidence_id": evidence_id,
+            "inspection_id": str(evidence_id),
+            "master_drawing_id": master_drawing_id,
+            "drawing_id": master_drawing_id,
+            "inspection_run_id": inspection_run_id,
+            "links_followed": raw.get("links_followed", match_investigation.get("followed")),
+            "pages_rendered": raw.get("pages_rendered"),
+            "linked_drawing_ids": match_investigation.get("linked_drawing_ids"),
+            "investigated_at": match_investigation.get("at"),
+            "match_investigation": match_investigation,
+        },
+    )
+
+
 def log_inspection_upload_match_summary(
     *,
     evidence_id: int,

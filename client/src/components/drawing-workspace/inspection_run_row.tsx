@@ -43,7 +43,7 @@ export type InspectionRunRowRun = SchemaInspectionRun & RunHistoryFields;
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pending",
   queued: "Queued",
-  processing: "Processing…",
+  processing: "Investigating linked files…",
   complete: "Complete",
   failed: "Failed",
 };
@@ -304,7 +304,7 @@ function InspectionRunPanelRow({
             <p className="text-xs text-muted-foreground">{timestamp}</p>
           </div>
           <Badge variant={statusVariant(run.status)} className="shrink-0 capitalize">
-            {run.status}
+            {statusLabel(run.status)}
           </Badge>
         </div>
         {run.evidence_id != null ? (

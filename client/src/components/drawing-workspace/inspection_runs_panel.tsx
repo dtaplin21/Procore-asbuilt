@@ -35,6 +35,7 @@ import {
   hasActiveInspectionRun,
   pollWhileInspectionRunsActive,
 } from "@/lib/inspection-runs/active_run";
+import { formatEvidenceUploadToastDescription } from "@/lib/inspection-runs/upload_toast";
 
 export type InspectionRunsPanelProps = {
   projectId: number;
@@ -198,19 +199,9 @@ export default function InspectionRunsPanel({
 
         onSelectRun?.(runId);
 
-        const parts = [
-          `${result.overlays_created} overlay${result.overlays_created === 1 ? "" : "s"} mapped`,
-        ];
-        if (result.unresolved_count > 0) {
-          parts.push(`${result.unresolved_count} need review`);
-        }
-        if (result.untagged_region_count > 0) {
-          parts.push(`${result.untagged_region_count} untagged region(s) on sheet`);
-        }
-
         toast({
-          title: "Evidence processed",
-          description: `Run #${runId}: ${parts.join(" · ")}`,
+          title: "Evidence uploaded",
+          description: formatEvidenceUploadToastDescription(runId, result),
         });
       } catch (error) {
         const message =
@@ -303,7 +294,7 @@ export default function InspectionRunsPanel({
           data-testid="inspection-run-evidence-upload"
           className="w-full rounded-md border border-primary bg-background px-3 py-2 text-sm font-medium text-primary hover:bg-primary-soft disabled:opacity-60"
         >
-          {uploadBusy ? "Processing evidence…" : "Upload inspection evidence…"}
+          {uploadBusy ? "Uploading evidence…" : "Upload inspection evidence…"}
         </button>
         <p className="text-xs text-muted-foreground">
           Maps the document onto this sheet via the inspection pipeline. Select a run first to

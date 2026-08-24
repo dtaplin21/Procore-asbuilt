@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any, Optional, cast
 
@@ -33,7 +34,9 @@ from services.inspection_match_persistence import (
     resolve_inspection_run_id,
 )
 from services.master_drawing_index_readiness import get_master_drawing_index_readiness
+from services.storage import StorageService
 from observability.location_match_logging import (
+    log_inspection_investigation_complete,
     log_inspection_match_persisted,
     log_inspection_match_result,
     log_inspection_match_started,
@@ -499,6 +502,40 @@ def _latest_overlay_id(
     return cast(int, overlay.id)
 
 
+def _finalize_inspection_run_after_match(
+    session: Session,
+    *,
+    inspection_run_id: int | None,
+    match_status: MatchStatus,
+    error_message: str | None = None,
+) -> None:
+    """Mark the inspection run complete/failed after the match worker finishes."""
+    if inspection_run_id is None:
+        return
+
+    storage = StorageService(session)
+    now = datetime.now(timezone.utc)
+
+    if error_message is not None:
+        storage.update_inspection_run_status(
+            inspection_run_id,
+            "failed",
+            completed_at=now,
+            error_message=error_message[:500],
+        )
+        return
+
+    if match_status == "index_pending":
+        storage.update_inspection_run_status(inspection_run_id, "processing")
+        return
+
+    storage.update_inspection_run_status(
+        inspection_run_id,
+        "complete",
+        completed_at=now,
+    )
+
+
 def run_inspection_match_job(payload: dict[str, Any], session: Session) -> MatchStatus:
     inspection_id = str(payload["inspection_id"])
     drawing_id = payload["drawing_id"]
@@ -508,6 +545,41 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
     job_id = _parse_optional_int(payload.get("job_id"))
     evidence_id = _parse_optional_int(inspection_id)
     master_drawing_id = _parse_optional_int(drawing_id)
+
+    try:
+        return _run_inspection_match_job_body(
+            session,
+            inspection_id=inspection_id,
+            drawing_id=drawing_id,
+            page=page,
+            run_id_hint=run_id_hint,
+            project_id=project_id,
+            job_id=job_id,
+            evidence_id=evidence_id,
+            master_drawing_id=master_drawing_id,
+        )
+    except Exception as exc:
+        _finalize_inspection_run_after_match(
+            session,
+            inspection_run_id=run_id_hint,
+            match_status="no_match",
+            error_message=str(exc),
+        )
+        raise
+
+
+def _run_inspection_match_job_body(
+    session: Session,
+    *,
+    inspection_id: str,
+    drawing_id: Any,
+    page: int,
+    run_id_hint: int | None,
+    project_id: int | None,
+    job_id: int | None,
+    evidence_id: int | None,
+    master_drawing_id: int | None,
+) -> MatchStatus:
 
     def _persist(**kwargs: Any) -> int | None:
         return persist_inspection_match_overlay(
@@ -529,7 +601,13 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
             page=page,
             inspection_run_id=run_id_hint,
         )
-        return "needs_review"
+        status: MatchStatus = "needs_review"
+        _finalize_inspection_run_after_match(
+            session,
+            inspection_run_id=run_id_hint,
+            match_status=status,
+        )
+        return status
 
     log_inspection_match_started(
         evidence_id=evidence_id,
@@ -549,6 +627,19 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
         inspection_run_id=run_id_hint,
     )
     status = result.status
+
+    evidence = session.get(EvidenceRecord, evidence_id)
+    investigation_meta: dict[str, Any] | None = None
+    if evidence is not None:
+        meta_raw = cast(dict[str, Any] | None, evidence.meta)
+        if isinstance(meta_raw, dict):
+            investigation_meta = meta_raw
+    log_inspection_investigation_complete(
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+        investigation_meta=investigation_meta,
+        inspection_run_id=run_id_hint,
+    )
 
     log_inspection_match_result(
         evidence_id=evidence_id,
@@ -573,6 +664,11 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
         page=result.page,
         inspection_run_id=run_id_hint,
         region_id=result.region_id,
+    )
+    _finalize_inspection_run_after_match(
+        session,
+        inspection_run_id=run_id_hint,
+        match_status=status,
     )
     return status
 

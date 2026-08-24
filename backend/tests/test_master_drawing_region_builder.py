@@ -11,6 +11,7 @@ import pytest
 from ai.pipelines.master_drawing_region_builder import (
     AUTO_INDEX_REGION_SOURCE,
     IndexedElement,
+    _union_rect_geometry,
     build_auto_regions_from_text_elements,
     cluster_elements_by_fixed_grid,
     cluster_elements_by_grid,
@@ -43,6 +44,25 @@ def _element(
         ocr_confidence=confidence,
         source="native_pdf",
     )
+
+
+def test_union_rect_geometry_clamps_off_page_ocr_cluster() -> None:
+    elements = [
+        IndexedElement(
+            row=_element(text="UCSF", x0=0.22, y0=1.27, x1=0.24, y1=1.36),
+            x0=0.22,
+            y0=1.27,
+            x1=0.24,
+            y1=1.36,
+            centroid_x=0.23,
+            centroid_y=1.315,
+        ),
+    ]
+
+    geometry = _union_rect_geometry(elements)
+
+    assert geometry["y"] <= 1.0
+    assert geometry["y"] + geometry["height"] <= 1.001
 
 
 def test_is_junk_text_element_filters_low_confidence_and_noise() -> None:

@@ -12,6 +12,7 @@ from ai.agents.tools.pdf_investigation import EvidenceInvestigationPayload
 from ai.pipelines.pdf_link_follower import LinkFollowResult
 from ai.schemas.document_extraction_schemas import DocumentType
 from models.document_extraction import DocumentExtraction
+from models.models import Drawing
 from services.evidence_investigation_persistence import persist_evidence_investigation
 from services.storage import StorageService
 
@@ -114,3 +115,41 @@ def test_persist_evidence_investigation_writes_match_investigation_meta(
     text_content = cast(str, evidence.text_content)
     assert "Location: COLO STA 10+50" in text_content
     assert "Inspection summary" in text_content
+
+
+def test_enqueue_linked_drawing_index_jobs_enqueues_render_for_unprocessed_drawing(
+    db_session: Session,
+    project,
+) -> None:
+    from models.models import JobQueue
+    from services.drawing_render_jobs import DRAWING_RENDER_JOB_TYPE
+    from services.evidence_investigation_persistence import enqueue_linked_drawing_index_jobs
+
+    aux = Drawing(
+        project_id=project.id,
+        source="linked_evidence",
+        name="Install.pdf",
+        storage_key=f"linked/{uuid.uuid4().hex[:8]}.pdf",
+        content_type="application/pdf",
+        processing_status="pending",
+        index_status="pending",
+    )
+    db_session.add(aux)
+    db_session.commit()
+
+    needing = enqueue_linked_drawing_index_jobs(
+        db_session,
+        project_id=cast(int, project.id),
+        linked_drawing_ids=[cast(int, aux.id)],
+    )
+
+    assert needing == [cast(int, aux.id)]
+    render_jobs = (
+        db_session.query(JobQueue)
+        .filter(
+            JobQueue.project_id == project.id,
+            JobQueue.job_type == DRAWING_RENDER_JOB_TYPE,
+        )
+        .count()
+    )
+    assert render_jobs == 1

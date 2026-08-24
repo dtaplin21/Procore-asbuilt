@@ -86,10 +86,10 @@ describe("InspectionRunsPanel", () => {
     createRunAsync.mockResolvedValue({ id: 7, status: "queued" });
     uploadRunEvidenceAsync.mockResolvedValue({
       evidence_id: 99,
-      overlays_created: 1,
+      overlays_created: 0,
       unresolved_count: 0,
       untagged_region_count: 0,
-      overlay_ids: [42],
+      overlay_ids: [],
     });
     mockRuns([
       {
@@ -181,6 +181,30 @@ describe("InspectionRunsPanel", () => {
         masterDrawingId: 10,
       });
     });
+  });
+
+  it("shows investigating label for processing runs", () => {
+    mockRuns([
+      {
+        id: 2,
+        project_id: 2,
+        master_drawing_id: 10,
+        evidence_id: 8,
+        inspection_type: "visual",
+        status: "processing",
+        started_at: "2026-01-01T12:00:00Z",
+        completed_at: null,
+        error_message: null,
+        created_at: "2026-01-01T12:00:00Z",
+        updated_at: "2026-01-01T12:00:00Z",
+      },
+    ]);
+
+    renderPanel(
+      <InspectionRunsPanel projectId={2} masterDrawingId={10} selectedRunId={2} />
+    );
+
+    expect(screen.getByText("Investigating linked files…")).toBeInTheDocument();
   });
 
   it("keeps upload enabled when a deferred queued run has no evidence yet", () => {

@@ -17,6 +17,7 @@ from ai.pipelines.candidate_tile_selector import (
     compute_tile_match_score,
     find_candidate_tiles_from_clues,
 )
+from ai.pipelines.fractional_coords import bbox_intersects_page
 from ai.pipelines.coordinate_frame import normalize_to_true_north
 from ai.pipelines.document_text_extraction import extract_document
 from ai.pipelines.drawing_location_resolver import (
@@ -181,6 +182,18 @@ def _non_sheet_supporting_clues(clues: Sequence[str]) -> tuple[str, ...]:
         for clue in clues
         if not _is_sheet_ref_token(clue.split(":", 1)[-1])
     )
+
+
+def _filter_off_page_candidates(
+    candidates: Sequence[LocationMatchCandidate],
+) -> list[LocationMatchCandidate]:
+    """Drop candidates whose bbox does not overlap the drawable page."""
+    kept: list[LocationMatchCandidate] = []
+    for candidate in candidates:
+        bbox = candidate.bbox_fractional
+        if bbox is None or bbox_intersects_page(bbox):
+            kept.append(candidate)
+    return kept
 
 
 def _filter_sheet_only_candidates(
@@ -437,14 +450,14 @@ def _lazy_extract_drawing_survey_points(
         elements,
         scale_json=scale_json,
         page_meta_json=page_meta_json,
-        scale_source="lazy_match",
+        scale_source="match_investigation",
     )
     placed_records = [
         record
         for record in records
         if is_placed_survey_label_bbox(
             record.label_bbox_json,
-            source="lazy_match",
+            source="match_investigation",
             meta_json=record.meta_json,
         )
     ]
@@ -456,7 +469,7 @@ def _lazy_extract_drawing_survey_points(
             session,
             drawing_id,
             placed_records,
-            source="lazy_match",
+            source="match_investigation",
         )
     except Exception:
         logger.exception(
@@ -551,6 +564,30 @@ def _enrich_evidence_stations(
     return enriched
 
 
+def _project_aux_bbox_to_master(
+    session: Session,
+    *,
+    aux_point: _ScopedSurveyPoint,
+    master_drawing_id: int,
+    registration_transform: RegistrationTransform | None,
+) -> tuple[float, float, float, float] | None:
+    """Map an auxiliary drawing survey bbox onto master fractional space."""
+    if registration_transform is None:
+        return None
+    try:
+        aux_bbox = _bbox_from_json(aux_point.label_bbox_json)
+    except (KeyError, TypeError, ValueError):
+        return None
+
+    projected = registration_transform.apply(*aux_bbox)
+    return _rotate_bbox_for_drawing_page(
+        session,
+        master_drawing_id,
+        aux_point.page,
+        projected,
+    )
+
+
 def _prefer_master_scoped_point(
     match: SurveyPointMatch,
     *,
@@ -578,6 +615,7 @@ def _coordinate_lookup_candidates(
     evidence_points: Sequence[SurveyPointRecord],
     scoped_points: Sequence[_ScopedSurveyPoint],
     master_drawing_id: int,
+    registration_transform: RegistrationTransform | None = None,
 ) -> list[LocationMatchCandidate]:
     if not evidence_points or not scoped_points:
         return []
@@ -594,16 +632,45 @@ def _coordinate_lookup_candidates(
     if scoped is None:
         return []
 
-    bbox = _rotate_bbox_for_drawing_page(
-        session,
-        scoped.drawing_id,
-        scoped.page,
-        _bbox_from_json(scoped.label_bbox_json),
-    )
     supporting = (
         f"coordinate:n={match.evidence.northing},e={match.evidence.easting}",
         f"survey_distance:{match.distance_ft:.2f}ft",
     )
+
+    if scoped.drawing_id == master_drawing_id:
+        bbox = _rotate_bbox_for_drawing_page(
+            session,
+            scoped.drawing_id,
+            scoped.page,
+            _bbox_from_json(scoped.label_bbox_json),
+        )
+        notes = (
+            f"Survey coordinate match at {match.distance_ft:.2f} ft "
+            f"on master drawing {scoped.drawing_id}."
+        )
+        contradicting: tuple[str, ...] = ()
+    else:
+        projected_bbox = _project_aux_bbox_to_master(
+            session,
+            aux_point=scoped,
+            master_drawing_id=master_drawing_id,
+            registration_transform=registration_transform,
+        )
+        if projected_bbox is not None:
+            bbox = projected_bbox
+            notes = (
+                f"Survey coordinate match at {match.distance_ft:.2f} ft; "
+                f"projected from auxiliary drawing {scoped.drawing_id} to master."
+            )
+            contradicting = ()
+        else:
+            bbox = None
+            notes = (
+                "aux_coords_unprojected: survey match on auxiliary drawing "
+                f"{scoped.drawing_id} at {match.distance_ft:.2f} ft without master projection."
+            )
+            contradicting = ("aux_coords_unprojected",)
+
     return [
         LocationMatchCandidate(
             method=ResolutionMethod.COORDINATE_LOOKUP,
@@ -612,10 +679,8 @@ def _coordinate_lookup_candidates(
             page=scoped.page,
             source_drawing_id=scoped.drawing_id,
             supporting_clues=supporting,
-            notes=(
-                f"Survey coordinate match at {match.distance_ft:.2f} ft "
-                f"on drawing {scoped.drawing_id}."
-            ),
+            contradicting_signals=contradicting,
+            notes=notes,
         )
     ]
 
@@ -1003,6 +1068,7 @@ def generate_all_location_candidates(
             evidence_points=evidence_points,
             scoped_points=scoped_points,
             master_drawing_id=master_drawing_id,
+            registration_transform=registration_transform,
         )
     )
     candidates.extend(
@@ -1050,7 +1116,34 @@ def generate_all_location_candidates(
         if alignment is not None and alignment.method == ResolutionMethod.ALIGNMENT:
             candidates.append(alignment)
 
-    return _filter_sheet_only_candidates(candidates)
+    return _filter_off_page_candidates(_filter_sheet_only_candidates(candidates))
+
+
+def _coordinate_projection_log_entries(
+    candidates: Sequence[LocationMatchCandidate],
+    *,
+    master_drawing_id: int,
+) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for candidate in candidates:
+        if candidate.method != ResolutionMethod.COORDINATE_LOOKUP:
+            continue
+        source_id = candidate.source_drawing_id
+        projected = (
+            candidate.bbox_fractional is not None
+            and source_id is not None
+            and source_id != master_drawing_id
+            and "projected from auxiliary" in candidate.notes
+        )
+        entries.append(
+            {
+                "source_drawing_id": source_id,
+                "projected": projected,
+                "aux_coords_unprojected": "aux_coords_unprojected" in candidate.notes,
+                "has_bbox": candidate.bbox_fractional is not None,
+            }
+        )
+    return entries
 
 
 def resolve_evidence_location(
@@ -1103,6 +1196,10 @@ def resolve_evidence_location(
         "coordinate_lookup_skipped": not evidence_points or not scoped_points,
         "has_registration_transform": _load_registration_transform(evidence) is not None,
         "candidate_count": len(location_candidates),
+        "coordinate_projections": _coordinate_projection_log_entries(
+            location_candidates,
+            master_drawing_id=master_drawing_id,
+        ),
     }
     log_inspection_match_candidates(
         evidence_id=evidence_id,

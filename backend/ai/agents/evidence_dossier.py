@@ -5,10 +5,13 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
 from sqlalchemy.orm import Session
+
+from config import settings
 
 from ai.pipelines.candidate_tile_selector import CandidateTile, find_candidate_tiles_from_clues
 from ai.pipelines.clue_expander import expand_clue_value
@@ -24,6 +27,7 @@ from services.evidence_text import build_full_evidence_text
 from services.file_storage import resolve_stored_file_path
 from services.legend_lookup import find_codes_for_term
 from services.match_candidate_scope import build_match_scope
+from services.master_drawing_index_readiness import get_master_drawing_index_readiness
 from services.region_index_loader import build_region_index
 
 logger = logging.getLogger(__name__)
@@ -34,6 +38,7 @@ _LINKED_CONTENT_SECTION = re.compile(
     re.DOTALL,
 )
 _TEXT_PREVIEW_CHARS = 500
+_INVESTIGATION_CACHE_HOURS = 24
 
 
 @dataclass(frozen=True)
@@ -90,6 +95,8 @@ def build_evidence_dossier(
     evidence_id: int,
     master_drawing_id: int,
     page: int = 1,
+    investigate: bool = True,
+    force_investigate: bool = False,
 ) -> EvidenceDossier:
     """Assemble the case file for the Inspection Location Agent."""
     evidence = session.get(EvidenceRecord, evidence_id)
@@ -97,6 +104,15 @@ def build_evidence_dossier(
         raise ValueError(f"Evidence {evidence_id} not found")
 
     project_id = cast(int, evidence.project_id)
+
+    investigated_summaries, pdf_investigation_meta = _maybe_investigate_and_persist(
+        session,
+        evidence=evidence,
+        project_id=project_id,
+        investigate=investigate,
+        force_investigate=force_investigate,
+    )
+
     meta = dict(cast(dict[str, Any] | None, evidence.meta) or {})
 
     extraction, clues = _load_extraction_and_clues(session, evidence_id)
@@ -132,16 +148,27 @@ def build_evidence_dossier(
         meta=meta,
         auxiliary_drawings=auxiliary_drawings,
     )
-    pdf_investigation_meta: dict[str, Any] = {}
-    investigated_attachments, pdf_investigation_meta = _pdf_investigation_for_evidence(evidence)
     linked_attachments = _merge_linked_attachment_summaries(
         linked_attachments,
-        investigated_attachments,
+        investigated_summaries,
     )
 
     region_index = build_region_index(session, master_drawing_id)
     drawing_ids = (master_drawing_id, *scope.auxiliary_drawing_ids)
     scoped_rows = _load_scoped_survey_points(session, drawing_ids)
+    scoped_point_counts = {str(drawing_id): 0 for drawing_id in drawing_ids}
+    for point in scoped_rows:
+        scoped_point_counts[str(point.drawing_id)] = (
+            scoped_point_counts.get(str(point.drawing_id), 0) + 1
+        )
+    logger.info(
+        "evidence_dossier_scoped_survey_points",
+        extra={
+            "evidence_id": evidence_id,
+            "master_drawing_id": master_drawing_id,
+            "scoped_point_counts": scoped_point_counts,
+        },
+    )
     scoped_survey_points = tuple(_scoped_to_survey_record(point) for point in scoped_rows)
 
     candidate_tiles = tuple(
@@ -176,6 +203,12 @@ def build_evidence_dossier(
         "auxiliary_drawing_ids": list(scope.auxiliary_drawing_ids),
         "preferred_pages": list(scope.preferred_pages),
         "pdfLinkFollow": meta.get("pdfLinkFollow"),
+        "matchInvestigation": meta.get("matchInvestigation"),
+        "scoped_point_counts": scoped_point_counts,
+        "auxiliary_index_pending": any(
+            not get_master_drawing_index_readiness(session, cast(int, drawing.id)).is_ready_for_matching
+            for drawing in auxiliary_drawings
+        ),
         **pdf_investigation_meta,
     }
 
@@ -376,10 +409,41 @@ def _merge_linked_attachment_summaries(
     return tuple(merged.values())
 
 
-def _pdf_investigation_for_evidence(
+def _match_investigation_is_fresh(meta: dict[str, Any]) -> bool:
+    raw = meta.get("matchInvestigation")
+    if not isinstance(raw, dict):
+        return False
+    at_raw = raw.get("at")
+    if not isinstance(at_raw, str) or not at_raw:
+        return False
+    try:
+        investigated_at = datetime.fromisoformat(at_raw.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if investigated_at.tzinfo is None:
+        investigated_at = investigated_at.replace(tzinfo=timezone.utc)
+    age = datetime.now(timezone.utc) - investigated_at
+    return age.total_seconds() < _INVESTIGATION_CACHE_HOURS * 3600
+
+
+def _pdf_investigation_meta_from_payload(result: Any) -> dict[str, Any]:
+    return {
+        "links_followed": result.links_followed,
+        "pages_rendered": result.pages_rendered,
+        "ocr_word_counts": dict(result.ocr_word_counts),
+        "pdf_investigation_errors": list(result.errors),
+    }
+
+
+def _maybe_investigate_and_persist(
+    session: Session,
+    *,
     evidence: EvidenceRecord,
+    project_id: int,
+    investigate: bool,
+    force_investigate: bool,
 ) -> tuple[tuple[LinkedAttachmentSummary, ...], dict[str, Any]]:
-    """Run PDF link investigation when the evidence file is a PDF."""
+    """Run match-time PDF investigation once and persist linked drawings/clues."""
     empty_meta: dict[str, Any] = {
         "links_followed": 0,
         "pages_rendered": 0,
@@ -387,34 +451,62 @@ def _pdf_investigation_for_evidence(
         "pdf_investigation_errors": [],
     }
 
+    meta = dict(cast(dict[str, Any] | None, evidence.meta) or {})
+    if not investigate:
+        return (), empty_meta
+    if not force_investigate and _match_investigation_is_fresh(meta):
+        return (), empty_meta
+
     storage_key = cast(str | None, evidence.storage_key)
     if not storage_key:
         return (), empty_meta
 
     file_path = resolve_stored_file_path(storage_key)
-    if file_path is None or file_path.suffix.lower() != ".pdf":
+    if file_path is None:
         return (), empty_meta
 
     try:
         from ai.agents.tools.pdf_investigation import run_pdf_investigation
+        from services.evidence_investigation_persistence import persist_evidence_investigation
 
-        result = run_pdf_investigation(file_path)
+        result = run_pdf_investigation(
+            file_path,
+            max_links=settings.pdf_link_follow_max_external_match,
+            session=session,
+            project_id=project_id,
+        )
+        persist_result = persist_evidence_investigation(
+            session,
+            evidence_id=cast(int, evidence.id),
+            file_path=file_path,
+            project_id=project_id,
+            payload=result,
+        )
+        session.flush()
+        session.refresh(evidence)
+        investigation_meta = _pdf_investigation_meta_from_payload(result)
+        match_investigation = dict(
+            cast(dict[str, Any] | None, cast(dict[str, Any] | None, evidence.meta) or {}).get(
+                "matchInvestigation"
+            )
+            or {}
+        )
+        if persist_result.drawing_ids_needing_index:
+            investigation_meta["drawing_ids_needing_index"] = (
+                persist_result.drawing_ids_needing_index
+            )
+        if match_investigation:
+            investigation_meta["matchInvestigation"] = match_investigation
+        return result.summaries, investigation_meta
     except Exception as exc:
         logger.exception(
-            "evidence_dossier_pdf_investigation_failed",
+            "evidence_dossier_match_investigation_failed",
             extra={"evidence_id": evidence.id, "file_path": str(file_path)},
         )
         return (), {
             **empty_meta,
             "pdf_investigation_errors": [str(exc)],
         }
-
-    return result.summaries, {
-        "links_followed": result.links_followed,
-        "pages_rendered": result.pages_rendered,
-        "ocr_word_counts": dict(result.ocr_word_counts),
-        "pdf_investigation_errors": list(result.errors),
-    }
 
 
 def _photo_paths(evidence: EvidenceRecord, kind: EvidenceKind) -> tuple[Path, ...]:

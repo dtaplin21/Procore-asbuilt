@@ -9,12 +9,14 @@ Followed PDF and image attachments are always OCR'd (never native PDF text layer
 from __future__ import annotations
 
 import ipaddress
+import json
 import logging
 import re
 import tempfile
 from dataclasses import dataclass
 from html import unescape
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlparse
 
 import httpx
@@ -22,9 +24,22 @@ import httpx
 from ai.pipelines.document_text_extraction import extract_document_via_ocr
 from config import pdf_link_follow_allowed_host_suffixes, settings
 
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
 logger = logging.getLogger(__name__)
 
 FETCH_TIMEOUT_SECONDS = 10.0
+_MAX_EMBEDDED_URL_DEPTH = 2
+_URL_IN_TEXT_RE = re.compile(r"https?://[^\s<>\"'\]\)]+", re.I)
+_JSON_URL_FIELD_RE = re.compile(
+    r'"(?:url|download_url|file_url|s3_source|redirect_url)"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"',
+    re.I,
+)
+_XML_URL_TAG_RE = re.compile(
+    r"<(?:url|location|redirecturl|download_url)[^>]*>([^<]+)</(?:url|location|redirecturl|download_url)>",
+    re.I,
+)
 
 
 def max_response_bytes() -> int:
@@ -44,6 +59,14 @@ class SafeFetchResult:
 
 
 @dataclass(frozen=True)
+class ProcoreFetchContext:
+    """Optional OAuth context for resolving app.procore.com document_downloader links."""
+
+    db: Session
+    project_id: int
+
+
+@dataclass(frozen=True)
 class UrlAttachmentFetch:
     text: str
     error: str | None
@@ -51,6 +74,7 @@ class UrlAttachmentFetch:
     pages: int
     body: bytes = b""
     content_type: str = ""
+    resolved_url: str | None = None
 
 
 def is_allowed_external_url(url: str) -> bool:
@@ -144,17 +168,29 @@ def fetch_url_text_with_error(url: str) -> tuple[str, str | None]:
     return attachment.text, attachment.error
 
 
-def fetch_url_attachment_with_error(url: str) -> UrlAttachmentFetch:
+def fetch_url_attachment_with_error(
+    url: str,
+    *,
+    procore_context: ProcoreFetchContext | None = None,
+    _redirect_depth: int = 0,
+) -> UrlAttachmentFetch:
     """Fetch an allowlisted URL and return OCR/text plus filename and page count."""
-    fetched = fetch_allowed_url(url)
+    resolved_url = _resolve_fetch_url(url, procore_context=procore_context)
+    fetched = fetch_allowed_url(resolved_url)
     filename = _resolve_attachment_filename(
-        url,
+        resolved_url,
         fetched.content_disposition if fetched.ok else None,
     )
     if not fetched.ok:
         error = fetched.error or "fetch failed"
-        logger.debug("pdf_link_fetch_failed url=%s error=%s", url, error)
-        return UrlAttachmentFetch(text="", error=error, filename=filename, pages=0)
+        logger.debug("pdf_link_fetch_failed url=%s error=%s", resolved_url, error)
+        return UrlAttachmentFetch(
+            text="",
+            error=error,
+            filename=filename,
+            pages=0,
+            resolved_url=resolved_url if resolved_url != url else None,
+        )
 
     content_type = (fetched.content_type or "").lower()
     body = fetched.body
@@ -177,6 +213,30 @@ def fetch_url_attachment_with_error(url: str) -> UrlAttachmentFetch:
             pages=pages,
             body=body,
             content_type=content_type or "application/pdf",
+            resolved_url=resolved_url if resolved_url != url else None,
+        )
+    if content_type in ("application/octet-stream", "binary/octet-stream") and body.startswith(
+        b"%PDF"
+    ):
+        text, pages = _pdf_bytes_to_text(body)
+        if not text.strip():
+            return UrlAttachmentFetch(
+                text="",
+                error="pdf OCR text extraction returned empty",
+                filename=filename,
+                pages=pages,
+                body=body,
+                content_type="application/pdf",
+                resolved_url=resolved_url if resolved_url != url else None,
+            )
+        return UrlAttachmentFetch(
+            text=text,
+            error=None,
+            filename=filename,
+            pages=pages,
+            body=body,
+            content_type="application/pdf",
+            resolved_url=resolved_url if resolved_url != url else None,
         )
     if content_type.startswith("image/") or _looks_like_image(body):
         text, pages = _image_bytes_to_text(body, content_type)
@@ -187,7 +247,13 @@ def fetch_url_attachment_with_error(url: str) -> UrlAttachmentFetch:
                 filename=filename,
                 pages=pages,
             )
-        return UrlAttachmentFetch(text=text, error=None, filename=filename, pages=pages)
+        return UrlAttachmentFetch(
+            text=text,
+            error=None,
+            filename=filename,
+            pages=pages,
+            resolved_url=resolved_url if resolved_url != url else None,
+        )
     if content_type in ("text/html", "application/xhtml+xml") or _looks_like_html(body):
         text = _html_bytes_to_text(body)
         if not text.strip():
@@ -197,7 +263,28 @@ def fetch_url_attachment_with_error(url: str) -> UrlAttachmentFetch:
                 filename=filename,
                 pages=0,
             )
-        return UrlAttachmentFetch(text=text, error=None, filename=filename, pages=0)
+        return UrlAttachmentFetch(
+            text=text,
+            error=None,
+            filename=filename,
+            pages=0,
+            resolved_url=resolved_url if resolved_url != url else None,
+        )
+    if content_type in ("application/xml", "text/xml") or _looks_like_xml(body):
+        nested = _follow_embedded_download_urls(
+            body,
+            procore_context=procore_context,
+            redirect_depth=_redirect_depth,
+        )
+        if nested is not None:
+            return nested
+        return UrlAttachmentFetch(
+            text="",
+            error=f"unsupported content type: {content_type or 'unknown'}",
+            filename=filename,
+            pages=0,
+            resolved_url=resolved_url if resolved_url != url else None,
+        )
     if content_type.startswith("text/"):
         text = body.decode("utf-8", errors="replace").strip()
         if not text:
@@ -207,13 +294,107 @@ def fetch_url_attachment_with_error(url: str) -> UrlAttachmentFetch:
                 filename=filename,
                 pages=0,
             )
-        return UrlAttachmentFetch(text=text, error=None, filename=filename, pages=0)
+        return UrlAttachmentFetch(
+            text=text,
+            error=None,
+            filename=filename,
+            pages=0,
+            resolved_url=resolved_url if resolved_url != url else None,
+        )
     return UrlAttachmentFetch(
         text="",
         error=f"unsupported content type: {content_type or 'unknown'}",
         filename=filename,
         pages=0,
+        resolved_url=resolved_url if resolved_url != url else None,
     )
+
+
+def _resolve_fetch_url(
+    url: str,
+    *,
+    procore_context: ProcoreFetchContext | None,
+) -> str:
+    if procore_context is None:
+        return url
+    from services.procore_attachment_fetch import resolve_procore_attachment_download_url
+
+    resolved = resolve_procore_attachment_download_url(
+        url,
+        db=procore_context.db,
+        project_id=procore_context.project_id,
+    )
+    return resolved or url
+
+
+def _follow_embedded_download_urls(
+    body: bytes,
+    *,
+    procore_context: ProcoreFetchContext | None,
+    redirect_depth: int,
+) -> UrlAttachmentFetch | None:
+    if redirect_depth >= _MAX_EMBEDDED_URL_DEPTH:
+        return None
+    for embedded_url in _extract_embedded_download_urls(body):
+        nested = fetch_url_attachment_with_error(
+            embedded_url,
+            procore_context=procore_context,
+            _redirect_depth=redirect_depth + 1,
+        )
+        if nested.error is None and (nested.text.strip() or nested.body.startswith(b"%PDF")):
+            return nested
+    return None
+
+
+def _extract_embedded_download_urls(body: bytes) -> list[str]:
+    text = body.decode("utf-8", errors="replace")
+    candidates: list[str] = []
+
+    for match in _JSON_URL_FIELD_RE.finditer(text):
+        candidates.append(unescape(json.loads(f'"{match.group(1)}"')))
+
+    for match in _XML_URL_TAG_RE.finditer(text):
+        candidates.append(unescape(match.group(1).strip()))
+
+    try:
+        payload = json.loads(text)
+        candidates.extend(_collect_urls_from_json(payload))
+    except json.JSONDecodeError:
+        pass
+
+    for match in _URL_IN_TEXT_RE.finditer(text):
+        candidates.append(match.group(0).rstrip(".,;)'\"}]"))
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        normalized = candidate.strip()
+        if not normalized or normalized in seen:
+            continue
+        if not is_allowed_external_url(normalized):
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return deduped
+
+
+def _collect_urls_from_json(payload: Any) -> list[str]:
+    found: list[str] = []
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            if key.lower() in {"url", "download_url", "file_url", "s3_source", "redirect_url"}:
+                if isinstance(value, str) and value.startswith(("http://", "https://")):
+                    found.append(value)
+            found.extend(_collect_urls_from_json(value))
+    elif isinstance(payload, list):
+        for item in payload:
+            found.extend(_collect_urls_from_json(item))
+    return found
+
+
+def _looks_like_xml(body: bytes) -> bool:
+    sample = body[:256].lstrip().lower()
+    return sample.startswith(b"<?xml") or sample.startswith(b"<")
 
 
 def _link_follow_ocr_max_pages() -> int | None:

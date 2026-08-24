@@ -105,6 +105,12 @@ class JsonFormatter(logging.Formatter):
             "existing_drawing_id",
             "storage_key",
             "fetched_pdf_count",
+            "attachment_filename",
+            "words",
+            "depth",
+            "attachment_id",
+            "resolved_host",
+            "reason",
         ):
             if hasattr(record, key):
                 payload[key] = getattr(record, key)

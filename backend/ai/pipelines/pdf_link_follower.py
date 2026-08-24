@@ -20,6 +20,7 @@ from ai.pipelines.linked_attachment_merge import (
 from config import settings
 from services.procore_url_parser import build_procore_cross_ref, parse_procore_url
 from services.safe_url_fetch import (
+    ProcoreFetchContext,
     fetch_url_attachment_with_error,
     is_allowed_external_url,
 )
@@ -82,7 +83,13 @@ def extract_pdf_hyperlinks(file_path: str | Path) -> list[PdfHyperlink]:
         return []
 
 
-def follow_pdf_links(file_path: str | Path) -> LinkFollowResult:
+def follow_pdf_links(
+    file_path: str | Path,
+    *,
+    max_external: int | None = None,
+    max_depth: int | None = None,
+    procore_context: ProcoreFetchContext | None = None,
+) -> LinkFollowResult:
     """Enumerate and follow hyperlinks in a PDF. Non-PDF files return empty result."""
     if not settings.pdf_link_follow_enabled:
         return LinkFollowResult()
@@ -90,6 +97,17 @@ def follow_pdf_links(file_path: str | Path) -> LinkFollowResult:
     path = Path(file_path)
     if path.suffix.lower() != ".pdf":
         return LinkFollowResult()
+
+    external_limit = (
+        settings.pdf_link_follow_max_external
+        if max_external is None
+        else max(0, int(max_external))
+    )
+    depth_limit = (
+        settings.pdf_link_follow_max_depth
+        if max_depth is None
+        else max(1, int(max_depth))
+    )
 
     try:
         links = _dedupe_links(_extract_hyperlinks(path))
@@ -100,7 +118,14 @@ def follow_pdf_links(file_path: str | Path) -> LinkFollowResult:
         )
         return LinkFollowResult(errors=["hyperlink extraction failed"])
 
-    result = _follow_links(path, links)
+    result = _follow_links(
+        path,
+        links,
+        max_external=external_limit,
+        max_depth=depth_limit,
+        depth=0,
+        procore_context=procore_context,
+    )
     logger.info(
         "pdf_link_follow_complete",
         extra={
@@ -109,6 +134,8 @@ def follow_pdf_links(file_path: str | Path) -> LinkFollowResult:
             "followed": result.followed_count,
             "skipped": result.skipped_count,
             "fetched_pdf_count": len(result.fetched_pdfs),
+            "max_external": external_limit,
+            "max_depth": depth_limit,
         },
     )
     return result
@@ -175,9 +202,54 @@ def _text_from_page(doc: fitz.Document, page_index: int) -> str:
     return str(doc.load_page(page_index).get_text("text") or "")
 
 
-def _follow_links(file_path: Path, links: list[PdfHyperlink]) -> LinkFollowResult:
+def _extract_hyperlinks_from_bytes(body: bytes) -> list[PdfHyperlink]:
+    if not body.startswith(b"%PDF"):
+        return []
+    doc = fitz.open(stream=body, filetype="pdf")
+    links: list[PdfHyperlink] = []
+    try:
+        for page_index in range(doc.page_count):
+            page = doc.load_page(page_index)
+            for raw in page.get_links():
+                link = _normalize_link_dict(page_index, raw)
+                if link is not None:
+                    links.append(link)
+    finally:
+        doc.close()
+    return _dedupe_links(links)
+
+
+def _fetch_attachment_with_retry(
+    uri: str,
+    *,
+    procore_context: ProcoreFetchContext | None = None,
+):
+    """Fetch an external attachment; retry once on timeout."""
+    fetched = fetch_url_attachment_with_error(uri, procore_context=procore_context)
+    if fetched.error and "timed out" in fetched.error.lower():
+        logger.info(
+            "pdf_link_fetch_timeout_retry",
+            extra={"url": uri},
+        )
+        fetched = fetch_url_attachment_with_error(uri, procore_context=procore_context)
+    return fetched
+
+
+def _follow_links(
+    file_path: Path,
+    links: list[PdfHyperlink],
+    *,
+    max_external: int,
+    max_depth: int,
+    depth: int = 0,
+    fetch_budget: list[int] | None = None,
+    visited_urls: set[str] | None = None,
+    procore_context: ProcoreFetchContext | None = None,
+) -> LinkFollowResult:
     result = LinkFollowResult()
     attachments: list[LinkedAttachment] = []
+    budget = fetch_budget if fetch_budget is not None else [0]
+    visited = visited_urls if visited_urls is not None else set()
 
     internal_links = [
         link
@@ -194,20 +266,23 @@ def _follow_links(file_path: Path, links: list[PdfHyperlink]) -> LinkFollowResul
     external_links = [
         link for link in links if link.kind == PdfLinkKind.EXTERNAL_URI and link.uri
     ]
-    external_fetches = 0
     for link in external_links:
         uri = link.uri
         if not uri:
             continue
+        if uri in visited:
+            result.skipped_count += 1
+            continue
         if not is_allowed_external_url(uri):
             result.skipped_count += 1
             continue
-        if external_fetches >= settings.pdf_link_follow_max_external:
+        if budget[0] >= max_external:
             result.skipped_count += 1
             continue
+        visited.add(uri)
         try:
-            fetched = fetch_url_attachment_with_error(uri)
-            external_fetches += 1
+            fetched = _fetch_attachment_with_retry(uri, procore_context=procore_context)
+            budget[0] += 1
             body = fetched.body
             content_type = (fetched.content_type or "").lower()
             is_pdf = bool(body) and (
@@ -243,6 +318,31 @@ def _follow_links(file_path: Path, links: list[PdfHyperlink]) -> LinkFollowResul
                         pages=fetched.pages or 1,
                         captured=True,
                     )
+                    if depth + 1 < max_depth:
+                        nested = _follow_nested_pdf_links(
+                            body,
+                            max_external=max_external,
+                            max_depth=max_depth,
+                            depth=depth + 1,
+                            fetch_budget=budget,
+                            visited_urls=visited,
+                            procore_context=procore_context,
+                        )
+                        result.fetched_pdfs.extend(nested.fetched_pdfs)
+                        result.followed_count += nested.followed_count
+                        result.skipped_count += nested.skipped_count
+                        result.errors.extend(nested.errors)
+                        result.cross_refs.extend(nested.cross_refs)
+                        if nested.supplemental_text.strip():
+                            attachments.append(
+                                LinkedAttachment(
+                                    url=f"nested:{uri}",
+                                    filename=f"nested-{fetched.filename}",
+                                    text=nested.supplemental_text,
+                                    word_count=len(nested.supplemental_text.split()),
+                                    pages=fetched.pages or 1,
+                                )
+                            )
                 else:
                     log_linked_drawing_fetch_capture(
                         url=uri,
@@ -258,7 +358,8 @@ def _follow_links(file_path: Path, links: list[PdfHyperlink]) -> LinkFollowResul
                     extra={
                         "pages": fetched.pages,
                         "words": word_count,
-                        "filename": fetched.filename,
+                        "attachment_filename": fetched.filename,
+                        "depth": depth,
                     },
                 )
                 result.followed_count += 1
@@ -307,6 +408,7 @@ def _follow_links(file_path: Path, links: list[PdfHyperlink]) -> LinkFollowResul
                 "included": merge_result["included"],
                 "truncated": merge_result["truncated"],
                 "dropped": merge_result["dropped"],
+                "depth": depth,
             },
         )
         if merge_result["dropped"]:
@@ -322,6 +424,41 @@ def _follow_links(file_path: Path, links: list[PdfHyperlink]) -> LinkFollowResul
                 result.errors.append(f"linked attachment truncated in merge: {filename}")
 
     return result
+
+
+def _follow_nested_pdf_links(
+    body: bytes,
+    *,
+    max_external: int,
+    max_depth: int,
+    depth: int,
+    fetch_budget: list[int],
+    visited_urls: set[str],
+    procore_context: ProcoreFetchContext | None = None,
+) -> LinkFollowResult:
+    import tempfile
+
+    nested_links = _extract_hyperlinks_from_bytes(body)
+    if not nested_links:
+        return LinkFollowResult()
+
+    temp_file = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    temp_path = Path(temp_file.name)
+    try:
+        temp_file.write(body)
+        temp_file.close()
+        return _follow_links(
+            temp_path,
+            nested_links,
+            max_external=max_external,
+            max_depth=max_depth,
+            depth=depth,
+            fetch_budget=fetch_budget,
+            visited_urls=visited_urls,
+            procore_context=procore_context,
+        )
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 def _collect_internal_attachments(

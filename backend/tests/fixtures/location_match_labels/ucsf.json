@@ -23,7 +23,7 @@
     "has_station_signal": true,
     "has_reference_signal": true,
     "evidence_kind": "form",
-    "notes": "Golden UCSF run 447 / evidence 377. Evidence carries N/E 2131764.84 / 6051541.82 and station 11+14.23 from linked C4.20 profile text, but master 661 has no positioned survey OCR (index survey_points=0). Coordinate lookup requires auto_index/lazy_match drawing_survey_points with real label bboxes — never use pre2_baseline_seed. Until the C4.20 plan sheet is indexed with paired N/E tokens, expect reference/clue fusion at needs_review. Re-annotate master_bbox_json when a verified pin exists."
+    "notes": "Golden UCSF run 447 / evidence 377. Evidence carries N/E 2131764.84 / 6051541.82 and station 11+14.23 from linked install-sheet profile text, but master 661 has no positioned survey OCR. Match-time investigation registers and indexes whichever linked plan the PDF references (not a fixed sheet id). Coordinate lookup uses auxiliary drawing OCR when indexed; without a registration transform the agent returns needs_review with aux_coords_unprojected rather than a wrong master pin. Re-annotate master_bbox_json when a verified pin exists."
   },
   {
     "label_id": "ucsf-rotated-detail",

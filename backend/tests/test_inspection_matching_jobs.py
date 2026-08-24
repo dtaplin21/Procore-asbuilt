@@ -176,6 +176,8 @@ def test_run_inspection_match_job_calls_agent(
 ):
     run, file_id = _seed_run(db)
     master_drawing_id = cast(int, run.master_drawing_id)
+    setattr(run, "status", "processing")
+    db.commit()
     mock_agent = mock_agent_cls.return_value
     mock_agent.run.return_value = _matched_agent_result()
 
@@ -185,17 +187,21 @@ def test_run_inspection_match_job_calls_agent(
             "drawing_id": str(master_drawing_id),
             "page": 1,
             "project_id": cast(int, run.project_id),
+            "inspection_run_id": cast(int, run.id),
         },
         db,
     )
 
     assert status == "matched"
+    db.refresh(run)
+    assert run.status == "complete"
+    assert run.completed_at is not None
     mock_agent.run.assert_called_once_with(
         db,
         evidence_id=int(file_id),
         master_drawing_id=master_drawing_id,
         page=1,
-        inspection_run_id=None,
+        inspection_run_id=cast(int, run.id),
     )
 
 

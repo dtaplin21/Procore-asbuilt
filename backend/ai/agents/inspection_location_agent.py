@@ -14,8 +14,9 @@ from ai.pipelines.clue_fusion_scorer import (
     fuse_candidate_scores,
     select_fused_winner,
 )
+from ai.pipelines.drawing_location_resolver import ResolutionMethod
 from ai.pipelines.location_match_orchestrator import generate_all_location_candidates
-from ai.pipelines.scope_geometry import ScopeGeometry, ScopeKind, infer_scope_kind
+from ai.pipelines.scope_geometry import ScopeGeometry, ScopeKind, bbox_to_scope_rect, clamp_fractional_bbox, infer_scope_kind
 from ai.pipelines.scope_line_tracer import trace_scope_geometry
 from ai.pipelines.vision_location_reasoner import (
     apply_vision_to_fused_scores,
@@ -77,9 +78,10 @@ class InspectionLocationAgent:
             evidence_id=evidence_id,
             master_drawing_id=master_drawing_id,
             page=page,
+            investigate=True,
         )
 
-        if _auxiliary_drawings_need_index(dossier):
+        if _auxiliary_drawings_need_index(session, dossier):
             result = AgentMatchResult(
                 status="index_pending",
                 scope=None,
@@ -135,6 +137,29 @@ class InspectionLocationAgent:
             )
 
         winner = select_fused_winner(ranked_scores)
+        if winner is None and _has_unprojected_aux_coordinate_match(candidates):
+            result = AgentMatchResult(
+                status="needs_review",
+                scope=None,
+                region_id=None,
+                page=page,
+                rationale=(
+                    "aux_coords_unprojected: survey coordinates matched on a linked "
+                    "drawing but could not be projected onto the master sheet."
+                ),
+                fused_score=None,
+            )
+            persist_agent_match_result(
+                session,
+                evidence_id=evidence_id,
+                master_drawing_id=master_drawing_id,
+                result=result,
+                ranked_scores=ranked_scores,
+                page=page,
+                inspection_run_id=inspection_run_id,
+            )
+            return result
+
         if winner is None:
             result = AgentMatchResult(
                 status="no_match",
@@ -159,14 +184,24 @@ class InspectionLocationAgent:
         anchor_bbox = winner.candidate.bbox_fractional
         scope: ScopeGeometry | None = None
         if anchor_bbox is not None:
-            scope = trace_scope_geometry(
-                dossier,
-                anchor_bbox=anchor_bbox,
-                scope_kind=scope_kind,
-                page=page,
-                session=session,
-                master_png_path=master_png_path,
-            )
+            safe_anchor = clamp_fractional_bbox(anchor_bbox)
+            try:
+                scope = trace_scope_geometry(
+                    dossier,
+                    anchor_bbox=safe_anchor,
+                    scope_kind=scope_kind,
+                    page=page,
+                    session=session,
+                    master_png_path=master_png_path,
+                )
+            except ValueError:
+                scope = None
+            if scope is None:
+                scope = bbox_to_scope_rect(
+                    safe_anchor,
+                    page=page,
+                    scope_kind=scope_kind,
+                )
 
         status = _decide_match_status(
             winner,
@@ -230,10 +265,21 @@ def _decide_match_status(
     return "needs_review"
 
 
-def _auxiliary_drawings_need_index(dossier: EvidenceDossier) -> bool:
+def _has_unprojected_aux_coordinate_match(candidates: list[object]) -> bool:
+    for candidate in candidates:
+        notes = str(getattr(candidate, "notes", "") or "")
+        method = getattr(candidate, "method", None)
+        if method == ResolutionMethod.COORDINATE_LOOKUP and "aux_coords_unprojected" in notes:
+            return True
+    return False
+
+
+def _auxiliary_drawings_need_index(session: Session, dossier: EvidenceDossier) -> bool:
+    if dossier.investigation_meta.get("auxiliary_index_pending"):
+        return True
     for drawing in dossier.auxiliary_drawings:
-        index_status = str(getattr(drawing, "index_status", "pending") or "pending")
-        if index_status != "ready":
+        readiness = get_master_drawing_index_readiness(session, cast(int, drawing.id))
+        if not readiness.is_ready_for_matching:
             return True
     return False
 

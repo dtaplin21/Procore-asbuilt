@@ -6,10 +6,11 @@ import logging
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import fitz
 
+from config import settings
 from ai.agents.evidence_dossier import LinkedAttachmentSummary
 from ai.pipelines.document_text_extraction import extract_document
 from ai.pipelines.pdf_link_follower import (
@@ -25,6 +26,10 @@ from ai.pipelines.survey_point_extractor import (
     extract_stations_from_text,
     extract_survey_points_from_plain_text,
 )
+from services.safe_url_fetch import ProcoreFetchContext
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +74,20 @@ def list_pdf_hyperlinks(file_path: Path) -> list[PdfHyperlink]:
     return extract_pdf_hyperlinks(file_path)
 
 
-def follow_and_capture_links(file_path: Path) -> LinkFollowResult:
+def follow_and_capture_links(
+    file_path: Path,
+    *,
+    max_external: int | None = None,
+    max_depth: int | None = None,
+    procore_context: ProcoreFetchContext | None = None,
+) -> LinkFollowResult:
     """Follow hyperlinks and capture supplemental text + fetched PDF bodies."""
-    return follow_pdf_links(file_path)
+    return follow_pdf_links(
+        file_path,
+        max_external=max_external,
+        max_depth=max_depth,
+        procore_context=procore_context,
+    )
 
 
 def render_pdf_page(pdf_path: Path, *, page: int = 1, dpi: int = 200) -> RenderedPdfPage:
@@ -165,7 +181,7 @@ def _summary_from_fetched(
         except Exception:
             logger.exception(
                 "pdf_investigation_fetched_clue_extract_failed",
-                extra={"url": fetched.url, "filename": fetched.filename},
+                extra={"url": fetched.url, "attachment_filename": fetched.filename},
             )
         finally:
             temp_path.unlink(missing_ok=True)
@@ -210,6 +226,8 @@ def run_pdf_investigation(
     file_path: Path,
     *,
     max_links: int = 10,
+    session: Session | None = None,
+    project_id: int | None = None,
 ) -> EvidenceInvestigationPayload:
     """Follow PDF links, render pages, extract clues, and return investigation payload."""
     if file_path.suffix.lower() != ".pdf":
@@ -243,7 +261,18 @@ def run_pdf_investigation(
         ocr_word_counts[key] = word_count
         pages_rendered += 1
 
-    link_result = follow_and_capture_links(file_path)
+    procore_context = (
+        ProcoreFetchContext(db=session, project_id=project_id)
+        if session is not None and project_id is not None
+        else None
+    )
+
+    link_result = follow_and_capture_links(
+        file_path,
+        max_external=settings.pdf_link_follow_max_external_match,
+        max_depth=settings.pdf_link_follow_max_depth,
+        procore_context=procore_context,
+    )
     errors.extend(link_result.errors)
     base_text = extract_document(file_path).full_text().strip()
     merged_text = _merge_evidence_text(base_text, link_result)

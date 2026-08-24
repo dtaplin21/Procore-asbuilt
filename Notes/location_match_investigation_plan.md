@@ -231,11 +231,11 @@ Run: cd backend && pytest tests/test_evidence_investigation_persistence.py tests
 
 ## PR-C — Single front door: `build_evidence_dossier(investigate=True)`
 
-- [ ] **C-1** Add `investigate: bool = True` param to `build_evidence_dossier`
-- [ ] **C-2** When `investigate=True`: run pdf investigation → persist → then load clues (replace `_pdf_investigation_for_evidence` duplicate fetch)
-- [ ] **C-3** Cache: skip re-investigate if `evidence.meta.matchInvestigation.at` fresh (< 24h) unless `force=True`
-- [ ] **C-4** `InspectionLocationAgent` passes `investigate=True` (default)
-- [ ] **C-5** Tests: dossier calls persist once; no double follow_pdf_links
+- [x] **C-1** Add `investigate: bool = True` param to `build_evidence_dossier`
+- [x] **C-2** When `investigate=True`: run pdf investigation → persist → then load clues (replace `_pdf_investigation_for_evidence` duplicate fetch)
+- [x] **C-3** Cache: skip re-investigate if `evidence.meta.matchInvestigation.at` fresh (< 24h) unless `force=True`
+- [x] **C-4** `InspectionLocationAgent` passes `investigate=True` (default)
+- [x] **C-5** Tests: dossier calls persist once; no double follow_pdf_links
 
 **Plain English:** When the agent starts, the dossier builder opens the PDF, follows every link, saves results to the DB, *then* reads them back to build the case file. One trip, not two.
 
@@ -278,10 +278,10 @@ Run: cd backend && pytest tests/test_evidence_dossier.py tests/test_inspection_l
 
 ## PR-D — Index linked drawings during dossier investigate
 
-- [ ] **D-1** After `persist_evidence_investigation`, enqueue render + index for new auxiliary drawings
-- [ ] **D-2** `build_evidence_dossier` waits or agent returns `index_pending` if aux not ready
-- [ ] **D-3** Lazy survey extraction on auxiliary drawing IDs after index ready
-- [ ] **D-4** Log `scoped_point_count` per drawing_id
+- [x] **D-1** After `persist_evidence_investigation`, enqueue render + index for new auxiliary drawings
+- [x] **D-2** `build_evidence_dossier` waits or agent returns `index_pending` if aux not ready
+- [x] **D-3** Lazy survey extraction on auxiliary drawing IDs after index ready
+- [x] **D-4** Log `scoped_point_count` per drawing_id
 
 **Plain English:** When match finds a linked sewer plan, it OCRs and indexes that plan before trying to place coordinates — like reading the referenced page before marking the map.
 
@@ -311,10 +311,10 @@ Run: cd backend && pytest tests/test_evidence_dossier.py tests/test_survey_point
 
 ## PR-E — Project auxiliary coordinates onto master drawing
 
-- [ ] **E-1** When coordinate match hits auxiliary drawing, project bbox to master
-- [ ] **E-2** Use registration transform when available
-- [ ] **E-3** Else emit `needs_review` with `aux_coords_unprojected` — never silent wrong pin
-- [ ] **E-4** Update `ucsf.json` eval label notes
+- [x] **E-1** When coordinate match hits auxiliary drawing, project bbox to master
+- [x] **E-2** Use registration transform when available
+- [x] **E-3** Else emit `needs_review` with `aux_coords_unprojected` — never silent wrong pin
+- [x] **E-4** Update `ucsf.json` eval label notes
 
 **Plain English:** Coordinates found on C4.20 get translated to the equivalent spot on Master.pdf — like aligning two maps by shared survey numbers.
 
@@ -342,10 +342,10 @@ Run: cd backend && pytest tests/test_location_match_eval.py tests/test_inspectio
 
 ## PR-F — Match-time hyperlink budget (on existing follower)
 
-- [ ] **F-1** `PDF_LINK_FOLLOW_MAX_EXTERNAL_MATCH` config (default 10)
-- [ ] **F-2** Optional depth limit for nested links in `pdf_link_follower`
-- [ ] **F-3** One retry on Procore timeout
-- [ ] **F-4** `run_pdf_investigation` passes match limits to follower
+- [x] **F-1** `PDF_LINK_FOLLOW_MAX_EXTERNAL_MATCH` config (default 10)
+- [x] **F-2** Optional depth limit for nested links in `pdf_link_follower`
+- [x] **F-3** One retry on Procore timeout
+- [x] **F-4** `run_pdf_investigation` passes match limits to follower
 
 **Plain English:** Match can follow more links and retry once if Procore is slow — applied to the existing link follower, not a new module.
 
@@ -372,9 +372,9 @@ Run: cd backend && pytest tests/test_pdf_link_follower.py -q --tb=short
 
 ## PR-G — UI & run status honesty
 
-- [ ] **G-1** Run `complete` only after match job finishes
-- [ ] **G-2** Panel: "Investigating linked files…" while processing
-- [ ] **G-3** Upload toast: no misleading overlay count
+- [x] **G-1** Run `complete` only after match job finishes
+- [x] **G-2** Panel: "Investigating linked files…" while processing
+- [x] **G-3** Upload toast: no misleading overlay count
 
 **Plain English:** UI says "reading linked plans" instead of showing a wrong pin and "upload complete."
 
@@ -394,9 +394,9 @@ Run: cd client && npm test -- inspection_runs_panel -q
 
 ## PR-H — Cleanup & docs
 
-- [ ] **H-1** Remove dead upload extraction code paths
-- [ ] **H-2** Update `.env.example` + cross-ref in `inspection_location_agent_plan.md`
-- [ ] **H-3** Full test suite + UCSF eval
+- [x] **H-1** Remove dead upload extraction code paths
+- [x] **H-2** Update `.env.example` + cross-ref in `inspection_location_agent_plan.md`
+- [x] **H-3** Full test suite + UCSF eval
 
 **Plain English:** Delete leftover upload detective code; document new flow; prove UCSF case.
 

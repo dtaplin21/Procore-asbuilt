@@ -16,6 +16,8 @@ from ai.pipelines.scope_geometry import (
     _evidence_survey_points,
     _station_range,
     bbox_to_scope_rect,
+    clamp_fractional_bbox,
+    clamp_point_to_page,
 )
 from ai.pipelines.survey_point_extractor import extract_stations_from_text
 from models.drawing_text_element import DrawingTextElement
@@ -440,12 +442,14 @@ def _expand_bbox(
     bbox: tuple[float, float, float, float],
     padding: float,
 ) -> tuple[float, float, float, float]:
-    x0, y0, x1, y1 = bbox
-    return (
-        max(0.0, x0 - padding),
-        max(0.0, y0 - padding),
-        min(1.0, x1 + padding),
-        min(1.0, y1 + padding),
+    x0, y0, x1, y1 = clamp_fractional_bbox(bbox)
+    return clamp_fractional_bbox(
+        (
+            x0 - padding,
+            y0 - padding,
+            x1 + padding,
+            y1 + padding,
+        )
     )
 
 
@@ -453,9 +457,9 @@ def _clamp_point(
     point: tuple[float, float],
     bbox: tuple[float, float, float, float],
 ) -> tuple[float, float]:
-    x0, y0, x1, y1 = bbox
+    x0, y0, x1, y1 = clamp_fractional_bbox(bbox)
     x, y = point
-    return (max(x0, min(x1, x)), max(y0, min(y1, y)))
+    return clamp_point_to_page((max(x0, min(x1, x)), max(y0, min(y1, y))))
 
 
 def _centroid(bbox: tuple[float, float, float, float]) -> tuple[float, float]:

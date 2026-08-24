@@ -261,12 +261,18 @@ def scope_to_geometry(
 ) -> dict[str, Any]:
     """Prefer ScopeGeometry; fall back to rect from bbox; else UNMAPPED_GEOMETRY."""
     if scope is not None:
-        geometry = scope.to_geometry_json()
-        geometry["label"] = "inspection_match"
-        return geometry
+        try:
+            geometry = scope.to_geometry_json()
+        except ValueError:
+            geometry = None
+        if geometry is not None:
+            geometry["label"] = "inspection_match"
+            return geometry
 
     if fallback_bbox is not None:
-        return bbox_to_geometry(fallback_bbox, page=page)
+        from ai.pipelines.scope_geometry import clamp_fractional_bbox
+
+        return bbox_to_geometry(clamp_fractional_bbox(fallback_bbox), page=page)
 
     geometry = dict(UNMAPPED_GEOMETRY)
     geometry["page"] = page
@@ -284,6 +290,9 @@ def bbox_to_geometry(
         return geometry
 
     x0, y0, x1, y1 = bbox
+    from ai.pipelines.scope_geometry import clamp_fractional_bbox
+
+    x0, y0, x1, y1 = clamp_fractional_bbox((x0, y0, x1, y1))
     return {
         "page": page,
         "type": "rect",

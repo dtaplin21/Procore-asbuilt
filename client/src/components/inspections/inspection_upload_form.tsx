@@ -10,6 +10,7 @@ import {
   uploadInspectionRunEvidence,
 } from "@/lib/api/inspections";
 import { refreshInspectionWorkspaceQueries } from "@/lib/api/inspection_runs";
+import { formatEvidenceUploadToastDescription } from "@/lib/inspection-runs/upload_toast";
 import type { EvidenceUploadResponse } from "@/types/inspection_overlay";
 
 export type InspectionUploadFormProps = {
@@ -88,19 +89,13 @@ export default function InspectionUploadForm({
           Number(resolvedMasterDrawingId),
         );
 
-        const parts = [
-          `${response.overlays_created} overlay${response.overlays_created === 1 ? "" : "s"} mapped`,
-        ];
-        if (response.unresolved_count > 0) {
-          parts.push(`${response.unresolved_count} need review`);
-        }
-        if (response.untagged_region_count > 0) {
-          parts.push(`${response.untagged_region_count} untagged region(s) on sheet`);
-        }
-
         toast({
           title: "Inspection uploaded",
-          description: `Run #${run.id}: ${parts.join(" · ")}`,
+          description: formatEvidenceUploadToastDescription(Number(run.id), {
+            overlays_created: response.overlays_created,
+            unresolved_count: response.unresolved_count,
+            untagged_region_count: response.untagged_region_count,
+          }),
         });
 
         if (!response.master_index_ready) {

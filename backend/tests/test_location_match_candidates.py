@@ -8,6 +8,7 @@ from typing import cast
 from ai.pipelines.drawing_location_resolver import ResolutionMethod
 from ai.pipelines.location_match_orchestrator import (
     LocationMatchCandidate,
+    _filter_off_page_candidates,
     _filter_sheet_only_candidates,
     generate_all_location_candidates,
     resolve_evidence_location,
@@ -52,6 +53,35 @@ def test_filter_sheet_only_candidates_drops_sheet_ref_only_support() -> None:
     assert sheet_only not in filtered
     assert mixed in filtered
     assert no_clues in filtered
+
+
+def test_filter_off_page_candidates_drops_title_block_only_bboxes() -> None:
+    on_page = LocationMatchCandidate(
+        method=ResolutionMethod.REFERENCE_LOOKUP,
+        confidence=0.8,
+        bbox_fractional=(0.2, 0.2, 0.3, 0.3),
+        page=1,
+        supporting_clues=("location:COLO",),
+    )
+    off_page = LocationMatchCandidate(
+        method=ResolutionMethod.REFERENCE_LOOKUP,
+        confidence=0.7,
+        bbox_fractional=(0.226, 1.277, 0.241, 1.362),
+        page=1,
+        supporting_clues=("clue:UCSF PROJECT NUMBER",),
+    )
+    no_bbox = LocationMatchCandidate(
+        method=ResolutionMethod.COORDINATE_LOOKUP,
+        confidence=0.9,
+        bbox_fractional=None,
+        page=1,
+    )
+
+    filtered = _filter_off_page_candidates([on_page, off_page, no_bbox])
+
+    assert on_page in filtered
+    assert off_page not in filtered
+    assert no_bbox in filtered
 
 
 def test_generate_all_location_candidates_produces_provenance_rich_set(

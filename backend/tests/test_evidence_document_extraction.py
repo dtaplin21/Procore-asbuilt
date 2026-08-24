@@ -148,7 +148,7 @@ def test_ingest_evidence_upload_only_persists_base_text_without_link_follow(
         return LinkFollowResult()
 
     monkeypatch.setattr(
-        "services.evidence_document_extraction.follow_pdf_links",
+        "ai.pipelines.pdf_link_follower.follow_pdf_links",
         _fail_if_follow,
     )
 

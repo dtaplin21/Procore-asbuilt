@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from ai.agents.tools.pdf_investigation import run_pdf_investigation
 from ai.pipelines.document_text_extraction import extract_document
-from ai.pipelines.pdf_link_follower import LinkFollowResult, follow_pdf_links
 from models.document_extraction import DocumentExtraction
 from models.models import EvidenceRecord
 from services.evidence_investigation_persistence import persist_evidence_investigation
@@ -32,21 +31,6 @@ def extract_evidence_file_content(file_path: str | Path) -> str:
     """Extract plain text (or OCR text) from an evidence file."""
     document = extract_document(file_path)
     return document.full_text()
-
-
-def extract_evidence_file_content_with_links(
-    file_path: str | Path,
-) -> tuple[str, str, LinkFollowResult]:
-    """Return ``(merged_text, base_text, link_result)``."""
-    base = extract_evidence_file_content(file_path).strip()
-    link_result = follow_pdf_links(file_path)
-    if link_result.supplemental_text.strip():
-        # Priority-ranked linked content first so classifiers/extractors see
-        # install drawings and plans within their preview window.
-        merged = f"{link_result.supplemental_text}\n{base}".strip()
-    else:
-        merged = base
-    return merged, base, link_result
 
 
 def ingest_evidence_upload_only(

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import logging
 from unittest.mock import MagicMock, patch
 
 from ai.pipelines.document_text_extraction import ExtractedDocument, PositionedWord, SourceFormat
@@ -118,6 +120,75 @@ def test_fetch_pdf_uses_content_disposition_filename() -> None:
     assert attachment.error is None
     assert attachment.filename == "7.20 Sanitary Sewer Install.pdf"
     assert attachment.pages == 2
+
+
+def test_fetch_xml_with_embedded_storage_url_follows_to_pdf() -> None:
+    url = "https://app.procore.com/2727475/project/submittal_log_approvers/document_downloader"
+    storage_url = (
+        "https://storage.procore.com/api/v5/files/us-east-1/pro-core.com/"
+        "1789-c/5747272-p/01KXRWH88XNQHS5YFS4EJ0R578"
+    )
+    xml_body = f'<?xml version="1.0"?><Download><url>{storage_url}</url></Download>'.encode()
+    fake_doc = ExtractedDocument(
+        source_format=SourceFormat.SCANNED_PDF,
+        page_count=1,
+        words=[PositionedWord(text="STA 11+14.23", bbox=MagicMock(), page_index=0)],
+    )
+
+    def fake_fetch(target_url: str) -> MagicMock:
+        if "document_downloader" in target_url:
+            return MagicMock(
+                ok=True,
+                content_type="application/xml",
+                content_disposition=None,
+                body=xml_body,
+            )
+        return MagicMock(
+            ok=True,
+            content_type="application/pdf",
+            content_disposition='attachment; filename="install.pdf"',
+            body=b"%PDF-1.4 fake",
+        )
+
+    with (
+        patch("services.safe_url_fetch.fetch_allowed_url", side_effect=fake_fetch),
+        patch(
+            "services.safe_url_fetch.extract_document_via_ocr",
+            return_value=fake_doc,
+        ),
+    ):
+        from services.safe_url_fetch import fetch_url_attachment_with_error
+
+        attachment = fetch_url_attachment_with_error(url)
+
+    assert attachment.error is None
+    assert attachment.text == "STA 11+14.23"
+    assert attachment.filename == "install.pdf"
+
+
+def test_fetch_attachment_filename_extra_does_not_break_logging() -> None:
+    import logging
+
+    from observability.logging_config import JsonFormatter
+
+    formatter = JsonFormatter()
+    record = logging.LogRecord(
+        name="ai.pipelines.pdf_link_follower",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=10,
+        msg="pdf_link_fetch_ocr_complete",
+        args=(),
+        exc_info=None,
+    )
+    record.attachment_filename = "install.pdf"
+    record.words = 42
+    record.depth = 0
+
+    payload = json.loads(formatter.format(record))
+
+    assert payload["attachment_filename"] == "install.pdf"
+    assert payload["words"] == 42
 
 
 def test_fetch_image_uses_ocr() -> None:

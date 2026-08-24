@@ -135,7 +135,7 @@ def test_follow_pdf_links_prioritizes_install_drawing_over_submittal(
     submittal_words = " ".join(["submittal"] * 22008)
     install_words = " ".join(["STA", "10+05.00", "manhole"] * 200)
 
-    def fake_fetch(url: str) -> UrlAttachmentFetch:
+    def fake_fetch(url: str, **kwargs: object) -> UrlAttachmentFetch:
         if "submittal" in url:
             return UrlAttachmentFetch(
                 text=submittal_words,
@@ -176,3 +176,170 @@ def test_truncate_section_to_fit_preserves_header() -> None:
     assert truncated.startswith("\n\n--- Linked content (page 2) ---\n")
     assert truncated.endswith("...[linked content truncated]")
     assert len(truncated) <= 200
+
+
+def test_follow_pdf_links_respects_max_external_param(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from services.safe_url_fetch import UrlAttachmentFetch
+
+    monkeypatch.setattr(
+        "ai.pipelines.pdf_link_follower.settings.pdf_link_follow_enabled",
+        True,
+    )
+    monkeypatch.setattr(
+        "ai.pipelines.pdf_link_follower.is_allowed_external_url",
+        lambda _url: True,
+    )
+
+    doc = fitz.open()
+    page = doc.new_page()
+    for index in range(3):
+        page.insert_link(
+            {
+                "kind": fitz.LINK_URI,
+                "uri": f"https://storage.procore.com/plan-{index}.pdf",
+                "from": fitz.Rect(72, 60 + index * 30, 300, 80 + index * 30),
+            }
+        )
+    pdf_path = tmp_path / "report.pdf"
+    doc.save(pdf_path)
+    doc.close()
+
+    def fake_fetch(url: str, **kwargs: object) -> UrlAttachmentFetch:
+        return UrlAttachmentFetch(
+            text=f"install detail {url}",
+            error=None,
+            filename=url.rsplit("/", 1)[-1],
+            pages=1,
+            body=b"%PDF-1.4",
+            content_type="application/pdf",
+        )
+
+    monkeypatch.setattr(
+        "ai.pipelines.pdf_link_follower.fetch_url_attachment_with_error",
+        fake_fetch,
+    )
+
+    result = follow_pdf_links(pdf_path, max_external=1, max_depth=1)
+
+    assert result.followed_count == 1
+    assert len(result.fetched_pdfs) == 1
+    assert result.skipped_count >= 2
+
+
+def test_fetch_attachment_with_retry_retries_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from ai.pipelines.pdf_link_follower import _fetch_attachment_with_retry
+    from services.safe_url_fetch import UrlAttachmentFetch
+
+    calls = {"count": 0}
+
+    def fake_fetch(url: str, **kwargs: object) -> UrlAttachmentFetch:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return UrlAttachmentFetch(
+                text="",
+                error="request timed out",
+                filename="plan.pdf",
+                pages=0,
+            )
+        return UrlAttachmentFetch(
+            text="Location: COLO",
+            error=None,
+            filename="plan.pdf",
+            pages=1,
+        )
+
+    monkeypatch.setattr(
+        "ai.pipelines.pdf_link_follower.fetch_url_attachment_with_error",
+        fake_fetch,
+    )
+
+    fetched = _fetch_attachment_with_retry("https://storage.procore.com/plan.pdf")
+
+    assert calls["count"] == 2
+    assert fetched.error is None
+    assert "COLO" in fetched.text
+
+
+def test_follow_pdf_links_follows_nested_pdf_when_depth_allows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from services.safe_url_fetch import UrlAttachmentFetch
+
+    monkeypatch.setattr(
+        "ai.pipelines.pdf_link_follower.settings.pdf_link_follow_enabled",
+        True,
+    )
+    monkeypatch.setattr(
+        "ai.pipelines.pdf_link_follower.is_allowed_external_url",
+        lambda _url: True,
+    )
+
+    nested_doc = fitz.open()
+    nested_page = nested_doc.new_page()
+    nested_page.insert_text((72, 72), "Nested install STA 10+05.00")
+    nested_bytes = nested_doc.tobytes()
+    nested_doc.close()
+
+    nested_with_link = fitz.open()
+    nested_link_page = nested_with_link.new_page()
+    nested_link_page.insert_link(
+        {
+            "kind": fitz.LINK_URI,
+            "uri": "https://storage.procore.com/deep.pdf",
+            "from": fitz.Rect(72, 60, 300, 90),
+        }
+    )
+    nested_link_bytes = nested_with_link.tobytes()
+    nested_with_link.close()
+
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_link(
+        {
+            "kind": fitz.LINK_URI,
+            "uri": "https://storage.procore.com/outer.pdf",
+            "from": fitz.Rect(72, 60, 300, 90),
+        }
+    )
+    pdf_path = tmp_path / "report.pdf"
+    doc.save(pdf_path)
+    doc.close()
+
+    def fake_fetch(url: str, **kwargs: object) -> UrlAttachmentFetch:
+        if url.endswith("outer.pdf"):
+            return UrlAttachmentFetch(
+                text="Outer sheet",
+                error=None,
+                filename="outer.pdf",
+                pages=1,
+                body=nested_link_bytes,
+                content_type="application/pdf",
+            )
+        if url.endswith("deep.pdf"):
+            return UrlAttachmentFetch(
+                text="Nested install STA 10+05.00",
+                error=None,
+                filename="deep.pdf",
+                pages=1,
+                body=nested_bytes,
+                content_type="application/pdf",
+            )
+        return UrlAttachmentFetch(text="", error="unexpected url", filename="", pages=0)
+
+    monkeypatch.setattr(
+        "ai.pipelines.pdf_link_follower.fetch_url_attachment_with_error",
+        fake_fetch,
+    )
+
+    shallow = follow_pdf_links(pdf_path, max_external=5, max_depth=1)
+    deep = follow_pdf_links(pdf_path, max_external=5, max_depth=2)
+
+    assert len(shallow.fetched_pdfs) == 1
+    assert len(deep.fetched_pdfs) == 2
+    assert "Nested install STA 10+05.00" in deep.supplemental_text

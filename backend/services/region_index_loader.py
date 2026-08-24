@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from ai.pipelines.document_text_extraction import BoundingBox
 from ai.pipelines.drawing_location_resolver import MasterRegion
+from ai.pipelines.fractional_coords import clamp_fractional, clamp_fractional_bbox
 from models.drawing_region import DrawingRegion
 
 logger = logging.getLogger(__name__)
@@ -82,6 +83,14 @@ def geometry_to_bounding_box(geometry: dict[str, Any]) -> BoundingBox | None:
             height = float(geometry["height"])
         except (KeyError, TypeError, ValueError):
             return None
+        x = clamp_fractional(x)
+        y = clamp_fractional(y)
+        width = max(float(width), 0.0)
+        height = max(float(height), 0.0)
+        if x + width > 1.0:
+            width = max(1.0 - x, 0.001)
+        if y + height > 1.0:
+            height = max(1.0 - y, 0.001)
         return BoundingBox(
             x=x,
             y=y,
@@ -109,11 +118,14 @@ def geometry_to_bounding_box(geometry: dict[str, Any]) -> BoundingBox | None:
             return None
         min_x, max_x = min(xs), max(xs)
         min_y, max_y = min(ys), max(ys)
+        min_x, min_y, max_x, max_y = clamp_fractional_bbox(
+            (min_x, min_y, max_x, max_y),
+        )
         return BoundingBox(
             x=min_x,
             y=min_y,
-            width=max_x - min_x,
-            height=max_y - min_y,
+            width=max(max_x - min_x, 0.001),
+            height=max(max_y - min_y, 0.001),
             page_width=1.0,
             page_height=1.0,
         )

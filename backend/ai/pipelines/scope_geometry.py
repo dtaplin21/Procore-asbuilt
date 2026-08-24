@@ -8,6 +8,12 @@ from enum import Enum
 from typing import Any, cast
 
 from ai.agents.evidence_dossier import EvidenceDossier
+from ai.pipelines.fractional_coords import (
+    bbox_intersects_page,
+    clamp_fractional,
+    clamp_fractional_bbox,
+    clamp_point_to_page,
+)
 from services.region_storage import _check_normalized
 
 _LINEAR_UTILITY_RE = re.compile(
@@ -55,18 +61,29 @@ class ScopeGeometry:
         if self.type == "rect":
             if self.x is None or self.y is None or self.width is None or self.height is None:
                 raise ValueError("rect scope requires x, y, width, and height")
+            x = clamp_fractional(float(self.x))
+            y = clamp_fractional(float(self.y))
+            width = max(float(self.width), 0.0)
+            height = max(float(self.height), 0.0)
+            if x + width > 1.0:
+                width = max(1.0 - x, 0.001)
+            if y + height > 1.0:
+                height = max(1.0 - y, 0.001)
             payload.update(
                 {
-                    "x": self.x,
-                    "y": self.y,
-                    "width": self.width,
-                    "height": self.height,
+                    "x": x,
+                    "y": y,
+                    "width": width,
+                    "height": height,
                 }
             )
         elif self.type in {"polygon", "polyline"}:
             if not self.points:
                 raise ValueError(f"{self.type} scope requires points")
-            payload["points"] = [[float(x), float(y)] for x, y in self.points]
+            payload["points"] = [
+                list(clamp_point_to_page((float(x), float(y))))
+                for x, y in self.points
+            ]
         else:
             raise ValueError("scope type must be 'rect', 'polygon', or 'polyline'")
 
@@ -128,14 +145,14 @@ def bbox_to_scope_rect(
     page: int,
     scope_kind: ScopeKind,
 ) -> ScopeGeometry:
-    x0, y0, x1, y1 = bbox
+    x0, y0, x1, y1 = clamp_fractional_bbox(bbox)
     return ScopeGeometry(
         page=page,
         type="rect",
         x=x0,
         y=y0,
-        width=max(x1 - x0, 0.0),
-        height=max(y1 - y0, 0.0),
+        width=max(x1 - x0, 0.001),
+        height=max(y1 - y0, 0.001),
         scope_kind=scope_kind,
     )
 

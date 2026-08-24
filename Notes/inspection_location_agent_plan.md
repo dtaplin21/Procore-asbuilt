@@ -8,6 +8,8 @@
 
 **Depends on (already built — skip unless tests fail):** `document_extraction_orchestrator`, `clue_extractor`, `legend_lookup`, `pdf_link_follower`, `linked_drawing_registration`, `location_match_orchestrator`, `candidate_tile_selector`, `region_index_loader`, `inspection_match_persistence`, eval labels.
 
+**Match-time investigation (upload → match worker):** Inspection-run uploads no longer follow PDF links or extract clues. The **single front door** for hyperlink investigation, linked drawing registration, survey extraction, and clue persistence is `build_evidence_dossier(investigate=True)` inside the match worker. See [location_match_investigation_plan.md](./location_match_investigation_plan.md) for the full upload-slim / dossier / UI flow (PR-A–H).
+
 ---
 
 ## Hard rules (every PR)

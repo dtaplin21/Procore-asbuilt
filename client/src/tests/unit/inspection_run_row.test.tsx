@@ -103,6 +103,16 @@ describe("InspectionRunRow history mode", () => {
 });
 
 describe("InspectionRunRow panel mode", () => {
+  it("shows investigating label for processing runs in panel mode", () => {
+    render(
+      <ul>
+        <InspectionRunRow run={buildRun({ id: 15, status: "processing" })} onSelect={vi.fn()} />
+      </ul>,
+    );
+
+    expect(screen.getByText("Investigating linked files…")).toBeInTheDocument();
+  });
+
   it("calls onSelect when clicked", () => {
     const onSelect = vi.fn();
 

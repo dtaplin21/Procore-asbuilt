@@ -104,6 +104,13 @@ class Settings(BaseSettings):
     pdf_link_follow_enabled: bool = Field(default=True, description="PDF_LINK_FOLLOW_ENABLED")
     #: Max external HTTP fetches per PDF upload. Env: ``PDF_LINK_FOLLOW_MAX_EXTERNAL``.
     pdf_link_follow_max_external: int = Field(default=5, description="PDF_LINK_FOLLOW_MAX_EXTERNAL")
+    #: Max external link fetches during match-time PDF investigation. Env: ``PDF_LINK_FOLLOW_MAX_EXTERNAL_MATCH``.
+    pdf_link_follow_max_external_match: int = Field(
+        default=10,
+        description="PDF_LINK_FOLLOW_MAX_EXTERNAL_MATCH",
+    )
+    #: Max nested hyperlink depth when following PDF links. Env: ``PDF_LINK_FOLLOW_MAX_DEPTH``.
+    pdf_link_follow_max_depth: int = Field(default=2, description="PDF_LINK_FOLLOW_MAX_DEPTH")
     #: Comma-separated allowed host suffixes for external link fetch. Env: ``PDF_LINK_FOLLOW_ALLOWED_HOSTS``.
     pdf_link_follow_allowed_hosts: str = Field(
         default="procore.com,sandbox.procore.com,amazonaws.com",

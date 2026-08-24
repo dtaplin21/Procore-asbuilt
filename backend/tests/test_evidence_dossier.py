@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import cast
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from sqlalchemy.orm import Session
 
@@ -18,6 +19,7 @@ from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
 from models.models import Drawing, EvidenceDrawingLink, EvidenceRecord
 from scripts.seed_legend_reference import seed
+from services.evidence_investigation_persistence import EvidenceInvestigationPersistResult
 from services.storage import StorageService
 
 
@@ -156,6 +158,7 @@ def test_build_evidence_dossier_expands_clues_and_loads_master_context(
         evidence_id=cast(int, evidence.id),
         master_drawing_id=cast(int, master.id),
         page=1,
+        investigate=False,
     )
 
     assert isinstance(dossier, EvidenceDossier)
@@ -209,11 +212,15 @@ def test_build_evidence_dossier_missing_evidence_raises(
         assert "not found" in str(exc).lower()
 
 
+@patch("services.evidence_investigation_persistence.persist_evidence_investigation")
+@patch("ai.pipelines.pdf_link_follower.follow_pdf_links")
 @patch("ai.agents.evidence_dossier.resolve_stored_file_path")
 @patch("ai.agents.tools.pdf_investigation.run_pdf_investigation")
-def test_build_evidence_dossier_merges_pdf_investigation(
-    mock_run_pdf: object,
-    mock_resolve_path: object,
+def test_build_evidence_dossier_investigates_and_persists_once(
+    mock_run_pdf: MagicMock,
+    mock_resolve_path: MagicMock,
+    mock_follow_pdf_links: MagicMock,
+    mock_persist: MagicMock,
     db_session: Session,
     project,
 ) -> None:
@@ -246,9 +253,9 @@ def test_build_evidence_dossier_merges_pdf_investigation(
     db_session.commit()
 
     mock_resolve_path.return_value = Path("/tmp/evidence.pdf")
-    mock_run_pdf.return_value = PdfInvestigationResult(
-        link_result=LinkFollowResult(),
-        merged_text="Underground Sanitary Sewer at COLO parking lot",
+    payload = PdfInvestigationResult(
+        link_result=LinkFollowResult(followed_count=1),
+        merged_text="Location: COLO STA 10+50\nUnderground Sanitary Sewer at COLO parking lot",
         base_text="Underground Sanitary Sewer at COLO parking lot",
         summaries=(
             LinkedAttachmentSummary(
@@ -264,12 +271,27 @@ def test_build_evidence_dossier_merges_pdf_investigation(
         ocr_word_counts={"https://example.com/install.pdf": 42},
         errors=(),
     )
+    mock_run_pdf.return_value = payload
+    mock_persist.return_value = EvidenceInvestigationPersistResult(
+        linked_drawing_ids=[501],
+        extraction_id=999,
+        survey_point_count=2,
+        drawing_ids_needing_index=[501],
+    )
 
     dossier = build_evidence_dossier(
         db_session,
         evidence_id=cast(int, evidence.id),
         master_drawing_id=cast(int, master.id),
+        investigate=True,
     )
+
+    mock_run_pdf.assert_called_once()
+    mock_persist.assert_called_once()
+    persist_kwargs = mock_persist.call_args.kwargs
+    assert persist_kwargs["payload"] is payload
+    assert persist_kwargs["evidence_id"] == cast(int, evidence.id)
+    assert mock_follow_pdf_links.call_count <= 1
 
     assert dossier.investigation_meta["links_followed"] == 1
     assert dossier.investigation_meta["pages_rendered"] == 1
@@ -280,4 +302,163 @@ def test_build_evidence_dossier_merges_pdf_investigation(
     )
     assert any(
         "COLO" in att.text_preview for att in dossier.linked_attachments
+    )
+
+
+@patch("services.evidence_investigation_persistence.persist_evidence_investigation")
+@patch("ai.agents.tools.pdf_investigation.run_pdf_investigation")
+def test_build_evidence_dossier_skips_investigation_when_cache_fresh(
+    mock_run_pdf: MagicMock,
+    mock_persist: MagicMock,
+    db_session: Session,
+    project,
+) -> None:
+    fresh_at = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    storage = StorageService(db_session)
+    master = Drawing(
+        project_id=project.id,
+        source="upload",
+        name="Master.pdf",
+        storage_key=f"drawings/{_unique()}.pdf",
+        content_type="application/pdf",
+        index_status="ready",
+    )
+    db_session.add(master)
+    db_session.flush()
+
+    evidence = storage.create_evidence_record(
+        project_id=cast(int, project.id),
+        type="inspection_doc",
+        trade=None,
+        spec_section=None,
+        title="Cached investigation",
+        storage_key=f"evidence/{_unique()}.pdf",
+        content_type="application/pdf",
+        text_content="Cached evidence text",
+        meta={
+            "matchInvestigation": {
+                "followed": 2,
+                "skipped": 0,
+                "errors": [],
+                "linked_drawing_ids": [101],
+                "at": fresh_at,
+            }
+        },
+    )
+    db_session.commit()
+
+    build_evidence_dossier(
+        db_session,
+        evidence_id=cast(int, evidence.id),
+        master_drawing_id=cast(int, master.id),
+        investigate=True,
+    )
+
+    mock_run_pdf.assert_not_called()
+    mock_persist.assert_not_called()
+
+
+def test_build_evidence_dossier_loads_scoped_survey_points_from_indexed_auxiliary(
+    db_session: Session,
+    project,
+) -> None:
+    storage = StorageService(db_session)
+    master = Drawing(
+        project_id=project.id,
+        source="upload",
+        name="Master.pdf",
+        storage_key=f"drawings/{_unique()}.pdf",
+        content_type="application/pdf",
+        index_status="ready",
+        processing_status="ready",
+    )
+    db_session.add(master)
+    db_session.flush()
+    storage.create_drawing_region(
+        cast(int, master.id),
+        label="Campus",
+        geometry={"type": "rect", "x": 0.1, "y": 0.2, "width": 0.08, "height": 0.09},
+    )
+
+    aux = Drawing(
+        project_id=project.id,
+        source="linked_evidence",
+        name="Install.pdf",
+        storage_key=f"linked/{_unique()}.pdf",
+        content_type="application/pdf",
+        index_status="ready",
+        processing_status="ready",
+        page_meta_json=[{"page": 1, "width_pt": 2592.0, "height_pt": 1728.0, "rotation": 0}],
+    )
+    db_session.add(aux)
+    db_session.flush()
+    storage.create_drawing_region(
+        cast(int, aux.id),
+        label="Install detail",
+        geometry={"type": "rect", "x": 0.1, "y": 0.2, "width": 0.08, "height": 0.09},
+    )
+
+    from models.drawing_text_element import DrawingTextElement
+
+    db_session.add_all(
+        [
+            DrawingTextElement(
+                master_drawing_id=cast(int, aux.id),
+                page=1,
+                text="N 2131764.84",
+                text_normalized="n 2131764.84",
+                bbox_json={"x0": 0.10, "y0": 0.20, "x1": 0.14, "y1": 0.22},
+                ocr_confidence=0.95,
+                source="native_pdf",
+            ),
+            DrawingTextElement(
+                master_drawing_id=cast(int, aux.id),
+                page=1,
+                text="E 6051541.82",
+                text_normalized="e 6051541.82",
+                bbox_json={"x0": 0.12, "y0": 0.20, "x1": 0.16, "y1": 0.22},
+                ocr_confidence=0.95,
+                source="native_pdf",
+            ),
+        ]
+    )
+
+    evidence = storage.create_evidence_record(
+        project_id=cast(int, project.id),
+        type="inspection_doc",
+        trade="33-Sanitary Sewerage",
+        spec_section=None,
+        title="Inspection report",
+        storage_key=f"evidence/{_unique()}.pdf",
+        content_type="application/pdf",
+        text_content="Underground Sanitary Sewer at COLO parking lot",
+        meta={"evidence_kind": "form"},
+    )
+    db_session.add(
+        EvidenceDrawingLink(
+            project_id=cast(int, project.id),
+            evidence_id=cast(int, evidence.id),
+            drawing_id=cast(int, aux.id),
+            link_type="sheet_ref",
+            matched_text="Install",
+            source="pdf_link",
+            confidence=0.9,
+        )
+    )
+    db_session.commit()
+
+    dossier = build_evidence_dossier(
+        db_session,
+        evidence_id=cast(int, evidence.id),
+        master_drawing_id=cast(int, master.id),
+        investigate=False,
+    )
+
+    aux_key = str(aux.id)
+    scoped_counts = dossier.investigation_meta.get("scoped_point_counts", {})
+    assert scoped_counts.get(aux_key, 0) > 0
+    assert dossier.investigation_meta.get("auxiliary_index_pending") is False
+    assert any(
+        point.meta_json.get("drawing_id") == cast(int, aux.id)
+        for point in dossier.master_context.scoped_survey_points
     )

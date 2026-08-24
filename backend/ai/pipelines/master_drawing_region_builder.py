@@ -9,6 +9,7 @@ from typing import Any, cast
 from sqlalchemy.orm import Session
 
 from ai.pipelines.drawing_scale_parser import TITLE_BLOCK_X_MIN, TITLE_BLOCK_Y_MIN
+from ai.pipelines.fractional_coords import clamp_fractional_bbox
 from config import settings
 from models.drawing_region import DrawingRegion
 from models.drawing_text_element import DrawingTextElement
@@ -157,6 +158,7 @@ def _union_rect_geometry(
     y0 = min(element.y0 for element in elements)
     x1 = max(element.x1 for element in elements)
     y1 = max(element.y1 for element in elements)
+    x0, y0, x1, y1 = clamp_fractional_bbox((x0, y0, x1, y1))
     geometry: dict[str, Any] = {
         "type": "rect",
         "x": x0,

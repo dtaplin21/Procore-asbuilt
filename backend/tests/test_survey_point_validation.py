@@ -10,6 +10,11 @@ def test_placed_bbox_accepts_auto_index_pairing() -> None:
     assert is_placed_survey_label_bbox(bbox, source="auto_index") is True
 
 
+def test_placed_bbox_accepts_match_investigation_source() -> None:
+    bbox = {"x0": 0.518, "y0": 0.472, "x1": 0.566, "y1": 0.514}
+    assert is_placed_survey_label_bbox(bbox, source="match_investigation") is True
+
+
 def test_placed_bbox_rejects_baseline_seed_source() -> None:
     bbox = {"x0": 0.518, "y0": 0.472, "x1": 0.566, "y1": 0.514}
     assert is_placed_survey_label_bbox(bbox, source="pre2_baseline_seed") is False

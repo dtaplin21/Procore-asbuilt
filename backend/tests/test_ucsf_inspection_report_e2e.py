@@ -19,7 +19,8 @@ from models.drawing_overlay import DrawingOverlay
 from models.document_clue import DocumentClue
 from models.models import Company, Drawing, EvidenceRecord, Project, User, UserCompany
 from models.inspection_run import InspectionRun
-from services.inspection_matching_jobs import MATCH_SCORE_THRESHOLD, run_inspection_match_job
+from services.inspection_match_persistence import MATCH_SCORE_THRESHOLD
+from services.inspection_matching_jobs import run_inspection_match_job
 from services.storage import StorageService
 from tests.fixtures.ucsf_inspection_report import (
     UCSF_CLASSIFICATION,

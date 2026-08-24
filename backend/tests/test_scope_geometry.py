@@ -16,7 +16,9 @@ from ai.pipelines.evidence_kind_classifier import EvidenceKind
 from ai.pipelines.scope_geometry import (
     ScopeGeometry,
     ScopeKind,
+    bbox_intersects_page,
     bbox_to_scope_rect,
+    clamp_fractional_bbox,
     infer_scope_kind,
     validate_scope_geometry,
 )
@@ -97,6 +99,43 @@ def _minimal_dossier(
         master_context=master_context,
         investigation_meta={},
     )
+
+
+def test_bbox_intersects_page_rejects_fully_off_page() -> None:
+    assert bbox_intersects_page((0.2, 1.28, 0.24, 1.36)) is False
+    assert bbox_intersects_page((0.2, 0.2, 0.4, 0.4)) is True
+
+
+def test_clamp_fractional_bbox_pulls_off_page_coords_into_range() -> None:
+    assert clamp_fractional_bbox((0.226, 1.277, 0.241, 1.362)) == (
+        pytest.approx(0.226),
+        pytest.approx(1.0),
+        pytest.approx(0.241),
+        pytest.approx(1.0),
+    )
+
+
+def test_bbox_to_scope_rect_clamps_off_page_anchor() -> None:
+    scope = bbox_to_scope_rect(
+        (0.226, 1.277, 0.241, 1.362),
+        page=1,
+        scope_kind=ScopeKind.POINT,
+    )
+    geometry = scope.to_geometry_json()
+    assert geometry["y"] <= 1.0
+    assert geometry["y"] + geometry["height"] <= 1.001
+
+
+def test_scope_geometry_polyline_clamps_off_page_points() -> None:
+    scope = ScopeGeometry(
+        page=1,
+        type="polyline",
+        points=((0.2, 1.227), (0.25, 1.3)),
+        scope_kind=ScopeKind.UTILITY_LINE,
+    )
+    geometry = scope.to_geometry_json()
+    assert geometry["points"][0][1] == pytest.approx(1.0)
+    assert geometry["points"][1][1] == pytest.approx(1.0)
 
 
 def test_validate_scope_geometry_accepts_rect() -> None:

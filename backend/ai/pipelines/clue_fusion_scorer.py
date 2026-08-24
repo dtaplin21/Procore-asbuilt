@@ -12,6 +12,7 @@ from ai.agents.evidence_dossier import EvidenceDossier, ExpandedClue
 from ai.pipelines.candidate_tile_selector import CandidateTile
 from ai.pipelines.drawing_location_resolver import MasterRegion, ResolutionMethod
 from ai.pipelines.location_match_orchestrator import LocationMatchCandidate
+from ai.pipelines.fractional_coords import bbox_intersects_page
 from services.inspection_vocabulary import location_labels_compatible
 from services.location_match_eval import rect_iou
 
@@ -115,7 +116,9 @@ def select_fused_winner(
     actionable = [
         score
         for score in scores
-        if score.fused_score > 0 and score.candidate.bbox_fractional is not None
+        if score.fused_score > 0
+        and score.candidate.bbox_fractional is not None
+        and bbox_intersects_page(score.candidate.bbox_fractional)
     ]
     if not actionable:
         return None
@@ -154,7 +157,9 @@ def _actionable_fused_scores(
     return [
         score
         for score in scores
-        if score.fused_score > 0 and score.candidate.bbox_fractional is not None
+        if score.fused_score > 0
+        and score.candidate.bbox_fractional is not None
+        and bbox_intersects_page(score.candidate.bbox_fractional)
     ]
 
 

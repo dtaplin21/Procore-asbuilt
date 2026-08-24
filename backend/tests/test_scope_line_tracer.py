@@ -141,3 +141,73 @@ def test_trace_utility_line_uses_nearby_ss_labels() -> None:
     assert scope.points[0][0] < scope.points[-1][0]
     assert scope.meta is not None
     assert "SS" in scope.meta.get("legend_codes", [])
+
+
+def test_trace_utility_line_clamps_centerline_when_anchor_is_off_page() -> None:
+    off_page_anchor = (0.226, 1.277, 0.241, 1.362)
+    dossier = _dossier(
+        evidence_text="Sanitary sewer lateral run in corridor",
+        tiles=(
+            _tile(text="ROOF", bbox=(0.80, 0.80, 0.84, 0.82), text_element_id=3),
+        ),
+    )
+
+    scope = trace_scope_geometry(
+        dossier,
+        anchor_bbox=off_page_anchor,
+        scope_kind=ScopeKind.UTILITY_LINE,
+        page=1,
+    )
+
+    geometry = scope.to_geometry_json()
+    for point in geometry["points"]:
+        assert 0.0 <= point[0] <= 1.0
+        assert 0.0 <= point[1] <= 1.0
+
+
+def test_trace_utility_line_clamps_vision_points_when_anchor_is_off_page(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    from ai.pipelines.vision_location_reasoner import VisionLocationResult
+
+    off_page_anchor = (0.226, 1.277, 0.241, 1.362)
+    master_png = tmp_path / "master.png"
+    master_png.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+    def fake_reason(**kwargs: object) -> VisionLocationResult:
+        return VisionLocationResult(
+            best_candidate_index=0,
+            confidence=0.82,
+            bbox_fractional=off_page_anchor,
+            polyline_points=((0.23, 1.22), (0.24, 1.35)),
+            highlight_detected=False,
+            rationale="vision trace",
+        )
+
+    monkeypatch.setattr(
+        "ai.pipelines.vision_location_reasoner.reason_over_master_crop",
+        fake_reason,
+    )
+
+    dossier = _dossier(
+        evidence_text="Sanitary sewer lateral run in corridor",
+        tiles=(
+            _tile(text="ROOF", bbox=(0.80, 0.80, 0.84, 0.82), text_element_id=3),
+        ),
+    )
+
+    scope = trace_scope_geometry(
+        dossier,
+        anchor_bbox=off_page_anchor,
+        scope_kind=ScopeKind.UTILITY_LINE,
+        page=1,
+        master_png_path=master_png,
+    )
+
+    assert scope.meta is not None
+    assert scope.meta.get("source") == "vision_trace"
+    geometry = scope.to_geometry_json()
+    for point in geometry["points"]:
+        assert 0.0 <= point[0] <= 1.0
+        assert 0.0 <= point[1] <= 1.0
