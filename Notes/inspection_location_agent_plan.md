@@ -111,7 +111,8 @@ Saved: `Notes/eval_baselines/pre2_ucsf_2026-08-20.json`
 
 Notes to restore this baseline if DB is wiped:
 - Fixture points at evidence `377` / run `447` (replaces deleted 357/435).
-- Master `661` needs a `drawing_survey_points` row for N/E `2131764.84` / `6051541.82` with label bbox `(0.518, 0.472)–(0.566, 0.514)` (seeded as `source=pre2_baseline_seed` until real sheet indexing fills it).
+- **Do not** insert `pre2_baseline_seed` survey rows — coordinate lookup requires `auto_index`/`lazy_match` points with real OCR bboxes on master or auxiliary drawings.
+- Re-run `scripts/remove_baseline_survey_seeds.py --yes` if synthetic seeds reappear.
 - Eval IoU now converts orchestrator `(x0,y0,x1,y1)` → label `(x,y,w,h)`.
 
 ### J-3 regression comparison (post Inspection Location Agent)

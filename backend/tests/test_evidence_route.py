@@ -1,28 +1,13 @@
 """End-to-end test of POST /api/projects/{project_id}/inspections/runs/{run_id}/evidence.
 
-Multipart upload hits the real FastAPI route on ``main.app`` (via TestClient),
-which runs the real region loader → ``map_document_to_overlays()`` → overlay /
-unresolved persistence against Postgres (``conftest.db_session``). Only PDF
-text-layer extraction is monkeypatched — the same legitimate external seam as
-the rest of this suite.
-
-This proves "wired into the actual upload route" is true: a real multipart file
-upload hits a real route, which calls the real pipeline, which writes real rows
-to a real (test) database, which these tests then query directly to confirm.
-
-Reconciled with this codebase vs the reference SQLite slice test:
-  - Integer ``project_id`` / ``inspection_run_id`` / ``master_drawing_id`` (not
-    string ``run1`` / ``master_1`` query params)
-  - Regions seeded via ``StorageService.create_drawing_region`` (normalized
-    geometry JSON) rather than ``DrawingRegionSQLite`` pixel columns
-  - ``tags_json`` is structured JSON (``inspectionStatuses``, ``fieldConditions``)
-  - Upload timestamp column is ``created_at``; ``uploaded_at`` is a read-only alias
+Inspection run upload is storage-only (PR-A): saves the file, enqueues location
+match, and does not create provisional overlays via map_document_to_overlays.
 """
 
 from __future__ import annotations
 
 from io import BytesIO
-from typing import Any, cast
+from typing import cast
 
 import pytest
 from fastapi.testclient import TestClient
@@ -35,8 +20,9 @@ from ai.pipelines.document_text_extraction import (
     PositionedWord,
     SourceFormat,
 )
-from models.drawing_overlay import DrawingOverlay, UnresolvedEvidence
-from models.models import Drawing
+from models.drawing_overlay import DrawingOverlay
+from models.models import Drawing, JobQueue
+from services.inspection_matching_jobs import JOB_TYPE_INSPECTION_MATCH
 from services.storage import StorageService
 
 
@@ -108,6 +94,7 @@ def master_drawing(db_session: Session, project) -> Drawing:
         name="master.pdf",
         storage_key=None,
         content_type="application/pdf",
+        index_status="ready",
     )
     db_session.add(drawing)
     db_session.commit()
@@ -142,7 +129,7 @@ def _upload_url(project_id: int, run_id: int) -> str:
 
 
 class TestEvidenceUploadHappyPath:
-    def test_pdf_naming_known_type_and_location_creates_overlay(
+    def test_upload_persists_evidence_and_enqueues_match_without_provisional_overlay(
         self,
         client: TestClient,
         evidence_upload_setup,
@@ -170,10 +157,6 @@ class TestEvidenceUploadHappyPath:
                 "at",
                 "Utility",
                 "MR",
-                "Status",
-                "Rejected",
-                "Repair",
-                "required",
             ],
         )
 
@@ -184,19 +167,33 @@ class TestEvidenceUploadHappyPath:
 
         assert response.status_code == 200
         body = response.json()
-        assert body["overlays_created"] == 1
+        assert body["evidence_id"] > 0
+        assert body["overlays_created"] == 0
         assert body["unresolved_count"] == 0
-        assert len(body["overlay_ids"]) == 1
+        assert body["overlay_ids"] == []
 
-        db_session.expire_all()
-        saved = db_session.query(DrawingOverlay).filter_by(id=body["overlay_ids"][0]).one()
-        assert saved.master_drawing_id == master_id
-        assert saved.inspection_run_id == run.id
-        assert saved.severity == "high"
-        tags = cast(dict[str, Any], saved.tags_json)
-        assert "Rejected" in tags.get("inspectionStatuses", [])
-        assert "Repair" in tags.get("fieldConditions", [])
-        assert saved.region_id is not None
+        db_session.refresh(run)
+        assert run.status == "processing"
+        assert run.evidence_id == body["evidence_id"]
+
+        job = (
+            db_session.query(JobQueue)
+            .filter(JobQueue.job_type == JOB_TYPE_INSPECTION_MATCH)
+            .order_by(JobQueue.id.desc())
+            .first()
+        )
+        assert job is not None
+        input_data = cast(dict, job.input_data)
+        assert input_data["inspection_id"] == str(body["evidence_id"])
+        assert input_data["drawing_id"] == str(master_id)
+        assert input_data["inspection_run_id"] == cast(int, run.id)
+
+        overlay_count = (
+            db_session.query(DrawingOverlay)
+            .filter_by(inspection_run_id=run.id)
+            .count()
+        )
+        assert overlay_count == 0
 
     def test_response_reports_untagged_region_count(
         self,
@@ -225,61 +222,6 @@ class TestEvidenceUploadHappyPath:
         )
         assert response.status_code == 200
         assert response.json()["untagged_region_count"] == 2
-
-
-class TestEvidenceUploadUnresolvedPath:
-    def test_unmatched_document_persists_unresolved_record_not_an_error(
-        self,
-        client: TestClient,
-        evidence_upload_setup,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        project, master_drawing, run, storage, db_session = evidence_upload_setup
-        master_id = cast(int, master_drawing.id)
-
-        _insert_region(
-            storage,
-            master_id,
-            "region_a",
-            inspection_type_tags=["Flush"],
-            location_tags=["Yard"],
-        )
-
-        _patch_pdf_text(monkeypatch, ["Final", "inspection", "at", "Roof"])
-
-        response = client.post(
-            _upload_url(cast(int, project.id), cast(int, run.id)),
-            files={"file": ("report.pdf", BytesIO(b"fake"), "application/pdf")},
-        )
-
-        assert response.status_code == 200
-        body = response.json()
-        assert body["overlays_created"] == 0
-        assert body["unresolved_count"] == 1
-
-        db_session.expire_all()
-        rows = db_session.query(UnresolvedEvidence).filter_by(inspection_run_id=run.id).all()
-        assert len(rows) == 1
-        assert "Final" in rows[0].reason or "Roof" in rows[0].reason
-
-    def test_document_with_no_vocabulary_is_unresolved_not_an_error(
-        self,
-        client: TestClient,
-        evidence_upload_setup,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        project, master_drawing, run, _storage, _db_session = evidence_upload_setup
-
-        _patch_pdf_text(monkeypatch, ["the", "quick", "brown", "fox"])
-
-        response = client.post(
-            _upload_url(cast(int, project.id), cast(int, run.id)),
-            files={"file": ("irrelevant.pdf", BytesIO(b"fake"), "application/pdf")},
-        )
-        assert response.status_code == 200
-        body = response.json()
-        assert body["overlays_created"] == 0
-        assert body["unresolved_count"] == 1
 
 
 class TestEvidenceUploadValidation:
@@ -318,201 +260,6 @@ class TestEvidenceUploadValidation:
         db_session.refresh(run)
         assert run.status == "failed"
         assert run.error_message is not None
-
-
-class TestEvidenceUploadMultiOverlay:
-    def test_document_naming_two_findings_resolves_to_first_unambiguous_match(
-        self,
-        client: TestClient,
-        evidence_upload_setup,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        project, master_drawing, run, storage, db_session = evidence_upload_setup
-        master_id = cast(int, master_drawing.id)
-
-        _insert_region(
-            storage,
-            master_id,
-            "region_a",
-            inspection_type_tags=["Final"],
-            location_tags=["Roof"],
-        )
-        _insert_region(
-            storage,
-            master_id,
-            "region_b",
-            inspection_type_tags=["Flush"],
-            location_tags=["Yard"],
-        )
-
-        _patch_pdf_text(
-            monkeypatch,
-            ["Final", "Roof", "Approved", "Flush", "Yard", "Rejected"],
-        )
-
-        response = client.post(
-            _upload_url(cast(int, project.id), cast(int, run.id)),
-            files={"file": ("report.pdf", BytesIO(b"fake"), "application/pdf")},
-        )
-        assert response.status_code == 200
-        body = response.json()
-        assert body["overlays_created"] == 1
-
-        db_session.expire_all()
-        saved_rows = (
-            db_session.query(DrawingOverlay)
-            .filter_by(inspection_run_id=run.id)
-            .all()
-        )
-        assert len(saved_rows) == 1
-
-
-class TestTimestampDisambiguation:
-    """Two separate uploads for the same finding are distinguished by created_at
-    (when the system received each upload). inspection_date is parsed from the
-    document text and tracked independently.
-    """
-
-    def test_two_uploads_get_distinct_created_at_timestamps(
-        self,
-        client: TestClient,
-        evidence_upload_setup,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        project, master_drawing, run, storage, db_session = evidence_upload_setup
-        master_id = cast(int, master_drawing.id)
-
-        _insert_region(
-            storage,
-            master_id,
-            "region_a",
-            inspection_type_tags=["Final"],
-            location_tags=["Roof"],
-        )
-
-        _patch_pdf_text(monkeypatch, ["Final", "inspection", "Roof", "Rejected"])
-
-        r1 = client.post(
-            _upload_url(cast(int, project.id), cast(int, run.id)),
-            files={"file": ("report1.pdf", BytesIO(b"fake1"), "application/pdf")},
-        )
-        r2 = client.post(
-            _upload_url(cast(int, project.id), cast(int, run.id)),
-            files={"file": ("report2.pdf", BytesIO(b"fake2"), "application/pdf")},
-        )
-        assert r1.status_code == 200 and r2.status_code == 200
-
-        db_session.expire_all()
-        rows = (
-            db_session.query(DrawingOverlay)
-            .filter_by(inspection_run_id=run.id)
-            .order_by(DrawingOverlay.created_at)
-            .all()
-        )
-        assert len(rows) == 2
-        assert rows[0].id != rows[1].id
-        assert rows[0].created_at is not None
-        assert rows[1].created_at is not None
-        assert rows[0].uploaded_at == rows[0].created_at
-        assert rows[1].uploaded_at == rows[1].created_at
-
-    def test_inspection_date_extracted_from_document_text(
-        self,
-        client: TestClient,
-        evidence_upload_setup,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        project, master_drawing, run, storage, db_session = evidence_upload_setup
-        master_id = cast(int, master_drawing.id)
-
-        _insert_region(
-            storage,
-            master_id,
-            "region_a",
-            inspection_type_tags=["Final"],
-            location_tags=["Roof"],
-        )
-
-        _patch_pdf_text(
-            monkeypatch,
-            ["Inspection", "date:", "06/24/2026", "Final", "inspection", "Roof", "Approved"],
-        )
-
-        response = client.post(
-            _upload_url(cast(int, project.id), cast(int, run.id)),
-            files={"file": ("report.pdf", BytesIO(b"fake"), "application/pdf")},
-        )
-        assert response.status_code == 200
-        overlay_id = response.json()["overlay_ids"][0]
-
-        db_session.expire_all()
-        row = db_session.query(DrawingOverlay).filter_by(id=overlay_id).one()
-        assert row.inspection_date is not None
-        assert row.inspection_date.isoformat() == "2026-06-24"
-
-    def test_inspection_date_is_none_when_document_states_no_date(
-        self,
-        client: TestClient,
-        evidence_upload_setup,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        project, master_drawing, run, storage, db_session = evidence_upload_setup
-        master_id = cast(int, master_drawing.id)
-
-        _insert_region(
-            storage,
-            master_id,
-            "region_a",
-            inspection_type_tags=["Final"],
-            location_tags=["Roof"],
-        )
-
-        _patch_pdf_text(monkeypatch, ["Final", "inspection", "Roof", "Approved"])
-
-        response = client.post(
-            _upload_url(cast(int, project.id), cast(int, run.id)),
-            files={"file": ("report.pdf", BytesIO(b"fake"), "application/pdf")},
-        )
-        overlay_id = response.json()["overlay_ids"][0]
-
-        db_session.expire_all()
-        row = db_session.query(DrawingOverlay).filter_by(id=overlay_id).one()
-        assert row.inspection_date is None
-
-    def test_inspection_date_and_created_at_are_independent(
-        self,
-        client: TestClient,
-        evidence_upload_setup,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        project, master_drawing, run, storage, db_session = evidence_upload_setup
-        master_id = cast(int, master_drawing.id)
-
-        _insert_region(
-            storage,
-            master_id,
-            "region_a",
-            inspection_type_tags=["Final"],
-            location_tags=["Roof"],
-        )
-
-        _patch_pdf_text(
-            monkeypatch,
-            ["Inspection", "date:", "2020-01-15", "Final", "Roof", "Approved"],
-        )
-
-        response = client.post(
-            _upload_url(cast(int, project.id), cast(int, run.id)),
-            files={"file": ("report.pdf", BytesIO(b"fake"), "application/pdf")},
-        )
-        overlay_id = response.json()["overlay_ids"][0]
-
-        db_session.expire_all()
-        row = db_session.query(DrawingOverlay).filter_by(id=overlay_id).one()
-        assert row.inspection_date is not None
-        assert row.inspection_date.isoformat() == "2020-01-15"
-        assert row.created_at.year >= 2026
-        assert row.uploaded_at.year >= 2026
 
 
 if __name__ == "__main__":

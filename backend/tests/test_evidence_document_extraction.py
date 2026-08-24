@@ -32,6 +32,7 @@ from services.evidence_document_extraction import (
     InspectionMatchEnqueueContext,
     extract_evidence_file_content,
     ingest_evidence_document_extraction,
+    ingest_evidence_upload_only,
 )
 from services.inspection_matching_jobs import (
     JOB_TYPE_INSPECTION_MATCH,
@@ -127,7 +128,64 @@ def _patch_pdf_text(monkeypatch: pytest.MonkeyPatch, words: list[str]) -> None:
     monkeypatch.setattr(dte, "_pdf_text_layer", lambda p: fake_doc)
 
 
-@patch("services.evidence_document_extraction.run_document_extraction")
+@patch("services.evidence_document_extraction.maybe_enqueue_inspection_match_after_extraction")
+def test_ingest_evidence_upload_only_persists_base_text_without_link_follow(
+    mock_enqueue,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    project,
+) -> None:
+    file_path = tmp_path / "report.pdf"
+    file_path.write_bytes(b"%PDF-1.4")
+    _patch_pdf_text(monkeypatch, ["COLO", "Sewerage"])
+
+    follow_called = False
+
+    def _fail_if_follow(*_args: object, **_kwargs: object) -> LinkFollowResult:
+        nonlocal follow_called
+        follow_called = True
+        return LinkFollowResult()
+
+    monkeypatch.setattr(
+        "services.evidence_document_extraction.follow_pdf_links",
+        _fail_if_follow,
+    )
+
+    storage = StorageService(db_session)
+    evidence = storage.create_evidence_record(
+        project_id=cast(int, project.id),
+        type="inspection_doc",
+        trade=None,
+        spec_section=None,
+        title="Upload Only",
+        storage_key="evidence/upload-only.pdf",
+        content_type="application/pdf",
+    )
+
+    ok = ingest_evidence_upload_only(
+        db_session,
+        evidence_id=cast(int, evidence.id),
+        file_path=file_path,
+        match_context=InspectionMatchEnqueueContext(
+            project_id=cast(int, project.id),
+            master_drawing_id=1,
+            inspection_run_id=99,
+        ),
+    )
+
+    assert ok is True
+    assert follow_called is False
+    mock_enqueue.assert_called_once()
+
+    db_session.refresh(evidence)
+    text_content = cast(str | None, evidence.text_content)
+    assert text_content is not None
+    assert "COLO" in text_content
+    assert "Sewerage" in text_content
+
+
+@patch("services.evidence_investigation_persistence.run_document_extraction")
 def test_ingest_evidence_document_extraction_persists_text_and_runs_orchestrator(
     mock_run,
     db_session: Session,
@@ -191,8 +249,10 @@ def test_ingest_evidence_document_extraction_persists_text_and_runs_orchestrator
     assert "COLO" in cast(str, evidence.text_content)
 
 
-@patch("services.evidence_document_extraction.run_document_extraction")
+@patch("services.evidence_investigation_persistence.run_document_extraction")
+@patch("ai.agents.tools.pdf_investigation.follow_and_capture_links")
 def test_ingest_merges_pdf_link_supplemental_text_and_cross_refs(
+    mock_follow,
     mock_run,
     db_session: Session,
     monkeypatch: pytest.MonkeyPatch,
@@ -211,16 +271,10 @@ def test_ingest_merges_pdf_link_supplemental_text_and_cross_refs(
         "anchor_text": None,
     }
 
-    def _fake_follow_pdf_links(_file_path: object) -> LinkFollowResult:
-        return LinkFollowResult(
-            supplemental_text=supplemental_block,
-            cross_refs=[link_cross_ref],
-            followed_count=1,
-        )
-
-    monkeypatch.setattr(
-        "services.evidence_document_extraction.follow_pdf_links",
-        _fake_follow_pdf_links,
+    mock_follow.return_value = LinkFollowResult(
+        supplemental_text=supplemental_block,
+        cross_refs=[link_cross_ref],
+        followed_count=1,
     )
 
     storage = StorageService(db_session)
@@ -265,53 +319,16 @@ def test_ingest_merges_pdf_link_supplemental_text_and_cross_refs(
     )
 
 
-@patch("ai.pipelines.document_extraction_orchestrator.extract_type_specific_fields")
-@patch("ai.pipelines.document_extraction_orchestrator.extract_universal_fields")
-@patch("ai.pipelines.document_extraction_orchestrator.classify_document")
-def test_upload_inspection_run_evidence_triggers_document_extraction(
-    mock_classify,
-    mock_universal,
-    mock_type_specific,
+@patch("api.routes.evidence.ingest_evidence_upload_only")
+def test_upload_inspection_run_evidence_enqueues_match_without_full_extraction(
+    mock_upload_only,
     client: TestClient,
     evidence_upload_setup,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    project, master_drawing, run, storage, db_session = evidence_upload_setup
+    project, master_drawing, run, _storage, db_session = evidence_upload_setup
     master_id = cast(int, master_drawing.id)
 
-    _insert_region(
-        storage,
-        master_id,
-        "Colo Parking",
-        inspection_type_tags=["Underground Sanitary Sewer #1"],
-        location_tags=["COLO"],
-    )
-
-    _patch_pdf_text(
-        monkeypatch,
-        [
-            "COLO",
-            "33-Sanitary",
-            "Sewerage",
-            "Underground",
-            "Sanitary",
-            "Sewer",
-            "at",
-            "COLO",
-        ],
-    )
-
-    mock_classify.return_value = DocumentClassification(
-        document_type=DocumentType.INSPECTION_REPORT,
-        confidence=0.91,
-    )
-    mock_universal.return_value = UniversalFields(
-        location_text="COLO",
-        trade="33-Sanitary Sewerage",
-    )
-    mock_type_specific.return_value = InspectionReportFields(
-        inspection_name="Underground Sanitary Sewer #1",
-    )
+    mock_upload_only.return_value = True
 
     response = client.post(
         _upload_url(cast(int, project.id), cast(int, run.id)),
@@ -325,38 +342,26 @@ def test_upload_inspection_run_evidence_triggers_document_extraction(
     )
 
     assert response.status_code == 200
-    evidence_id = response.json()["evidence_id"]
+    body = response.json()
+    assert body["evidence_id"] > 0
+    assert body["overlays_created"] == 0
+    assert body["overlay_ids"] == []
 
-    extraction = (
+    mock_upload_only.assert_called_once()
+    call_kwargs = mock_upload_only.call_args.kwargs
+    assert call_kwargs["match_context"].project_id == cast(int, project.id)
+    assert call_kwargs["match_context"].master_drawing_id == master_id
+    assert call_kwargs["match_context"].inspection_run_id == cast(int, run.id)
+
+    db_session.refresh(run)
+    assert run.status == "processing"
+
+    extraction_for_evidence = (
         db_session.query(DocumentExtraction)
-        .filter_by(file_id=str(evidence_id))
-        .order_by(DocumentExtraction.created_at.desc())
-        .first()
+        .filter_by(file_id=str(body["evidence_id"]))
+        .count()
     )
-    assert extraction is not None
-
-    clues = (
-        db_session.query(DocumentClue)
-        .filter_by(document_extraction_id=cast(int, extraction.id))
-        .all()
-    )
-    values = {cast(str, clue.clue_value) for clue in clues}
-    assert "COLO" in values
-    assert "33-Sanitary Sewerage" in values
-
-    job = (
-        db_session.query(JobQueue)
-        .filter(JobQueue.job_type == JOB_TYPE_INSPECTION_MATCH)
-        .order_by(JobQueue.id.desc())
-        .first()
-    )
-    assert job is not None
-    input_data = cast(dict, job.input_data)
-    assert input_data["inspection_id"] == str(evidence_id)
-    assert input_data["drawing_id"] == str(master_id)
-    assert input_data["page"] == 1
-    assert input_data["inspection_run_id"] == cast(int, run.id)
-    assert input_data["project_id"] == cast(int, project.id)
+    assert extraction_for_evidence == 0
 
 
 def test_maybe_enqueue_inspection_match_job_skips_without_master_drawing(
@@ -372,7 +377,7 @@ def test_maybe_enqueue_inspection_match_job_skips_without_master_drawing(
     assert job is None
 
 
-@patch("services.evidence_document_extraction.run_document_extraction")
+@patch("services.evidence_investigation_persistence.run_document_extraction")
 def test_ingest_without_match_context_does_not_enqueue(
     mock_run,
     db_session: Session,

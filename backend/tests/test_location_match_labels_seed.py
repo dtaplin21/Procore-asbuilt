@@ -50,16 +50,13 @@ def test_ucsf_corridor_label_fields() -> None:
     assert golden["master_drawing_id"] == 661
     assert golden["inspection_run_id"] == 447
     assert golden["rotation_deg"] == 180
-    assert golden["expected_method"] == "coordinate_lookup"
-    assert golden["expected_match_status"] == "matched"
+    assert golden["expected_method"] == "reference_lookup"
+    assert golden["expected_match_status"] == "needs_review"
     bbox = golden["master_bbox_json"]
     assert bbox["type"] == "rect"
-    assert bbox["width"] > 0
+    assert bbox["width"] == 0
     scope = golden.get("master_scope_geometry_json")
-    assert scope is not None
-    assert scope["type"] == "polyline"
-    assert scope["scope_kind"] == "utility_line"
-    assert len(scope["points"]) >= 2
+    assert scope is None
 
 
 def test_validate_entry_accepts_polyline_scope_geometry() -> None:

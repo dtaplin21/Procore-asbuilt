@@ -10,25 +10,20 @@
     "master_bbox_json": {
       "type": "rect",
       "page": 1,
-      "x": 0.518,
-      "y": 0.472,
-      "width": 0.048,
-      "height": 0.042
+      "x": 0.0,
+      "y": 0.0,
+      "width": 0.0,
+      "height": 0.0
     },
-    "master_scope_geometry_json": {
-      "type": "polyline",
-      "page": 1,
-      "points": [[0.51, 0.47], [0.54, 0.48], [0.56, 0.49]],
-      "scope_kind": "utility_line"
-    },
-    "expected_method": "coordinate_lookup",
-    "expected_match_status": "matched",
+    "master_scope_geometry_json": null,
+    "expected_method": "reference_lookup",
+    "expected_match_status": "needs_review",
     "rotation_deg": 180,
     "has_coordinate_signal": true,
-    "has_station_signal": false,
+    "has_station_signal": true,
     "has_reference_signal": true,
     "evidence_kind": "form",
-    "notes": "Golden UCSF run 447 / evidence 377 — underground SS corridor pin at COLO parking lot (N/E 2131764.84 / 6051541.82). Label id kept as ucsf-435-ss-corridor for continuity."
+    "notes": "Golden UCSF run 447 / evidence 377. Evidence carries N/E 2131764.84 / 6051541.82 and station 11+14.23 from linked C4.20 profile text, but master 661 has no positioned survey OCR (index survey_points=0). Coordinate lookup requires auto_index/lazy_match drawing_survey_points with real label bboxes — never use pre2_baseline_seed. Until the C4.20 plan sheet is indexed with paired N/E tokens, expect reference/clue fusion at needs_review. Re-annotate master_bbox_json when a verified pin exists."
   },
   {
     "label_id": "ucsf-rotated-detail",

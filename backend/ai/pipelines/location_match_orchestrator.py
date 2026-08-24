@@ -39,6 +39,7 @@ from ai.pipelines.survey_point_extractor import (
     SurveyPointRecord,
     extract_stations_from_text,
     extract_survey_points_from_elements,
+    is_placed_survey_label_bbox,
 )
 from ai.pipelines.survey_point_matcher import (
     COORD_MATCH_TOLERANCE_FT,
@@ -392,7 +393,13 @@ def _meta_survey_points(evidence: EvidenceRecord) -> list[SurveyPointRecord]:
 
 def _scoped_point_from_row(row: DrawingSurveyPoint) -> _ScopedSurveyPoint | None:
     label_bbox = cast(dict[str, float] | None, row.label_bbox_json)
-    if not isinstance(label_bbox, dict):
+    meta_json = cast(dict[str, Any] | None, row.meta_json)
+    source = cast(str | None, row.source)
+    if not is_placed_survey_label_bbox(
+        label_bbox,
+        source=source,
+        meta_json=meta_json,
+    ):
         return None
     return _ScopedSurveyPoint(
         drawing_id=cast(int, row.drawing_id),
@@ -432,14 +439,23 @@ def _lazy_extract_drawing_survey_points(
         page_meta_json=page_meta_json,
         scale_source="lazy_match",
     )
-    if not records:
+    placed_records = [
+        record
+        for record in records
+        if is_placed_survey_label_bbox(
+            record.label_bbox_json,
+            source="lazy_match",
+            meta_json=record.meta_json,
+        )
+    ]
+    if not placed_records:
         return []
 
     try:
         persist_survey_points(
             session,
             drawing_id,
-            records,
+            placed_records,
             source="lazy_match",
         )
     except Exception:
@@ -459,8 +475,7 @@ def _lazy_extract_drawing_survey_points(
             label_bbox_json=record.label_bbox_json,
             ocr_confidence=record.ocr_confidence,
         )
-        for record in records
-        if isinstance(record.label_bbox_json, dict)
+        for record in placed_records
     ]
 
 

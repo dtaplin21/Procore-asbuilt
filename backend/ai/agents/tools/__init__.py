@@ -6,6 +6,7 @@ from ai.agents.tools.master_search import (
     search_master_by_clues,
 )
 from ai.agents.tools.pdf_investigation import (
+    EvidenceInvestigationPayload,
     PdfInvestigationResult,
     RenderedPdfPage,
     extract_page_clues,
@@ -17,6 +18,7 @@ from ai.agents.tools.pdf_investigation import (
 )
 
 __all__ = [
+    "EvidenceInvestigationPayload",
     "PdfInvestigationResult",
     "RenderedPdfPage",
     "expand_term_with_legend",

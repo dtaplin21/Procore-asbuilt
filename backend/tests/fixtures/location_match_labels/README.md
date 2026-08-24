@@ -9,6 +9,9 @@
 
 ## Annotation guide
 
+- **Do not seed synthetic survey points** (e.g. `pre2_baseline_seed`) for eval — coordinate
+  lookup requires `auto_index`/`lazy_match` rows with real OCR label bboxes. Use
+  `scripts/remove_baseline_survey_seeds.py` to clean stale seeds.
 - **Utility run inspections** (sewer, water, conduit, lateral): mark a **polyline**
   along the exact scoped line on the master drawing. Set `master_scope_geometry_json`
   with `"type": "polyline"`, normalized `points` (0–1), and `"scope_kind": "utility_line"`.

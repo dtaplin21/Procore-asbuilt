@@ -5,22 +5,16 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 from sqlalchemy.orm import Session
 
-from ai.pipelines.document_extraction_orchestrator import run_document_extraction
+from ai.agents.tools.pdf_investigation import run_pdf_investigation
 from ai.pipelines.document_text_extraction import extract_document
-from ai.pipelines.evidence_kind_classifier import classify_and_persist_evidence_kind
 from ai.pipelines.pdf_link_follower import LinkFollowResult, follow_pdf_links
 from models.document_extraction import DocumentExtraction
 from models.models import EvidenceRecord
-from services.evidence_linking import replace_evidence_drawing_links
-from services.linked_drawing_registration import register_linked_pdfs_as_auxiliary_drawings
-from services.evidence_survey_extraction import (
-    extract_survey_points_from_evidence,
-    persist_evidence_survey_meta,
-)
+from services.evidence_investigation_persistence import persist_evidence_investigation
 from services.inspection_matching_jobs import maybe_enqueue_inspection_match_after_extraction
 
 logger = logging.getLogger(__name__)
@@ -55,6 +49,48 @@ def extract_evidence_file_content_with_links(
     return merged, base, link_result
 
 
+def ingest_evidence_upload_only(
+    session: Session,
+    *,
+    evidence_id: int,
+    file_path: str | Path,
+    persist_text_content: bool = True,
+    match_context: InspectionMatchEnqueueContext | None = None,
+) -> bool:
+    """Persist uploaded evidence file metadata only (no link follow or clue extraction).
+
+    PDF hyperlink investigation, linked drawing registration, survey extraction, and
+    document clue extraction run at location-match time via ``build_evidence_dossier``.
+    """
+    try:
+        base = extract_evidence_file_content(file_path).strip()
+    except Exception:
+        logger.exception(
+            "evidence_upload_only_content_failed",
+            extra={"evidence_id": evidence_id, "file_path": str(file_path)},
+        )
+        return False
+
+    if persist_text_content and base:
+        evidence = session.query(EvidenceRecord).filter(EvidenceRecord.id == evidence_id).first()
+        if evidence is not None:
+            setattr(evidence, "text_content", base)
+            session.flush()
+
+    if match_context is not None:
+        maybe_enqueue_inspection_match_after_extraction(
+            session,
+            evidence_id=evidence_id,
+            project_id=match_context.project_id,
+            inspection_id=str(evidence_id),
+            master_drawing_id=match_context.master_drawing_id,
+            page=match_context.page,
+            inspection_run_id=match_context.inspection_run_id,
+        )
+
+    return True
+
+
 def ingest_evidence_document_extraction(
     session: Session,
     *,
@@ -63,9 +99,14 @@ def ingest_evidence_document_extraction(
     persist_text_content: bool = True,
     match_context: InspectionMatchEnqueueContext | None = None,
 ) -> DocumentExtraction | None:
-    """Run clue-based document extraction for an uploaded evidence file."""
+    """Run clue-based document extraction for an uploaded evidence file.
+
+    .. deprecated::
+        Inspection run uploads use ``ingest_evidence_upload_only``; full extraction
+        moves to location-match investigation (see Notes/location_match_investigation_plan.md).
+    """
     try:
-        content, base, link_result = extract_evidence_file_content_with_links(file_path)
+        payload = run_pdf_investigation(Path(file_path))
     except Exception:
         logger.exception(
             "evidence_content_extraction_failed",
@@ -73,94 +114,35 @@ def ingest_evidence_document_extraction(
         )
         return None
 
-    if not base and not link_result.supplemental_text.strip():
+    if not payload.base_text and not payload.link_result.supplemental_text.strip():
         logger.warning(
             "evidence_content_empty",
             extra={"evidence_id": evidence_id, "file_path": str(file_path)},
         )
         return None
 
-    evidence: EvidenceRecord | None = None
-    if persist_text_content:
-        evidence = session.query(EvidenceRecord).filter(EvidenceRecord.id == evidence_id).first()
-        if evidence is not None:
-            setattr(evidence, "text_content", content)
-            cross_raw = cast(list[Any] | None, evidence.cross_refs_json)
-            existing_refs = list(cross_raw or [])
-            existing_refs.extend(link_result.cross_refs)
-            evidence.cross_refs_json = existing_refs  # type: ignore[assignment]
-            meta_raw = cast(dict[str, Any] | None, evidence.meta)
-            meta = dict(meta_raw or {})
-            meta["pdfLinkFollow"] = {
-                "followed": link_result.followed_count,
-                "skipped": link_result.skipped_count,
-                "errors": link_result.errors[:5],
-            }
-            evidence.meta = meta  # type: ignore[assignment]
-            session.flush()
-            try:
-                register_linked_pdfs_as_auxiliary_drawings(
-                    session,
-                    project_id=cast(int, evidence.project_id),
-                    link_result=link_result,
-                    evidence_id=evidence_id,
-                )
-            except Exception:
-                logger.exception(
-                    "linked_drawing_registration_failed",
-                    extra={"evidence_id": evidence_id},
-                )
-            try:
-                replace_evidence_drawing_links(session, evidence, commit=False)
-            except Exception:
-                logger.exception(
-                    "evidence_drawing_link_sync_failed",
-                    extra={"evidence_id": evidence_id},
-                )
-
-            try:
-                survey_points, scale_json = extract_survey_points_from_evidence(
-                    session,
-                    evidence,
-                    file_path,
-                )
-                persist_evidence_survey_meta(evidence, survey_points, scale_json)
-                session.flush()
-            except Exception:
-                logger.exception(
-                    "evidence_survey_point_extraction_failed",
-                    extra={"evidence_id": evidence_id, "file_path": str(file_path)},
-                )
-
-    try:
-        extraction = run_document_extraction(
-            session,
-            file_id=str(evidence_id),
-            content=content,
-            classification_content=base or None,
-        )
-    except Exception:
-        logger.exception(
-            "document_extraction_orchestrator_failed",
+    evidence = session.query(EvidenceRecord).filter(EvidenceRecord.id == evidence_id).first()
+    if evidence is None:
+        logger.warning(
+            "evidence_document_extraction_missing_evidence",
             extra={"evidence_id": evidence_id},
         )
-        session.rollback()
         return None
 
-    if extraction is not None and evidence is not None:
-        try:
-            classify_and_persist_evidence_kind(
-                session,
-                evidence,
-                document_type=str(extraction.document_type),
-                file_path=file_path,
-            )
-            session.flush()
-        except Exception:
-            logger.exception(
-                "evidence_kind_classification_failed",
-                extra={"evidence_id": evidence_id, "file_path": str(file_path)},
-            )
+    persist_result = persist_evidence_investigation(
+        session,
+        evidence_id=evidence_id,
+        file_path=file_path,
+        project_id=cast(int, evidence.project_id),
+        payload=payload,
+        persist_text_content=persist_text_content,
+        text_content_max_chars=None,
+    )
+
+    if persist_result.extraction_id is None:
+        return None
+
+    extraction = session.get(DocumentExtraction, persist_result.extraction_id)
 
     if extraction is not None and match_context is not None:
         maybe_enqueue_inspection_match_after_extraction(

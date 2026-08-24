@@ -32,13 +32,28 @@ _TEXT_PREVIEW_CHARS = 500
 _IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}
 
 
+def _merge_evidence_text(base_text: str, link_result: LinkFollowResult) -> str:
+    """Linked supplemental content first, then base — same order as upload merge."""
+    base = base_text.strip()
+    if link_result.supplemental_text.strip():
+        return f"{link_result.supplemental_text}\n{base}".strip()
+    return base
+
+
 @dataclass(frozen=True)
-class PdfInvestigationResult:
+class EvidenceInvestigationPayload:
+    link_result: LinkFollowResult
+    merged_text: str
+    base_text: str
     summaries: tuple[LinkedAttachmentSummary, ...]
     links_followed: int
     pages_rendered: int
     ocr_word_counts: dict[str, int]
     errors: tuple[str, ...]
+
+
+# Backward-compatible alias for callers that only need investigation summaries.
+PdfInvestigationResult = EvidenceInvestigationPayload
 
 
 @dataclass(frozen=True)
@@ -195,10 +210,14 @@ def run_pdf_investigation(
     file_path: Path,
     *,
     max_links: int = 10,
-) -> PdfInvestigationResult:
-    """Follow PDF links, render pages, extract clues, and return investigation meta."""
+) -> EvidenceInvestigationPayload:
+    """Follow PDF links, render pages, extract clues, and return investigation payload."""
     if file_path.suffix.lower() != ".pdf":
-        return PdfInvestigationResult(
+        base_text = extract_document(file_path).full_text().strip()
+        return EvidenceInvestigationPayload(
+            link_result=LinkFollowResult(),
+            merged_text=base_text,
+            base_text=base_text,
             summaries=(),
             links_followed=0,
             pages_rendered=0,
@@ -226,6 +245,8 @@ def run_pdf_investigation(
 
     link_result = follow_and_capture_links(file_path)
     errors.extend(link_result.errors)
+    base_text = extract_document(file_path).full_text().strip()
+    merged_text = _merge_evidence_text(base_text, link_result)
 
     for fetched in link_result.fetched_pdfs:
         if len(summaries) >= max_links:
@@ -261,7 +282,10 @@ def run_pdf_investigation(
             )
             errors.append(f"internal page {target_page + 1} investigation failed")
 
-    return PdfInvestigationResult(
+    return EvidenceInvestigationPayload(
+        link_result=link_result,
+        merged_text=merged_text,
+        base_text=base_text,
         summaries=tuple(summaries),
         links_followed=link_result.followed_count,
         pages_rendered=pages_rendered,

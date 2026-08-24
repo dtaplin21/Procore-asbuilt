@@ -382,3 +382,37 @@ def extract_survey_points_from_plain_text(
             },
         )
     ]
+
+
+_UNTRUSTED_SURVEY_SOURCES = frozenset({"pre2_baseline_seed"})
+_MIN_PLACED_BBOX_AREA = 0.00005
+
+
+def is_placed_survey_label_bbox(
+    bbox: Any,
+    *,
+    source: str | None = None,
+    meta_json: dict[str, Any] | None = None,
+) -> bool:
+    """True when a survey point bbox is suitable for coordinate pin placement on a drawing."""
+    if not isinstance(bbox, dict):
+        return False
+    try:
+        x0 = float(bbox["x0"])
+        y0 = float(bbox["y0"])
+        x1 = float(bbox["x1"])
+        y1 = float(bbox["y1"])
+    except (KeyError, TypeError, ValueError):
+        return False
+
+    width = x1 - x0
+    height = y1 - y0
+    if width <= 0 or height <= 0:
+        return False
+    if width * height < _MIN_PLACED_BBOX_AREA:
+        return False
+    if source in _UNTRUSTED_SURVEY_SOURCES:
+        return False
+    if isinstance(meta_json, dict) and meta_json.get("plain_text_fallback"):
+        return False
+    return True

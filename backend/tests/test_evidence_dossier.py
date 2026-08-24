@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from ai.agents.evidence_dossier import EvidenceDossier, LinkedAttachmentSummary, build_evidence_dossier
 from ai.agents.tools.master_search import expand_term_with_legend
 from ai.agents.tools.pdf_investigation import PdfInvestigationResult
+from ai.pipelines.pdf_link_follower import LinkFollowResult
 from ai.pipelines.drawing_location_resolver import MasterRegion
 from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
@@ -246,6 +247,9 @@ def test_build_evidence_dossier_merges_pdf_investigation(
 
     mock_resolve_path.return_value = Path("/tmp/evidence.pdf")
     mock_run_pdf.return_value = PdfInvestigationResult(
+        link_result=LinkFollowResult(),
+        merged_text="Underground Sanitary Sewer at COLO parking lot",
+        base_text="Underground Sanitary Sewer at COLO parking lot",
         summaries=(
             LinkedAttachmentSummary(
                 url="https://example.com/install.pdf",

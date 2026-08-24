@@ -14,6 +14,7 @@ from ai.agents.tools.pdf_investigation import (
     investigate_pdf_links,
     list_pdf_hyperlinks,
     render_pdf_page,
+    run_pdf_investigation,
 )
 from ai.pipelines.pdf_link_follower import (
     FetchedLinkedPdf,
@@ -146,3 +147,32 @@ def test_follow_and_capture_links_delegates(tmp_path: Path, monkeypatch: pytest.
 
     assert isinstance(result, LinkFollowResult)
     assert "COLO" in result.supplemental_text
+
+
+@patch("ai.agents.tools.pdf_investigation.extract_document")
+@patch("ai.agents.tools.pdf_investigation.follow_and_capture_links")
+def test_run_pdf_investigation_returns_link_result_and_merged_text(
+    mock_follow: MagicMock,
+    mock_extract: MagicMock,
+    tmp_path: Path,
+) -> None:
+    from ai.pipelines.document_text_extraction import ExtractedDocument, SourceFormat
+
+    pdf_path = tmp_path / "report.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    mock_extract.return_value = ExtractedDocument(
+        source_format=SourceFormat.NATIVE_PDF,
+        page_count=1,
+        words=[],
+    )
+    mock_follow.return_value = LinkFollowResult(
+        supplemental_text="Linked install sheet",
+        followed_count=1,
+    )
+
+    payload = run_pdf_investigation(pdf_path, max_links=0)
+
+    assert payload.link_result is mock_follow.return_value
+    assert payload.base_text == ""
+    assert payload.merged_text == "Linked install sheet"
+    assert payload.links_followed == 1

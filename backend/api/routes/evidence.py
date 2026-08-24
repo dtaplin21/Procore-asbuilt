@@ -6,7 +6,6 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Dep
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db, get_idempotency_key
-from ai.pipelines.inspection_mapping import DocumentEvidenceInput, map_document_to_overlays
 from models.models import EvidenceRecord, InspectionRun, Project
 from models.schemas import (
     EvidenceRecordResponse,
@@ -16,6 +15,7 @@ from models.schemas import (
 from services.evidence_document_extraction import (
     InspectionMatchEnqueueContext,
     ingest_evidence_document_extraction,
+    ingest_evidence_upload_only,
 )
 from services.evidence_file_storage import (
     UnsupportedEvidenceFileType,
@@ -25,7 +25,6 @@ from services.evidence_file_storage import (
 )
 from services.file_storage import get_file_path, read_and_validate_upload, save_upload_from_bytes, sha256_bytes
 from services.idempotency import begin_idempotent_operation, finish_idempotent_operation
-from services.overlay_storage import create_drawing_overlays, flag_unresolved_evidence
 from services.master_drawing_index_readiness import get_master_drawing_index_readiness
 from services.drawing_index_jobs import maybe_enqueue_drawing_index_job
 from services.region_index_loader import build_region_index
@@ -35,11 +34,6 @@ from fastapi.responses import FileResponse
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["evidence"])
-
-
-def _try_visual_registration(file_path: str, master_drawing_id: str):
-    """Placeholder for Case A (alignment) registration — returns None until wired."""
-    return None
 
 
 def _maybe_trigger_run_completion(db: Session, run: InspectionRun) -> None:
@@ -80,7 +74,7 @@ async def upload_inspection_run_evidence(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ) -> InspectionRunEvidenceUploadResponse:
-    """Upload evidence against an inspection run and map it onto the master drawing."""
+    """Upload evidence against an inspection run; location match runs in the worker."""
     storage = StorageService(db)
     if storage.get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -137,7 +131,7 @@ async def upload_inspection_run_evidence(
         if not index_readiness.is_ready_for_matching:
             maybe_enqueue_drawing_index_job(db, project_id=project_id, drawing_id=master_drawing_id)
 
-        ingest_evidence_document_extraction(
+        upload_ok = ingest_evidence_upload_only(
             db,
             evidence_id=evidence_id,
             file_path=str(saved_path),
@@ -148,41 +142,18 @@ async def upload_inspection_run_evidence(
                 inspection_run_id=inspection_run_id,
             ),
         )
-
-        region_load = build_region_index(db, master_drawing_id)
-        registration = _try_visual_registration(str(saved_path), str(master_drawing_id))
-
-        evidence_input = DocumentEvidenceInput(
-            evidence_id=str(evidence_id),
-            inspection_run_id=str(inspection_run_id),
-            master_drawing_id=str(master_drawing_id),
-            file_path=str(saved_path),
-            region_index=region_load.regions,
-            registration_transform=registration,
-        )
-
-        try:
-            overlays, unresolved = map_document_to_overlays(evidence_input, session=db)
-        except Exception:
-            logger.exception(
-                "map_document_to_overlays failed for evidence_id=%s run_id=%s drawing_id=%s",
-                evidence_id,
-                inspection_run_id,
-                master_drawing_id,
-            )
+        if not upload_ok:
             raise HTTPException(
                 status_code=422,
                 detail=(
-                    "Could not process the uploaded evidence file. It may be "
+                    "Could not read the uploaded evidence file. It may be "
                     "corrupted, password-protected, or an unsupported format."
                 ),
-            ) from None
+            )
 
-        saved_overlays = create_drawing_overlays(db, overlays) if overlays else []
-        if unresolved:
-            flag_unresolved_evidence(db, unresolved)
+        region_load = build_region_index(db, master_drawing_id)
 
-        storage.update_inspection_run_status(run_id, "complete")
+        storage.update_inspection_run_status(run_id, "processing")
 
         if region_load.untagged_region_count > 0:
             logger.info(
@@ -195,10 +166,10 @@ async def upload_inspection_run_evidence(
 
         return InspectionRunEvidenceUploadResponse(
             evidence_id=evidence_id,
-            overlays_created=len(saved_overlays),
-            unresolved_count=len(unresolved),
+            overlays_created=0,
+            unresolved_count=0,
             untagged_region_count=region_load.untagged_region_count,
-            overlay_ids=[cast(int, overlay.id) for overlay in saved_overlays],
+            overlay_ids=[],
             master_index_status=index_readiness.upload_response_status,
             master_index_ready=index_readiness.is_ready_for_matching,
         )
