@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ArrowLeft, FileStack, Trash2 } from "lucide-react";
 import { Link, useParams } from "wouter";
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/hooks/use-toast";
 import { fetchProjectDrawings, projectDrawingsQueryKey } from "@/lib/api/drawings";
 import { fetchProjectDashboardSummary } from "@/lib/api/projects";
 import { buildWorkspaceUrl } from "@/lib/workspace-links";
@@ -22,6 +23,7 @@ export default function DrawingLibraryPage() {
   const projectId = params?.projectId ?? "";
   const parsedProjectId = Number(projectId);
   const isValidProject = Number.isFinite(parsedProjectId);
+  const queryClient = useQueryClient();
 
   const [deleteTarget, setDeleteTarget] = useState<ProjectDrawingCandidate | null>(
     null
@@ -146,7 +148,11 @@ export default function DrawingLibraryPage() {
                     size="icon"
                     className="h-8 w-8 text-muted-foreground hover:text-destructive"
                     aria-label={`Delete ${drawing.name}`}
-                    onClick={() => setDeleteTarget(drawing)}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setDeleteTarget(drawing);
+                    }}
                     data-testid={`drawing-library-delete-${drawing.id}`}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -191,6 +197,16 @@ export default function DrawingLibraryPage() {
         open={deleteTarget !== null}
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
+        }}
+        onDeleteSuccess={async (deletedDrawingId) => {
+          setDeleteTarget(null);
+          await queryClient.refetchQueries({
+            queryKey: projectDrawingsQueryKey(parsedProjectId),
+          });
+          toast({
+            title: "Drawing deleted",
+            description: `Drawing #${deletedDrawingId} was removed from the project.`,
+          });
         }}
       />
     </div>

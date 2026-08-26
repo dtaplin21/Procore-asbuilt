@@ -124,5 +124,41 @@
     "has_reference_signal": false,
     "evidence_kind": "form",
     "notes": "Chainage/station label (12+50) on master aligns with evidence station text; no N/E coordinates."
+  },
+  {
+    "label_id": "ucsf-642-ss-run",
+    "suite": "ucsf",
+    "project_id": 2,
+    "evidence_id": 632,
+    "inspection_run_id": 642,
+    "master_drawing_id": 661,
+    "evidence_fixture_path": null,
+    "master_bbox_json": {
+      "type": "rect",
+      "page": 1,
+      "x": 0.441,
+      "y": 0.454,
+      "width": 0.243,
+      "height": 0.125
+    },
+    "master_scope_geometry_json": {
+      "type": "polyline",
+      "page": 1,
+      "scope_kind": "utility_line",
+      "points": [
+        [0.451, 0.464],
+        [0.556, 0.472],
+        [0.653, 0.535],
+        [0.674, 0.569]
+      ]
+    },
+    "expected_method": "coordinate_lookup",
+    "expected_match_status": "matched",
+    "rotation_deg": null,
+    "has_coordinate_signal": true,
+    "has_station_signal": true,
+    "has_reference_signal": true,
+    "evidence_kind": "form",
+    "notes": "Run 642 / evidence 632. Truth polyline = sanitary sewer run STA 10+00→10+90.95 on master 661 campus plan. Vertices projected from C4.20 (1084) plan OCR + green-highlight shape using control pair 11+14.23 aux (0.162,0.208)→master campus (0.518,0.472). Refine after S-4 registration if control points shift."
   }
 ]

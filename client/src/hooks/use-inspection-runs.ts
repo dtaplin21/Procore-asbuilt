@@ -13,6 +13,7 @@ import {
   uploadInspectionRunEvidence,
 } from "@/lib/api/inspection_runs";
 import { deleteInspectionRun } from "@/lib/api/inspections";
+import { invalidateProjectDrawingListQueries } from "@/lib/api/drawings";
 import {
   fetchDrawingOverlays,
   fetchLatestRunOverlays,
@@ -252,6 +253,7 @@ export function useDeleteInspectionRun(projectId: number | null) {
         void queryClient.invalidateQueries({
           queryKey: [`/api/projects/${projectId}/evidence`],
         });
+        void invalidateProjectDrawingListQueries(queryClient, projectId);
       }
     },
   });

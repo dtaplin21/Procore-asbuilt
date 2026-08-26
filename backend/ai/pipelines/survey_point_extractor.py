@@ -37,6 +37,10 @@ _STRUCTURE_RE = re.compile(
     r"\b(SSMH|SSMH-\d+|MH-?\d+|CO-?\d+|SMH|DMH|CB|DI)\b",
     re.IGNORECASE,
 )
+_BARE_COORD_NUMBER_RE = re.compile(r"^(\d{6,8}(?:\.\d{1,2})?)$")
+# California State Plane–style campus coords (UCSF / Bay Area drawings).
+_BARE_NORTHING_RANGE = (1_000_000.0, 3_000_000.0)
+_BARE_EASTING_RANGE = (5_000_000.0, 7_500_000.0)
 
 
 class _TextElementLike(Protocol):
@@ -201,6 +205,25 @@ def _valid_bbox(bbox: Any) -> dict[str, float] | None:
     return {"x0": x0, "y0": y0, "x1": x1, "y1": y1}
 
 
+def _classify_bare_coordinate(value: float) -> Literal["northing", "easting"] | None:
+    """Classify OCR-only numeric tokens (no ``N``/``E`` prefix) by campus value ranges."""
+    if _BARE_NORTHING_RANGE[0] <= value <= _BARE_NORTHING_RANGE[1]:
+        return "northing"
+    if _BARE_EASTING_RANGE[0] <= value <= _BARE_EASTING_RANGE[1]:
+        return "easting"
+    return None
+
+
+def _append_coord_token(
+    tokens: list[tuple[float, dict[str, float], float]],
+    *,
+    value: float,
+    bbox: dict[str, float],
+    confidence: float,
+) -> None:
+    tokens.append((value, bbox, confidence))
+
+
 def extract_survey_points_from_elements(
     elements: Sequence[_TextElementLike],
     *,
@@ -236,10 +259,38 @@ def extract_survey_points_from_elements(
             confidence = float(getattr(element, "ocr_confidence", 1.0))
             northing_match = _NORTHING_RE.search(text)
             if northing_match:
-                n_tokens.append((float(northing_match.group(1)), bbox, confidence))
+                _append_coord_token(
+                    n_tokens,
+                    value=float(northing_match.group(1)),
+                    bbox=bbox,
+                    confidence=confidence,
+                )
             easting_match = _EASTING_RE.search(text)
             if easting_match:
-                e_tokens.append((float(easting_match.group(1)), bbox, confidence))
+                _append_coord_token(
+                    e_tokens,
+                    value=float(easting_match.group(1)),
+                    bbox=bbox,
+                    confidence=confidence,
+                )
+            if northing_match is None and easting_match is None:
+                bare_match = _BARE_COORD_NUMBER_RE.match(text.strip())
+                if bare_match is not None:
+                    kind = _classify_bare_coordinate(float(bare_match.group(1)))
+                    if kind == "northing":
+                        _append_coord_token(
+                            n_tokens,
+                            value=float(bare_match.group(1)),
+                            bbox=bbox,
+                            confidence=confidence,
+                        )
+                    elif kind == "easting":
+                        _append_coord_token(
+                            e_tokens,
+                            value=float(bare_match.group(1)),
+                            bbox=bbox,
+                            confidence=confidence,
+                        )
 
         for n_val, n_bbox, n_conf in n_tokens:
             nx, ny = _centroid(n_bbox)

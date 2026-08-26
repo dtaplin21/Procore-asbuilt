@@ -8,6 +8,7 @@ import pytest
 
 from ai.pipelines.survey_point_extractor import (
     extract_survey_points_from_elements,
+    is_placed_survey_label_bbox,
     resolve_pairing_scale,
 )
 
@@ -111,3 +112,43 @@ def test_survey_point_extractor_normalized_fallback_without_page_dims() -> None:
     assert len(points) == 1
     assert points[0].meta_json["pairing_scale_mode"] == "normalized_fallback"
     assert points[0].meta_json["scale_fallback"] is True
+
+
+def test_survey_point_extractor_pairs_stacked_bare_coordinate_tokens() -> None:
+    """CAD OCR often emits N/E values without prefix labels (C4.20 install sheets)."""
+    elements = [
+        _FakeElement(
+            1,
+            "2131764.84",
+            {"x0": 0.15388888888888888, "y0": 0.20375, "x1": 0.17041666666666666, "y1": 0.2075},
+            ocr_confidence=0.82,
+        ),
+        _FakeElement(
+            1,
+            "6051541.82",
+            {"x0": 0.15388888888888888, "y0": 0.20916666666666667, "x1": 0.17027777777777778, "y1": 0.213125},
+            ocr_confidence=0.81,
+        ),
+        _FakeElement(
+            1,
+            "11+14.23/",
+            {"x0": 0.34305555555555556, "y0": 0.2675, "x1": 0.3575, "y1": 0.274375},
+            ocr_confidence=0.0,
+        ),
+    ]
+
+    points = extract_survey_points_from_elements(
+        elements,
+        scale_json=SCALE_1_IN_10_FT,
+        page_meta_json=ARCH_PAGE_META,
+    )
+
+    assert len(points) >= 1
+    primary = next(
+        point
+        for point in points
+        if point.northing == pytest.approx(2131764.84)
+        and point.easting == pytest.approx(6051541.82)
+    )
+    assert primary.station is None or primary.station == "11+14.23"
+    assert is_placed_survey_label_bbox(primary.label_bbox_json, source="auto_index")

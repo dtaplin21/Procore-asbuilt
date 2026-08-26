@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
 from sqlalchemy.orm import Session
 
@@ -43,6 +43,18 @@ def build_match_scope(
         )
         for link in linked_rows:
             auxiliary.append(cast(int, link.drawing_id))
+
+        meta = cast(dict[str, Any] | None, evidence.meta)
+        if isinstance(meta, dict):
+            investigation = meta.get("matchInvestigation")
+            if isinstance(investigation, dict):
+                linked_ids = investigation.get("linked_drawing_ids")
+                if isinstance(linked_ids, list):
+                    for drawing_id in linked_ids:
+                        try:
+                            auxiliary.append(int(drawing_id))
+                        except (TypeError, ValueError):
+                            continue
 
     auxiliary_ids = tuple(
         drawing_id

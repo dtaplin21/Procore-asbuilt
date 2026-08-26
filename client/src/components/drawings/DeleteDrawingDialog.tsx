@@ -19,7 +19,7 @@ import {
   deleteProjectDrawing,
   fetchDrawingDeleteSummary,
 } from "@/lib/api/projects";
-import { projectDrawingsQueryKey } from "@/lib/api/drawings";
+import { invalidateProjectDrawingListQueries } from "@/lib/api/drawings";
 
 type DrawingRow = {
   id: number;
@@ -110,18 +110,7 @@ export function DeleteDrawingDialog({
       }
       const deletedId = drawingId;
 
-      await queryClient.removeQueries({
-        queryKey: projectDrawingsQueryKey(projectId),
-      });
-      await queryClient.removeQueries({
-        queryKey: ["drawing-manage-dashboard-summary", projectId],
-      });
-      await queryClient.removeQueries({
-        queryKey: ["drawing-picker-dashboard-summary", projectId],
-      });
-      await queryClient.removeQueries({
-        queryKey: ["project-dashboard-summary", projectId],
-      });
+      await invalidateProjectDrawingListQueries(queryClient, projectId);
       queryClient.removeQueries({
         predicate: (q) => {
           const k = q.queryKey;

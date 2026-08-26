@@ -65,6 +65,7 @@ def _minimal_dossier(
     *,
     evidence_text: str = "",
     expanded_clues: tuple[ExpandedClue, ...] = (),
+    clues: tuple[object, ...] = (),
     survey_points_meta: tuple[dict[str, object], ...] = (),
     evidence_meta: dict[str, object] | None = None,
 ) -> EvidenceDossier:
@@ -87,7 +88,7 @@ def _minimal_dossier(
         master_drawing_id=661,
         evidence=evidence,
         extraction=None,
-        clues=(),
+        clues=clues,
         expanded_clues=expanded_clues,
         evidence_text=evidence_text,
         base_text=evidence_text,
@@ -284,6 +285,24 @@ def test_infer_scope_kind_station_range_with_sewer_language_is_utility_line() ->
     dossier = _minimal_dossier(
         evidence_text="Sanitary sewer work from station 10+00 to 11+50",
         evidence_meta={"station_from": "10+00", "station_to": "11+50"},
+    )
+
+    assert infer_scope_kind(dossier) == ScopeKind.UTILITY_LINE
+
+
+def test_infer_scope_kind_uses_station_clues_from_linked_aux_extraction() -> None:
+    dossier = _minimal_dossier(
+        evidence_text="7/20-7/24 Trench and Install Sanitary Sewer Lines",
+        clues=(
+            SimpleNamespace(
+                clue_type="station_from",
+                clue_value="10+00",
+            ),
+            SimpleNamespace(
+                clue_type="station_to",
+                clue_value="10+90.95",
+            ),
+        ),
     )
 
     assert infer_scope_kind(dossier) == ScopeKind.UTILITY_LINE

@@ -15,7 +15,12 @@ from ai.pipelines.clue_fusion_scorer import (
     select_fused_winner,
 )
 from ai.pipelines.drawing_location_resolver import ResolutionMethod
-from ai.pipelines.location_match_orchestrator import generate_all_location_candidates
+from ai.pipelines.drawing_location_resolver import RegistrationTransform
+from ai.pipelines.location_match_orchestrator import (
+    _load_registration_transform,
+    generate_all_location_candidates,
+    project_polyline_to_master,
+)
 from ai.pipelines.scope_geometry import ScopeGeometry, ScopeKind, bbox_to_scope_rect, clamp_fractional_bbox, infer_scope_kind
 from ai.pipelines.scope_line_tracer import trace_scope_geometry
 from ai.pipelines.vision_location_reasoner import (
@@ -193,6 +198,7 @@ class InspectionLocationAgent:
                     page=page,
                     session=session,
                     master_png_path=master_png_path,
+                    source_drawing_id=winner.candidate.source_drawing_id,
                 )
             except ValueError:
                 scope = None
@@ -203,12 +209,26 @@ class InspectionLocationAgent:
                     scope_kind=scope_kind,
                 )
 
+        registration_transform = _load_registration_transform(dossier.evidence)
+        scope, aux_scope_unprojected = _maybe_project_aux_scope_to_master(
+            scope,
+            master_drawing_id=master_drawing_id,
+            registration_transform=registration_transform,
+            source_drawing_id=winner.candidate.source_drawing_id,
+        )
+
         status = _decide_match_status(
             winner,
             scope=scope,
             scope_kind=scope_kind,
         )
         rationale = winner.rationale
+        if aux_scope_unprojected:
+            status = "needs_review"
+            rationale = (
+                f"{rationale} | aux_coords_unprojected: aux scope polyline "
+                "could not be projected onto the master sheet."
+            )
         if scope is not None and scope.meta:
             source = scope.meta.get("source")
             if source:
@@ -232,6 +252,46 @@ class InspectionLocationAgent:
             inspection_run_id=inspection_run_id,
         )
         return result
+
+
+def _maybe_project_aux_scope_to_master(
+    scope: ScopeGeometry | None,
+    *,
+    master_drawing_id: int,
+    registration_transform: RegistrationTransform | None,
+    source_drawing_id: int | None,
+) -> tuple[ScopeGeometry | None, bool]:
+    """Project aux-space polylines onto master; drop scope when transform is missing."""
+    if scope is None or scope.type != "polyline" or not scope.points:
+        return scope, False
+
+    meta = dict(scope.meta or {})
+    raw_aux_id = meta.get("source_drawing_id")
+    if raw_aux_id is None and source_drawing_id is not None:
+        raw_aux_id = source_drawing_id
+    try:
+        aux_drawing_id = int(raw_aux_id) if raw_aux_id is not None else None
+    except (TypeError, ValueError):
+        aux_drawing_id = None
+
+    if aux_drawing_id is None or aux_drawing_id == master_drawing_id:
+        return scope, False
+
+    if registration_transform is None:
+        return None, True
+
+    projected_points = project_polyline_to_master(scope.points, registration_transform)
+    meta["projected_from_drawing_id"] = aux_drawing_id
+    source = meta.get("source")
+    if source:
+        meta["source"] = f"{source}_projected"
+    return ScopeGeometry(
+        page=scope.page,
+        type=scope.type,
+        points=projected_points,
+        scope_kind=scope.scope_kind,
+        meta=meta,
+    ), False
 
 
 def _decide_match_status(
@@ -277,6 +337,16 @@ def _has_unprojected_aux_coordinate_match(candidates: list[object]) -> bool:
 def _auxiliary_drawings_need_index(session: Session, dossier: EvidenceDossier) -> bool:
     if dossier.investigation_meta.get("auxiliary_index_pending"):
         return True
+    needing_index = dossier.investigation_meta.get("drawing_ids_needing_index")
+    if isinstance(needing_index, list):
+        for drawing_id in needing_index:
+            try:
+                did = int(drawing_id)
+            except (TypeError, ValueError):
+                continue
+            readiness = get_master_drawing_index_readiness(session, did)
+            if not readiness.is_ready_for_matching:
+                return True
     for drawing in dossier.auxiliary_drawings:
         readiness = get_master_drawing_index_readiness(session, cast(int, drawing.id))
         if not readiness.is_ready_for_matching:

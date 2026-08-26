@@ -257,7 +257,7 @@ def test_coordinate_lookup_marks_aux_unprojected_without_transform(
     assert len(candidates) == 1
     candidate = candidates[0]
     assert candidate.method == ResolutionMethod.COORDINATE_LOOKUP
-    assert candidate.bbox_fractional is None
+    assert candidate.bbox_fractional == pytest.approx((0.12, 0.18, 0.18, 0.22))
     assert "aux_coords_unprojected" in candidate.notes
     assert candidate.source_drawing_id == cast(int, aux.id)
 
@@ -316,8 +316,8 @@ def test_coordinate_lookup_projects_aux_match_with_registration_transform(
     transform = RegistrationTransform(
         scale_x=1.0,
         scale_y=1.0,
-        translate_x=0.0,
-        translate_y=0.0,
+        translate_x=0.356,
+        translate_y=0.264,
         rotation_degrees=0.0,
     )
 
@@ -331,6 +331,90 @@ def test_coordinate_lookup_projects_aux_match_with_registration_transform(
 
     assert len(candidates) == 1
     candidate = candidates[0]
-    assert candidate.bbox_fractional == pytest.approx((0.10, 0.20, 0.14, 0.24))
+    assert candidate.bbox_fractional == pytest.approx((0.456, 0.464, 0.496, 0.504))
     assert candidate.source_drawing_id == cast(int, aux.id)
     assert "projected from auxiliary" in candidate.notes
+    assert "aux_coords_unprojected" not in candidate.contradicting_signals
+
+    polyline = ((0.10, 0.20), (0.29, 0.27))
+    from ai.pipelines.registration_from_survey import project_polyline_to_master
+
+    projected_polyline = project_polyline_to_master(polyline, transform)
+    assert projected_polyline[0][0] == pytest.approx(0.456, abs=0.01)
+    assert projected_polyline[-1][0] == pytest.approx(0.646, abs=0.01)
+
+
+def test_load_scoped_survey_points_lazy_pairs_bare_ocr_tokens(
+    db_session: Session,
+    project,
+) -> None:
+    from ai.pipelines.location_match_orchestrator import _load_scoped_survey_points
+    from models.drawing_text_element import DrawingTextElement
+
+    aux = Drawing(
+        project_id=project.id,
+        source="linked_evidence",
+        name="C4.20 Install.pdf",
+        storage_key="linked/c420.pdf",
+        content_type="application/pdf",
+        processing_status="ready",
+        index_status="ready",
+        page_meta_json=[
+            {"page": 1, "width_pt": 2592.0, "height_pt": 1728.0, "rotation": 0},
+        ],
+        scale_json={
+            "raw_text": '1" = 10\'',
+            "paper_inches_per_real_foot": 0.1,
+            "real_feet_per_paper_inch": 10.0,
+            "confidence": 0.9,
+            "page": 1,
+        },
+    )
+    db_session.add(aux)
+    db_session.flush()
+
+    db_session.add_all(
+        [
+            DrawingTextElement(
+                master_drawing_id=aux.id,
+                page=1,
+                text="2131764.84",
+                text_normalized="2131764.84",
+                bbox_json={
+                    "x0": 0.15388888888888888,
+                    "y0": 0.20375,
+                    "x1": 0.17041666666666666,
+                    "y1": 0.2075,
+                },
+                ocr_confidence=0.82,
+                source="tesseract",
+            ),
+            DrawingTextElement(
+                master_drawing_id=aux.id,
+                page=1,
+                text="6051541.82",
+                text_normalized="6051541.82",
+                bbox_json={
+                    "x0": 0.15388888888888888,
+                    "y0": 0.20916666666666667,
+                    "x1": 0.17027777777777778,
+                    "y1": 0.213125,
+                },
+                ocr_confidence=0.81,
+                source="tesseract",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    scoped = _load_scoped_survey_points(db_session, [cast(int, aux.id)])
+
+    assert len(scoped) >= 1
+    match = next(
+        point
+        for point in scoped
+        if point.northing == pytest.approx(2131764.84)
+        and point.easting == pytest.approx(6051541.82)
+    )
+    assert match.drawing_id == cast(int, aux.id)
+    assert match.label_bbox_json["x0"] < match.label_bbox_json["x1"]

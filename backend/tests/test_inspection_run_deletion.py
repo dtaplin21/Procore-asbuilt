@@ -158,3 +158,48 @@ class TestDeleteInspectionRun:
 
         db_session.expire_all()
         assert db_session.query(JobQueue).filter_by(id=job_id).first() is None
+
+    def test_delete_run_removes_linked_evidence_drawings(
+        self,
+        client: TestClient,
+        delete_run_setup,
+    ) -> None:
+        from models.models import Drawing
+
+        project, drawing, run, storage, db_session = delete_run_setup
+        project_id = cast(int, project.id)
+        run_id = cast(int, run.id)
+
+        aux = Drawing(
+            project_id=project_id,
+            source="linked_evidence",
+            name="C4.20.pdf",
+            storage_key=f"drawings/{project_id}/c420.pdf",
+        )
+        db_session.add(aux)
+        db_session.commit()
+        db_session.refresh(aux)
+        aux_id = cast(int, aux.id)
+
+        evidence = storage.create_evidence_record(
+            project_id=project_id,
+            type="inspection_doc",
+            title="report.pdf",
+            storage_key=f"projects/{project_id}/evidence/{run_id}.pdf",
+            content_type="application/pdf",
+        )
+        evidence_id = cast(int, evidence.id)
+        evidence.meta = {
+            "matchInvestigation": {
+                "linked_drawing_ids": [aux_id],
+            },
+        }
+        setattr(run, "evidence_id", evidence_id)
+        db_session.commit()
+
+        response = client.delete(f"/api/projects/{project_id}/inspections/runs/{run_id}")
+        assert response.status_code == 200
+
+        db_session.expire_all()
+        assert db_session.query(Drawing).filter(Drawing.id == aux_id).first() is None
+        assert storage.get_drawing(project_id, cast(int, drawing.id)) is not None

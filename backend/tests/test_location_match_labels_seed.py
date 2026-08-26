@@ -42,6 +42,26 @@ def test_synthetic_suite_exists() -> None:
     assert "synthetic-no-match" in label_ids
 
 
+def test_ucsf_642_ss_run_polyline_label_fields() -> None:
+    entries = load_fixture(UCSF_FIXTURE_PATH)
+    golden = next(e for e in entries if e["label_id"] == "ucsf-642-ss-run")
+    assert golden["suite"] == "ucsf"
+    assert golden["evidence_id"] == 632
+    assert golden["inspection_run_id"] == 642
+    assert golden["master_drawing_id"] == 661
+    assert golden["expected_method"] == "coordinate_lookup"
+    assert golden["expected_match_status"] == "matched"
+    scope = golden["master_scope_geometry_json"]
+    assert scope is not None
+    assert scope["type"] == "polyline"
+    assert scope["scope_kind"] == "utility_line"
+    assert len(scope["points"]) >= 4
+    bbox = golden["master_bbox_json"]
+    assert bbox["width"] > 0
+    assert bbox["height"] > 0
+    validate_entry(golden, 0)
+
+
 def test_ucsf_corridor_label_fields() -> None:
     entries = load_fixture(UCSF_FIXTURE_PATH)
     golden = next(e for e in entries if e["label_id"] == "ucsf-435-ss-corridor")

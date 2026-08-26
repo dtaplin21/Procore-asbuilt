@@ -17,6 +17,7 @@ from ai.pipelines.document_text_extraction import (
 )
 from ai.pipelines.master_drawing_indexer import (
     IndexResult,
+    _native_text_looks_garbled,
     build_page_meta_json,
     extract_drawing_document,
     index_master_drawing,
@@ -91,6 +92,85 @@ def test_extract_drawing_document_respects_max_pages(tmp_path: Path) -> None:
 
     assert extracted.page_count == 2
     assert [word.text for word in extracted.words] == ["A", "B"]
+
+
+def test_native_text_looks_garbled_detects_cad_font_encoding() -> None:
+    garbage_words = [
+        _word("5($'<"),
+        _word("0$<"),
+        _word("129"),
+        _word(")&%"),
+        _word("6(9"),
+    ] * 5
+    document = ExtractedDocument(
+        source_format=SourceFormat.NATIVE_PDF,
+        page_count=1,
+        words=garbage_words,
+    )
+
+    assert _native_text_looks_garbled(document) is True
+
+
+def test_native_text_looks_garbled_accepts_readable_native_layer() -> None:
+    document = ExtractedDocument(
+        source_format=SourceFormat.NATIVE_PDF,
+        page_count=1,
+        words=[_word("STA 10+00"), _word("SS-3"), _word("COLO")] * 8,
+    )
+
+    assert _native_text_looks_garbled(document) is False
+
+
+def test_extract_drawing_document_force_ocr_for_linked_evidence(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "install.pdf"
+    pdf_path.write_bytes(b"%PDF")
+    ocr_doc = ExtractedDocument(
+        source_format=SourceFormat.SCANNED_PDF,
+        page_count=2,
+        words=[_word("2131764.84"), _word("6051541.82")],
+    )
+
+    with patch(
+        "ai.pipelines.master_drawing_indexer.extract_document_via_ocr",
+        return_value=ocr_doc,
+    ) as ocr_mock:
+        extracted = extract_drawing_document(pdf_path, force_ocr=True)
+
+    ocr_mock.assert_called_once()
+    assert extracted.source_format == SourceFormat.SCANNED_PDF
+    assert any("2131764" in word.text for word in extracted.words)
+
+
+def test_extract_drawing_document_falls_back_to_ocr_when_native_is_garbled(
+    tmp_path: Path,
+) -> None:
+    pdf_path = tmp_path / "cad.pdf"
+    pdf_path.write_bytes(b"%PDF")
+    native_doc = ExtractedDocument(
+        source_format=SourceFormat.NATIVE_PDF,
+        page_count=1,
+        words=[_word("5($'<"), _word("0$<")] * 12,
+    )
+    ocr_doc = ExtractedDocument(
+        source_format=SourceFormat.SCANNED_PDF,
+        page_count=1,
+        words=[_word("11+14.23"), _word("2131764.84")],
+    )
+
+    with (
+        patch(
+            "ai.pipelines.master_drawing_indexer.extract_document",
+            return_value=native_doc,
+        ),
+        patch(
+            "ai.pipelines.master_drawing_indexer.extract_document_via_ocr",
+            return_value=ocr_doc,
+        ) as ocr_mock,
+    ):
+        extracted = extract_drawing_document(pdf_path)
+
+    ocr_mock.assert_called_once()
+    assert any("11+14" in word.text for word in extracted.words)
 
 
 def test_persist_text_elements(db_session: Session, seeded_ready_pdf_drawing: Drawing) -> None:

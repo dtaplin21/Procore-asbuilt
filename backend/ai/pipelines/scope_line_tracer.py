@@ -9,6 +9,7 @@ from typing import Any, cast
 
 from sqlalchemy.orm import Session
 
+from ai.pipelines.aux_scope_polyline import build_aux_survey_polyline
 from ai.agents.evidence_dossier import EvidenceDossier
 from ai.pipelines.scope_geometry import (
     ScopeGeometry,
@@ -44,10 +45,16 @@ def trace_scope_geometry(
     page: int = 1,
     session: Session | None = None,
     master_png_path: Path | None = None,
+    source_drawing_id: int | None = None,
 ) -> ScopeGeometry:
     """Build normalized scope geometry for the matched work area."""
     expanded_anchor = _expand_bbox(anchor_bbox, _ANCHOR_PADDING)
-    tokens = _load_master_text_tokens(dossier, page=page, session=session)
+    tokens, trace_on_aux = _resolve_trace_tokens(
+        dossier,
+        page=page,
+        session=session,
+        source_drawing_id=source_drawing_id,
+    )
 
     if scope_kind == ScopeKind.STATION_RANGE:
         return _trace_station_range(
@@ -56,9 +63,55 @@ def trace_scope_geometry(
             expanded_anchor=expanded_anchor,
             tokens=tokens,
             page=page,
+            global_station_search=trace_on_aux,
+            source_drawing_id=source_drawing_id if trace_on_aux else None,
         )
 
     if scope_kind == ScopeKind.UTILITY_LINE:
+        station_from, station_to = _station_range(dossier)
+        aux_polyline = build_aux_survey_polyline(
+            dossier.master_context.scoped_survey_points,
+            station_from=station_from,
+            station_to=station_to,
+        )
+        if aux_polyline is not None:
+            return ScopeGeometry(
+                page=page,
+                type="polyline",
+                points=aux_polyline.points,
+                scope_kind=ScopeKind.UTILITY_LINE,
+                meta={
+                    "source": "aux_survey_chain",
+                    "source_drawing_id": aux_polyline.source_drawing_id,
+                    "stations": list(aux_polyline.stations),
+                },
+            )
+
+        if station_from and station_to:
+            station_scope = _trace_station_range(
+                dossier,
+                anchor_bbox=anchor_bbox,
+                expanded_anchor=expanded_anchor,
+                tokens=tokens,
+                page=page,
+                global_station_search=trace_on_aux,
+                source_drawing_id=source_drawing_id if trace_on_aux else None,
+            )
+            if station_scope.meta is not None and station_scope.meta.get("source") == "station_labels":
+                meta = {
+                    "source": "aux_station_labels" if trace_on_aux else "station_labels",
+                    "stations": station_scope.meta.get("stations", []),
+                }
+                if trace_on_aux and source_drawing_id is not None:
+                    meta["source_drawing_id"] = source_drawing_id
+                return ScopeGeometry(
+                    page=page,
+                    type="polyline",
+                    points=station_scope.points or (),
+                    scope_kind=ScopeKind.UTILITY_LINE,
+                    meta=meta,
+                )
+
         endpoint_positions = _survey_endpoint_positions(
             dossier,
             expanded_anchor=expanded_anchor,
@@ -79,6 +132,7 @@ def trace_scope_geometry(
             page=page,
             session=session,
             master_png_path=master_png_path,
+            source_drawing_id=source_drawing_id if trace_on_aux else None,
         )
 
     if scope_kind in {ScopeKind.AREA, ScopeKind.CORRIDOR}:
@@ -106,6 +160,8 @@ def _trace_station_range(
     expanded_anchor: tuple[float, float, float, float],
     tokens: list[_MasterTextToken],
     page: int,
+    global_station_search: bool = False,
+    source_drawing_id: int | None = None,
 ) -> ScopeGeometry:
     station_from, station_to = _station_range(dossier)
     target_stations = [
@@ -116,26 +172,40 @@ def _trace_station_range(
 
     matched_points: list[tuple[float, float]] = []
     for station in target_stations:
-        centroid = _find_station_centroid(tokens, station, expanded_anchor)
+        centroid = _find_station_centroid(
+            tokens,
+            station,
+            expanded_anchor,
+            global_search=global_station_search,
+        )
         if centroid is not None:
             matched_points.append(centroid)
 
     if len(matched_points) >= 2:
+        meta: dict[str, Any] = {"source": "station_labels", "stations": target_stations}
+        if source_drawing_id is not None:
+            meta["source_drawing_id"] = source_drawing_id
         return ScopeGeometry(
             page=page,
             type="polyline",
             points=tuple(matched_points),
             scope_kind=ScopeKind.STATION_RANGE,
-            meta={"source": "station_labels", "stations": target_stations},
+            meta=meta,
         )
 
     fallback = _centerline_through_anchor(anchor_bbox, expanded_anchor)
+    fallback_meta: dict[str, Any] = {
+        "source": "anchor_centerline_fallback",
+        "stations": target_stations,
+    }
+    if source_drawing_id is not None:
+        fallback_meta["source_drawing_id"] = source_drawing_id
     return ScopeGeometry(
         page=page,
         type="polyline",
         points=fallback,
         scope_kind=ScopeKind.STATION_RANGE,
-        meta={"source": "anchor_centerline_fallback", "stations": target_stations},
+        meta=fallback_meta,
     )
 
 
@@ -148,11 +218,19 @@ def _trace_utility_line(
     page: int,
     session: Session | None,
     master_png_path: Path | None = None,
+    source_drawing_id: int | None = None,
 ) -> ScopeGeometry:
     legend_codes = _utility_legend_codes(dossier, session=session)
-    label_points = _legend_label_points(tokens, legend_codes, expanded_anchor)
+    label_points = _legend_label_points(
+        tokens,
+        legend_codes,
+        expanded_anchor,
+        global_search=source_drawing_id is not None,
+    )
 
     meta: dict[str, Any] = {"source": "utility_line_trace"}
+    if source_drawing_id is not None:
+        meta["source_drawing_id"] = source_drawing_id
     ambiguous = len(label_points) >= 3
     if ambiguous:
         meta["ambiguous"] = True
@@ -272,6 +350,55 @@ def _trace_point_scope(
     )
 
 
+def _load_drawing_text_tokens(
+    session: Session,
+    drawing_id: int,
+    *,
+    page: int,
+) -> list[_MasterTextToken]:
+    tokens: list[_MasterTextToken] = []
+    seen: set[tuple[str, tuple[float, float, float, float]]] = set()
+    rows: list[DrawingTextElement] = (
+        session.query(DrawingTextElement)
+        .filter(DrawingTextElement.master_drawing_id == drawing_id)
+        .filter(DrawingTextElement.page == page)
+        .order_by(DrawingTextElement.id.asc())
+        .all()
+    )
+    for row in rows:
+        bbox_json = cast(dict[str, float], row.bbox_json)
+        token = _MasterTextToken(
+            text=str(row.text),
+            bbox=_bbox_from_json(bbox_json),
+            page=page,
+        )
+        key = (token.text, token.bbox)
+        if key not in seen:
+            seen.add(key)
+            tokens.append(token)
+    return tokens
+
+
+def _resolve_trace_tokens(
+    dossier: EvidenceDossier,
+    *,
+    page: int,
+    session: Session | None,
+    source_drawing_id: int | None,
+) -> tuple[list[_MasterTextToken], bool]:
+    master_drawing_id = dossier.master_drawing_id
+    if (
+        source_drawing_id is not None
+        and source_drawing_id != master_drawing_id
+        and session is not None
+    ):
+        return (
+            _load_drawing_text_tokens(session, source_drawing_id, page=page),
+            True,
+        )
+    return _load_master_text_tokens(dossier, page=page, session=session), False
+
+
 def _load_master_text_tokens(
     dossier: EvidenceDossier,
     *,
@@ -321,13 +448,18 @@ def _find_station_centroid(
     tokens: list[_MasterTextToken],
     station: str,
     expanded_anchor: tuple[float, float, float, float],
+    *,
+    global_search: bool = False,
 ) -> tuple[float, float] | None:
     for token in tokens:
-        if not _bbox_intersects(token.bbox, expanded_anchor):
+        if not global_search and not _bbox_intersects(token.bbox, expanded_anchor):
             continue
         for extracted in extract_stations_from_text(token.text):
             if _normalize_station(extracted) == station:
-                return _clamp_point(_centroid(token.bbox), expanded_anchor)
+                centroid = _centroid(token.bbox)
+                if global_search:
+                    return clamp_point_to_page(centroid)
+                return _clamp_point(centroid, expanded_anchor)
     return None
 
 
@@ -377,18 +509,23 @@ def _legend_label_points(
     tokens: list[_MasterTextToken],
     legend_codes: set[str],
     expanded_anchor: tuple[float, float, float, float],
+    *,
+    global_search: bool = False,
 ) -> list[tuple[float, float]]:
     if not legend_codes:
         return []
 
     points: list[tuple[float, float]] = []
     for token in tokens:
-        if not _bbox_intersects(token.bbox, expanded_anchor):
+        if not global_search and not _bbox_intersects(token.bbox, expanded_anchor):
             continue
         upper = token.text.upper()
         if not any(re.search(rf"\b{re.escape(code)}\b", upper) for code in legend_codes):
             continue
-        points.append(_clamp_point(_centroid(token.bbox), expanded_anchor))
+        if global_search:
+            points.append(clamp_point_to_page(_centroid(token.bbox)))
+        else:
+            points.append(_clamp_point(_centroid(token.bbox), expanded_anchor))
     return points
 
 

@@ -664,7 +664,12 @@ def _coordinate_lookup_candidates(
             )
             contradicting = ()
         else:
-            bbox = None
+            bbox = _rotate_bbox_for_drawing_page(
+                session,
+                scoped.drawing_id,
+                scoped.page,
+                _bbox_from_json(scoped.label_bbox_json),
+            )
             notes = (
                 "aux_coords_unprojected: survey match on auxiliary drawing "
                 f"{scoped.drawing_id} at {match.distance_ft:.2f} ft without master projection."
@@ -1010,6 +1015,18 @@ def _load_registration_transform(
         )
     except (KeyError, TypeError, ValueError):
         return None
+
+
+def project_polyline_to_master(
+    points: Sequence[tuple[float, float]],
+    registration_transform: RegistrationTransform,
+) -> tuple[tuple[float, float], ...]:
+    """Project normalized aux polyline vertices onto the master drawing frame."""
+    from ai.pipelines.registration_from_survey import (
+        project_polyline_to_master as _project_polyline,
+    )
+
+    return _project_polyline(points, registration_transform)
 
 
 def _load_document_extraction(

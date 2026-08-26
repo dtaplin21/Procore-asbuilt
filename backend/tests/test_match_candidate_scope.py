@@ -120,3 +120,41 @@ def test_build_match_scope_empty_when_no_sheet_refs(
 
     assert scope.sheet_refs == ()
     assert scope.auxiliary_drawing_ids == ()
+
+
+def test_build_match_scope_includes_linked_drawing_ids_from_match_investigation(
+    db_session: Session,
+    project,
+    master_drawing: Drawing,
+) -> None:
+    aux = Drawing(
+        project_id=project.id,
+        source="linked_evidence",
+        name="C4.20 Install.pdf",
+        storage_key=None,
+        content_type="application/pdf",
+    )
+    db_session.add(aux)
+    db_session.commit()
+
+    evidence = EvidenceRecord(
+        project_id=project.id,
+        type="inspection_doc",
+        title="inspection.pdf",
+        text_content="Field report with no sheet refs.",
+        meta={
+            "matchInvestigation": {
+                "linked_drawing_ids": [cast(int, aux.id)],
+            },
+        },
+    )
+    db_session.add(evidence)
+    db_session.commit()
+
+    scope = build_match_scope(
+        db_session,
+        evidence_id=cast(int, evidence.id),
+        master_drawing_id=cast(int, master_drawing.id),
+    )
+
+    assert cast(int, aux.id) in scope.auxiliary_drawing_ids

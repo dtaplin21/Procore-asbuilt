@@ -56,6 +56,25 @@ export function invalidateProjectDrawingsQueries(
   });
 }
 
+/** Refresh drawing lists and dashboard counts after a drawing is deleted. */
+export function invalidateProjectDrawingListQueries(
+  queryClient: QueryClient,
+  projectId: number
+): Promise<void> {
+  return Promise.all([
+    invalidateProjectDrawingsQueries(queryClient, projectId),
+    queryClient.invalidateQueries({
+      queryKey: ["drawing-manage-dashboard-summary", projectId],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ["drawing-picker-dashboard-summary", projectId],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ["project-dashboard-summary", projectId],
+    }),
+  ]).then(() => undefined);
+}
+
 export async function fetchProjectDrawings(
   projectId: number | string
 ): Promise<ProjectDrawingsResponse> {

@@ -18,6 +18,7 @@ from ai.pipelines.drawing_location_resolver import MasterRegion
 from ai.pipelines.evidence_kind_classifier import EvidenceKind
 from ai.pipelines.scope_geometry import ScopeKind
 from ai.pipelines.scope_line_tracer import trace_scope_geometry
+from ai.pipelines.survey_point_extractor import SurveyPointRecord
 from models.models import EvidenceRecord
 
 
@@ -48,6 +49,7 @@ def _dossier(
     tiles: tuple[CandidateTile, ...] = (),
     regions: tuple[MasterRegion, ...] = (),
     legend_codes: tuple[str, ...] = ("SS",),
+    scoped_survey_points: tuple[SurveyPointRecord, ...] = (),
 ) -> EvidenceDossier:
     evidence = cast(
         EvidenceRecord,
@@ -80,7 +82,7 @@ def _dossier(
             regions=regions,
             total_region_count=len(regions),
             untagged_region_count=0,
-            scoped_survey_points=(),
+            scoped_survey_points=scoped_survey_points,
             candidate_tiles=tiles,
             legend_codes_near_candidates=legend_codes,
         ),
@@ -141,6 +143,134 @@ def test_trace_utility_line_uses_nearby_ss_labels() -> None:
     assert scope.points[0][0] < scope.points[-1][0]
     assert scope.meta is not None
     assert "SS" in scope.meta.get("legend_codes", [])
+
+
+def test_trace_utility_line_uses_aux_survey_chain_when_station_range_present() -> None:
+    anchor = (0.10, 0.20, 0.50, 0.40)
+    scoped_points = (
+        SurveyPointRecord(
+            page=1,
+            northing=2_131_704.56,
+            easting=6_051_547.82,
+            station="10+00",
+            structure_label=None,
+            label_bbox_json={"x0": 0.08, "y0": 0.18, "x1": 0.12, "y1": 0.22},
+            northing_bbox_json=None,
+            easting_bbox_json=None,
+            ocr_confidence=0.9,
+            meta_json={"drawing_id": 1084},
+        ),
+        SurveyPointRecord(
+            page=1,
+            northing=2_131_705.56,
+            easting=6_051_483.28,
+            station="10+71",
+            structure_label=None,
+            label_bbox_json={"x0": 0.18, "y0": 0.19, "x1": 0.22, "y1": 0.23},
+            northing_bbox_json=None,
+            easting_bbox_json=None,
+            ocr_confidence=0.9,
+            meta_json={"drawing_id": 1084},
+        ),
+        SurveyPointRecord(
+            page=1,
+            northing=2_131_764.84,
+            easting=6_051_541.82,
+            station="10+90.95",
+            structure_label=None,
+            label_bbox_json={"x0": 0.27, "y0": 0.26, "x1": 0.31, "y1": 0.28},
+            northing_bbox_json=None,
+            easting_bbox_json=None,
+            ocr_confidence=0.9,
+            meta_json={"drawing_id": 1084},
+        ),
+    )
+    dossier = _dossier(
+        evidence_text="7/20-7/24 Trench and Install Sanitary Sewer Lines",
+        evidence_meta={"station_from": "10+00", "station_to": "10+90.95"},
+        scoped_survey_points=scoped_points,
+    )
+
+    scope = trace_scope_geometry(
+        dossier,
+        anchor_bbox=anchor,
+        scope_kind=ScopeKind.UTILITY_LINE,
+        page=1,
+    )
+
+    assert scope.type == "polyline"
+    assert scope.points is not None
+    assert len(scope.points) >= 3
+    assert scope.points[0][0] < scope.points[-1][0]
+    assert scope.meta is not None
+    assert scope.meta.get("source") == "aux_survey_chain"
+    assert scope.meta.get("source_drawing_id") == 1084
+
+
+def test_trace_station_range_uses_aux_tokens_when_source_drawing_differs(
+    db_session,
+    project,
+) -> None:
+    from models.drawing_text_element import DrawingTextElement
+    from models.models import Drawing
+
+    project_id = cast(int, project.id)
+    aux = Drawing(
+        project_id=project_id,
+        source="linked_evidence",
+        name="c4-20.pdf",
+        content_type="application/pdf",
+        processing_status="ready",
+        index_status="ready",
+    )
+    db_session.add(aux)
+    db_session.flush()
+    aux_id = cast(int, aux.id)
+
+    db_session.add_all(
+        [
+            DrawingTextElement(
+                master_drawing_id=aux_id,
+                page=1,
+                text="SAN STA 10+00",
+                text_normalized="san sta 10+00",
+                bbox_json={"x0": 0.08, "y0": 0.18, "x1": 0.12, "y1": 0.22},
+                source="tesseract",
+            ),
+            DrawingTextElement(
+                master_drawing_id=aux_id,
+                page=1,
+                text="10+90.95",
+                text_normalized="10+90.95",
+                bbox_json={"x0": 0.27, "y0": 0.26, "x1": 0.31, "y1": 0.28},
+                source="tesseract",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    anchor = (0.10, 0.20, 0.50, 0.40)
+    dossier = _dossier(
+        evidence_meta={"station_from": "10+00", "station_to": "10+90.95"},
+        tiles=(),
+    )
+
+    scope = trace_scope_geometry(
+        dossier,
+        anchor_bbox=anchor,
+        scope_kind=ScopeKind.STATION_RANGE,
+        page=1,
+        session=db_session,
+        source_drawing_id=aux_id,
+    )
+
+    assert scope.type == "polyline"
+    assert scope.points is not None
+    assert len(scope.points) == 2
+    assert scope.points[0][0] < scope.points[1][0]
+    assert scope.meta is not None
+    assert scope.meta.get("source") == "station_labels"
+    assert scope.meta.get("source_drawing_id") == aux_id
 
 
 def test_trace_utility_line_clamps_centerline_when_anchor_is_off_page() -> None:

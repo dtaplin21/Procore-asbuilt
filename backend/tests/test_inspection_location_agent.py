@@ -265,3 +265,246 @@ def test_agent_end_to_end_polyline_for_utility_line(
     assert candidate_meta["fused_score"] == pytest.approx(MATCH_SCORE_THRESHOLD + 0.1)
     assert candidate_meta["conflicts"] == []
     assert candidate_meta["clue_hits"] == []
+
+
+@patch("ai.agents.inspection_location_agent.should_invoke_vision", return_value=False)
+@patch("ai.agents.inspection_location_agent.trace_scope_geometry")
+@patch("ai.agents.inspection_location_agent.fuse_candidate_scores")
+@patch("ai.agents.inspection_location_agent.generate_all_location_candidates")
+@patch("ai.agents.inspection_location_agent.build_evidence_dossier")
+def test_agent_passes_aux_source_drawing_id_to_scope_tracer(
+    mock_build_dossier,
+    mock_generate_candidates,
+    mock_fuse_scores,
+    mock_trace_scope,
+    _mock_should_vision,
+    db_session: Session,
+) -> None:
+    from ai.pipelines.scope_geometry import ScopeGeometry
+
+    run, evidence_id, master_drawing_id, region_id = _seed_ready_master_run(db_session)
+    dossier = _utility_line_dossier(
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+        region_id=region_id,
+    )
+    mock_build_dossier.return_value = dossier
+
+    candidate = LocationMatchCandidate(
+        method=ResolutionMethod.COORDINATE_LOOKUP,
+        confidence=0.98,
+        bbox_fractional=(0.16, 0.20, 0.18, 0.22),
+        page=1,
+        source_drawing_id=1084,
+        notes="aux_coords_unprojected",
+        contradicting_signals=("aux_coords_unprojected",),
+    )
+    mock_generate_candidates.return_value = [candidate]
+    mock_fuse_scores.return_value = [
+        FusedCandidateScore(
+            candidate=candidate,
+            fused_score=MATCH_SCORE_THRESHOLD + 0.1,
+            clue_hits=(),
+            conflicts=(),
+            rationale="coordinate_lookup@0.98",
+        )
+    ]
+    mock_trace_scope.return_value = ScopeGeometry(
+        page=1,
+        type="polyline",
+        points=((0.10, 0.20), (0.29, 0.27)),
+        scope_kind=ScopeKind.UTILITY_LINE,
+        meta={"source": "aux_station_labels", "source_drawing_id": 1084},
+    )
+
+    agent = InspectionLocationAgent()
+    agent.run(
+        db_session,
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+    )
+
+    mock_trace_scope.assert_called_once()
+    assert mock_trace_scope.call_args.kwargs["source_drawing_id"] == 1084
+
+
+def _polyline_path_length(points: tuple[tuple[float, float], ...]) -> float:
+    total = 0.0
+    for index in range(1, len(points)):
+        dx = points[index][0] - points[index - 1][0]
+        dy = points[index][1] - points[index - 1][1]
+        total += (dx * dx + dy * dy) ** 0.5
+    return total
+
+
+@patch("ai.agents.inspection_location_agent.should_invoke_vision", return_value=False)
+@patch("ai.agents.inspection_location_agent.trace_scope_geometry")
+@patch("ai.agents.inspection_location_agent.fuse_candidate_scores")
+@patch("ai.agents.inspection_location_agent.generate_all_location_candidates")
+@patch("ai.agents.inspection_location_agent.build_evidence_dossier")
+def test_agent_projects_aux_polyline_to_master_with_registration_transform(
+    mock_build_dossier,
+    mock_generate_candidates,
+    mock_fuse_scores,
+    mock_trace_scope,
+    _mock_should_vision,
+    db_session: Session,
+) -> None:
+    from ai.pipelines.drawing_location_resolver import RegistrationTransform
+    from ai.pipelines.scope_geometry import ScopeGeometry
+
+    run, evidence_id, master_drawing_id, region_id = _seed_ready_master_run(db_session)
+    dossier = _utility_line_dossier(
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+        region_id=region_id,
+    )
+    transform = RegistrationTransform(
+        scale_x=2.0,
+        scale_y=2.0,
+        translate_x=0.30,
+        translate_y=0.07,
+        rotation_degrees=0.0,
+    )
+    dossier.evidence.meta = {
+        "registration_transform": {
+            "scale_x": transform.scale_x,
+            "scale_y": transform.scale_y,
+            "translate_x": transform.translate_x,
+            "translate_y": transform.translate_y,
+            "rotation_degrees": transform.rotation_degrees,
+        }
+    }
+    mock_build_dossier.return_value = dossier
+
+    aux_drawing_id = 1084
+    candidate = LocationMatchCandidate(
+        method=ResolutionMethod.COORDINATE_LOOKUP,
+        confidence=0.98,
+        bbox_fractional=(0.518, 0.472, 0.556, 0.480),
+        page=1,
+        source_drawing_id=aux_drawing_id,
+    )
+    mock_generate_candidates.return_value = [candidate]
+    mock_fuse_scores.return_value = [
+        FusedCandidateScore(
+            candidate=candidate,
+            fused_score=MATCH_SCORE_THRESHOLD + 0.1,
+            clue_hits=(),
+            conflicts=(),
+            rationale="coordinate_lookup@0.98",
+        )
+    ]
+    aux_polyline = (
+        (0.10, 0.20),
+        (0.20, 0.22),
+        (0.29, 0.27),
+        (0.30, 0.27),
+    )
+    mock_trace_scope.return_value = ScopeGeometry(
+        page=1,
+        type="polyline",
+        points=aux_polyline,
+        scope_kind=ScopeKind.UTILITY_LINE,
+        meta={"source": "aux_survey_chain", "source_drawing_id": aux_drawing_id},
+    )
+
+    agent = InspectionLocationAgent()
+    result = agent.run(
+        db_session,
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+    )
+
+    assert result.status == "matched"
+    assert result.scope is not None
+    assert result.scope.type == "polyline"
+    assert result.scope.points is not None
+    assert result.scope.points[0][0] == pytest.approx(0.50, abs=0.02)
+    assert result.scope.points[0][1] == pytest.approx(0.47, abs=0.02)
+    assert _polyline_path_length(result.scope.points) > 0.05
+    assert result.scope.meta is not None
+    assert result.scope.meta.get("projected_from_drawing_id") == aux_drawing_id
+
+    overlay = (
+        db_session.query(DrawingOverlay)
+        .filter(DrawingOverlay.inspection_run_id == run.id)
+        .one()
+    )
+    geometry = cast(dict, overlay.geometry)
+    assert geometry["type"] == "polyline"
+    points = cast(list[list[float]], geometry["points"])
+    assert points[0][0] == pytest.approx(0.50, abs=0.02)
+    assert points[0][1] == pytest.approx(0.47, abs=0.02)
+    assert _polyline_path_length(tuple(tuple(p) for p in points)) > 0.05
+
+
+@patch("ai.agents.inspection_location_agent.should_invoke_vision", return_value=False)
+@patch("ai.agents.inspection_location_agent.trace_scope_geometry")
+@patch("ai.agents.inspection_location_agent.fuse_candidate_scores")
+@patch("ai.agents.inspection_location_agent.generate_all_location_candidates")
+@patch("ai.agents.inspection_location_agent.build_evidence_dossier")
+def test_agent_defers_aux_polyline_when_registration_transform_missing(
+    mock_build_dossier,
+    mock_generate_candidates,
+    mock_fuse_scores,
+    mock_trace_scope,
+    _mock_should_vision,
+    db_session: Session,
+) -> None:
+    from ai.pipelines.scope_geometry import ScopeGeometry
+
+    run, evidence_id, master_drawing_id, region_id = _seed_ready_master_run(db_session)
+    dossier = _utility_line_dossier(
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+        region_id=region_id,
+    )
+    mock_build_dossier.return_value = dossier
+
+    aux_drawing_id = 1084
+    candidate = LocationMatchCandidate(
+        method=ResolutionMethod.COORDINATE_LOOKUP,
+        confidence=0.98,
+        bbox_fractional=(0.16, 0.20, 0.18, 0.22),
+        page=1,
+        source_drawing_id=aux_drawing_id,
+        notes="aux_coords_unprojected",
+        contradicting_signals=("aux_coords_unprojected",),
+    )
+    mock_generate_candidates.return_value = [candidate]
+    mock_fuse_scores.return_value = [
+        FusedCandidateScore(
+            candidate=candidate,
+            fused_score=MATCH_SCORE_THRESHOLD + 0.1,
+            clue_hits=(),
+            conflicts=(),
+            rationale="coordinate_lookup@0.98",
+        )
+    ]
+    mock_trace_scope.return_value = ScopeGeometry(
+        page=1,
+        type="polyline",
+        points=((0.10, 0.20), (0.29, 0.27)),
+        scope_kind=ScopeKind.UTILITY_LINE,
+        meta={"source": "aux_station_labels", "source_drawing_id": aux_drawing_id},
+    )
+
+    agent = InspectionLocationAgent()
+    result = agent.run(
+        db_session,
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+    )
+
+    assert result.status == "needs_review"
+    assert result.scope is None
+    assert "aux_coords_unprojected" in result.rationale
+
+    overlay = (
+        db_session.query(DrawingOverlay)
+        .filter(DrawingOverlay.inspection_run_id == run.id)
+        .one()
+    )
+    geometry = cast(dict, overlay.geometry)
+    assert geometry["type"] != "polyline"

@@ -20,6 +20,7 @@ from ai.pipelines.document_text_extraction import (
     PositionedWord,
     SourceFormat,
     extract_document,
+    extract_document_via_ocr,
 )
 from ai.pipelines.drawing_scale_parser import page_size_inches_from_points, parse_scale_from_words
 from ai.pipelines.landmark_extractor import LandmarkRecord, extract_landmarks_from_page
@@ -38,6 +39,10 @@ from services.storage import open_storage_path
 from services.survey_point_storage import persist_survey_points
 
 _WHITESPACE_RE = re.compile(r"\s+")
+_READABLE_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9+\-'.]{1,}$")
+_LINKED_DRAWING_SOURCE = "linked_evidence"
+_GARBLED_NATIVE_MIN_TOKENS = 20
+_GARBLED_NATIVE_MAX_READABLE_RATIO = 0.35
 
 
 @dataclass(frozen=True)
@@ -99,9 +104,32 @@ def _limit_extracted_document(
     )
 
 
-def extract_drawing_document(file_path: Path) -> ExtractedDocument:
-    document = extract_document(file_path)
-    return _limit_extracted_document(document, _index_max_pages())
+def _native_text_looks_garbled(document: ExtractedDocument) -> bool:
+    """True when a native PDF text layer is mostly unreadable (common CAD exports)."""
+    if document.source_format != SourceFormat.NATIVE_PDF:
+        return False
+    tokens = [word.text.strip() for word in document.words if word.text.strip()]
+    if len(tokens) < _GARBLED_NATIVE_MIN_TOKENS:
+        return False
+    readable = sum(1 for token in tokens if _READABLE_TOKEN_RE.match(token))
+    return (readable / len(tokens)) < _GARBLED_NATIVE_MAX_READABLE_RATIO
+
+
+def extract_drawing_document(file_path: Path, *, force_ocr: bool = False) -> ExtractedDocument:
+    max_pages = _index_max_pages()
+    if force_ocr:
+        return _limit_extracted_document(
+            extract_document_via_ocr(file_path, max_pages=max_pages),
+            max_pages,
+        )
+
+    document = _limit_extracted_document(extract_document(file_path), max_pages)
+    if _native_text_looks_garbled(document):
+        return _limit_extracted_document(
+            extract_document_via_ocr(file_path, max_pages=max_pages),
+            max_pages,
+        )
+    return document
 
 
 def build_page_meta_json(
@@ -282,7 +310,8 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
     if not source_path.exists():
         raise FileNotFoundError(f"Drawing source file not found: {source_path}")
 
-    extracted = extract_drawing_document(source_path)
+    force_ocr = cast(str | None, drawing.source) == _LINKED_DRAWING_SOURCE
+    extracted = extract_drawing_document(source_path, force_ocr=force_ocr)
     page_meta_json = build_page_meta_json(
         session,
         drawing_id,

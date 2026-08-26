@@ -471,4 +471,100 @@ Run eval: python backend/scripts/eval_location_match.py (ucsf label)
 
 ---
 
-*Updated: 2026-08-24 — Lean plan: single front door via `build_evidence_dossier`, extend existing `run_pdf_investigation`, thin `persist_evidence_investigation` wrapper.*
+## Post-H hotfixes (2026-08-24) — log before re-upload
+
+Fixes applied after Run #641 (evidence **625**, master **661**) failed to place location. **Do not re-upload master 661** — re-upload **inspection evidence only**.
+
+### I-1 — Off-page coordinate crash / bad placement ✅
+
+| Area | Fix |
+|------|-----|
+| `ai/pipelines/fractional_coords.py` | Shared clamp helpers (`clamp_fractional_bbox`, `bbox_intersects_page`) |
+| `scope_geometry.py` | Clamp rect/polyline on serialize; `bbox_to_scope_rect` clamps input |
+| `location_match_orchestrator.py` | `_filter_off_page_candidates()` drops bboxes with no overlap on `[0,1]` |
+| `clue_fusion_scorer.py` | Winner must intersect page |
+| `scope_line_tracer.py` / `inspection_location_agent.py` | Clamp anchor before vision trace; fallback rect on `ValueError` |
+| `region_index_loader.py` / `master_drawing_region_builder.py` | Clamp OCR-bleed regions on load/build |
+| `inspection_match_persistence.py` | Clamp bbox before overlay persist |
+
+**Symptom fixed:** Run #638 crashed with `points[0][1] must be 0-1 … got 1.227` when title-block region 296 (y > 1) won and vision traced off-page.
+
+**Tests:** `test_scope_geometry.py`, `test_location_match_candidates.py`, `test_scope_line_tracer.py`, `test_master_drawing_region_builder.py`
+
+---
+
+### I-2 — Link follow: Procore XML + logging crash ✅
+
+| Area | Fix |
+|------|-----|
+| `services/procore_attachment_fetch.py` | **New** — resolve `document_downloader` URLs via Procore OAuth → signed `storage.procore.com` URL |
+| `services/safe_url_fetch.py` | Parse `application/xml` for embedded download URLs; follow up to 2 hops; `application/octet-stream` PDF magic; `ProcoreFetchContext` |
+| `pdf_link_follower.py` | Pass `procore_context`; logging extra `filename` → `attachment_filename` (LogRecord collision) |
+| `pdf_investigation.py` / `evidence_dossier.py` | Pass `session` + `project_id` into link follow at match time |
+
+**Symptom fixed:** Run #641 `matchInvestigation`: `followed: 0`, `unsupported content type: application/xml`, `"Attempt to overwrite 'filename' in LogRecord"` ×4 — link follow never OCR'd C4.20.
+
+**Exact XML-blocked nested link (coversheet PDF page 2 only):**
+```
+https://app.procore.com/2727475/project/submittal_log_approvers/document_downloader?attachment_id=6001321764&item_id=177539970&item_type=SubmittalLogApprover&project_id=2727475&source=coversheet&submittal_log_id=69397739
+```
+
+**Top-level inspection PDF links (both fetch as PDF — not XML):**
+- `…/01KXRWH87V5MSTG49T0TSEDJHB?…` — submittal coversheet
+- `…/01KXRWH88XNQHS5YFS4EJ0R578?…` — **C4.20 Sanitary Sewer Install** (drawing 1084; highlighted plan lives here)
+
+**Tests:** `test_safe_url_fetch.py`, `test_procore_attachment_fetch.py`, `test_pdf_link_follower.py`
+
+---
+
+### I-3 — Auxiliary drawing index: forced OCR for linked CAD PDFs ✅
+
+Drawing **1084** (`7.20-7.24 U1.C4.20 6.00 Sanitary Sewer Install.pdf`) is a CAD export with a **garbled native text layer** (114 `native_pdf` tokens, no coords). **Forced OCR** on that file finds `2131764`, `6051541`, `11+14`.
+
+| Area | Fix |
+|------|-----|
+| `master_drawing_indexer.py` | `source=linked_evidence` → always `extract_document_via_ocr` |
+| `master_drawing_indexer.py` | `_native_text_looks_garbled()` fallback to OCR for any native PDF with unreadable tokens |
+
+**Re-index existing aux drawing 1084:** trigger `drawing_index` job on that drawing (or re-upload evidence so a fresh linked copy indexes with OCR).
+
+**Tests:** `test_master_drawing_indexer.py` — garbled detection, force_ocr, OCR fallback
+
+---
+
+### Re-upload QA checklist (UCSF / master 661)
+
+```
+Prerequisites:
+  [ ] Procore OAuth connected for project 2 company (for document_downloader resolution)
+  [ ] Worker running (npm run dev or worker process)
+
+1. Upload inspection PDF only (same UCSF sewer inspection)
+   [ ] Upload returns quickly; run status processing/queued
+
+2. Worker logs — expect:
+   [ ] pdf_link_fetch_ocr_complete (attachment_filename present, no LogRecord errors)
+   [ ] procore_attachment_resolved (if document_downloader hit)
+   [ ] pdf_link_follow_complete with followed >= 1
+   [ ] linked_drawing_registered (C4.20 → drawing 1084 or new id)
+   [ ] inspection_match_candidates with coordinate_lookup or station_lookup candidate
+   [ ] inspection_match_result (matched or needs_review — NOT failed crash)
+
+3. evidence.meta.matchInvestigation:
+   [ ] followed > 0
+   [ ] errors empty or only non-blocking (XML coversheet link OK to fail if OAuth resolves C4.20 directly)
+   [ ] linked_drawing_ids includes C4.20 aux
+
+4. Dossier / match:
+   [ ] scoped_point_count >= 1 on aux or master
+   [ ] survey_points_meta non-empty OR coordinate_lookup candidate in logs
+   [ ] Overlay on sewer run area (not title-block edge y=1.0 only)
+
+5. UI:
+   [ ] Match banner: matched or needs_review (not stuck index_pending)
+   [ ] Overlay visible on master 661 plan view
+```
+
+---
+
+*Updated: 2026-08-26 — Post-H hotfixes I-1/I-2/I-3 implemented; re-upload checklist for UCSF evidence on master 661.*
