@@ -102,7 +102,7 @@ describe("DrawingOverlayLayer", () => {
     expect(polyline).toHaveAttribute("fill", "none");
     expect(polyline).toHaveAttribute("stroke-linecap", "round");
     expect(polyline).toHaveAttribute("stroke-linejoin", "round");
-    expect(polyline).toHaveAttribute("stroke-width", "3");
+    expect(polyline).toHaveAttribute("stroke-width", "1.5");
     expect(polyline).toHaveAttribute(
       "points",
       "410,304 430,312 450,320",

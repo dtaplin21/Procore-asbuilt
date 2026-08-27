@@ -75,6 +75,7 @@ def build_aux_survey_polyline(
     station_from: str | None = None,
     station_to: str | None = None,
     min_points: int = 3,
+    max_centroid_y: float | None = None,
 ) -> AuxSurveyPolylineResult | None:
     """Chain scoped aux survey points into an ordered polyline by station chainage."""
     if not scoped_points:
@@ -94,6 +95,8 @@ def build_aux_survey_polyline(
             continue
         centroid = _bbox_centroid(point.label_bbox_json)
         if centroid is None:
+            continue
+        if max_centroid_y is not None and centroid[1] > max_centroid_y:
             continue
         grouped.setdefault(drawing_id, []).append(
             (station_chainage(station), station, centroid)

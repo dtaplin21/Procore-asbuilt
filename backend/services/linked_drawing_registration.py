@@ -117,6 +117,9 @@ def register_linked_pdfs_as_auxiliary_drawings(
             original_filename=fetched.filename,
             page_count=fetched.pages or None,
         )
+        # PDF bytes are already stored — OCR index can run without waiting on render tiles.
+        drawing.processing_status = "ready"  # type: ignore[assignment]
+        session.commit()
         drawing_id = cast(int, drawing.id)
         drawing_ids.append(drawing_id)
         registered_ids.append(drawing_id)

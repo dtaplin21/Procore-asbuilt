@@ -19,6 +19,7 @@ from services.evidence_investigation_persistence import persist_evidence_investi
 from services.storage import StorageService
 
 
+@patch("services.evidence_investigation_persistence.index_linked_attachment_drawings_sync")
 @patch("services.evidence_investigation_persistence.extract_station_range_for_drawings")
 @patch("services.evidence_investigation_persistence.register_linked_pdfs_as_auxiliary_drawings")
 @patch("services.evidence_investigation_persistence.run_document_extraction")
@@ -30,6 +31,7 @@ def test_persist_evidence_investigation_writes_match_investigation_meta(
     mock_run_extraction,
     mock_register_linked,
     mock_station_range,
+    mock_sync_index,
     db_session: Session,
     project,
     tmp_path,
@@ -53,6 +55,7 @@ def test_persist_evidence_investigation_writes_match_investigation_meta(
     )
 
     mock_register_linked.return_value = [101, 102]
+    mock_sync_index.return_value = [101, 102]
     mock_survey.return_value = ([], None)
     mock_station_range.return_value = StationRangeResult(station_from=None, station_to=None)
     extraction = DocumentExtraction(
@@ -60,7 +63,9 @@ def test_persist_evidence_investigation_writes_match_investigation_meta(
         document_type=DocumentType.INSPECTION_REPORT.value,
         classification_confidence=0.9,
     )
-    extraction.id = 999
+    db_session.add(extraction)
+    db_session.flush()
+    extraction_id = cast(int, extraction.id)
     mock_run_extraction.return_value = extraction
 
     storage = StorageService(db_session)
@@ -74,7 +79,7 @@ def test_persist_evidence_investigation_writes_match_investigation_meta(
         content_type="application/pdf",
     )
     db_session.flush()
-    extraction.file_id = str(evidence.id)
+    setattr(extraction, "file_id", str(evidence.id))
 
     file_path = tmp_path / "report.pdf"
     file_path.write_bytes(b"%PDF-1.4")
@@ -103,7 +108,7 @@ def test_persist_evidence_investigation_writes_match_investigation_meta(
 
     assert result.linked_drawing_ids == [101, 102]
     assert result.survey_point_count == 0
-    assert result.extraction_id == 999
+    assert result.extraction_id == extraction_id
 
     db_session.refresh(evidence)
     meta = cast(dict, evidence.meta)
@@ -122,6 +127,7 @@ def test_persist_evidence_investigation_writes_match_investigation_meta(
     assert "Inspection summary" in text_content
 
 
+@patch("services.evidence_investigation_persistence.index_linked_attachment_drawings_sync")
 @patch("services.evidence_investigation_persistence.classify_and_persist_evidence_kind")
 @patch("services.evidence_investigation_persistence.extract_station_range_for_drawings")
 @patch("services.evidence_investigation_persistence.register_linked_pdfs_as_auxiliary_drawings")
@@ -135,6 +141,7 @@ def test_persist_evidence_investigation_preserves_survey_points_in_meta(
     mock_register_linked,
     mock_station_range,
     mock_classify_kind,
+    mock_sync_index,
     db_session: Session,
     project,
     tmp_path,
@@ -170,6 +177,7 @@ def test_persist_evidence_investigation_preserves_survey_points_in_meta(
     )
 
     mock_register_linked.return_value = [1084]
+    mock_sync_index.return_value = []
     mock_station_range.return_value = StationRangeResult(station_from=None, station_to=None)
     mock_survey.return_value = ([survey_point], None)
     extraction = DocumentExtraction(
@@ -215,6 +223,7 @@ def test_persist_evidence_investigation_preserves_survey_points_in_meta(
     assert raw_points[0]["easting"] == 6051541.82
 
 
+@patch("services.evidence_investigation_persistence.index_linked_attachment_drawings_sync")
 @patch("services.evidence_investigation_persistence.classify_and_persist_evidence_kind")
 @patch("services.evidence_investigation_persistence.register_linked_pdfs_as_auxiliary_drawings")
 @patch("services.evidence_investigation_persistence.run_document_extraction")
@@ -228,6 +237,7 @@ def test_persist_evidence_investigation_persists_aux_station_range(
     mock_run_extraction,
     mock_register_linked,
     mock_classify_kind,
+    mock_sync_index,
     db_session: Session,
     project,
     tmp_path,
@@ -297,6 +307,7 @@ def test_persist_evidence_investigation_persists_aux_station_range(
     )
 
     mock_register_linked.return_value = [aux_id]
+    mock_sync_index.return_value = []
     mock_enqueue_index.return_value = []
     mock_survey.return_value = ([], None)
     extraction = DocumentExtraction(
@@ -320,7 +331,7 @@ def test_persist_evidence_investigation_persists_aux_station_range(
         content_type="application/pdf",
     )
     db_session.flush()
-    extraction.file_id = str(evidence.id)
+    setattr(extraction, "file_id", str(evidence.id))
 
     file_path = tmp_path / "report.pdf"
     file_path.write_bytes(b"%PDF-1.4")

@@ -150,9 +150,48 @@ def extract_page_clues(pdf_path: Path, *, page: int = 1) -> dict[str, Any]:
     return {
         "text": page_text,
         "word_count": len(page_words),
+        "page_count": document.page_count,
         "positioned_term_count": len(page_terms),
         "survey_hints": {
             "stations": extract_stations_from_text(page_text),
+            "coordinate_pairs": coordinate_pairs,
+        },
+    }
+
+
+def extract_attachment_clues(pdf_path: Path) -> dict[str, Any]:
+    """Full multi-page OCR and clue extraction for a linked attachment PDF."""
+    from ai.pipelines.master_drawing_indexer import extract_drawing_document
+
+    document = extract_drawing_document(pdf_path, force_ocr=True)
+    positioned_terms = extract_positioned_terms(document)
+
+    all_stations: list[str] = []
+    coordinate_pairs: list[dict[str, Any]] = []
+    for page_index in range(document.page_count):
+        page_text = document.page_text(page_index)
+        all_stations.extend(extract_stations_from_text(page_text))
+        survey_points = extract_survey_points_from_plain_text(
+            page_text,
+            page=page_index + 1,
+            scale_source="attachment_ocr",
+        )
+        coordinate_pairs.extend(
+            {
+                "northing": point.northing,
+                "easting": point.easting,
+                "station": point.station,
+            }
+            for point in survey_points
+        )
+
+    return {
+        "text": document.full_text(),
+        "word_count": len(document.words),
+        "page_count": document.page_count,
+        "positioned_term_count": len(positioned_terms),
+        "survey_hints": {
+            "stations": sorted(set(all_stations)),
             "coordinate_pairs": coordinate_pairs,
         },
     }
@@ -170,12 +209,14 @@ def _summary_from_fetched(
 ) -> tuple[LinkedAttachmentSummary, int]:
     preview = _text_preview(fetched.text)
     word_count = len(fetched.text.split())
+    page_count = fetched.pages or 1
     if fetched.body:
         temp_path = _write_pdf_bytes(fetched.body, filename_hint=fetched.filename)
         try:
-            clues = extract_page_clues(temp_path, page=1)
+            clues = extract_attachment_clues(temp_path)
             page_text = str(clues.get("text", "") or "")
             word_count = int(clues.get("word_count", word_count))
+            page_count = int(clues.get("page_count", page_count))
             if page_text.strip():
                 preview = _text_preview(page_text)
         except Exception:
@@ -189,7 +230,7 @@ def _summary_from_fetched(
     summary = LinkedAttachmentSummary(
         url=fetched.url,
         filename=fetched.filename,
-        page_count=fetched.pages,
+        page_count=page_count,
         text_preview=preview,
         drawing_id=None,
     )
@@ -259,7 +300,7 @@ def run_pdf_investigation(
         seen_keys.add(key)
         summaries.append(summary)
         ocr_word_counts[key] = word_count
-        pages_rendered += 1
+        pages_rendered += max(summary.page_count, 1)
 
     procore_context = (
         ProcoreFetchContext(db=session, project_id=project_id)

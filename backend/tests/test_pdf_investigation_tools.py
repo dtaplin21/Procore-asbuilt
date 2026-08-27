@@ -97,10 +97,48 @@ def test_extract_page_clues_returns_counts(mock_extract: MagicMock, tmp_path: Pa
     assert "10+50" in clues["survey_hints"]["stations"]
 
 
+@patch("ai.pipelines.master_drawing_indexer.extract_drawing_document")
+def test_extract_attachment_clues_aggregates_all_pages(
+    mock_extract_document: MagicMock,
+    tmp_path: Path,
+) -> None:
+    from ai.agents.tools.pdf_investigation import extract_attachment_clues
+    from ai.pipelines.document_text_extraction import (
+        BoundingBox,
+        ExtractedDocument,
+        PositionedWord,
+        SourceFormat,
+    )
+
+    bbox = BoundingBox(x=0, y=0, width=100, height=100, page_width=100, page_height=100)
+    words = [
+        PositionedWord(text="10+00", bbox=bbox, page_index=0),
+        PositionedWord(text="10+90.95", bbox=bbox, page_index=1),
+    ]
+    mock_extract_document.return_value = ExtractedDocument(
+        source_format=SourceFormat.SCANNED_PDF,
+        page_count=2,
+        words=words,
+    )
+
+    clues = extract_attachment_clues(tmp_path / "install.pdf")
+
+    mock_extract_document.assert_called_once()
+    assert mock_extract_document.call_args.kwargs.get("force_ocr") is True
+    assert clues["page_count"] == 2
+    assert clues["word_count"] == 2
+    assert "10+00" in clues["text"]
+    assert "10+90.95" in clues["text"]
+    assert "10+00" in clues["survey_hints"]["stations"]
+    assert "10+90.95" in clues["survey_hints"]["stations"]
+
+
 @patch("ai.agents.tools.pdf_investigation.follow_and_capture_links")
 @patch("ai.agents.tools.pdf_investigation.extract_page_clues")
+@patch("ai.agents.tools.pdf_investigation.extract_attachment_clues")
 def test_investigate_pdf_links_external_and_internal(
-    mock_extract_clues: MagicMock,
+    mock_extract_attachment_clues: MagicMock,
+    mock_extract_page_clues: MagicMock,
     mock_follow: MagicMock,
     tmp_path: Path,
 ) -> None:
@@ -118,17 +156,26 @@ def test_investigate_pdf_links_external_and_internal(
         ],
         followed_count=2,
     )
-    mock_extract_clues.return_value = {
+    mock_extract_attachment_clues.return_value = {
         "text": "Location: COLO",
         "word_count": 2,
+        "page_count": 1,
         "positioned_term_count": 1,
         "survey_hints": {"stations": [], "coordinate_pairs": []},
+    }
+    mock_extract_page_clues.return_value = {
+        "text": "Location: COLO STA 10+50",
+        "word_count": 4,
+        "page_count": 2,
+        "positioned_term_count": 1,
+        "survey_hints": {"stations": ["10+50"], "coordinate_pairs": []},
     }
 
     summaries = investigate_pdf_links(pdf_path, max_links=10)
 
     assert mock_follow.called
-    assert mock_extract_clues.call_count >= 2
+    assert mock_extract_attachment_clues.call_count >= 1
+    assert mock_extract_page_clues.call_count >= 1
     urls = {item.url for item in summaries}
     assert "https://example.com/install.pdf" in urls
     assert "internal:page-2" in urls

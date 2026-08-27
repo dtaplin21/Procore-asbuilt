@@ -42,12 +42,17 @@ const OVERLAY_PALETTE: Record<
 
 export function overlayColorsForTone(tone: OverlayInspectionTone, selected: boolean) {
   const p = OVERLAY_PALETTE[tone];
-  const strokeWidth = selected ? 3 : 2;
+  const strokeWidth = selected ? 2 : 1.5;
   return {
     stroke: selected ? p.strokeMuted : p.stroke,
     fill: selected ? p.fillMuted : p.fill,
     strokeWidth,
   };
+}
+
+/** Thin stroke for utility-line polylines so overlays match drawing linework weight. */
+export function utilityPolylineStrokeWidth(selected: boolean): number {
+  return selected ? 2 : 1.5;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

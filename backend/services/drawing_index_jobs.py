@@ -27,10 +27,12 @@ from services.inspection_matching_jobs import (
     flush_deferred_inspection_matches_for_drawing,
     flush_inspection_matches_for_linked_auxiliary_drawing,
 )
+from services.storage import open_storage_path
 
 logger = logging.getLogger(__name__)
 
 JOB_TYPE = "drawing_index"
+_LINKED_DRAWING_SOURCE = "linked_evidence"
 
 
 def region_geometry_source(geometry: object) -> str | None:
@@ -164,6 +166,82 @@ def maybe_enqueue_drawing_index_job(
             extra={"project_id": project_id, "drawing_id": drawing_id},
         )
         return None
+
+
+def ensure_linked_attachment_ready_for_index(session: Session, drawing: Drawing) -> bool:
+    """Mark linked attachment drawings ready for OCR when the PDF is already on disk."""
+    if cast(str, drawing.processing_status) == "ready":
+        return True
+
+    storage_key = cast(str | None, drawing.storage_key)
+    if not storage_key:
+        return False
+
+    source_path = open_storage_path(storage_key)
+    if not source_path.exists():
+        return False
+
+    drawing.processing_status = "ready"  # type: ignore[assignment]
+    session.flush()
+    return True
+
+
+def index_linked_attachment_drawing_sync(
+    session: Session,
+    drawing_id: int,
+) -> IndexResult | None:
+    """Run full positioned OCR index synchronously for one linked attachment."""
+    if not settings.drawing_index_enabled:
+        return None
+
+    drawing = session.get(Drawing, drawing_id)
+    if drawing is None:
+        return None
+    if cast(str | None, drawing.source) != _LINKED_DRAWING_SOURCE:
+        return None
+    if cast(str, drawing.index_status) == "ready":
+        return None
+
+    if not ensure_linked_attachment_ready_for_index(session, drawing):
+        logger.warning(
+            "linked_attachment_sync_index_not_ready",
+            extra={"drawing_id": drawing_id},
+        )
+        return None
+
+    drawing.index_status = "processing"  # type: ignore[assignment]
+    drawing.index_error = None  # type: ignore[assignment]
+    session.flush()
+
+    try:
+        clear_drawing_index_artifacts(session, drawing_id)
+        result = index_master_drawing(drawing_id, session)
+        _apply_index_result(drawing, result)
+        session.flush()
+        flush_inspection_matches_for_linked_auxiliary_drawing(session, drawing_id)
+        return result
+    except Exception as exc:
+        drawing.index_status = "failed"  # type: ignore[assignment]
+        drawing.index_error = str(exc)  # type: ignore[assignment]
+        session.flush()
+        logger.exception(
+            "linked_attachment_sync_index_failed",
+            extra={"drawing_id": drawing_id},
+        )
+        return None
+
+
+def index_linked_attachment_drawings_sync(
+    session: Session,
+    drawing_ids: list[int],
+) -> list[int]:
+    """OCR-index every linked attachment; return ids that reached index_status=ready."""
+    indexed: list[int] = []
+    for drawing_id in drawing_ids:
+        result = index_linked_attachment_drawing_sync(session, drawing_id)
+        if result is not None:
+            indexed.append(drawing_id)
+    return indexed
 
 
 def _apply_index_result(drawing: Drawing, result: IndexResult) -> None:

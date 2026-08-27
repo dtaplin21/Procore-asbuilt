@@ -6,6 +6,7 @@ import {
 } from "@/lib/drawing-overlays/geometry";
 import {
   overlayColorsForTone,
+  utilityPolylineStrokeWidth,
   type OverlayInspectionTone,
 } from "@/lib/drawing-overlays/inspection_overlay";
 
@@ -78,6 +79,7 @@ export default function OverlayShape({
   if (region.kind === "polyline") {
     const points = normalizedPointsToPixels(region.points, viewerSize);
     const pointsString = polygonPointsToSvgString(points);
+    const polylineStroke = utilityPolylineStrokeWidth(selected);
 
     return (
       <g
@@ -89,7 +91,7 @@ export default function OverlayShape({
           points={pointsString}
           fill="none"
           stroke={stroke}
-          strokeWidth={strokeWidth + 1}
+          strokeWidth={polylineStroke}
           strokeLinecap="round"
           strokeLinejoin="round"
           data-testid={`overlay-polyline-${index}`}

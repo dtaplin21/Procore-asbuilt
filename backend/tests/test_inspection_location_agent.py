@@ -328,6 +328,87 @@ def test_agent_passes_aux_source_drawing_id_to_scope_tracer(
     assert mock_trace_scope.call_args.kwargs["source_drawing_id"] == 1084
 
 
+@patch("ai.agents.inspection_location_agent.should_invoke_vision", return_value=False)
+@patch("ai.agents.inspection_location_agent.trace_scope_geometry")
+@patch("ai.agents.inspection_location_agent.fuse_candidate_scores")
+@patch("ai.agents.inspection_location_agent.generate_all_location_candidates")
+@patch("ai.agents.inspection_location_agent.build_evidence_dossier")
+def test_agent_prefers_registration_aux_for_scope_tracing(
+    mock_build_dossier,
+    mock_generate_candidates,
+    mock_fuse_scores,
+    mock_trace_scope,
+    _mock_should_vision,
+    db_session: Session,
+) -> None:
+    from ai.pipelines.drawing_location_resolver import RegistrationTransform
+    from ai.pipelines.scope_geometry import ScopeGeometry
+
+    run, evidence_id, master_drawing_id, region_id = _seed_ready_master_run(db_session)
+    dossier = _utility_line_dossier(
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+        region_id=region_id,
+    )
+    registered_aux_id = 1501
+    dossier.evidence.meta = {
+        "station_from": "10+00",
+        "station_to": "10+90.95",
+        "station_range_source_drawing_id": registered_aux_id,
+        "registration_transform": {
+            "scale_x": 2.0,
+            "scale_y": 2.0,
+            "translate_x": 0.30,
+            "translate_y": 0.07,
+            "rotation_degrees": 0.0,
+            "registration_aux_drawing_id": registered_aux_id,
+        },
+    }
+    mock_build_dossier.return_value = dossier
+
+    wrong_aux_id = 1549
+    candidate = LocationMatchCandidate(
+        method=ResolutionMethod.REFERENCE_LOOKUP,
+        confidence=0.94,
+        bbox_fractional=(0.63, 0.18, 0.66, 0.20),
+        page=1,
+        source_drawing_id=wrong_aux_id,
+    )
+    mock_generate_candidates.return_value = [candidate]
+    mock_fuse_scores.return_value = [
+        FusedCandidateScore(
+            candidate=candidate,
+            fused_score=0.2,
+            clue_hits=(),
+            conflicts=(),
+            rationale="reference_lookup@0.94",
+        )
+    ]
+    mock_trace_scope.return_value = ScopeGeometry(
+        page=1,
+        type="polyline",
+        points=((0.10, 0.20), (0.29, 0.27)),
+        scope_kind=ScopeKind.UTILITY_LINE,
+        meta={
+            "source": "aux_plan_station_labels",
+            "source_drawing_id": registered_aux_id,
+        },
+    )
+
+    agent = InspectionLocationAgent()
+    result = agent.run(
+        db_session,
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+    )
+
+    mock_trace_scope.assert_called_once()
+    assert mock_trace_scope.call_args.kwargs["source_drawing_id"] == registered_aux_id
+    assert result.scope is not None
+    assert result.scope.points is not None
+    assert result.scope.points[0][0] == pytest.approx(0.50, abs=0.02)
+
+
 def _polyline_path_length(points: tuple[tuple[float, float], ...]) -> float:
     total = 0.0
     for index in range(1, len(points)):

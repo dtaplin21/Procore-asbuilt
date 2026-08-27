@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
@@ -26,6 +26,7 @@ from models.document_extraction import DocumentExtraction
 from models.inspection_run import InspectionRun
 from models.models import Drawing, EvidenceRecord, JobQueue, Project
 from services.drawing_index_jobs import JOB_TYPE as DRAWING_INDEX_JOB_TYPE, maybe_enqueue_drawing_index_job
+from services.drawing_index_jobs import index_linked_attachment_drawings_sync
 from services.drawing_render_jobs import DRAWING_RENDER_JOB_TYPE, enqueue_drawing_render_job
 from services.evidence_linking import replace_evidence_drawing_links
 from services.evidence_survey_extraction import (
@@ -46,6 +47,7 @@ class EvidenceInvestigationPersistResult:
     extraction_id: int | None
     survey_point_count: int
     drawing_ids_needing_index: list[int]
+    linked_drawing_ids_indexed_sync: list[int] = field(default_factory=list)
 
 
 def _text_content_for_evidence(
@@ -196,11 +198,11 @@ def _resolve_master_drawing_id(
         .first()
     )
     if run is not None and run.master_drawing_id is not None:
-        return int(run.master_drawing_id)
+        return cast(int, run.master_drawing_id)
 
     project = session.get(Project, evidence.project_id)
     if project is not None and project.master_drawing_id is not None:
-        return int(project.master_drawing_id)
+        return cast(int, project.master_drawing_id)
     return None
 
 
@@ -282,17 +284,34 @@ def persist_evidence_investigation(
         )
 
     drawing_ids_needing_index: list[int] = []
+    linked_drawing_ids_indexed_sync: list[int] = []
     if linked_drawing_ids:
+        try:
+            linked_drawing_ids_indexed_sync = index_linked_attachment_drawings_sync(
+                session,
+                linked_drawing_ids,
+            )
+        except Exception:
+            logger.exception(
+                "linked_attachment_sync_index_batch_failed",
+                extra={"evidence_id": evidence_id, "linked_drawing_ids": linked_drawing_ids},
+            )
+
+        still_needing_index = [
+            drawing_id
+            for drawing_id in linked_drawing_ids
+            if drawing_id not in linked_drawing_ids_indexed_sync
+        ]
         try:
             drawing_ids_needing_index = enqueue_linked_drawing_index_jobs(
                 session,
                 project_id=project_id,
-                linked_drawing_ids=linked_drawing_ids,
+                linked_drawing_ids=still_needing_index,
             )
         except Exception:
             logger.exception(
                 "linked_drawing_index_enqueue_failed",
-                extra={"evidence_id": evidence_id, "linked_drawing_ids": linked_drawing_ids},
+                extra={"evidence_id": evidence_id, "linked_drawing_ids": still_needing_index},
             )
 
     try:
@@ -361,6 +380,7 @@ def persist_evidence_investigation(
         "skipped": link_result.skipped_count,
         "errors": link_result.errors[:5],
         "linked_drawing_ids": linked_drawing_ids,
+        "linked_drawing_ids_indexed_sync": linked_drawing_ids_indexed_sync,
         "drawing_ids_needing_index": drawing_ids_needing_index,
         "at": datetime.now(timezone.utc).isoformat(),
     }
@@ -427,4 +447,5 @@ def persist_evidence_investigation(
         extraction_id=extraction_id,
         survey_point_count=survey_point_count,
         drawing_ids_needing_index=drawing_ids_needing_index,
+        linked_drawing_ids_indexed_sync=linked_drawing_ids_indexed_sync,
     )

@@ -269,7 +269,7 @@ def test_trace_station_range_uses_aux_tokens_when_source_drawing_differs(
     assert len(scope.points) == 2
     assert scope.points[0][0] < scope.points[1][0]
     assert scope.meta is not None
-    assert scope.meta.get("source") == "station_labels"
+    assert scope.meta.get("source") == "aux_plan_station_labels"
     assert scope.meta.get("source_drawing_id") == aux_id
 
 

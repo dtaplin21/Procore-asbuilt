@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,7 @@ from ai.pipelines.clue_fusion_scorer import (
 from ai.pipelines.drawing_location_resolver import ResolutionMethod
 from ai.pipelines.drawing_location_resolver import RegistrationTransform
 from ai.pipelines.location_match_orchestrator import (
+    LocationMatchCandidate,
     _load_registration_transform,
     generate_all_location_candidates,
     project_polyline_to_master,
@@ -187,6 +189,10 @@ class InspectionLocationAgent:
 
         scope_kind = infer_scope_kind(dossier)
         anchor_bbox = winner.candidate.bbox_fractional
+        scope_source_drawing_id = _resolve_scope_source_drawing_id(
+            dossier,
+            winner.candidate.source_drawing_id,
+        )
         scope: ScopeGeometry | None = None
         if anchor_bbox is not None:
             safe_anchor = clamp_fractional_bbox(anchor_bbox)
@@ -198,7 +204,7 @@ class InspectionLocationAgent:
                     page=page,
                     session=session,
                     master_png_path=master_png_path,
-                    source_drawing_id=winner.candidate.source_drawing_id,
+                    source_drawing_id=scope_source_drawing_id,
                 )
             except ValueError:
                 scope = None
@@ -210,11 +216,14 @@ class InspectionLocationAgent:
                 )
 
         registration_transform = _load_registration_transform(dossier.evidence)
+        registration_aux_drawing_id = _registration_aux_drawing_id(dossier.evidence)
         scope, aux_scope_unprojected = _maybe_project_aux_scope_to_master(
             scope,
             master_drawing_id=master_drawing_id,
             registration_transform=registration_transform,
-            source_drawing_id=winner.candidate.source_drawing_id,
+            source_drawing_id=scope_source_drawing_id
+            or winner.candidate.source_drawing_id,
+            registration_aux_drawing_id=registration_aux_drawing_id,
         )
 
         status = _decide_match_status(
@@ -254,12 +263,54 @@ class InspectionLocationAgent:
         return result
 
 
+def _resolve_scope_source_drawing_id(
+    dossier: EvidenceDossier,
+    winner_source_drawing_id: int | None,
+) -> int | None:
+    """Prefer the aux sheet used for station range / registration over match winner."""
+    meta = cast(dict[str, Any] | None, getattr(dossier.evidence, "meta", None))
+    if isinstance(meta, dict):
+        raw_station_source = meta.get("station_range_source_drawing_id")
+        if raw_station_source is not None:
+            try:
+                return int(raw_station_source)
+            except (TypeError, ValueError):
+                pass
+
+        reg_aux_id = _registration_aux_drawing_id_from_meta(meta)
+        if reg_aux_id is not None:
+            return reg_aux_id
+
+    return winner_source_drawing_id
+
+
+def _registration_aux_drawing_id(evidence: object) -> int | None:
+    meta = cast(dict[str, Any] | None, getattr(evidence, "meta", None))
+    if not isinstance(meta, dict):
+        return None
+    return _registration_aux_drawing_id_from_meta(meta)
+
+
+def _registration_aux_drawing_id_from_meta(meta: dict[str, Any]) -> int | None:
+    raw = meta.get("registration_transform")
+    if not isinstance(raw, dict):
+        return None
+    reg_aux = raw.get("registration_aux_drawing_id")
+    if reg_aux is None:
+        return None
+    try:
+        return int(reg_aux)
+    except (TypeError, ValueError):
+        return None
+
+
 def _maybe_project_aux_scope_to_master(
     scope: ScopeGeometry | None,
     *,
     master_drawing_id: int,
     registration_transform: RegistrationTransform | None,
     source_drawing_id: int | None,
+    registration_aux_drawing_id: int | None = None,
 ) -> tuple[ScopeGeometry | None, bool]:
     """Project aux-space polylines onto master; drop scope when transform is missing."""
     if scope is None or scope.type != "polyline" or not scope.points:
@@ -278,6 +329,12 @@ def _maybe_project_aux_scope_to_master(
         return scope, False
 
     if registration_transform is None:
+        return None, True
+
+    if (
+        registration_aux_drawing_id is not None
+        and aux_drawing_id != registration_aux_drawing_id
+    ):
         return None, True
 
     projected_points = project_polyline_to_master(scope.points, registration_transform)
@@ -325,11 +382,14 @@ def _decide_match_status(
     return "needs_review"
 
 
-def _has_unprojected_aux_coordinate_match(candidates: list[object]) -> bool:
+def _has_unprojected_aux_coordinate_match(
+    candidates: Sequence[LocationMatchCandidate],
+) -> bool:
     for candidate in candidates:
-        notes = str(getattr(candidate, "notes", "") or "")
-        method = getattr(candidate, "method", None)
-        if method == ResolutionMethod.COORDINATE_LOOKUP and "aux_coords_unprojected" in notes:
+        if (
+            candidate.method == ResolutionMethod.COORDINATE_LOOKUP
+            and "aux_coords_unprojected" in candidate.notes
+        ):
             return True
     return False
 

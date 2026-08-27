@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from ai.pipelines.aux_scope_polyline import build_aux_survey_polyline
 from ai.agents.evidence_dossier import EvidenceDossier
+from ai.pipelines.station_range_extractor import station_chainage
 from ai.pipelines.scope_geometry import (
     ScopeGeometry,
     ScopeKind,
@@ -28,6 +29,8 @@ from services.location_match_eval import rect_iou
 _ANCHOR_PADDING = 0.05
 _POINT_RECT_SIZE = 0.02
 _STATION_NORMALIZE_RE = re.compile(r"\s+")
+_PLAN_VIEW_MAX_Y = 0.55
+_PLAN_VIEW_MIN_Y = 0.10
 
 
 @dataclass(frozen=True)
@@ -69,10 +72,45 @@ def trace_scope_geometry(
 
     if scope_kind == ScopeKind.UTILITY_LINE:
         station_from, station_to = _station_range(dossier)
+
+        if station_from and station_to:
+            station_scope = _trace_station_range(
+                dossier,
+                anchor_bbox=anchor_bbox,
+                expanded_anchor=expanded_anchor,
+                tokens=tokens,
+                page=page,
+                global_station_search=trace_on_aux,
+                source_drawing_id=source_drawing_id if trace_on_aux else None,
+            )
+            if (
+                station_scope.points
+                and len(station_scope.points) >= 2
+                and station_scope.meta is not None
+                and station_scope.meta.get("source")
+                in {"station_labels", "aux_plan_station_labels"}
+            ):
+                meta = {
+                    "source": "aux_plan_station_labels"
+                    if trace_on_aux
+                    else "station_labels",
+                    "stations": station_scope.meta.get("stations", []),
+                }
+                if trace_on_aux and source_drawing_id is not None:
+                    meta["source_drawing_id"] = source_drawing_id
+                return ScopeGeometry(
+                    page=page,
+                    type="polyline",
+                    points=station_scope.points,
+                    scope_kind=ScopeKind.UTILITY_LINE,
+                    meta=meta,
+                )
+
         aux_polyline = build_aux_survey_polyline(
             dossier.master_context.scoped_survey_points,
             station_from=station_from,
             station_to=station_to,
+            max_centroid_y=_PLAN_VIEW_MAX_Y if trace_on_aux else None,
         )
         if aux_polyline is not None:
             return ScopeGeometry(
@@ -86,31 +124,6 @@ def trace_scope_geometry(
                     "stations": list(aux_polyline.stations),
                 },
             )
-
-        if station_from and station_to:
-            station_scope = _trace_station_range(
-                dossier,
-                anchor_bbox=anchor_bbox,
-                expanded_anchor=expanded_anchor,
-                tokens=tokens,
-                page=page,
-                global_station_search=trace_on_aux,
-                source_drawing_id=source_drawing_id if trace_on_aux else None,
-            )
-            if station_scope.meta is not None and station_scope.meta.get("source") == "station_labels":
-                meta = {
-                    "source": "aux_station_labels" if trace_on_aux else "station_labels",
-                    "stations": station_scope.meta.get("stations", []),
-                }
-                if trace_on_aux and source_drawing_id is not None:
-                    meta["source_drawing_id"] = source_drawing_id
-                return ScopeGeometry(
-                    page=page,
-                    type="polyline",
-                    points=station_scope.points or (),
-                    scope_kind=ScopeKind.UTILITY_LINE,
-                    meta=meta,
-                )
 
         endpoint_positions = _survey_endpoint_positions(
             dossier,
@@ -170,6 +183,27 @@ def _trace_station_range(
         if station
     ]
 
+    if global_station_search and len(target_stations) >= 2:
+        plan_points = _collect_aux_plan_station_polyline_points(
+            tokens,
+            station_from=target_stations[0],
+            station_to=target_stations[1],
+        )
+        if len(plan_points) >= 2:
+            meta: dict[str, Any] = {
+                "source": "aux_plan_station_labels",
+                "stations": target_stations,
+            }
+            if source_drawing_id is not None:
+                meta["source_drawing_id"] = source_drawing_id
+            return ScopeGeometry(
+                page=page,
+                type="polyline",
+                points=tuple(plan_points),
+                scope_kind=ScopeKind.STATION_RANGE,
+                meta=meta,
+            )
+
     matched_points: list[tuple[float, float]] = []
     for station in target_stations:
         centroid = _find_station_centroid(
@@ -182,7 +216,7 @@ def _trace_station_range(
             matched_points.append(centroid)
 
     if len(matched_points) >= 2:
-        meta: dict[str, Any] = {"source": "station_labels", "stations": target_stations}
+        meta = {"source": "station_labels", "stations": target_stations}
         if source_drawing_id is not None:
             meta["source_drawing_id"] = source_drawing_id
         return ScopeGeometry(
@@ -442,6 +476,70 @@ def _load_master_text_tokens(
             tokens.append(token)
 
     return tokens
+
+
+def _collect_aux_plan_station_polyline_points(
+    tokens: list[_MasterTextToken],
+    *,
+    station_from: str,
+    station_to: str,
+    max_plan_y: float = _PLAN_VIEW_MAX_Y,
+    min_plan_y: float = _PLAN_VIEW_MIN_Y,
+) -> list[tuple[float, float]]:
+    """Chain plan-view station/structure OCR into a left-to-right utility polyline."""
+    lo = station_chainage(station_from)
+    hi = station_chainage(station_to)
+    chainage_hits: dict[float, tuple[float, float]] = {}
+    structure_points: list[tuple[float, tuple[float, float]]] = []
+
+    for token in tokens:
+        centroid = clamp_point_to_page(_centroid(token.bbox))
+        if centroid[1] > max_plan_y or centroid[1] < min_plan_y:
+            continue
+
+        token_stations = extract_stations_from_text(token.text)
+        for extracted in token_stations:
+            chainage = station_chainage(_normalize_station(extracted) or extracted)
+            if lo <= chainage <= hi:
+                chainage_hits[chainage] = centroid
+
+        upper = token.text.upper()
+        if token_stations:
+            continue
+        if any(marker in upper for marker in ("SSMH", "STA.", "STA ", "SAN. MH", "SAN MH")):
+            structure_points.append((centroid[0], centroid))
+
+    if len(chainage_hits) < 2 and structure_points:
+        structure_points.sort(key=lambda item: item[0])
+        if chainage_hits:
+            end_point = chainage_hits[max(chainage_hits.keys())]
+            end_x = end_point[0]
+            start_candidates = [pt for x, pt in structure_points if x <= end_x]
+            if start_candidates:
+                chainage_hits.setdefault(lo, start_candidates[0])
+        elif len(structure_points) >= 2:
+            chainage_hits[lo] = structure_points[0][1]
+            chainage_hits[hi] = structure_points[-1][1]
+
+    if len(chainage_hits) < 2:
+        return []
+
+    start_point = chainage_hits[min(chainage_hits.keys())]
+    end_point = chainage_hits[max(chainage_hits.keys())]
+    min_x = min(start_point[0], end_point[0])
+    max_x = max(start_point[0], end_point[0])
+
+    ordered: list[tuple[float, float]] = [start_point]
+    for x, point in sorted(structure_points, key=lambda item: item[0]):
+        if min_x < x < max_x and point not in ordered:
+            ordered.append(point)
+    if end_point not in ordered:
+        ordered.append(end_point)
+
+    if len(ordered) < 2:
+        ordered = [start_point, end_point]
+
+    return ordered
 
 
 def _find_station_centroid(

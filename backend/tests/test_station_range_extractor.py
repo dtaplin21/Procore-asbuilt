@@ -43,10 +43,36 @@ def test_extract_station_range_from_tokens_ignores_profile_strip() -> None:
     assert result.station_to_bbox_json is not None
 
 
-def test_extract_station_range_from_tokens_requires_two_plan_stations() -> None:
+def test_extract_station_range_from_tokens_pairs_plan_with_profile_minimum() -> None:
     tokens = (
         _Token("10+90.95", {"x0": 0.27, "y0": 0.26, "x1": 0.31, "y1": 0.28}),
         _Token("10+00", {"x0": 0.08, "y0": 0.94, "x1": 0.12, "y1": 0.96}),
+    )
+
+    result = extract_station_range_from_tokens(tokens, max_profile_y=0.85)
+
+    assert result.station_from == "10+00"
+    assert result.station_to == "10+90.95"
+
+
+def test_extract_station_range_from_tokens_picks_widest_major_when_plan_spans_majors() -> None:
+    """C4.20 has 10+90.95 and 11+14.23 on plan plus profile-grid majors."""
+    tokens = (
+        _Token("10+90.95", {"x0": 0.27, "y0": 0.26, "x1": 0.31, "y1": 0.28}),
+        _Token("11+14.23", {"x0": 0.35, "y0": 0.27, "x1": 0.39, "y1": 0.29}),
+        _Token("10+00", {"x0": 0.08, "y0": 0.94, "x1": 0.12, "y1": 0.96}),
+        _Token("11+00", {"x0": 0.33, "y0": 0.94, "x1": 0.37, "y1": 0.96}),
+    )
+
+    result = extract_station_range_from_tokens(tokens, max_profile_y=0.85)
+
+    assert result.station_from == "10+00"
+    assert result.station_to == "10+90.95"
+
+
+def test_extract_station_range_from_tokens_requires_two_plan_stations_without_profile_pair() -> None:
+    tokens = (
+        _Token("10+90.95", {"x0": 0.27, "y0": 0.26, "x1": 0.31, "y1": 0.28}),
     )
 
     result = extract_station_range_from_tokens(tokens, max_profile_y=0.85)
