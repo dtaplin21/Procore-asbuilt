@@ -50,6 +50,7 @@ Master drawing auto-index::
 Sheet digitization (optional symbol YOLO)::
 
     SYMBOL_DETECTOR_WEIGHTS_PATH           # path to .pt/.onnx weights; unset → symbols=[]
+    SHEET_DIGITIZATION_ENABLED             # default false — run digitize after OCR index
 """
 
 from urllib.parse import urlparse
@@ -159,6 +160,12 @@ class Settings(BaseSettings):
     symbol_detector_weights_path: Optional[str] = Field(
         default=None,
         description="SYMBOL_DETECTOR_WEIGHTS_PATH",
+    )
+    #: After successful OCR index, optionally run ``digitize_drawing_page`` (D-2).
+    #: Default false — enable only after viewports are seeded. Env: ``SHEET_DIGITIZATION_ENABLED``.
+    sheet_digitization_enabled: bool = Field(
+        default=False,
+        description="SHEET_DIGITIZATION_ENABLED",
     )
 
     # In some environments (CI, sandboxes), extra env vars may be present.

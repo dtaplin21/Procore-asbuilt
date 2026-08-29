@@ -23,6 +23,7 @@ from ai.pipelines.scope_geometry import (
 )
 from ai.pipelines.survey_point_extractor import extract_stations_from_text
 from models.drawing_text_element import DrawingTextElement
+from models.models import Drawing
 from services.legend_lookup import find_codes_for_term
 from services.location_match_eval import rect_iou
 
@@ -31,6 +32,8 @@ _POINT_RECT_SIZE = 0.02
 _STATION_NORMALIZE_RE = re.compile(r"\s+")
 _PLAN_VIEW_MAX_Y = 0.55
 _PLAN_VIEW_MIN_Y = 0.10
+# Prefer digitized SheetLine over vision when line confidence meets this floor.
+_SHEET_LINE_HIGH_CONFIDENCE = 0.7
 
 
 @dataclass(frozen=True)
@@ -300,6 +303,21 @@ def _trace_utility_line(
             meta={**meta, "legend_codes": sorted(legend_codes)},
         )
 
+    sheet_line_geometry = _prefer_plan_sheet_line(
+        session=session,
+        drawing_id=(
+            int(source_drawing_id)
+            if source_drawing_id is not None
+            else int(dossier.master_drawing_id)
+        ),
+        page=page,
+        expanded_anchor=expanded_anchor,
+        base_meta={**meta, "legend_codes": sorted(legend_codes)},
+        source_drawing_id=source_drawing_id,
+    )
+    if sheet_line_geometry is not None:
+        return sheet_line_geometry
+
     centerline = _centerline_through_anchor(anchor_bbox, expanded_anchor)
     vision_geometry = _vision_trace_fallback(
         dossier,
@@ -319,6 +337,113 @@ def _trace_utility_line(
         scope_kind=ScopeKind.UTILITY_LINE,
         meta={**meta, "legend_codes": sorted(legend_codes), "vision_deferred": True},
     )
+
+
+def _prefer_plan_sheet_line(
+    *,
+    session: Session | None,
+    drawing_id: int,
+    page: int,
+    expanded_anchor: tuple[float, float, float, float],
+    base_meta: dict[str, Any],
+    source_drawing_id: int | None,
+) -> ScopeGeometry | None:
+    """Use high-confidence SheetLine polylines inside plan viewports over vision."""
+    if session is None:
+        return None
+    candidate = _best_plan_sheet_line(
+        session,
+        drawing_id=drawing_id,
+        page=page,
+        expanded_anchor=expanded_anchor,
+    )
+    if candidate is None:
+        return None
+    points, viewport_id, confidence = candidate
+    meta = {
+        **base_meta,
+        "source": "sheet_line",
+        "viewport_id": viewport_id,
+        "sheet_line_confidence": confidence,
+    }
+    if source_drawing_id is not None:
+        meta["source_drawing_id"] = source_drawing_id
+    return ScopeGeometry(
+        page=page,
+        type="polyline",
+        points=points,
+        scope_kind=ScopeKind.UTILITY_LINE,
+        meta=meta,
+    )
+
+
+def _best_plan_sheet_line(
+    session: Session,
+    *,
+    drawing_id: int,
+    page: int,
+    expanded_anchor: tuple[float, float, float, float],
+) -> tuple[tuple[tuple[float, float], ...], str | None, float] | None:
+    drawing = session.get(Drawing, int(drawing_id))
+    if drawing is None:
+        return None
+    stats = cast(dict[str, Any] | None, drawing.index_stats_json)
+    if not isinstance(stats, dict):
+        return None
+    graphs = stats.get("sheetEntityGraph")
+    if not isinstance(graphs, dict):
+        return None
+    page_graph = graphs.get(str(page))
+    if not isinstance(page_graph, dict):
+        return None
+
+    plan_ids = {
+        str(vp.get("viewport_id"))
+        for vp in (page_graph.get("viewports") or [])
+        if isinstance(vp, dict) and vp.get("kind") == "plan" and vp.get("viewport_id")
+    }
+    if not plan_ids:
+        return None
+
+    ax0, ay0, ax1, ay1 = expanded_anchor
+    anchor_cx = (ax0 + ax1) / 2.0
+    anchor_cy = (ay0 + ay1) / 2.0
+
+    best: tuple[tuple[tuple[float, float], ...], str | None, float, float] | None = None
+    for raw in page_graph.get("lines") or []:
+        if not isinstance(raw, dict):
+            continue
+        try:
+            confidence = float(raw.get("confidence") or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if confidence < _SHEET_LINE_HIGH_CONFIDENCE:
+            continue
+        viewport_id = raw.get("viewport_id")
+        if viewport_id is None or str(viewport_id) not in plan_ids:
+            continue
+        points_raw = raw.get("points")
+        if not isinstance(points_raw, (list, tuple)) or len(points_raw) < 2:
+            continue
+        points: list[tuple[float, float]] = []
+        for pt in points_raw:
+            if not isinstance(pt, (list, tuple)) or len(pt) < 2:
+                continue
+            points.append((float(pt[0]), float(pt[1])))
+        if len(points) < 2:
+            continue
+        mid_x = sum(p[0] for p in points) / len(points)
+        mid_y = sum(p[1] for p in points) / len(points)
+        intersects = any(ax0 <= px <= ax1 and ay0 <= py <= ay1 for px, py in points)
+        # Prefer lines that intersect the anchor; otherwise nearest midpoint.
+        distance = 0.0 if intersects else ((mid_x - anchor_cx) ** 2 + (mid_y - anchor_cy) ** 2)
+        score = distance - confidence  # lower is better
+        if best is None or score < best[3]:
+            best = (tuple(points), str(viewport_id), confidence, score)
+
+    if best is None:
+        return None
+    return best[0], best[1], best[2]
 
 
 def _vision_trace_fallback(

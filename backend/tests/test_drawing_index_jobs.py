@@ -116,6 +116,43 @@ def test_run_drawing_index_job_sets_ready_status(
     assert len(page_meta) >= 1
 
 
+def test_run_drawing_index_job_skips_digitization_when_disabled(
+    db_session: Session,
+    seeded_ready_pdf_drawing: Drawing,
+) -> None:
+    """SHEET_DIGITIZATION_ENABLED defaults false — index must not call digitize."""
+    from services.drawing_index_jobs import maybe_digitize_drawing_after_index
+
+    drawing_id = cast(int, seeded_ready_pdf_drawing.id)
+    with patch("services.sheet_digitization.digitize_drawing_page") as mock_digitize:
+        maybe_digitize_drawing_after_index(db_session, drawing_id)
+        mock_digitize.assert_not_called()
+
+    result = run_drawing_index_job(drawing_id, db_session)
+    db_session.refresh(seeded_ready_pdf_drawing)
+    assert cast(str, seeded_ready_pdf_drawing.index_status) == "ready"
+    assert result.pages >= 1
+
+
+def test_maybe_digitize_swallows_failures_when_enabled(
+    db_session: Session,
+    seeded_ready_pdf_drawing: Drawing,
+    monkeypatch,
+) -> None:
+    from config import settings
+    from services.drawing_index_jobs import maybe_digitize_drawing_after_index
+
+    monkeypatch.setattr(settings, "sheet_digitization_enabled", True)
+    drawing_id = cast(int, seeded_ready_pdf_drawing.id)
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("yolo weights missing simulation")
+
+    with patch("services.sheet_digitization.digitize_drawing_page", side_effect=_boom):
+        # Must not raise — index path relies on this being non-blocking.
+        maybe_digitize_drawing_after_index(db_session, drawing_id)
+
+
 def test_clear_drawing_index_artifacts_keeps_manual_regions(
     db_session: Session,
     seeded_ready_pdf_drawing: Drawing,

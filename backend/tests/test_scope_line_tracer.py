@@ -341,3 +341,109 @@ def test_trace_utility_line_clamps_vision_points_when_anchor_is_off_page(
     for point in geometry["points"]:
         assert 0.0 <= point[0] <= 1.0
         assert 0.0 <= point[1] <= 1.0
+
+
+def test_trace_utility_line_prefers_plan_sheet_line_over_vision(
+    db_session,
+    project,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    from dataclasses import replace
+
+    from models.models import Drawing
+    from sqlalchemy.orm import Session
+
+    session = cast(Session, db_session)
+    master = Drawing(
+        project_id=cast(int, project.id),
+        source="upload",
+        name="Master.pdf",
+        content_type="application/pdf",
+        processing_status="ready",
+        index_status="ready",
+        index_stats_json={
+            "sheetEntityGraph": {
+                "1": {
+                    "drawing_id": 0,
+                    "page": 1,
+                    "viewports": [
+                        {
+                            "viewport_id": "plan",
+                            "kind": "plan",
+                            "page": 1,
+                            "bbox_fractional": [0.05, 0.05, 0.95, 0.55],
+                            "scale": None,
+                            "source": "manual",
+                            "notes": "",
+                        },
+                        {
+                            "viewport_id": "section_a",
+                            "kind": "section",
+                            "page": 1,
+                            "bbox_fractional": [0.05, 0.60, 0.95, 0.95],
+                            "scale": None,
+                            "source": "manual",
+                            "notes": "",
+                        },
+                    ],
+                    "labels": [],
+                    "symbols": [],
+                    "lines": [
+                        {
+                            "points": [[0.20, 0.25], [0.45, 0.30]],
+                            "viewport_id": "plan",
+                            "confidence": 0.85,
+                            "line_type": None,
+                        },
+                        {
+                            "points": [[0.20, 0.70], [0.45, 0.75]],
+                            "viewport_id": "section_a",
+                            "confidence": 0.99,
+                            "line_type": None,
+                        },
+                    ],
+                    "associations": [],
+                    "meta": {},
+                }
+            }
+        },
+    )
+    session.add(master)
+    session.commit()
+    master_id = cast(int, master.id)
+
+    master_png = tmp_path / "master.png"
+    master_png.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+    def fake_reason(**kwargs: object) -> object:
+        raise AssertionError("vision must not run when plan SheetLine is available")
+
+    monkeypatch.setattr(
+        "ai.pipelines.vision_location_reasoner.reason_over_master_crop",
+        fake_reason,
+    )
+
+    dossier = replace(
+        _dossier(
+            evidence_text="Sanitary sewer lateral run in corridor",
+            tiles=(
+                _tile(text="ROOF", bbox=(0.80, 0.80, 0.84, 0.82), text_element_id=3),
+            ),
+        ),
+        master_drawing_id=master_id,
+    )
+
+    scope = trace_scope_geometry(
+        dossier,
+        anchor_bbox=(0.18, 0.22, 0.48, 0.35),
+        scope_kind=ScopeKind.UTILITY_LINE,
+        page=1,
+        session=session,
+        master_png_path=master_png,
+    )
+
+    assert scope.meta is not None
+    assert scope.meta.get("source") == "sheet_line"
+    assert scope.meta.get("viewport_id") == "plan"
+    assert scope.points == ((0.20, 0.25), (0.45, 0.30))

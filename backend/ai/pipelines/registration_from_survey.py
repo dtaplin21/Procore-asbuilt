@@ -5,15 +5,20 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
-from typing import Sequence, cast
+from typing import Any, Sequence, cast
 
 from sqlalchemy.orm import Session
 
 from ai.pipelines.coordinate_frame import rotate_point
 from ai.pipelines.drawing_location_resolver import RegistrationTransform
 from ai.pipelines.scope_geometry import clamp_point_to_page
-from ai.pipelines.survey_point_extractor import is_placed_survey_label_bbox
+from ai.pipelines.survey_point_extractor import (
+    extract_stations_from_text,
+    is_placed_survey_label_bbox,
+)
 from models.drawing_survey_point import DrawingSurveyPoint
+from models.drawing_viewport import DrawingViewport as DrawingViewportRow
+from models.models import Drawing
 
 
 @dataclass(frozen=True)
@@ -34,6 +39,180 @@ def _normalize_station(value: str | None) -> str | None:
         return None
     normalized = _STATION_NORMALIZE_RE.sub("", value.strip().upper())
     return normalized or None
+
+
+def _load_plan_viewport_bboxes(
+    session: Session,
+    drawing_id: int,
+    *,
+    page: int = 1,
+) -> list[tuple[float, float, float, float]]:
+    """Return fractional bboxes for kind=plan viewports (empty if none seeded)."""
+    rows = (
+        session.query(DrawingViewportRow)
+        .filter(
+            DrawingViewportRow.drawing_id == int(drawing_id),
+            DrawingViewportRow.page == int(page),
+            DrawingViewportRow.kind == "plan",
+        )
+        .all()
+    )
+    bboxes: list[tuple[float, float, float, float]] = []
+    for row in rows:
+        bbox = cast(dict[str, Any], row.bbox_json)
+        bboxes.append(
+            (
+                float(bbox["x0"]),
+                float(bbox["y0"]),
+                float(bbox["x1"]),
+                float(bbox["y1"]),
+            )
+        )
+    return bboxes
+
+
+def _point_in_any_bbox(
+    point: tuple[float, float],
+    bboxes: Sequence[tuple[float, float, float, float]],
+) -> bool:
+    x, y = point
+    for x0, y0, x1, y1 in bboxes:
+        if x0 <= x <= x1 and y0 <= y <= y1:
+            return True
+    return False
+
+
+def _filter_survey_rows_to_plan_viewports(
+    session: Session,
+    rows: Sequence[DrawingSurveyPoint],
+    *,
+    drawing_id: int,
+) -> list[DrawingSurveyPoint]:
+    """Keep survey controls inside plan viewports when viewports are seeded.
+
+    Section/profile geometry must never silently drive plan registration.
+    If no plan viewport exists for the drawing, keep all rows (legacy behavior).
+    """
+    plan_bboxes = _load_plan_viewport_bboxes(session, drawing_id, page=1)
+    if not plan_bboxes:
+        return list(rows)
+
+    kept: list[DrawingSurveyPoint] = []
+    for row in rows:
+        if int(row.page) != 1:
+            # Multi-page: only keep if that page has a plan viewport containing the point.
+            page_bboxes = _load_plan_viewport_bboxes(
+                session, drawing_id, page=int(row.page)
+            )
+            if not page_bboxes:
+                continue
+            centroid = _bbox_centroid(cast(dict[str, float], row.label_bbox_json))
+            if centroid is not None and _point_in_any_bbox(centroid, page_bboxes):
+                kept.append(row)
+            continue
+        centroid = _bbox_centroid(cast(dict[str, float], row.label_bbox_json))
+        if centroid is None:
+            continue
+        if _point_in_any_bbox(centroid, plan_bboxes):
+            kept.append(row)
+    return kept
+
+
+def _digitized_station_centroids(
+    session: Session,
+    drawing_id: int,
+    *,
+    page: int = 1,
+) -> dict[str, tuple[float, float]]:
+    """Station → centroid from persisted SheetEntityGraph labels in plan viewports."""
+    drawing = session.get(Drawing, int(drawing_id))
+    if drawing is None:
+        return {}
+    stats = cast(dict[str, Any] | None, drawing.index_stats_json)
+    if not isinstance(stats, dict):
+        return {}
+    graphs = stats.get("sheetEntityGraph")
+    if not isinstance(graphs, dict):
+        return {}
+    page_graph = graphs.get(str(page))
+    if not isinstance(page_graph, dict):
+        return {}
+
+    plan_ids = {
+        str(vp.get("viewport_id"))
+        for vp in (page_graph.get("viewports") or [])
+        if isinstance(vp, dict) and vp.get("kind") == "plan"
+    }
+    plan_bboxes = _load_plan_viewport_bboxes(session, drawing_id, page=page)
+    stations: dict[str, tuple[float, float]] = {}
+
+    for label in page_graph.get("labels") or []:
+        if not isinstance(label, dict):
+            continue
+        text = str(label.get("text") or "")
+        found = extract_stations_from_text(text)
+        if not found:
+            continue
+        bbox = label.get("bbox_fractional")
+        if not (isinstance(bbox, (list, tuple)) and len(bbox) == 4):
+            continue
+        x0, y0, x1, y1 = (float(v) for v in bbox)
+        centroid = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
+        viewport_id = label.get("viewport_id")
+        if plan_ids and viewport_id not in plan_ids:
+            continue
+        if plan_bboxes and not _point_in_any_bbox(centroid, plan_bboxes):
+            continue
+        for station in found:
+            key = _normalize_station(station)
+            if key is not None and key not in stations:
+                stations[key] = centroid
+
+    # Symbol associations may carry station text via label_text.
+    for assoc in page_graph.get("associations") or []:
+        if not isinstance(assoc, dict):
+            continue
+        if plan_ids and assoc.get("viewport_id") not in plan_ids:
+            continue
+        for station in extract_stations_from_text(str(assoc.get("label_text") or "")):
+            key = _normalize_station(station)
+            if key is None or key in stations:
+                continue
+            # Prefer associated symbol bbox if present in symbols list.
+            si = assoc.get("symbol_index")
+            symbols = page_graph.get("symbols") or []
+            if isinstance(si, int) and 0 <= si < len(symbols):
+                symbol = symbols[si]
+                bbox = symbol.get("bbox_fractional") if isinstance(symbol, dict) else None
+                if isinstance(bbox, (list, tuple)) and len(bbox) == 4:
+                    x0, y0, x1, y1 = (float(v) for v in bbox)
+                    stations[key] = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
+    return stations
+
+
+def _match_digitized_station_controls(
+    session: Session,
+    *,
+    aux_drawing_id: int,
+    master_drawing_id: int,
+) -> list[ControlPointPair]:
+    """Prefer SheetEntityGraph station labels inside plan viewports when available."""
+    aux_stations = _digitized_station_centroids(session, aux_drawing_id)
+    master_stations = _digitized_station_centroids(session, master_drawing_id)
+    pairs: list[ControlPointPair] = []
+    for station, aux_xy in aux_stations.items():
+        master_xy = master_stations.get(station)
+        if master_xy is None:
+            continue
+        pairs.append(
+            ControlPointPair(
+                aux_xy=aux_xy,
+                master_xy=master_xy,
+                station=station,
+                pairing_method="digitized_station",
+            )
+        )
+    return pairs
 
 
 def _bbox_centroid(bbox_json: dict[str, float]) -> tuple[float, float] | None:
@@ -290,7 +469,20 @@ def match_control_points(
     aux_drawing_id: int,
     master_drawing_id: int,
 ) -> list[ControlPointPair]:
-    """Pair aux/master control points by shared N/E, then by shared station labels."""
+    """Pair aux/master control points by shared N/E, then by shared station labels.
+
+    Prefers digitized SheetEntityGraph stations inside ``kind=plan`` viewports.
+    Falls back to ``DrawingSurveyPoint`` rows, filtered to plan viewports when
+    seeded (section/profile geometry is ignored for registration).
+    """
+    digitized = _match_digitized_station_controls(
+        session,
+        aux_drawing_id=int(aux_drawing_id),
+        master_drawing_id=int(master_drawing_id),
+    )
+    if len(digitized) >= 2:
+        return digitized
+
     aux_rows: list[DrawingSurveyPoint] = (
         session.query(DrawingSurveyPoint)
         .filter(DrawingSurveyPoint.drawing_id == aux_drawing_id)
@@ -303,6 +495,12 @@ def match_control_points(
         .order_by(DrawingSurveyPoint.id.asc())
         .all()
     )
+    aux_rows = _filter_survey_rows_to_plan_viewports(
+        session, aux_rows, drawing_id=int(aux_drawing_id)
+    )
+    master_rows = _filter_survey_rows_to_plan_viewports(
+        session, master_rows, drawing_id=int(master_drawing_id)
+    )
 
     pairs_by_ne, matched_aux_ids = _match_control_points_by_ne(aux_rows, master_rows)
     if not _master_has_real_survey_coordinates(master_rows):
@@ -313,7 +511,20 @@ def match_control_points(
         master_rows,
         exclude_aux_ids=matched_aux_ids,
     )
-    return [*pairs_by_ne, *pairs_by_station]
+    survey_pairs = [*pairs_by_ne, *pairs_by_station]
+    if digitized and not survey_pairs:
+        return digitized
+    if digitized:
+        # Merge: digitized stations first, then survey pairs for unmatched stations.
+        seen = {_normalize_station(p.station) for p in digitized}
+        for pair in survey_pairs:
+            key = _normalize_station(pair.station)
+            if key is None or key not in seen:
+                digitized.append(pair)
+                if key is not None:
+                    seen.add(key)
+        return digitized
+    return survey_pairs
 
 
 def compute_registration_for_linked_drawings(

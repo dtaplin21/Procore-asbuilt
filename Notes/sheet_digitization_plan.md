@@ -613,7 +613,7 @@ Reuse legend_lookup.expand_abbreviation / find_codes_for_term for class normaliz
 
 # Phase D — Digitization orchestrator + wire-in
 
-- [ ] **D-1** `digitize_drawing_page` service
+- [x] **D-1** `digitize_drawing_page` service
 
 **PROMPT — copy below:**
 
@@ -642,7 +642,7 @@ cd backend && ./venv/bin/python -m pytest tests/test_sheet_digitization.py -q --
 
 ---
 
-- [ ] **D-2** Hook into drawing index job (non-blocking)
+- [x] **D-2** Hook into drawing index job (non-blocking)
 
 **PROMPT — copy below:**
 
@@ -661,7 +661,7 @@ MODIFY backend/services/drawing_index_jobs.py (or master_drawing_indexer complet
 
 ---
 
-- [ ] **D-3** Feed registration / scope (replace hand seeds gradually)
+- [x] **D-3** Feed registration / scope (replace hand seeds gradually)
 
 **PROMPT — copy below:**
 
@@ -694,7 +694,7 @@ cd backend
 
 # Phase E — Eval / regression
 
-- [ ] **E-1** Digitization fixtures + multi-scale unit gate
+- [x] **E-1** Digitization fixtures + multi-scale unit gate
 
 **PROMPT — copy below:**
 
@@ -732,7 +732,7 @@ cd backend && ./venv/bin/python -m pytest tests/test_viewport_scale.py tests/tes
 ## Definition of done
 
 - [ ] C4.20 has **≥2 viewports** (plan + section) with **different** `real_feet_per_paper_inch`
-- [ ] Feet conversion tests prove plan vs section diverge correctly
+- [x] Feet conversion tests prove plan vs section diverge correctly
 - [ ] Line extractor returns fractional polylines inside a viewport crop
 - [ ] Symbol detector module exists (weights optional); manual symbol insert works
 - [ ] Digitization does not break drawing index when disabled

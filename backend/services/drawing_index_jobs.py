@@ -10,7 +10,8 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Any, Optional, cast
+from pathlib import Path
+from typing import Optional, cast
 
 from sqlalchemy.orm import Session
 
@@ -21,7 +22,7 @@ from models.drawing_region import DrawingRegion
 from models.drawing_landmark import DrawingLandmark
 from models.drawing_survey_point import DrawingSurveyPoint
 from models.drawing_text_element import DrawingTextElement
-from models.models import Drawing, JobQueue, Project, User, UserCompany
+from models.models import Drawing, DrawingRendition, JobQueue, Project, User, UserCompany
 from observability.workflow_logging import log_job_status_transition
 from services.inspection_matching_jobs import (
     flush_deferred_inspection_matches_for_drawing,
@@ -218,6 +219,7 @@ def index_linked_attachment_drawing_sync(
         result = index_master_drawing(drawing_id, session)
         _apply_index_result(drawing, result)
         session.flush()
+        maybe_digitize_drawing_after_index(session, drawing_id)
         flush_inspection_matches_for_linked_auxiliary_drawing(session, drawing_id)
         return result
     except Exception as exc:
@@ -255,6 +257,89 @@ def _apply_index_result(drawing: Drawing, result: IndexResult) -> None:
         drawing.page_meta_json = result.page_meta_json  # type: ignore[assignment]
 
 
+def _rendition_png_for_page(session: Session, drawing_id: int, page: int) -> Path | None:
+    """Return absolute Path to a ready page PNG, or None."""
+    rendition = (
+        session.query(DrawingRendition)
+        .filter(
+            DrawingRendition.drawing_id == int(drawing_id),
+            DrawingRendition.page_number == int(page),
+            DrawingRendition.render_status == "ready",
+        )
+        .one_or_none()
+    )
+    if rendition is None:
+        return None
+    key = cast(str | None, rendition.image_storage_key)
+    if not key:
+        return None
+    path = open_storage_path(key)
+    return path if path.exists() else None
+
+
+def maybe_digitize_drawing_after_index(session: Session, drawing_id: int) -> None:
+    """Optionally digitize pages after OCR index (non-blocking for the index job).
+
+    Controlled by ``SHEET_DIGITIZATION_ENABLED`` (default false). Failures are
+    logged and never raised to the caller — missing YOLO weights must not fail index.
+    """
+    if not settings.sheet_digitization_enabled:
+        return
+
+    from services.sheet_digitization import digitize_drawing_page
+
+    try:
+        renditions = (
+            session.query(DrawingRendition)
+            .filter(
+                DrawingRendition.drawing_id == int(drawing_id),
+                DrawingRendition.render_status == "ready",
+            )
+            .order_by(DrawingRendition.page_number.asc())
+            .all()
+        )
+        pages = [cast(int, r.page_number) for r in renditions] or [1]
+
+        for page in pages:
+            png_path = _rendition_png_for_page(session, drawing_id, page)
+            if png_path is None:
+                logger.info(
+                    "sheet_digitization_skipped_no_rendition",
+                    extra={"drawing_id": drawing_id, "page": page},
+                )
+                continue
+            graph = digitize_drawing_page(
+                session,
+                int(drawing_id),
+                page=int(page),
+                rendition_png=png_path,
+                persist=True,
+            )
+            logger.info(
+                "sheet_digitization_complete",
+                extra={
+                    "drawing_id": drawing_id,
+                    "page": page,
+                    "viewports": len(graph.viewports),
+                    "labels": len(graph.labels),
+                    "symbols": len(graph.symbols),
+                    "lines": len(graph.lines),
+                    "associations": len(graph.associations),
+                    "viewport_warning": bool(graph.meta.get("viewport_warning")),
+                },
+            )
+        session.commit()
+    except Exception:
+        logger.exception(
+            "sheet_digitization_failed",
+            extra={"drawing_id": drawing_id},
+        )
+        try:
+            session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def run_drawing_index_job(drawing_id: int, session: Session) -> IndexResult:
     """Index a master drawing: clear prior auto-index data, run pipeline, persist status."""
     drawing = session.get(Drawing, drawing_id)
@@ -285,6 +370,7 @@ def run_drawing_index_job(drawing_id: int, session: Session) -> IndexResult:
         result = index_master_drawing(drawing_id, session)
         _apply_index_result(drawing, result)
         session.commit()
+        maybe_digitize_drawing_after_index(session, drawing_id)
         flush_deferred_inspection_matches_for_drawing(session, drawing_id)
         flush_inspection_matches_for_linked_auxiliary_drawing(session, drawing_id)
         return result

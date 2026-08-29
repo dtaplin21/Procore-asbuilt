@@ -4,6 +4,10 @@
 Seeds a 4-point station-matched control chain (10+00 → 10+71.41 → 10+90.95 →
 11+14.21) for UCSF master 661 ↔ aux C4.20 (1501), then recomputes registration.
 
+When a SheetEntityGraph exists, ``match_control_points`` prefers station labels
+inside ``kind=plan`` viewports and ignores section/profile geometry; this script
+remains the manual fallback when digitization is unavailable.
+
 Usage (from ``backend/``)::
 
     ./venv/bin/python scripts/seed_master_registration_controls.py

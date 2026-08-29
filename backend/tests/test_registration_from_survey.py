@@ -376,3 +376,122 @@ def test_project_aux_bbox_to_master_with_computed_registration(
     master_polyline = project_polyline_to_master(aux_polyline, transform)
     assert len(master_polyline) == 3
     assert master_polyline[0][0] < master_polyline[-1][0]
+
+
+def test_match_control_points_ignores_section_viewport_geometry(
+    db_session: Session,
+    project,
+) -> None:
+    """Section/profile survey labels must not drive plan registration when plan VPs exist."""
+    from models.drawing_viewport import DrawingViewport as DrawingViewportRow
+
+    project_id = cast(int, project.id)
+    master = Drawing(
+        project_id=project_id,
+        source="upload",
+        name="Master.pdf",
+        content_type="application/pdf",
+        processing_status="ready",
+        index_status="ready",
+    )
+    aux = Drawing(
+        project_id=project_id,
+        source="linked_evidence",
+        name="Install.pdf",
+        content_type="application/pdf",
+        processing_status="ready",
+        index_status="ready",
+    )
+    db_session.add_all([master, aux])
+    db_session.flush()
+    master_id = cast(int, master.id)
+    aux_id = cast(int, aux.id)
+
+    for drawing_id in (master_id, aux_id):
+        db_session.add_all(
+            [
+                DrawingViewportRow(
+                    drawing_id=drawing_id,
+                    page=1,
+                    viewport_id="plan",
+                    kind="plan",
+                    bbox_json={"x0": 0.05, "y0": 0.05, "x1": 0.95, "y1": 0.50},
+                    scale_json=None,
+                    source="manual",
+                ),
+                DrawingViewportRow(
+                    drawing_id=drawing_id,
+                    page=1,
+                    viewport_id="section_a",
+                    kind="section",
+                    bbox_json={"x0": 0.05, "y0": 0.55, "x1": 0.95, "y1": 0.95},
+                    scale_json=None,
+                    source="manual",
+                ),
+            ]
+        )
+
+    # Shared station only appears in the section band — must be ignored.
+    db_session.add_all(
+        [
+            DrawingSurveyPoint(
+                drawing_id=aux_id,
+                page=1,
+                northing=0.0,
+                easting=0.0,
+                station="10+00",
+                label_bbox_json={"x0": 0.20, "y0": 0.70, "x1": 0.24, "y1": 0.74},
+                source="manual",
+                meta_json={"pairing": "station"},
+            ),
+            DrawingSurveyPoint(
+                drawing_id=master_id,
+                page=1,
+                northing=0.0,
+                easting=0.0,
+                station="10+00",
+                label_bbox_json={"x0": 0.40, "y0": 0.72, "x1": 0.44, "y1": 0.76},
+                source="manual",
+                meta_json={"pairing": "station"},
+            ),
+            # Plan-band controls that should pair.
+            DrawingSurveyPoint(
+                drawing_id=aux_id,
+                page=1,
+                northing=0.0,
+                easting=0.0,
+                station="10+90.95",
+                label_bbox_json={"x0": 0.25, "y0": 0.20, "x1": 0.29, "y1": 0.24},
+                source="manual",
+                meta_json={"pairing": "station"},
+            ),
+            DrawingSurveyPoint(
+                drawing_id=master_id,
+                page=1,
+                northing=0.0,
+                easting=0.0,
+                station="10+90.95",
+                label_bbox_json={"x0": 0.55, "y0": 0.30, "x1": 0.59, "y1": 0.34},
+                source="manual",
+                meta_json={"pairing": "station"},
+            ),
+        ]
+    )
+    db_session.commit()
+
+    pairs = match_control_points(
+        db_session,
+        aux_drawing_id=aux_id,
+        master_drawing_id=master_id,
+    )
+
+    assert len(pairs) == 1
+    assert _normalize_station_for_test(pairs[0].station) == "10+90.95"
+    assert pairs[0].aux_xy[1] < 0.50
+    assert pairs[0].master_xy[1] < 0.50
+
+
+def _normalize_station_for_test(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return value.strip().upper().replace(" ", "")
