@@ -1,0 +1,3 @@
+# Regenerated locally by scripts/export_symbol_crops.py
+**/*.png
+**/manifest.csv

@@ -382,7 +382,7 @@ cd backend && ./venv/bin/python scripts/seed_drawing_viewports.py --drawing-id 1
 
 ---
 
-- [ ] **V-4** `viewport_scale` helpers + tests
+- [x] **V-4** `viewport_scale` helpers + tests
 
 **PROMPT — copy below:**
 
@@ -432,7 +432,7 @@ cd backend && ./venv/bin/python -m pytest tests/test_viewport_scale.py -q --tb=s
 
 ---
 
-- [ ] **V-5** OCR-assisted viewport proposals (optional automation)
+- [x] **V-5** OCR-assisted viewport proposals (optional automation)
 
 **PROMPT — copy below:**
 
@@ -461,7 +461,7 @@ Vision LLM may ONLY be used to choose among proposed bboxes / confirm kind — n
 
 # Phase L — Line extraction (OpenCV)
 
-- [ ] **L-1** OpenCV line / centerline extractor
+- [x] **L-1** OpenCV line / centerline extractor
 
 **PROMPT — copy below:**
 
@@ -500,7 +500,7 @@ cd backend && ./venv/bin/python -m pytest tests/test_line_extractor.py -q --tb=s
 
 # Phase S — Symbol detection
 
-- [ ] **S-1** Symbol crop export + labeling README
+- [x] **S-1** Symbol crop export + labeling README
 
 **PROMPT — copy below:**
 
@@ -528,7 +528,7 @@ ADD backend/data/symbol_crops/README.md with labeling instructions:
 
 ---
 
-- [ ] **S-2** Detector inference wrapper (weights optional)
+- [x] **S-2** Detector inference wrapper (weights optional)
 
 **PROMPT — copy below:**
 
@@ -564,7 +564,7 @@ Do not block indexing if weights absent — digitization graph can have symbols=
 
 ---
 
-- [ ] **S-3** Persist symbols table
+- [x] **S-3** Persist symbols table
 
 **PROMPT — copy below:**
 
@@ -582,7 +582,7 @@ Migration + upsert helper in services/sheet_digitization.py.
 
 # Phase A — Association (LLM semantics only)
 
-- [ ] **A-1** Associate labels ↔ symbols with known boxes
+- [x] **A-1** Associate labels ↔ symbols with known boxes
 
 **PROMPT — copy below:**
 

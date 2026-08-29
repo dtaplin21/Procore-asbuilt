@@ -353,6 +353,11 @@ class Drawing(Base):
         back_populates="drawing",
         cascade="all, delete-orphan",
     )
+    symbols = relationship(
+        "DrawingSymbol",
+        back_populates="drawing",
+        cascade="all, delete-orphan",
+    )
     overlays = relationship("DrawingOverlay", back_populates="master_drawing", cascade="all, delete-orphan")
     inspection_runs = relationship("InspectionRun", back_populates="master_drawing", cascade="all, delete-orphan")
     unresolved_evidence = relationship(

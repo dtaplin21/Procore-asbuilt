@@ -46,6 +46,10 @@ Master drawing auto-index::
     DRAWING_INDEX_MIN_CLUSTER_WORDS        # min words per OCR cluster for auto-regions (default 2)
     DRAWING_INDEX_OCR_MAX_PAGES            # max pages to OCR; 0 = all (default 0)
     DRAWING_INDEX_AUTO_REGION_MODE         # cluster | grid | hybrid (default cluster)
+
+Sheet digitization (optional symbol YOLO)::
+
+    SYMBOL_DETECTOR_WEIGHTS_PATH           # path to .pt/.onnx weights; unset → symbols=[]
 """
 
 from urllib.parse import urlparse
@@ -150,6 +154,13 @@ class Settings(BaseSettings):
         description="DRAWING_INDEX_AUTO_REGION_MODE",
     )
 
+    #: Optional YOLO weights for sheet symbol detection (S-2). Env: ``SYMBOL_DETECTOR_WEIGHTS_PATH``.
+    #: When unset/missing, ``detect_symbols`` returns [] and digitization continues without symbols.
+    symbol_detector_weights_path: Optional[str] = Field(
+        default=None,
+        description="SYMBOL_DETECTOR_WEIGHTS_PATH",
+    )
+
     # In some environments (CI, sandboxes), extra env vars may be present.
     # Ignore unknown keys instead of erroring at import time.
     model_config = SettingsConfigDict(
@@ -190,6 +201,13 @@ class Settings(BaseSettings):
     @field_validator("openai_api_key", mode="before")
     @classmethod
     def _empty_openai_key_to_none(cls, v: object) -> object:
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
+    @field_validator("symbol_detector_weights_path", mode="before")
+    @classmethod
+    def _empty_symbol_weights_to_none(cls, v: object) -> object:
         if isinstance(v, str) and not v.strip():
             return None
         return v

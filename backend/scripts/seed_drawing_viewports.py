@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seed manual drawing_viewports for multi-scale sheets (digitization V-3).
+"""Seed manual drawing_viewports for multi-scale sheets (digitization V-3 / V-5).
 
 Hard-coded (editable) viewports for UCSF aux C4.20 (drawing 1501): plan + profile
 with distinct bboxes and scales from the sheet (not the legacy sheet-global
@@ -9,6 +9,10 @@ Usage (from ``backend/``)::
 
     ./venv/bin/python scripts/seed_drawing_viewports.py --dry-run
     ./venv/bin/python scripts/seed_drawing_viewports.py --drawing-id 1501
+
+    # OCR proposals (V-5): print only unless --apply
+    ./venv/bin/python scripts/seed_drawing_viewports.py --from-ocr --drawing-id 1501
+    ./venv/bin/python scripts/seed_drawing_viewports.py --from-ocr --drawing-id 1501 --apply
 
 Refine bboxes with ``scripts/pick_fractional_point.py`` + the exported PNG under
 ``tests/fixtures/digitization/aux_c420_page1.png``.
@@ -27,6 +31,10 @@ if _BACKEND_ROOT not in sys.path:
 
 from sqlalchemy.orm import Session  # noqa: E402
 
+from ai.pipelines.viewport_detector import (  # noqa: E402
+    proposal_to_seed_dict,
+    propose_viewports_from_ocr,
+)
 from database import SessionLocal  # noqa: E402
 from models.drawing_viewport import DrawingViewport  # noqa: E402
 from models.models import Drawing  # noqa: E402
@@ -114,19 +122,24 @@ def _bbox_tuple(bbox: dict[str, Any]) -> tuple[float, float, float, float]:
     )
 
 
-def _validate_viewports(viewports: tuple[dict[str, Any], ...]) -> None:
+def _validate_viewports(
+    viewports: tuple[dict[str, Any], ...],
+    *,
+    require_plan_and_other: bool = True,
+) -> None:
     by_kind = {str(v["kind"]): v for v in viewports}
-    plan = by_kind.get("plan")
-    other = by_kind.get("section") or by_kind.get("profile")
-    if plan is None or other is None:
-        raise SystemExit(
-            "Seed must include kind=plan and kind=section|profile with distinct bboxes."
-        )
-    if _bbox_tuple(plan["bbox_json"]) == _bbox_tuple(other["bbox_json"]):
-        raise SystemExit(
-            "Refuse to seed: plan and section/profile bboxes are identical. "
-            "Edit _UCSF_C420_VIEWPORTS."
-        )
+    if require_plan_and_other:
+        plan = by_kind.get("plan")
+        other = by_kind.get("section") or by_kind.get("profile")
+        if plan is None or other is None:
+            raise SystemExit(
+                "Seed must include kind=plan and kind=section|profile with distinct bboxes."
+            )
+        if _bbox_tuple(plan["bbox_json"]) == _bbox_tuple(other["bbox_json"]):
+            raise SystemExit(
+                "Refuse to seed: plan and section/profile bboxes are identical. "
+                "Edit _UCSF_C420_VIEWPORTS."
+            )
     # Also reject any duplicate bboxes across the full seed list.
     seen: dict[tuple[float, float, float, float], str] = {}
     for vp in viewports:
@@ -141,12 +154,13 @@ def _validate_viewports(viewports: tuple[dict[str, Any], ...]) -> None:
 
 def _print_viewport(vp: dict[str, Any], *, action: str) -> None:
     bbox = vp["bbox_json"]
-    scale = vp["scale_json"]
+    scale = vp.get("scale_json") or {}
     print(
         f"  [{action}] viewport_id={vp['viewport_id']!r} kind={vp['kind']!r} "
         f"bbox=({bbox['x0']:.4f},{bbox['y0']:.4f},{bbox['x1']:.4f},{bbox['y1']:.4f}) "
         f"scale={scale.get('raw_text')!r} "
-        f"rfppi={scale.get('real_feet_per_paper_inch')}"
+        f"rfppi={scale.get('real_feet_per_paper_inch')} "
+        f"source={vp.get('source', SOURCE)!r}"
     )
 
 
@@ -156,9 +170,11 @@ def upsert_viewports(
     drawing_id: int,
     viewports: tuple[dict[str, Any], ...] = _UCSF_C420_VIEWPORTS,
     dry_run: bool = False,
+    require_plan_and_other: bool = True,
+    default_source: str = SOURCE,
 ) -> int:
     """Upsert viewports by (drawing_id, page, viewport_id). Returns row count."""
-    _validate_viewports(viewports)
+    _validate_viewports(viewports, require_plan_and_other=require_plan_and_other)
 
     drawing = session.get(Drawing, drawing_id)
     if drawing is None:
@@ -173,11 +189,14 @@ def upsert_viewports(
             .filter_by(drawing_id=drawing_id, page=PAGE, viewport_id=viewport_id)
             .one_or_none()
         )
+        scale_json = spec.get("scale_json")
+        if isinstance(scale_json, dict) and float(scale_json.get("real_feet_per_paper_inch") or 0) <= 0:
+            scale_json = None
         payload = {
             "kind": str(spec["kind"]),
             "bbox_json": dict(spec["bbox_json"]),
-            "scale_json": dict(spec["scale_json"]),
-            "source": SOURCE,
+            "scale_json": dict(scale_json) if isinstance(scale_json, dict) else None,
+            "source": str(spec.get("source") or default_source),
             "notes": str(spec.get("notes") or "") or None,
         }
         if existing is None:
@@ -207,6 +226,46 @@ def upsert_viewports(
     return written
 
 
+def _run_from_ocr(
+    session: Session,
+    *,
+    drawing_id: int,
+    apply: bool,
+) -> int:
+    drawing = session.get(Drawing, drawing_id)
+    if drawing is None:
+        raise SystemExit(f"Drawing {drawing_id} not found")
+
+    proposals = propose_viewports_from_ocr(session, drawing_id, page=PAGE)
+    print(
+        f"Drawing {drawing_id}: {drawing.name!r} — OCR proposals "
+        f"({len(proposals)}; write={'yes' if apply else 'no, pass --apply'})"
+    )
+    if not proposals:
+        print("  (no proposals)")
+        return 0
+
+    seed_rows = tuple(proposal_to_seed_dict(p) for p in proposals)
+    for row in seed_rows:
+        _print_viewport(row, action="OCR" if not apply else "OCR-APPLY")
+
+    plan_count = sum(1 for p in proposals if p.kind == "plan")
+    section_count = sum(1 for p in proposals if p.kind == "section")
+    print(f"  summary: plan={plan_count} section={section_count} total={len(proposals)}")
+
+    if not apply:
+        return len(proposals)
+
+    return upsert_viewports(
+        session,
+        drawing_id=drawing_id,
+        viewports=seed_rows,
+        dry_run=False,
+        require_plan_and_other=False,
+        default_source="ocr",
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -218,17 +277,37 @@ def main() -> int:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Print planned upserts without writing",
+        help="Print planned manual upserts without writing",
+    )
+    parser.add_argument(
+        "--from-ocr",
+        action="store_true",
+        help="Propose viewports from OCR (prints only unless --apply)",
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="With --from-ocr, write filtered proposals to drawing_viewports",
     )
     args = parser.parse_args()
 
+    if args.apply and not args.from_ocr:
+        raise SystemExit("--apply requires --from-ocr")
+
     db = SessionLocal()
     try:
-        upsert_viewports(
-            db,
-            drawing_id=cast(int, args.drawing_id),
-            dry_run=bool(args.dry_run),
-        )
+        if args.from_ocr:
+            _run_from_ocr(
+                db,
+                drawing_id=cast(int, args.drawing_id),
+                apply=bool(args.apply),
+            )
+        else:
+            upsert_viewports(
+                db,
+                drawing_id=cast(int, args.drawing_id),
+                dry_run=bool(args.dry_run),
+            )
     finally:
         db.close()
     return 0
