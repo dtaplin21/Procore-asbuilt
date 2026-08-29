@@ -20,6 +20,9 @@ STATION_ATTACH_MAX_NORM = 0.08
 STRUCTURE_ATTACH_MAX_NORM = 0.08
 SCALE_FALLBACK_REAL_FEET_PER_PAPER_INCH = 10.0
 MIN_OCR_CONFIDENCE = 0.40
+# Plan-view N/E and station labels on install sheets (exclude profile/title blocks).
+PLAN_VIEW_MAX_Y = 0.55
+_STATION_SAME_ROW_MAX_DY_NORM = 0.08
 
 _NORTHING_RE = re.compile(
     r"\bN\s*(?:=|:)?\s*(\d{6,8}(?:\.\d{1,2})?)\b",
@@ -317,7 +320,12 @@ def extract_survey_points_from_elements(
                 "y1": max(n_bbox["y1"], e_bbox["y1"]),
             }
 
-            station: str | None = None
+            station = _attach_nearest_plan_station(
+                page_elements,
+                nx=nx,
+                ny=ny,
+                ctx=ctx,
+            )
             structure_label: str | None = None
             for element in page_elements:
                 bbox = _valid_bbox(element.bbox_json)
@@ -325,11 +333,6 @@ def extract_survey_points_from_elements(
                     continue
                 cx, cy = _centroid(bbox)
                 text = str(element.text)
-                station_match = _STATION_RE.search(text)
-                if station_match and attach_passes_gates(
-                    nx, ny, cx, cy, ctx=ctx, attach_kind="station"
-                ):
-                    station = station_match.group(1)
                 structure_match = _STRUCTURE_RE.search(text)
                 if structure_match and attach_passes_gates(
                     nx, ny, cx, cy, ctx=ctx, attach_kind="structure"
@@ -363,6 +366,49 @@ def extract_survey_points_from_elements(
             )
 
     return results
+
+
+def _attach_nearest_plan_station(
+    page_elements: Sequence[_TextElementLike],
+    *,
+    nx: float,
+    ny: float,
+    ctx: PairingScaleContext,
+) -> str | None:
+    """Attach the closest plan-view station label to an N/E block.
+
+    Profile and title-block stations (high y) are ignored when plan-view
+    candidates exist so C4.20 N/E at cy≈0.21 pair with 10+00, not 11+14.
+    """
+    candidates: list[tuple[float, float, str]] = []
+    for element in page_elements:
+        bbox = _valid_bbox(element.bbox_json)
+        if bbox is None:
+            continue
+        cx, cy = _centroid(bbox)
+        station_match = _STATION_RE.search(str(element.text))
+        if station_match is None:
+            continue
+        if not attach_passes_gates(nx, ny, cx, cy, ctx=ctx, attach_kind="station"):
+            continue
+        _, _, dist = _distance_between(nx, ny, cx, cy, ctx=ctx)
+        candidates.append((dist, cy, station_match.group(1).strip().upper()))
+
+    if not candidates:
+        return None
+
+    plan_candidates = [
+        item for item in candidates if item[1] <= PLAN_VIEW_MAX_Y
+    ]
+    pool = plan_candidates if plan_candidates else candidates
+    same_row = [
+        item
+        for item in pool
+        if abs(item[1] - ny) <= _STATION_SAME_ROW_MAX_DY_NORM
+    ]
+    pool = same_row if same_row else pool
+    pool.sort(key=lambda item: (item[0], abs(item[1] - ny)))
+    return pool[0][2]
 
 
 def extract_stations_from_text(text: str) -> list[str]:

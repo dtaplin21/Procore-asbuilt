@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Seed manual registration control points for campus plans without N/E OCR.
 
+Seeds a 4-point station-matched control chain (10+00 → 10+71.41 → 10+90.95 →
+11+14.21) for UCSF master 661 ↔ aux C4.20 (1501), then recomputes registration.
+
 Usage (from ``backend/``)::
 
     ./venv/bin/python scripts/seed_master_registration_controls.py
@@ -34,6 +37,7 @@ from services.evidence_investigation_persistence import (  # noqa: E402
 )
 from models.models import EvidenceRecord  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
+from typing import cast
 
 # UCSF run 663 / evidence 665 / master 661 / aux C4.20 install sheet 1501.
 MASTER_ID = 661
@@ -43,17 +47,29 @@ RUN_ID = 663
 PROJECT_ID = 2
 SEED_SOURCE = "manual"
 
-# Golden campus polyline endpoints (ucsf-642-ss-run) + matching aux plan OCR centroids.
+# Green-highlight trench chain (C4.20 QC markup → campus master 661).
+# Master vertices mirror ucsf-642-ss-run eval polyline; aux centroids from
+# drawing 1501 plan-view OCR / N-E table (profile stations at cy≈0.95 ignored).
 _UCSF_MASTER_CONTROLS = (
     {
         "station": "10+00",
         "centroid": (0.451, 0.464),
-        "notes": "Campus trench start STA 10+00 (golden eval)",
+        "notes": "Master campus trench start (STA 10+00, ucsf-642-ss-run vertex 1)",
+    },
+    {
+        "station": "10+71.41",
+        "centroid": (0.556, 0.472),
+        "notes": "Master campus trench bend (STA 10+71.41, ucsf-642-ss-run vertex 2)",
     },
     {
         "station": "10+90.95",
+        "centroid": (0.653, 0.535),
+        "notes": "Master campus trench corner (STA 10+90.95, ucsf-642-ss-run vertex 3)",
+    },
+    {
+        "station": "11+14.21",
         "centroid": (0.674, 0.569),
-        "notes": "Campus trench end STA 10+90.95 (golden eval)",
+        "notes": "Master campus trench end (STA 11+14.21, ucsf-642-ss-run vertex 4)",
     },
 )
 
@@ -61,17 +77,31 @@ _UCSF_AUX_CONTROLS = (
     {
         "station": "10+00",
         "centroid": (0.25743055555555555, 0.2),
-        "notes": "C4.20 plan trench start (SSMH/STA chain)",
+        "notes": "C4.20 plan trench start (SSMH/STA chain, cy≈0.20)",
+    },
+    {
+        "station": "10+71.41",
+        "centroid": (0.2888, 0.2562),
+        "notes": "C4.20 plan trench bend (interpolated 78% along 10+00→10+90.95 plan run)",
     },
     {
         "station": "10+90.95",
         "centroid": (0.29743055555555553, 0.27156250000000004),
-        "notes": "C4.20 plan station label 10+90.95",
+        "notes": "C4.20 plan station label 10+90.95 (OCR cy≈0.27)",
+    },
+    {
+        "station": "11+14.21",
+        "centroid": (0.3503, 0.2709),
+        "notes": "C4.20 plan station label 11+14.23/ (OCR cy≈0.27)",
     },
 )
 
-# Legacy single-point control — removed so 2-point scale+translate fit is used.
+# Legacy single-point control from early registration experiments.
 _LEGACY_STATIONS_TO_REMOVE = ("11+14.23",)
+
+
+def _active_stations(controls: tuple[dict[str, object], ...]) -> set[str]:
+    return {str(control["station"]) for control in controls}
 
 
 def _bbox_for_centroid(x: float, y: float, *, half: float = 0.004) -> dict[str, float]:
@@ -98,6 +128,34 @@ def _remove_legacy_master_controls(session: Session, *, dry_run: bool) -> None:
             print(f"  remove legacy master {MASTER_ID} station={station} id={row.id}")
             if not dry_run:
                 session.delete(row)
+
+
+def _prune_stale_manual_controls(
+    session: Session,
+    *,
+    drawing_id: int,
+    active_stations: set[str],
+    dry_run: bool,
+) -> None:
+    """Drop manual seed rows whose station is no longer in the active control set."""
+    rows = (
+        session.query(DrawingSurveyPoint)
+        .filter(
+            DrawingSurveyPoint.drawing_id == drawing_id,
+            DrawingSurveyPoint.source == SEED_SOURCE,
+        )
+        .all()
+    )
+    for row in rows:
+        station = cast(str | None, row.station)
+        if station is None or station in active_stations:
+            continue
+        print(
+            f"  prune stale manual drawing {drawing_id} "
+            f"station={station} id={row.id}"
+        )
+        if not dry_run:
+            session.delete(row)
 
 
 def _upsert_manual_control(
@@ -161,6 +219,20 @@ def seed_registration_controls(*, dry_run: bool) -> int:
     inserted = 0
     try:
         _remove_legacy_master_controls(db, dry_run=dry_run)
+        master_stations = _active_stations(_UCSF_MASTER_CONTROLS)
+        aux_stations = _active_stations(_UCSF_AUX_CONTROLS)
+        _prune_stale_manual_controls(
+            db,
+            drawing_id=MASTER_ID,
+            active_stations=master_stations,
+            dry_run=dry_run,
+        )
+        _prune_stale_manual_controls(
+            db,
+            drawing_id=AUX_ID,
+            active_stations=aux_stations,
+            dry_run=dry_run,
+        )
 
         for control in _UCSF_MASTER_CONTROLS:
             inserted += _upsert_manual_control(

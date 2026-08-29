@@ -41,12 +41,40 @@ def test_compute_registration_from_control_points_fits_translate_and_scale() -> 
     transform = compute_registration_from_control_points(pairs)
 
     assert transform is not None
-    assert transform.rotation_degrees == pytest.approx(0.0)
+    assert transform.scale_x == pytest.approx(transform.scale_y)
     assert project_polyline_to_master([(0.2, 0.2)], transform)[0] == pytest.approx(
-        (0.5, 0.47)
+        (0.5, 0.47),
+        abs=0.02,
     )
     assert project_polyline_to_master([(0.3, 0.25)], transform)[0] == pytest.approx(
-        (0.55, 0.49)
+        (0.55, 0.49),
+        abs=0.02,
+    )
+
+
+def test_similarity_registration_uses_uniform_scale_for_ucsf_controls() -> None:
+    pairs = (
+        ControlPointPair(
+            aux_xy=(0.25743055555555555, 0.2),
+            master_xy=(0.451, 0.464),
+            station="10+00",
+        ),
+        ControlPointPair(
+            aux_xy=(0.29743055555555553, 0.27156250000000004),
+            master_xy=(0.674, 0.569),
+            station="10+90.95",
+        ),
+    )
+    transform = compute_registration_from_control_points(pairs)
+    assert transform is not None
+    assert transform.scale_x == pytest.approx(transform.scale_y)
+    assert project_polyline_to_master([pairs[0].aux_xy], transform)[0] == pytest.approx(
+        pairs[0].master_xy,
+        abs=0.02,
+    )
+    assert project_polyline_to_master([pairs[1].aux_xy], transform)[0] == pytest.approx(
+        pairs[1].master_xy,
+        abs=0.02,
     )
 
 

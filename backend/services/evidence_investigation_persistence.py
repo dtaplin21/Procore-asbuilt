@@ -32,6 +32,7 @@ from services.evidence_linking import replace_evidence_drawing_links
 from services.evidence_survey_extraction import (
     extract_survey_points_from_evidence,
     persist_evidence_survey_meta,
+    retag_evidence_survey_points_with_station_range,
 )
 from services.linked_drawing_registration import register_linked_pdfs_as_auxiliary_drawings
 from services.master_drawing_index_readiness import get_master_drawing_index_readiness
@@ -344,6 +345,11 @@ def persist_evidence_investigation(
                 linked_drawing_ids,
             )
             _apply_station_range_to_evidence(evidence, station_range)
+            retag_evidence_survey_points_with_station_range(
+                evidence,
+                station_from=station_range.station_from,
+                station_to=station_range.station_to,
+            )
             session.flush()
         except Exception:
             logger.exception(

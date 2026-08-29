@@ -73,6 +73,27 @@ def trace_scope_geometry(
     if scope_kind == ScopeKind.UTILITY_LINE:
         station_from, station_to = _station_range(dossier)
 
+        if trace_on_aux and station_from and station_to:
+            aux_polyline = build_aux_survey_polyline(
+                dossier.master_context.scoped_survey_points,
+                station_from=station_from,
+                station_to=station_to,
+                max_centroid_y=_PLAN_VIEW_MAX_Y,
+                min_points=2,
+            )
+            if aux_polyline is not None:
+                return ScopeGeometry(
+                    page=page,
+                    type="polyline",
+                    points=aux_polyline.points,
+                    scope_kind=ScopeKind.UTILITY_LINE,
+                    meta={
+                        "source": "aux_survey_chain",
+                        "source_drawing_id": aux_polyline.source_drawing_id,
+                        "stations": list(aux_polyline.stations),
+                    },
+                )
+
         if station_from and station_to:
             station_scope = _trace_station_range(
                 dossier,

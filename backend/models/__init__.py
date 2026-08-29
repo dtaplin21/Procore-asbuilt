@@ -13,6 +13,7 @@ from .drawing_match_candidate import DrawingMatchCandidate
 from .drawing_landmark import DrawingLandmark
 from .drawing_survey_point import DrawingSurveyPoint
 from .drawing_text_element import DrawingTextElement
+from .drawing_viewport import DrawingViewport
 from .drawing_overlay import DrawingOverlay, UnresolvedEvidence
 from .drawing_region import DrawingRegion
 from .inspection_run import InspectionRun
@@ -35,6 +36,7 @@ __all__ = [
     "DrawingLandmark",
     "DrawingSurveyPoint",
     "DrawingTextElement",
+    "DrawingViewport",
     "DrawingRegion",
     "DrawingOverlay",
     "UnresolvedEvidence",

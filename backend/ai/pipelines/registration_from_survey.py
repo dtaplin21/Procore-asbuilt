@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 from typing import Sequence, cast
@@ -78,6 +79,77 @@ def _linear_fit(
     return scale, translate
 
 
+def _has_real_survey_coordinates(row: DrawingSurveyPoint) -> bool:
+    """True when a row carries OCR N/E suitable for coordinate matching."""
+    if float(row.northing) == 0.0 and float(row.easting) == 0.0:
+        return False
+    meta = row.meta_json if isinstance(row.meta_json, dict) else {}
+    if meta.get("plain_text_fallback"):
+        return False
+    return is_placed_survey_label_bbox(
+        cast(dict[str, float], row.label_bbox_json),
+        source=cast(str | None, row.source),
+        meta_json=meta,
+    )
+
+
+def _master_has_real_survey_coordinates(master_rows: Sequence[DrawingSurveyPoint]) -> bool:
+    return any(_has_real_survey_coordinates(row) for row in master_rows)
+
+
+def _similarity_registration(
+    pairs: Sequence[tuple[tuple[float, float], tuple[float, float]]],
+) -> RegistrationTransform | None:
+    """Uniform scale + rotation (+ translation) from paired fractional centroids."""
+    if len(pairs) < 2:
+        return None
+
+    best_transform: RegistrationTransform | None = None
+    best_error = float("inf")
+
+    for rotation_deg in [step * 0.5 for step in range(-360, 361)]:
+        aux0, master0 = pairs[0]
+        rotated0 = rotate_point(aux0[0], aux0[1], rotation_deg)
+        scales: list[float] = []
+        for aux_xy, master_xy in pairs[1:]:
+            rotated = rotate_point(aux_xy[0], aux_xy[1], rotation_deg)
+            delta_rot = (rotated[0] - rotated0[0], rotated[1] - rotated0[1])
+            delta_master = (master_xy[0] - master0[0], master_xy[1] - master0[1])
+            rot_len = math.hypot(delta_rot[0], delta_rot[1])
+            master_len = math.hypot(delta_master[0], delta_master[1])
+            if rot_len > 1e-9:
+                scales.append(master_len / rot_len)
+        if not scales:
+            continue
+
+        scale = sum(scales) / len(scales)
+        translate_x = master0[0] - scale * rotated0[0]
+        translate_y = master0[1] - scale * rotated0[1]
+        candidate = RegistrationTransform(
+            scale_x=scale,
+            scale_y=scale,
+            translate_x=translate_x,
+            translate_y=translate_y,
+            rotation_degrees=rotation_deg,
+        )
+        error = 0.0
+        for aux_xy, master_xy in pairs:
+            projected = project_point_to_master(
+                aux_xy[0],
+                aux_xy[1],
+                candidate,
+            )
+            error += math.hypot(
+                projected[0] - master_xy[0],
+                projected[1] - master_xy[1],
+            )
+        if error < best_error:
+            best_error = error
+            best_transform = candidate
+
+    return best_transform
+
+
 def compute_registration_from_control_points(
     pairs: Sequence[ControlPointPair | tuple[tuple[float, float], tuple[float, float]]],
 ) -> RegistrationTransform | None:
@@ -101,6 +173,10 @@ def compute_registration_from_control_points(
 
     if len(normalized) < 2:
         return None
+
+    similarity = _similarity_registration(normalized)
+    if similarity is not None:
+        return similarity
 
     aux_x = [aux[0] for aux, _ in normalized]
     aux_y = [aux[1] for aux, _ in normalized]
@@ -229,6 +305,9 @@ def match_control_points(
     )
 
     pairs_by_ne, matched_aux_ids = _match_control_points_by_ne(aux_rows, master_rows)
+    if not _master_has_real_survey_coordinates(master_rows):
+        pairs_by_ne = []
+        matched_aux_ids = set()
     pairs_by_station = _match_control_points_by_station(
         aux_rows,
         master_rows,

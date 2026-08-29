@@ -203,3 +203,59 @@ def persist_evidence_survey_meta(
     if scale_json is not None:
         meta["scale_json"] = scale_json
     evidence.meta = meta  # type: ignore[assignment]
+
+
+def retag_evidence_survey_points_with_station_range(
+    evidence: EvidenceRecord,
+    *,
+    station_from: str | None,
+    station_to: str | None,
+) -> None:
+    """Re-tag plan-view evidence survey rows using the aux station span."""
+    if not station_from or not station_to:
+        return
+
+    meta = dict(cast(dict[str, Any] | None, evidence.meta) or {})
+    raw_points = meta.get("survey_points")
+    if not isinstance(raw_points, list) or len(raw_points) < 2:
+        return
+
+    from ai.pipelines.station_range_extractor import station_chainage
+
+    lo = station_chainage(station_from)
+    hi = station_chainage(station_to)
+
+    plan_points: list[dict[str, Any]] = []
+    for row in raw_points:
+        if not isinstance(row, dict):
+            continue
+        bbox = row.get("label_bbox_json")
+        if isinstance(bbox, dict):
+            cy = (float(bbox.get("y0", 0.0)) + float(bbox.get("y1", 0.0))) / 2.0
+            if cy > 0.55:
+                continue
+        plan_points.append(dict(row))
+
+    pool = plan_points if len(plan_points) >= 2 else [dict(row) for row in raw_points if isinstance(row, dict)]
+    if len(pool) < 2:
+        return
+
+    pool.sort(
+        key=lambda row: float(row.get("easting") or 0.0),
+        reverse=True,
+    )
+    pool[0]["station"] = station_from
+    pool[-1]["station"] = station_to
+    for row in pool[1:-1]:
+        station = row.get("station")
+        if not station:
+            continue
+        try:
+            chainage = station_chainage(str(station))
+        except ValueError:
+            continue
+        if chainage < lo or chainage > hi:
+            row["station"] = None
+
+    meta["survey_points"] = raw_points
+    evidence.meta = meta  # type: ignore[assignment]

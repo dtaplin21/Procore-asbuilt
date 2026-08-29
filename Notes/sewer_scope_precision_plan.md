@@ -16,6 +16,7 @@
 - `Notes/location_match_investigation_plan.md` — upload slim + dossier investigation
 - `Notes/universal_location_match_eval.md` — eval label schema
 - `backend/tests/fixtures/location_match_labels/README.md` — polyline annotation guide
+- `Notes/sheet_digitization_plan.md` — raster digitization; **per-viewport scale** (plan vs section on one sheet)
 
 ---
 
