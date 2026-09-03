@@ -38,6 +38,7 @@ from ai.pipelines.viewport_detector import (  # noqa: E402
 from database import SessionLocal  # noqa: E402
 from models.drawing_viewport import DrawingViewport  # noqa: E402
 from models.models import Drawing  # noqa: E402
+from services.viewport_seeding import upsert_drawing_viewports  # noqa: E402
 
 DEFAULT_DRAWING_ID = 1501  # aux C4.20 (see seed_master_registration_controls.AUX_ID)
 PAGE = 1
@@ -181,48 +182,23 @@ def upsert_viewports(
         raise SystemExit(f"Drawing {drawing_id} not found")
 
     print(f"Drawing {drawing_id}: {drawing.name!r} (page={PAGE})")
-    written = 0
     for spec in viewports:
-        viewport_id = str(spec["viewport_id"])
-        existing = (
-            session.query(DrawingViewport)
-            .filter_by(drawing_id=drawing_id, page=PAGE, viewport_id=viewport_id)
-            .one_or_none()
-        )
-        scale_json = spec.get("scale_json")
-        if isinstance(scale_json, dict) and float(scale_json.get("real_feet_per_paper_inch") or 0) <= 0:
-            scale_json = None
-        payload = {
-            "kind": str(spec["kind"]),
-            "bbox_json": dict(spec["bbox_json"]),
-            "scale_json": dict(scale_json) if isinstance(scale_json, dict) else None,
-            "source": str(spec.get("source") or default_source),
-            "notes": str(spec.get("notes") or "") or None,
-        }
-        if existing is None:
-            _print_viewport({**spec, **payload}, action="INSERT" if not dry_run else "DRY-INSERT")
-            if not dry_run:
-                session.add(
-                    DrawingViewport(
-                        drawing_id=drawing_id,
-                        page=PAGE,
-                        viewport_id=viewport_id,
-                        **payload,
-                    )
-                )
-        else:
-            _print_viewport({**spec, **payload}, action="UPDATE" if not dry_run else "DRY-UPDATE")
-            if not dry_run:
-                for key, value in payload.items():
-                    setattr(existing, key, value)
-        written += 1
+        _print_viewport({**spec, "source": spec.get("source") or default_source}, action="PLAN")
 
     if dry_run:
-        session.rollback()
-        print(f"Dry-run only — would upsert {written} viewport(s).")
-    else:
-        session.commit()
-        print(f"Upserted {written} viewport(s).")
+        print(f"Dry-run only — would upsert {len(viewports)} viewport(s).")
+        return len(viewports)
+
+    written = upsert_drawing_viewports(
+        session,
+        drawing_id=drawing_id,
+        viewports=viewports,
+        page=PAGE,
+        default_source=default_source,
+        require_plan_and_other=require_plan_and_other,
+    )
+    session.commit()
+    print(f"Upserted {written} viewport(s).")
     return written
 
 

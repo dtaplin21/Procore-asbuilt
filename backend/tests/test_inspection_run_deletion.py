@@ -159,12 +159,14 @@ class TestDeleteInspectionRun:
         db_session.expire_all()
         assert db_session.query(JobQueue).filter_by(id=job_id).first() is None
 
-    def test_delete_run_removes_linked_evidence_drawings(
+    def test_delete_run_removes_linked_evidence_drawings_and_viewports(
         self,
         client: TestClient,
         delete_run_setup,
     ) -> None:
+        from models.drawing_viewport import DrawingViewport
         from models.models import Drawing
+        from services.sheet_digitization import SHEET_ENTITY_GRAPH_KEY
 
         project, drawing, run, storage, db_session = delete_run_setup
         project_id = cast(int, project.id)
@@ -175,11 +177,59 @@ class TestDeleteInspectionRun:
             source="linked_evidence",
             name="C4.20.pdf",
             storage_key=f"drawings/{project_id}/c420.pdf",
+            index_stats_json={
+                SHEET_ENTITY_GRAPH_KEY: {
+                    "1": {
+                        "labels": [{"text": "10+00", "viewport_id": "plan"}],
+                        "lines": [],
+                        "symbols": [],
+                    }
+                }
+            },
         )
         db_session.add(aux)
-        db_session.commit()
-        db_session.refresh(aux)
+        db_session.flush()
         aux_id = cast(int, aux.id)
+        db_session.add_all(
+            [
+                DrawingViewport(
+                    drawing_id=aux_id,
+                    page=1,
+                    viewport_id="plan",
+                    kind="plan",
+                    bbox_json={"x0": 0.03, "y0": 0.03, "x1": 0.82, "y1": 0.45},
+                    scale_json={
+                        "raw_text": '1"=10\'',
+                        "real_feet_per_paper_inch": 10.0,
+                        "confidence": 0.9,
+                        "page": 1,
+                    },
+                    source="ocr",
+                ),
+                DrawingViewport(
+                    drawing_id=aux_id,
+                    page=1,
+                    viewport_id="profile",
+                    kind="profile",
+                    bbox_json={"x0": 0.03, "y0": 0.45, "x1": 0.82, "y1": 0.94},
+                    scale_json={
+                        "raw_text": '1"=10\' HORIZONTAL, 1"=1\' VERTICAL',
+                        "real_feet_per_paper_inch": 10.0,
+                        "confidence": 0.85,
+                        "page": 1,
+                    },
+                    source="layout_fallback",
+                ),
+            ]
+        )
+        db_session.commit()
+
+        assert (
+            db_session.query(DrawingViewport)
+            .filter(DrawingViewport.drawing_id == aux_id)
+            .count()
+            == 2
+        )
 
         evidence = storage.create_evidence_record(
             project_id=project_id,
@@ -193,6 +243,13 @@ class TestDeleteInspectionRun:
             "matchInvestigation": {
                 "linked_drawing_ids": [aux_id],
             },
+            "registration_transform": {
+                "scale_x": 2.0,
+                "scale_y": 2.0,
+                "translate_x": 0.1,
+                "translate_y": 0.2,
+                "rotation_degrees": 0.0,
+            },
         }
         setattr(run, "evidence_id", evidence_id)
         db_session.commit()
@@ -203,3 +260,10 @@ class TestDeleteInspectionRun:
         db_session.expire_all()
         assert db_session.query(Drawing).filter(Drawing.id == aux_id).first() is None
         assert storage.get_drawing(project_id, cast(int, drawing.id)) is not None
+        assert (
+            db_session.query(DrawingViewport)
+            .filter(DrawingViewport.drawing_id == aux_id)
+            .count()
+            == 0
+        )
+        assert db_session.query(EvidenceRecord).filter_by(id=evidence_id).first() is None

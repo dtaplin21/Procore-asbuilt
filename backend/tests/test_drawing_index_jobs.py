@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from models.drawing_region import DrawingRegion
 from models.drawing_text_element import DrawingTextElement
+from models.drawing_viewport import DrawingViewport
 from models.models import Drawing, JobQueue, Project
 from services.drawing_index_jobs import (
     AUTO_INDEX_REGION_SOURCE,
@@ -93,7 +94,11 @@ def test_enqueue_drawing_index_job(db_session: Session, seeded_ready_pdf_drawing
 def test_run_drawing_index_job_sets_ready_status(
     db_session: Session,
     seeded_ready_pdf_drawing: Drawing,
+    monkeypatch,
 ) -> None:
+    from config import settings
+
+    monkeypatch.setattr(settings, "sheet_digitization_enabled", False)
     drawing_id = cast(int, seeded_ready_pdf_drawing.id)
 
     result = run_drawing_index_job(drawing_id, db_session)
@@ -119,10 +124,13 @@ def test_run_drawing_index_job_sets_ready_status(
 def test_run_drawing_index_job_skips_digitization_when_disabled(
     db_session: Session,
     seeded_ready_pdf_drawing: Drawing,
+    monkeypatch,
 ) -> None:
-    """SHEET_DIGITIZATION_ENABLED defaults false — index must not call digitize."""
+    """SHEET_DIGITIZATION_ENABLED=false — index must not call digitize."""
+    from config import settings
     from services.drawing_index_jobs import maybe_digitize_drawing_after_index
 
+    monkeypatch.setattr(settings, "sheet_digitization_enabled", False)
     drawing_id = cast(int, seeded_ready_pdf_drawing.id)
     with patch("services.sheet_digitization.digitize_drawing_page") as mock_digitize:
         maybe_digitize_drawing_after_index(db_session, drawing_id)
@@ -141,16 +149,45 @@ def test_maybe_digitize_swallows_failures_when_enabled(
 ) -> None:
     from config import settings
     from services.drawing_index_jobs import maybe_digitize_drawing_after_index
+    from services.viewport_seeding import maybe_seed_viewports_after_index
 
     monkeypatch.setattr(settings, "sheet_digitization_enabled", True)
     drawing_id = cast(int, seeded_ready_pdf_drawing.id)
+    drawing = seeded_ready_pdf_drawing
+    drawing.source = "linked_evidence"  # type: ignore[assignment]
+    drawing.scale_json = {  # type: ignore[assignment]
+        "raw_text": '1"=10\'',
+        "real_feet_per_paper_inch": 10.0,
+        "confidence": 0.8,
+        "page": 1,
+    }
+    db_session.add(
+        DrawingTextElement(
+            master_drawing_id=drawing_id,
+            page=1,
+            text="SCALES: 1 IN = 10 FT",
+            text_normalized="scales: 1 in = 10 ft",
+            bbox_json={"x0": 0.1, "y0": 0.96, "x1": 0.4, "y1": 0.99},
+            ocr_confidence=0.9,
+            source="tesseract",
+        )
+    )
+    db_session.commit()
+
+    maybe_seed_viewports_after_index(db_session, drawing_id)
 
     def _boom(*args, **kwargs):
         raise RuntimeError("yolo weights missing simulation")
 
     with patch("services.sheet_digitization.digitize_drawing_page", side_effect=_boom):
-        # Must not raise — index path relies on this being non-blocking.
         maybe_digitize_drawing_after_index(db_session, drawing_id)
+
+    rows = (
+        db_session.query(DrawingViewport)
+        .filter(DrawingViewport.drawing_id == drawing_id)
+        .count()
+    )
+    assert rows == 2
 
 
 def test_clear_drawing_index_artifacts_keeps_manual_regions(

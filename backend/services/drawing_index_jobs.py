@@ -29,6 +29,7 @@ from services.inspection_matching_jobs import (
     flush_inspection_matches_for_linked_auxiliary_drawing,
 )
 from services.storage import open_storage_path
+from services.viewport_seeding import maybe_seed_viewports_after_index
 
 logger = logging.getLogger(__name__)
 
@@ -219,7 +220,9 @@ def index_linked_attachment_drawing_sync(
         result = index_master_drawing(drawing_id, session)
         _apply_index_result(drawing, result)
         session.flush()
+        maybe_seed_viewports_after_index(session, drawing_id)
         maybe_digitize_drawing_after_index(session, drawing_id)
+        session.commit()
         flush_inspection_matches_for_linked_auxiliary_drawing(session, drawing_id)
         return result
     except Exception as exc:
@@ -328,16 +331,15 @@ def maybe_digitize_drawing_after_index(session: Session, drawing_id: int) -> Non
                     "viewport_warning": bool(graph.meta.get("viewport_warning")),
                 },
             )
-        session.commit()
+        session.flush()
     except Exception:
         logger.exception(
             "sheet_digitization_failed",
             extra={"drawing_id": drawing_id},
         )
-        try:
-            session.rollback()
-        except Exception:  # noqa: BLE001
-            pass
+        # Do not session.rollback() — viewports are committed per-page before
+        # digitization runs; rolling back here would discard flushed graph rows
+        # in the caller's transaction while leaving committed viewports intact.
 
 
 def run_drawing_index_job(drawing_id: int, session: Session) -> IndexResult:
@@ -370,7 +372,9 @@ def run_drawing_index_job(drawing_id: int, session: Session) -> IndexResult:
         result = index_master_drawing(drawing_id, session)
         _apply_index_result(drawing, result)
         session.commit()
+        maybe_seed_viewports_after_index(session, drawing_id)
         maybe_digitize_drawing_after_index(session, drawing_id)
+        session.commit()
         flush_deferred_inspection_matches_for_drawing(session, drawing_id)
         flush_inspection_matches_for_linked_auxiliary_drawing(session, drawing_id)
         return result

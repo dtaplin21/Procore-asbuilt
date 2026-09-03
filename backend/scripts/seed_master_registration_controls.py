@@ -43,11 +43,11 @@ from models.models import EvidenceRecord  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from typing import cast
 
-# UCSF run 663 / evidence 665 / master 661 / aux C4.20 install sheet 1501.
+# UCSF run 690 / evidence 706 / master 661 / aux C4.20 linked_evidence 1638.
 MASTER_ID = 661
-AUX_ID = 1501
-EVIDENCE_ID = 665
-RUN_ID = 663
+AUX_ID = 1638
+EVIDENCE_ID = 706
+RUN_ID = 690
 PROJECT_ID = 2
 SEED_SOURCE = "manual"
 
