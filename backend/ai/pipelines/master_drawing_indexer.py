@@ -7,6 +7,7 @@ later phases.
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +23,7 @@ from ai.pipelines.document_text_extraction import (
     extract_document,
     extract_document_via_ocr,
 )
+from ai.pipelines.hybrid_text_merge import merge_native_and_ocr_words
 from ai.pipelines.drawing_scale_parser import page_size_inches_from_points, parse_scale_from_words
 from ai.pipelines.landmark_extractor import LandmarkRecord, extract_landmarks_from_page
 from ai.pipelines.master_drawing_region_builder import build_auto_regions_from_text_elements
@@ -43,6 +45,8 @@ _READABLE_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9+\-'.]{1,}$")
 _LINKED_DRAWING_SOURCE = "linked_evidence"
 _GARBLED_NATIVE_MIN_TOKENS = 20
 _GARBLED_NATIVE_MAX_READABLE_RATIO = 0.35
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -79,6 +83,15 @@ def word_bbox_json(word: PositionedWord) -> dict[str, float]:
 def element_source(source_format: SourceFormat) -> str:
     if source_format == SourceFormat.NATIVE_PDF:
         return "native_pdf"
+    if source_format == SourceFormat.HYBRID_PDF:
+        return "hybrid_pdf"
+    backend = settings.ocr_backend
+    if backend == "openai_vision":
+        return "openai_vision"
+    return "tesseract"
+
+
+def _ocr_token_source() -> str:
     backend = settings.ocr_backend
     if backend == "openai_vision":
         return "openai_vision"
@@ -115,6 +128,23 @@ def _native_text_looks_garbled(document: ExtractedDocument) -> bool:
     return (readable / len(tokens)) < _GARBLED_NATIVE_MAX_READABLE_RATIO
 
 
+def _merge_native_and_ocr_documents(
+    native: ExtractedDocument,
+    ocr: ExtractedDocument,
+) -> ExtractedDocument:
+    page_count = max(native.page_count, ocr.page_count)
+    merged_words = merge_native_and_ocr_words(
+        native.words,
+        ocr.words,
+        ocr_source=_ocr_token_source(),
+    )
+    return ExtractedDocument(
+        source_format=SourceFormat.HYBRID_PDF,
+        page_count=page_count,
+        words=merged_words,
+    )
+
+
 def extract_drawing_document(file_path: Path, *, force_ocr: bool = False) -> ExtractedDocument:
     max_pages = _index_max_pages()
     if force_ocr:
@@ -123,13 +153,21 @@ def extract_drawing_document(file_path: Path, *, force_ocr: bool = False) -> Ext
             max_pages,
         )
 
-    document = _limit_extracted_document(extract_document(file_path), max_pages)
-    if _native_text_looks_garbled(document):
-        return _limit_extracted_document(
-            extract_document_via_ocr(file_path, max_pages=max_pages),
-            max_pages,
+    native = _limit_extracted_document(extract_document(file_path), max_pages)
+    ocr = _limit_extracted_document(
+        extract_document_via_ocr(file_path, max_pages=max_pages),
+        max_pages,
+    )
+    if _native_text_looks_garbled(native):
+        logger.info(
+            "master_drawing_index_native_text_garbled_diagnostic",
+            extra={
+                "path": str(file_path),
+                "native_tokens": len(native.words),
+                "ocr_tokens": len(ocr.words),
+            },
         )
-    return document
+    return _merge_native_and_ocr_documents(native, ocr)
 
 
 def build_page_meta_json(
@@ -272,12 +310,13 @@ def persist_text_elements(
     words: list[PositionedWord],
     source_format: SourceFormat,
 ) -> int:
-    source = element_source(source_format)
+    default_source = element_source(source_format)
     rows: list[DrawingTextElement] = []
     for word in words:
         text = word.text.strip()
         if not text:
             continue
+        source = word.token_source or default_source
         rows.append(
             DrawingTextElement(
                 master_drawing_id=drawing_id,
@@ -310,8 +349,8 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
     if not source_path.exists():
         raise FileNotFoundError(f"Drawing source file not found: {source_path}")
 
-    force_ocr = cast(str | None, drawing.source) == _LINKED_DRAWING_SOURCE
-    extracted = extract_drawing_document(source_path, force_ocr=force_ocr)
+    is_linked_evidence = cast(str | None, drawing.source) == _LINKED_DRAWING_SOURCE
+    extracted = extract_drawing_document(source_path, force_ocr=is_linked_evidence)
     page_meta_json = build_page_meta_json(
         session,
         drawing_id,

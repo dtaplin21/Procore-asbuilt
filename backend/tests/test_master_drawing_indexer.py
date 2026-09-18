@@ -77,21 +77,33 @@ def test_extract_drawing_document_respects_max_pages(tmp_path: Path) -> None:
             _word("C", page_index=2),
         ],
     )
+    fake_ocr = ExtractedDocument(
+        source_format=SourceFormat.SCANNED_PDF,
+        page_count=3,
+        words=[_word("OCR", page_index=0)],
+    )
     pdf_path = tmp_path / "master.pdf"
     pdf_path.write_bytes(b"%PDF")
 
-    with patch(
-        "ai.pipelines.master_drawing_indexer.extract_document",
-        return_value=fake_doc,
-    ):
-        with patch(
+    with (
+        patch(
+            "ai.pipelines.master_drawing_indexer.extract_document",
+            return_value=fake_doc,
+        ),
+        patch(
+            "ai.pipelines.master_drawing_indexer.extract_document_via_ocr",
+            return_value=fake_ocr,
+        ),
+        patch(
             "ai.pipelines.master_drawing_indexer._index_max_pages",
             return_value=2,
-        ):
-            extracted = extract_drawing_document(pdf_path)
+        ),
+    ):
+        extracted = extract_drawing_document(pdf_path)
 
     assert extracted.page_count == 2
-    assert [word.text for word in extracted.words] == ["A", "B"]
+    assert extracted.source_format == SourceFormat.HYBRID_PDF
+    assert {word.text for word in extracted.words} == {"A", "B", "OCR"}
 
 
 def test_native_text_looks_garbled_detects_cad_font_encoding() -> None:
@@ -141,20 +153,18 @@ def test_extract_drawing_document_force_ocr_for_linked_evidence(tmp_path: Path) 
     assert any("2131764" in word.text for word in extracted.words)
 
 
-def test_extract_drawing_document_falls_back_to_ocr_when_native_is_garbled(
-    tmp_path: Path,
-) -> None:
+def test_extract_drawing_document_always_hybrid_for_masters(tmp_path: Path) -> None:
     pdf_path = tmp_path / "cad.pdf"
     pdf_path.write_bytes(b"%PDF")
     native_doc = ExtractedDocument(
         source_format=SourceFormat.NATIVE_PDF,
         page_count=1,
-        words=[_word("5($'<"), _word("0$<")] * 12,
+        words=[_word("UCSF"), _word("5($'<"), _word("0$<")] * 4,
     )
     ocr_doc = ExtractedDocument(
         source_format=SourceFormat.SCANNED_PDF,
         page_count=1,
-        words=[_word("11+14.23"), _word("2131764.84")],
+        words=[_word("11+14.23"), _word("2131764.84"), _word("SSMH")],
     )
 
     with (
@@ -170,7 +180,9 @@ def test_extract_drawing_document_falls_back_to_ocr_when_native_is_garbled(
         extracted = extract_drawing_document(pdf_path)
 
     ocr_mock.assert_called_once()
+    assert extracted.source_format == SourceFormat.HYBRID_PDF
     assert any("11+14" in word.text for word in extracted.words)
+    assert any(word.text == "UCSF" for word in extracted.words)
 
 
 def test_persist_text_elements(db_session: Session, seeded_ready_pdf_drawing: Drawing) -> None:
@@ -193,10 +205,11 @@ def test_persist_text_elements(db_session: Session, seeded_ready_pdf_drawing: Dr
     )
 
     assert count == 2
-    assert [row.text for row in rows] == ["COLO", "SS"]
-    assert rows[0].text_normalized == "colo"
-    assert rows[0].source == "native_pdf"
-    assert rows[0].bbox_json["x0"] == pytest.approx(0.1)
+    assert [cast(str, row.text) for row in rows] == ["COLO", "SS"]
+    assert cast(str, rows[0].text_normalized) == "colo"
+    assert cast(str, rows[0].source) == "native_pdf"
+    bbox = cast(dict[str, float], rows[0].bbox_json)
+    assert bbox["x0"] == pytest.approx(0.1)
 
 
 def test_master_drawing_indexer_persists_elements(

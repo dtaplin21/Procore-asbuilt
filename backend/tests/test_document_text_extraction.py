@@ -244,6 +244,29 @@ def test_pdf_has_text_layer_scanned_pdf(tmp_path: Path) -> None:
     assert _pdf_has_text_layer(scanned_path) is False
 
 
+def test_pdf_text_layer_maps_rotated_page_to_display_coordinates(tmp_path: Path) -> None:
+    import fitz
+
+    from ai.pipelines.document_text_extraction import _pdf_text_layer
+
+    pdf_path = tmp_path / "rotated.pdf"
+    doc = fitz.open()
+    page = doc.new_page(width=400, height=300)
+    page.set_rotation(270)
+    page.insert_text((72, 72), "Plan Label")
+    doc.save(str(pdf_path))
+    doc.close()
+
+    extracted = _pdf_text_layer(pdf_path)
+    assert extracted.words
+    for word in extracted.words:
+        x0, y0, x1, y1 = word.bbox.to_fractional()
+        assert -0.05 <= x0 <= 1.05
+        assert -0.05 <= y0 <= 1.05
+        assert -0.05 <= x1 <= 1.05
+        assert -0.05 <= y1 <= 1.05
+
+
 def test_pdf_text_layer_extracts_words_with_boxes(tmp_path: Path) -> None:
     import fitz
 

@@ -1,0 +1,4498 @@
+[
+  {
+    "id": 437,
+    "page": 1,
+    "centroid_x": 0.5443535254745887,
+    "centroid_y": 0.8644309997558595,
+    "bbox_json": {
+      "x0": 0.5441075885106647,
+      "y0": 0.8641777321144387,
+      "x1": 0.5445994624385128,
+      "y1": 0.8646842673972801
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "1",
+    "text_normalized": "1"
+  },
+  {
+    "id": 438,
+    "page": 1,
+    "centroid_x": 0.5441814604259673,
+    "centroid_y": 0.8651386402271413,
+    "bbox_json": {
+      "x0": 0.5438757598715485,
+      "y0": 0.8646395082826968,
+      "x1": 0.5444871609803861,
+      "y1": 0.8656377721715857
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "CU",
+    "text_normalized": "cu"
+  },
+  {
+    "id": 439,
+    "page": 1,
+    "centroid_x": 0.5439533455661996,
+    "centroid_y": 0.866076914469401,
+    "bbox_json": {
+      "x0": 0.5436513184239624,
+      "y0": 0.8655930130570023,
+      "x1": 0.5442553727084367,
+      "y1": 0.8665608158817998
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "YD",
+    "text_normalized": "yd"
+  },
+  {
+    "id": 440,
+    "page": 1,
+    "centroid_x": 0.5314269091086412,
+    "centroid_y": 0.8632921289514612,
+    "bbox_json": {
+      "x0": 0.5311809721447173,
+      "y0": 0.8630388613100405,
+      "x1": 0.5316728460725653,
+      "y1": 0.863545396592882
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "1",
+    "text_normalized": "1"
+  },
+  {
+    "id": 441,
+    "page": 1,
+    "centroid_x": 0.5312548844271867,
+    "centroid_y": 0.863999769422743,
+    "bbox_json": {
+      "x0": 0.5309491838727679,
+      "y0": 0.8635006374782986,
+      "x1": 0.5315605849816055,
+      "y1": 0.8644989013671875
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "CU",
+    "text_normalized": "cu"
+  },
+  {
+    "id": 442,
+    "page": 1,
+    "centroid_x": 0.5310267493838355,
+    "centroid_y": 0.8649380154079862,
+    "bbox_json": {
+      "x0": 0.5307247424251819,
+      "y0": 0.8644541422526042,
+      "x1": 0.5313287563424892,
+      "y1": 0.8654218885633681
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "YD",
+    "text_normalized": "yd"
+  },
+  {
+    "id": 443,
+    "page": 1,
+    "centroid_x": 0.031013792784756453,
+    "centroid_y": 0.5103720205801505,
+    "bbox_json": {
+      "x0": 0.029925608761096126,
+      "y0": 0.5090032506872106,
+      "x1": 0.03210197680841678,
+      "y1": 0.5117407904730903
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "UP",
+    "text_normalized": "up"
+  },
+  {
+    "id": 444,
+    "page": 1,
+    "centroid_x": 0.05219206229719535,
+    "centroid_y": 0.6004600524902344,
+    "bbox_json": {
+      "x0": 0.05058116509170128,
+      "y0": 0.5988476788556134,
+      "x1": 0.05380295950268942,
+      "y1": 0.6020724261248553
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "FEC",
+    "text_normalized": "fec"
+  },
+  {
+    "id": 445,
+    "page": 1,
+    "centroid_x": 0.05403730099794095,
+    "centroid_y": 0.5292656509964555,
+    "bbox_json": {
+      "x0": 0.05242640379244688,
+      "y0": 0.5276532773618345,
+      "x1": 0.05564819820343502,
+      "y1": 0.5308780246310764
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "FEC",
+    "text_normalized": "fec"
+  },
+  {
+    "id": 446,
+    "page": 1,
+    "centroid_x": 0.6039827134874132,
+    "centroid_y": 1.0490371138961225,
+    "bbox_json": {
+      "x0": 0.5998247338350488,
+      "y0": 1.0373888934100115,
+      "x1": 0.6081406931397776,
+      "y1": 1.0606853343822338
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "BPS",
+    "text_normalized": "bps"
+  },
+  {
+    "id": 447,
+    "page": 1,
+    "centroid_x": 0.6039827134874132,
+    "centroid_y": 1.0996813738787616,
+    "bbox_json": {
+      "x0": 0.5998247338350488,
+      "y0": 1.0637821903935185,
+      "x1": 0.6081406931397776,
+      "y1": 1.1355805573640045
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "PERMITTING",
+    "text_normalized": "permitting"
+  },
+  {
+    "id": 448,
+    "page": 1,
+    "centroid_x": 0.6039827134874132,
+    "centroid_y": 1.1425601535373264,
+    "bbox_json": {
+      "x0": 0.5998247338350488,
+      "y0": 1.1386774133752893,
+      "x1": 0.6081406931397776,
+      "y1": 1.1464428936993634
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "&",
+    "text_normalized": "&"
+  },
+  {
+    "id": 449,
+    "page": 1,
+    "centroid_x": 0.6039827134874132,
+    "centroid_y": 1.1712120338722511,
+    "bbox_json": {
+      "x0": 0.5998247338350488,
+      "y0": 1.149539749710648,
+      "x1": 0.6081406931397776,
+      "y1": 1.1928843180338542
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "UTILITY",
+    "text_normalized": "utility"
+  },
+  {
+    "id": 450,
+    "page": 1,
+    "centroid_x": 0.6039827134874132,
+    "centroid_y": 1.2160351223415797,
+    "bbox_json": {
+      "x0": 0.5998247338350488,
+      "y0": 1.195981174045139,
+      "x1": 0.6081406931397776,
+      "y1": 1.2360890706380208
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "NOTES",
+    "text_normalized": "notes"
+  },
+  {
+    "id": 451,
+    "page": 1,
+    "centroid_x": 0.17993839203365264,
+    "centroid_y": 1.278590845178675,
+    "bbox_json": {
+      "x0": 0.17837924049014137,
+      "y0": 1.270333297164352,
+      "x1": 0.18149754357716394,
+      "y1": 1.2868483931929977
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "KEYPLAN",
+    "text_normalized": "keyplan"
+  },
+  {
+    "id": 452,
+    "page": 1,
+    "centroid_x": 0.11679355681888641,
+    "centroid_y": 1.2762841683846933,
+    "bbox_json": {
+      "x0": 0.11523440527537512,
+      "y0": 1.2679305465133102,
+      "x1": 0.1183527083623977,
+      "y1": 1.2846377902560764
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "PROJECT",
+    "text_normalized": "project"
+  },
+  {
+    "id": 453,
+    "page": 1,
+    "centroid_x": 0.11679355681888641,
+    "centroid_y": 1.291995973940249,
+    "bbox_json": {
+      "x0": 0.11523440527537512,
+      "y0": 1.2856331154152199,
+      "x1": 0.1183527083623977,
+      "y1": 1.2983588324652777
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "NORTH",
+    "text_normalized": "north"
+  },
+  {
+    "id": 454,
+    "page": 1,
+    "centroid_x": 0.5072399724728216,
+    "centroid_y": 1.2771427860966436,
+    "bbox_json": {
+      "x0": 0.5056808310211021,
+      "y0": 1.2707777235243056,
+      "x1": 0.5087991139245411,
+      "y1": 1.2835078486689815
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "OSHPD",
+    "text_normalized": "oshpd"
+  },
+  {
+    "id": 455,
+    "page": 1,
+    "centroid_x": 0.5072399724728216,
+    "centroid_y": 1.293356775354456,
+    "bbox_json": {
+      "x0": 0.5056808310211021,
+      "y0": 1.284503286856192,
+      "x1": 0.5087991139245411,
+      "y1": 1.30221026385272
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "FACILITY#",
+    "text_normalized": "facility#"
+  },
+  {
+    "id": 456,
+    "page": 1,
+    "centroid_x": 0.5028451586526538,
+    "centroid_y": 1.2771427860966436,
+    "bbox_json": {
+      "x0": 0.5012860172009342,
+      "y0": 1.2707777235243056,
+      "x1": 0.5044043001043733,
+      "y1": 1.2835078486689815
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "OSHPD",
+    "text_normalized": "oshpd"
+  },
+  {
+    "id": 457,
+    "page": 1,
+    "centroid_x": 0.5028451586526538,
+    "centroid_y": 1.2854986685293692,
+    "bbox_json": {
+      "x0": 0.5012860172009342,
+      "y0": 1.284503286856192,
+      "x1": 0.5044043001043733,
+      "y1": 1.2864940502025464
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "#",
+    "text_normalized": "#"
+  },
+  {
+    "id": 458,
+    "page": 1,
+    "centroid_x": 0.23846945182356255,
+    "centroid_y": 1.2837599577727141,
+    "bbox_json": {
+      "x0": 0.23639059319067254,
+      "y0": 1.2772639521846065,
+      "x1": 0.24054831045645256,
+      "y1": 1.2902559633608217
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "UCSF",
+    "text_normalized": "ucsf"
+  },
+  {
+    "id": 459,
+    "page": 1,
+    "centroid_x": 0.23846945182356255,
+    "centroid_y": 1.302721263744213,
+    "bbox_json": {
+      "x0": 0.23639059319067254,
+      "y0": 1.2915831389250578,
+      "x1": 0.24054831045645256,
+      "y1": 1.313859388563368
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "PROJECT",
+    "text_normalized": "project"
+  },
+  {
+    "id": 460,
+    "page": 1,
+    "centroid_x": 0.23846945182356255,
+    "centroid_y": 1.326190807201244,
+    "bbox_json": {
+      "x0": 0.23639059319067254,
+      "y0": 1.3151865641276042,
+      "x1": 0.24054831045645256,
+      "y1": 1.3371950502748842
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "NUMBER:",
+    "text_normalized": "number:"
+  },
+  {
+    "id": 461,
+    "page": 1,
+    "centroid_x": 0.23240793823565126,
+    "centroid_y": 1.281384164315683,
+    "bbox_json": {
+      "x0": 0.23032907960276125,
+      "y0": 1.2774027506510417,
+      "x1": 0.23448679686854126,
+      "y1": 1.2853655779803241
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "747",
+    "text_normalized": "747"
+  },
+  {
+    "id": 462,
+    "page": 1,
+    "centroid_x": 0.23240793823565126,
+    "centroid_y": 1.292793047869647,
+    "bbox_json": {
+      "x0": 0.23032907960276125,
+      "y0": 1.2866928665726274,
+      "x1": 0.23448679686854126,
+      "y1": 1.2988932291666666
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "52ND",
+    "text_normalized": "52nd"
+  },
+  {
+    "id": 463,
+    "page": 1,
+    "centroid_x": 0.23240793823565126,
+    "centroid_y": 1.3102991739908854,
+    "bbox_json": {
+      "x0": 0.23032907960276125,
+      "y0": 1.3002204047309027,
+      "x1": 0.23448679686854126,
+      "y1": 1.320377943250868
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "STREET,",
+    "text_normalized": "street,"
+  },
+  {
+    "id": 464,
+    "page": 1,
+    "centroid_x": 0.22763611526085586,
+    "centroid_y": 1.289458324291088,
+    "bbox_json": {
+      "x0": 0.22555725662796586,
+      "y0": 1.2773888481987847,
+      "x1": 0.22971497389374587,
+      "y1": 1.3015278003833912
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "OAKLAND,",
+    "text_normalized": "oakland,"
+  },
+  {
+    "id": 465,
+    "page": 1,
+    "centroid_x": 0.22763611526085586,
+    "centroid_y": 1.3061699196144385,
+    "bbox_json": {
+      "x0": 0.22555725662796586,
+      "y0": 1.3028549759476273,
+      "x1": 0.22971497389374587,
+      "y1": 1.30948486328125
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "CA",
+    "text_normalized": "ca"
+  },
+  {
+    "id": 466,
+    "page": 1,
+    "centroid_x": 0.22763611526085586,
+    "centroid_y": 1.3174477471245658,
+    "bbox_json": {
+      "x0": 0.22555725662796586,
+      "y0": 1.310812038845486,
+      "x1": 0.22971497389374587,
+      "y1": 1.3240834554036458
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "94609",
+    "text_normalized": "94609"
+  },
+  {
+    "id": 467,
+    "page": 1,
+    "centroid_x": 0.35357928402209404,
+    "centroid_y": 1.3449579309534143,
+    "bbox_json": {
+      "x0": 0.3520201425703745,
+      "y0": 1.3412777370876736,
+      "x1": 0.35513842547381363,
+      "y1": 1.348638124819155
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "REV",
+    "text_normalized": "rev"
+  },
+  {
+    "id": 468,
+    "page": 1,
+    "centroid_x": 0.25426172327112273,
+    "centroid_y": 1.2934933697735822,
+    "bbox_json": {
+      "x0": 0.25114342018410013,
+      "y0": 1.2770000316478587,
+      "x1": 0.2573800263581453,
+      "y1": 1.3099867078993055
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "UTILITY",
+    "text_normalized": "utility"
+  },
+  {
+    "id": 469,
+    "page": 1,
+    "centroid_x": 0.25426172327112273,
+    "centroid_y": 1.3419997038664642,
+    "bbox_json": {
+      "x0": 0.25114342018410013,
+      "y0": 1.3124138726128471,
+      "x1": 0.2573800263581453,
+      "y1": 1.371585535120081
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "MAKE-READY",
+    "text_normalized": "make-ready"
+  },
+  {
+    "id": 470,
+    "page": 1,
+    "centroid_x": 0.23840993043606873,
+    "centroid_y": 1.3508273089373553,
+    "bbox_json": {
+      "x0": 0.23633107180317875,
+      "y0": 1.3395000316478587,
+      "x1": 0.24048878906895874,
+      "y1": 1.3621545862268518
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "9951303",
+    "text_normalized": "9951303"
+  },
+  {
+    "id": 471,
+    "page": 1,
+    "centroid_x": 0.5072399724728216,
+    "centroid_y": 1.3109490288628471,
+    "bbox_json": {
+      "x0": 0.5056808310211021,
+      "y0": 1.3059721770109953,
+      "x1": 0.5087991139245411,
+      "y1": 1.3159258807146992
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "11242",
+    "text_normalized": "11242"
+  },
+  {
+    "id": 472,
+    "page": 1,
+    "centroid_x": 0.5028451586526538,
+    "centroid_y": 1.3012838858145255,
+    "bbox_json": {
+      "x0": 0.5012860172009342,
+      "y0": 1.2889444986979166,
+      "x1": 0.5044043001043733,
+      "y1": 1.3136232729311343
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "S250254-01-00",
+    "text_normalized": "s250254-01-00"
+  },
+  {
+    "id": 473,
+    "page": 1,
+    "centroid_x": 0.627666574306589,
+    "centroid_y": 1.2754883377640336,
+    "bbox_json": {
+      "x0": 0.6261074328548694,
+      "y0": 1.2703195077401621,
+      "x1": 0.6292257157583085,
+      "y1": 1.280657167787905
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "DCFM",
+    "text_normalized": "dcfm"
+  },
+  {
+    "id": 474,
+    "page": 1,
+    "centroid_x": 0.627666574306589,
+    "centroid_y": 1.2918004353841144,
+    "bbox_json": {
+      "x0": 0.6261074328548694,
+      "y0": 1.2816526059751157,
+      "x1": 0.6292257157583085,
+      "y1": 1.3019482647931133
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "APPROVAL:",
+    "text_normalized": "approval:"
+  },
+  {
+    "id": 475,
+    "page": 1,
+    "centroid_x": 0.5670019079137731,
+    "centroid_y": 1.2797826696325232,
+    "bbox_json": {
+      "x0": 0.5654427664620536,
+      "y0": 1.270333297164352,
+      "x1": 0.5685610493654927,
+      "y1": 1.2892320421006944
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "BO/OSHPD",
+    "text_normalized": "bo/oshpd"
+  },
+  {
+    "id": 476,
+    "page": 1,
+    "centroid_x": 0.5670019079137731,
+    "centroid_y": 1.300375309696904,
+    "bbox_json": {
+      "x0": 0.5654427664620536,
+      "y0": 1.290227480287905,
+      "x1": 0.5685610493654927,
+      "y1": 1.3105231391059027
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "APPROVAL:",
+    "text_normalized": "approval:"
+  },
+  {
+    "id": 477,
+    "page": 1,
+    "centroid_x": 0.47562291382481814,
+    "centroid_y": 1.2849199648256655,
+    "bbox_json": {
+      "x0": 0.47406377237309855,
+      "y0": 1.2741805465133103,
+      "x1": 0.4771820552765377,
+      "y1": 1.2956593831380208
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "ARCHTIECT,",
+    "text_normalized": "archtiect,"
+  },
+  {
+    "id": 478,
+    "page": 1,
+    "centroid_x": 0.47562291382481814,
+    "centroid_y": 1.3074966995804398,
+    "bbox_json": {
+      "x0": 0.47406377237309855,
+      "y0": 1.2966547082971644,
+      "x1": 0.4771820552765377,
+      "y1": 1.3183386908637154
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "LANDSCAPE",
+    "text_normalized": "landscape"
+  },
+  {
+    "id": 479,
+    "page": 1,
+    "centroid_x": 0.47562291382481814,
+    "centroid_y": 1.329575828269676,
+    "bbox_json": {
+      "x0": 0.47406377237309855,
+      "y0": 1.319334129050926,
+      "x1": 0.4771820552765377,
+      "y1": 1.3398175274884259
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "ARCHITECT",
+    "text_normalized": "architect"
+  },
+  {
+    "id": 480,
+    "page": 1,
+    "centroid_x": 0.47196221730065724,
+    "centroid_y": 1.2770277800383392,
+    "bbox_json": {
+      "x0": 0.47040307584893765,
+      "y0": 1.274041635018808,
+      "x1": 0.47352135875237683,
+      "y1": 1.2800139250578704
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "301",
+    "text_normalized": "301"
+  },
+  {
+    "id": 481,
+    "page": 1,
+    "centroid_x": 0.47196221730065724,
+    "centroid_y": 1.2892645941840277,
+    "bbox_json": {
+      "x0": 0.47040307584893765,
+      "y0": 1.2810092502170138,
+      "x1": 0.47352135875237683,
+      "y1": 1.2975199381510416
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "BATTERY",
+    "text_normalized": "battery"
+  },
+  {
+    "id": 482,
+    "page": 1,
+    "centroid_x": 0.47196221730065724,
+    "centroid_y": 1.3055766918041087,
+    "bbox_json": {
+      "x0": 0.47040307584893765,
+      "y0": 1.298515263310185,
+      "x1": 0.47352135875237683,
+      "y1": 1.3126381202980324
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "STREET",
+    "text_normalized": "street"
+  },
+  {
+    "id": 483,
+    "page": 1,
+    "centroid_x": 0.4683014804093295,
+    "centroid_y": 1.2775200737847223,
+    "bbox_json": {
+      "x0": 0.46674233895760997,
+      "y0": 1.2741389521846065,
+      "x1": 0.4698606218610491,
+      "y1": 1.280901195384838
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "4TH",
+    "text_normalized": "4th"
+  },
+  {
+    "id": 484,
+    "page": 1,
+    "centroid_x": 0.4683014804093295,
+    "centroid_y": 1.288560711895978,
+    "bbox_json": {
+      "x0": 0.46674233895760997,
+      "y0": 1.2818966335720485,
+      "x1": 0.4698606218610491,
+      "y1": 1.2952247902199074
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "FLOOR,",
+    "text_normalized": "floor,"
+  },
+  {
+    "id": 485,
+    "page": 1,
+    "centroid_x": 0.4683014804093295,
+    "centroid_y": 1.2999003092447916,
+    "bbox_json": {
+      "x0": 0.46674233895760997,
+      "y0": 1.296220115379051,
+      "x1": 0.4698606218610491,
+      "y1": 1.3035805031105323
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "SAN",
+    "text_normalized": "san"
+  },
+  {
+    "id": 486,
+    "page": 1,
+    "centroid_x": 0.4683014804093295,
+    "centroid_y": 1.3156143753616898,
+    "bbox_json": {
+      "x0": 0.46674233895760997,
+      "y0": 1.3045759412977431,
+      "x1": 0.4698606218610491,
+      "y1": 1.3266528094256367
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "FRANCISCO,",
+    "text_normalized": "francisco,"
+  },
+  {
+    "id": 487,
+    "page": 1,
+    "centroid_x": 0.4683014804093295,
+    "centroid_y": 1.3301344129774306,
+    "bbox_json": {
+      "x0": 0.46674233895760997,
+      "y0": 1.3276482476128473,
+      "x1": 0.4698606218610491,
+      "y1": 1.332620578342014
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "CA",
+    "text_normalized": "ca"
+  },
+  {
+    "id": 488,
+    "page": 1,
+    "centroid_x": 0.4683014804093295,
+    "centroid_y": 1.3385928118670427,
+    "bbox_json": {
+      "x0": 0.46674233895760997,
+      "y0": 1.3336160165292246,
+      "x1": 0.4698606218610491,
+      "y1": 1.343569607204861
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "94111",
+    "text_normalized": "94111"
+  },
+  {
+    "id": 489,
+    "page": 1,
+    "centroid_x": 0.46465071420820936,
+    "centroid_y": 1.2850879245334201,
+    "bbox_json": {
+      "x0": 0.46309157275648977,
+      "y0": 1.2741389521846065,
+      "x1": 0.4662098556599289,
+      "y1": 1.2960368968822338
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "415.227.0100",
+    "text_normalized": "415.227.0100"
+  },
+  {
+    "id": 490,
+    "page": 1,
+    "centroid_x": 0.4609899773168816,
+    "centroid_y": 1.2868017126012732,
+    "bbox_json": {
+      "x0": 0.45943083586516203,
+      "y0": 1.2740694399233217,
+      "x1": 0.46254911876860116,
+      "y1": 1.2995339852792245
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "smithgroup.com",
+    "text_normalized": "smithgroup.com"
+  },
+  {
+    "id": 491,
+    "page": 1,
+    "centroid_x": 0.41632729989510997,
+    "centroid_y": 1.2751602172851562,
+    "bbox_json": {
+      "x0": 0.4147681584433904,
+      "y0": 1.2693888346354167,
+      "x1": 0.4178864413468295,
+      "y1": 1.2809315999348958
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "SEALS",
+    "text_normalized": "seals"
+  },
+  {
+    "id": 492,
+    "page": 1,
+    "centroid_x": 0.41632729989510997,
+    "centroid_y": 1.2857053403501157,
+    "bbox_json": {
+      "x0": 0.4147681584433904,
+      "y0": 1.2819269250940393,
+      "x1": 0.4178864413468295,
+      "y1": 1.2894837556061922
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "AND",
+    "text_normalized": "and"
+  },
+  {
+    "id": 493,
+    "page": 1,
+    "centroid_x": 0.41632729989510997,
+    "centroid_y": 1.3009216873734086,
+    "bbox_json": {
+      "x0": 0.4147681584433904,
+      "y0": 1.2904791937934028,
+      "x1": 0.4178864413468295,
+      "y1": 1.3113641809534144
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "SIGNATURE",
+    "text_normalized": "signature"
+  },
+  {
+    "id": 494,
+    "page": 1,
+    "centroid_x": 0.44586100906291337,
+    "centroid_y": 1.2784908718532986,
+    "bbox_json": {
+      "x0": 0.4443018676111938,
+      "y0": 1.2740139431423612,
+      "x1": 0.44742015051463296,
+      "y1": 1.2829678005642362
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "CIVIL",
+    "text_normalized": "civil"
+  },
+  {
+    "id": 495,
+    "page": 1,
+    "centroid_x": 0.44586100906291337,
+    "centroid_y": 1.2933120727539062,
+    "bbox_json": {
+      "x0": 0.4443018676111938,
+      "y0": 1.2839631257233797,
+      "x1": 0.44742015051463296,
+      "y1": 1.3026610197844328
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "ENGINEER",
+    "text_normalized": "engineer"
+  },
+  {
+    "id": 496,
+    "page": 1,
+    "centroid_x": 0.44220031253875247,
+    "centroid_y": 1.2770416824905961,
+    "bbox_json": {
+      "x0": 0.4406411710870329,
+      "y0": 1.274055537471065,
+      "x1": 0.44375945399047206,
+      "y1": 1.2800278275101273
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "636",
+    "text_normalized": "636"
+  },
+  {
+    "id": 497,
+    "page": 1,
+    "centroid_x": 0.44220031253875247,
+    "centroid_y": 1.284404217755353,
+    "bbox_json": {
+      "x0": 0.4406411710870329,
+      "y0": 1.2810230396412037,
+      "x1": 0.44375945399047206,
+      "y1": 1.2877853958695022
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "9TH",
+    "text_normalized": "9th"
+  },
+  {
+    "id": 498,
+    "page": 1,
+    "centroid_x": 0.44220031253875247,
+    "centroid_y": 1.295842206036603,
+    "bbox_json": {
+      "x0": 0.4406411710870329,
+      "y0": 1.288780834056713,
+      "x1": 0.44375945399047206,
+      "y1": 1.302903578016493
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "STREET",
+    "text_normalized": "street"
+  },
+  {
+    "id": 499,
+    "page": 1,
+    "centroid_x": 0.43853957564742474,
+    "centroid_y": 1.2830521195023148,
+    "bbox_json": {
+      "x0": 0.4369804341957052,
+      "y0": 1.2740000406901042,
+      "x1": 0.44009871709914433,
+      "y1": 1.2921041983145254
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "OAKLAND,",
+    "text_normalized": "oakland,"
+  },
+  {
+    "id": 500,
+    "page": 1,
+    "centroid_x": 0.43853957564742474,
+    "centroid_y": 1.2955857453522859,
+    "bbox_json": {
+      "x0": 0.4369804341957052,
+      "y0": 1.293099523473669,
+      "x1": 0.44009871709914433,
+      "y1": 1.2980719672309027
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "CA",
+    "text_normalized": "ca"
+  },
+  {
+    "id": 501,
+    "page": 1,
+    "centroid_x": 0.43853957564742474,
+    "centroid_y": 1.3040442007559316,
+    "bbox_json": {
+      "x0": 0.4369804341957052,
+      "y0": 1.2990674054181135,
+      "x1": 0.44009871709914433,
+      "y1": 1.30902099609375
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "94607",
+    "text_normalized": "94607"
+  },
+  {
+    "id": 502,
+    "page": 1,
+    "centroid_x": 0.4348888094463046,
+    "centroid_y": 1.2849906073676216,
+    "bbox_json": {
+      "x0": 0.433329667994585,
+      "y0": 1.274041635018808,
+      "x1": 0.43644795089802413,
+      "y1": 1.2959395797164353
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "510.873.8866",
+    "text_normalized": "510.873.8866"
+  },
+  {
+    "id": 503,
+    "page": 1,
+    "centroid_x": 0.43122807255497686,
+    "centroid_y": 1.2867142288773148,
+    "bbox_json": {
+      "x0": 0.42966893110325727,
+      "y0": 1.2741805465133103,
+      "x1": 0.43278721400669645,
+      "y1": 1.2992479112413196
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "www.sandis.net",
+    "text_normalized": "www.sandis.net"
+  },
+  {
+    "id": 504,
+    "page": 1,
+    "centroid_x": 0.043400703914581784,
+    "centroid_y": 1.2789369371202257,
+    "bbox_json": {
+      "x0": 0.04184155741696635,
+      "y0": 1.2705833152488426,
+      "x1": 0.044959850412197216,
+      "y1": 1.2872905589916088
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "PROJECT",
+    "text_normalized": "project"
+  },
+  {
+    "id": 505,
+    "page": 1,
+    "centroid_x": 0.043400703914581784,
+    "centroid_y": 1.2960413614908854,
+    "bbox_json": {
+      "x0": 0.04184155741696635,
+      "y0": 1.2882858841507523,
+      "x1": 0.044959850412197216,
+      "y1": 1.3037968388310186
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "NUMBER",
+    "text_normalized": "number"
+  },
+  {
+    "id": 506,
+    "page": 1,
+    "centroid_x": 0.04378691804472101,
+    "centroid_y": 1.374854815447772,
+    "bbox_json": {
+      "x0": 0.04170805562740911,
+      "y0": 1.366763870804398,
+      "x1": 0.04586578046203291,
+      "y1": 1.382945760091146
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "12018",
+    "text_normalized": "12018"
+  },
+  {
+    "id": 507,
+    "page": 1,
+    "centroid_x": 0.2760792787743624,
+    "centroid_y": 1.2742347999855324,
+    "bbox_json": {
+      "x0": 0.2745201272308511,
+      "y0": 1.2706528275101274,
+      "x1": 0.27763843031787366,
+      "y1": 1.2778167724609375
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "BPS",
+    "text_normalized": "bps"
+  },
+  {
+    "id": 508,
+    "page": 1,
+    "centroid_x": 0.2760792787743624,
+    "centroid_y": 1.2888574105721933,
+    "bbox_json": {
+      "x0": 0.2745201272308511,
+      "y0": 1.278812097620081,
+      "x1": 0.27763843031787366,
+      "y1": 1.2989027235243056
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "SUBMITTAL",
+    "text_normalized": "submittal"
+  },
+  {
+    "id": 509,
+    "page": 1,
+    "centroid_x": 0.2760792787743624,
+    "centroid_y": 1.3641992639612268,
+    "bbox_json": {
+      "x0": 0.2745201272308511,
+      "y0": 1.3542499683521412,
+      "x1": 0.27763843031787366,
+      "y1": 1.3741485595703125
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "05MAR2025",
+    "text_normalized": "05mar2025"
+  },
+  {
+    "id": 510,
+    "page": 1,
+    "centroid_x": 0.28041459139061986,
+    "centroid_y": 1.2742347999855324,
+    "bbox_json": {
+      "x0": 0.27885543984710853,
+      "y0": 1.2706528275101274,
+      "x1": 0.28197374293413113,
+      "y1": 1.2778167724609375
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "BPS",
+    "text_normalized": "bps"
+  },
+  {
+    "id": 511,
+    "page": 1,
+    "centroid_x": 0.28041459139061986,
+    "centroid_y": 1.2913436324508103,
+    "bbox_json": {
+      "x0": 0.27885543984710853,
+      "y0": 1.278812097620081,
+      "x1": 0.28197374293413113,
+      "y1": 1.3038751672815394
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "RESUBMITTAL",
+    "text_normalized": "resubmittal"
+  },
+  {
+    "id": 512,
+    "page": 1,
+    "centroid_x": 0.28041459139061986,
+    "centroid_y": 1.3058658741138598,
+    "bbox_json": {
+      "x0": 0.27885543984710853,
+      "y0": 1.3048704924406829,
+      "x1": 0.28197374293413113,
+      "y1": 1.306861255787037
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "1",
+    "text_normalized": "1"
+  },
+  {
+    "id": 513,
+    "page": 1,
+    "centroid_x": 0.28041459139061986,
+    "centroid_y": 1.342374504937066,
+    "bbox_json": {
+      "x0": 0.27885543984710853,
+      "y0": 1.3411805329499422,
+      "x1": 0.28197374293413113,
+      "y1": 1.3435684769241898
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "A",
+    "text_normalized": "a"
+  },
+  {
+    "id": 514,
+    "page": 1,
+    "centroid_x": 0.28041459139061986,
+    "centroid_y": 1.3641426934136285,
+    "bbox_json": {
+      "x0": 0.27885543984710853,
+      "y0": 1.354291675708912,
+      "x1": 0.28197374293413113,
+      "y1": 1.373993711118345
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "29MAY2025",
+    "text_normalized": "29may2025"
+  },
+  {
+    "id": 515,
+    "page": 1,
+    "centroid_x": 0.023995250621169965,
+    "centroid_y": 1.2760547214084201,
+    "bbox_json": {
+      "x0": 0.021916386942384104,
+      "y0": 1.2702221905743634,
+      "x1": 0.026074114299955823,
+      "y1": 1.281887252242477
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Utility",
+    "text_normalized": "utility"
+  },
+  {
+    "id": 516,
+    "page": 1,
+    "centroid_x": 0.023995250621169965,
+    "centroid_y": 1.2869250827365453,
+    "bbox_json": {
+      "x0": 0.021916386942384104,
+      "y0": 1.283214314778646,
+      "x1": 0.026074114299955823,
+      "y1": 1.2906358506944444
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "MR",
+    "text_normalized": "mr"
+  },
+  {
+    "id": 517,
+    "page": 1,
+    "centroid_x": 0.023995250621169965,
+    "centroid_y": 1.296739027235243,
+    "bbox_json": {
+      "x0": 0.021916386942384104,
+      "y0": 1.2919630262586805,
+      "x1": 0.026074114299955823,
+      "y1": 1.3015150282118055
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "BPS",
+    "text_normalized": "bps"
+  },
+  {
+    "id": 518,
+    "page": 1,
+    "centroid_x": 0.2847499040068773,
+    "centroid_y": 1.2742347999855324,
+    "bbox_json": {
+      "x0": 0.283190752463366,
+      "y0": 1.2706528275101274,
+      "x1": 0.28630905555038855,
+      "y1": 1.2778167724609375
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "BPS",
+    "text_normalized": "bps"
+  },
+  {
+    "id": 519,
+    "page": 1,
+    "centroid_x": 0.2847499040068773,
+    "centroid_y": 1.2851772167064526,
+    "bbox_json": {
+      "x0": 0.283190752463366,
+      "y0": 1.278812097620081,
+      "x1": 0.28630905555038855,
+      "y1": 1.2915423357928242
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "ACD-01",
+    "text_normalized": "acd-01"
+  },
+  {
+    "id": 520,
+    "page": 1,
+    "centroid_x": 0.28478753629815645,
+    "centroid_y": 1.347303941514757,
+    "bbox_json": {
+      "x0": 0.283160234885241,
+      "y0": 1.3411805329499422,
+      "x1": 0.28641483771107185,
+      "y1": 1.3534273500795717
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "ACD-01",
+    "text_normalized": "acd-01"
+  },
+  {
+    "id": 521,
+    "page": 1,
+    "centroid_x": 0.2847499040068773,
+    "centroid_y": 1.3637453997576678,
+    "bbox_json": {
+      "x0": 0.283190752463366,
+      "y0": 1.354291675708912,
+      "x1": 0.28630905555038855,
+      "y1": 1.3731991238064236
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "27FEB2026",
+    "text_normalized": "27feb2026"
+  },
+  {
+    "id": 522,
+    "page": 1,
+    "centroid_x": 0.28907530648367746,
+    "centroid_y": 1.2742347999855324,
+    "bbox_json": {
+      "x0": 0.2875161549401662,
+      "y0": 1.2706528275101274,
+      "x1": 0.29063445802718874,
+      "y1": 1.2778167724609375
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "BPS",
+    "text_normalized": "bps"
+  },
+  {
+    "id": 523,
+    "page": 1,
+    "centroid_x": 0.28907530648367746,
+    "centroid_y": 1.2851772167064526,
+    "bbox_json": {
+      "x0": 0.2875161549401662,
+      "y0": 1.278812097620081,
+      "x1": 0.29063445802718874,
+      "y1": 1.2915423357928242
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "ACD-01",
+    "text_normalized": "acd-01"
+  },
+  {
+    "id": 524,
+    "page": 1,
+    "centroid_x": 0.28907530648367746,
+    "centroid_y": 1.2974118268048322,
+    "bbox_json": {
+      "x0": 0.2875161549401662,
+      "y0": 1.2925376609519676,
+      "x1": 0.29063445802718874,
+      "y1": 1.3022859926576968
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "BKCK",
+    "text_normalized": "bkck"
+  },
+  {
+    "id": 525,
+    "page": 1,
+    "centroid_x": 0.28907530648367746,
+    "centroid_y": 1.3042766994900172,
+    "bbox_json": {
+      "x0": 0.2875161549401662,
+      "y0": 1.3032813178168403,
+      "x1": 0.29063445802718874,
+      "y1": 1.3052720811631944
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "1",
+    "text_normalized": "1"
+  },
+  {
+    "id": 526,
+    "page": 1,
+    "centroid_x": 0.293448251391214,
+    "centroid_y": 1.347303941514757,
+    "bbox_json": {
+      "x0": 0.2918209499782986,
+      "y0": 1.3411805329499422,
+      "x1": 0.29507555280412945,
+      "y1": 1.3534273500795717
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "ACD-01",
+    "text_normalized": "acd-01"
+  },
+  {
+    "id": 527,
+    "page": 1,
+    "centroid_x": 0.28907530648367746,
+    "centroid_y": 1.3639631483289931,
+    "bbox_json": {
+      "x0": 0.2875161549401662,
+      "y0": 1.3540138527199075,
+      "x1": 0.29063445802718874,
+      "y1": 1.3739124439380788
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "17MAR2026",
+    "text_normalized": "17mar2026"
+  },
+  {
+    "id": 528,
+    "page": 1,
+    "centroid_x": 0.2891129387749566,
+    "centroid_y": 1.3456474586769387,
+    "bbox_json": {
+      "x0": 0.2874856373620412,
+      "y0": 1.3409583197699653,
+      "x1": 0.29074024018787203,
+      "y1": 1.3503365975839121
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "BKCK",
+    "text_normalized": "bkck"
+  },
+  {
+    "id": 529,
+    "page": 1,
+    "centroid_x": 0.2891129387749566,
+    "centroid_y": 1.3522517451533564,
+    "bbox_json": {
+      "x0": 0.2874856373620412,
+      "y0": 1.3512941713686342,
+      "x1": 0.29074024018787203,
+      "y1": 1.3532093189380787
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "1",
+    "text_normalized": "1"
+  },
+  {
+    "id": 530,
+    "page": 1,
+    "centroid_x": 0.019105068590275193,
+    "centroid_y": 1.276662247269242,
+    "bbox_json": {
+      "x0": 0.017545922092659764,
+      "y0": 1.270694421838831,
+      "x1": 0.020664215087890625,
+      "y1": 1.2826300726996527
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "SHEET",
+    "text_normalized": "sheet"
+  },
+  {
+    "id": 531,
+    "page": 1,
+    "centroid_x": 0.019105068590275193,
+    "centroid_y": 1.2913808751989295,
+    "bbox_json": {
+      "x0": 0.017545922092659764,
+      "y0": 1.2836253978587964,
+      "x1": 0.020664215087890625,
+      "y1": 1.2991363525390625
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "NUMBER",
+    "text_normalized": "number"
+  },
+  {
+    "id": 532,
+    "page": 1,
+    "centroid_x": 0.0938868144201854,
+    "centroid_y": 1.2763983267324943,
+    "bbox_json": {
+      "x0": 0.09232766287667411,
+      "y0": 1.2704305013020833,
+      "x1": 0.09544596596369667,
+      "y1": 1.282366152162905
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "SHEET",
+    "text_normalized": "sheet"
+  },
+  {
+    "id": 533,
+    "page": 1,
+    "centroid_x": 0.0938868144201854,
+    "centroid_y": 1.2882356996889466,
+    "bbox_json": {
+      "x0": 0.09232766287667411,
+      "y0": 1.2833614773220485,
+      "x1": 0.09544596596369667,
+      "y1": 1.2931099220558449
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "TITLE",
+    "text_normalized": "title"
+  },
+  {
+    "id": 534,
+    "page": 1,
+    "centroid_x": 0.3536784661510003,
+    "centroid_y": 1.2771779943395543,
+    "bbox_json": {
+      "x0": 0.35211932469928076,
+      "y0": 1.270513916015625,
+      "x1": 0.3552376076027199,
+      "y1": 1.2838420726634838
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "ISSUED",
+    "text_normalized": "issued"
+  },
+  {
+    "id": 535,
+    "page": 1,
+    "centroid_x": 0.3536784661510003,
+    "centroid_y": 1.288615926106771,
+    "bbox_json": {
+      "x0": 0.35211932469928076,
+      "y0": 1.2848375108506944,
+      "x1": 0.3552376076027199,
+      "y1": 1.2923943413628471
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "FOR",
+    "text_normalized": "for"
+  },
+  {
+    "id": 536,
+    "page": 1,
+    "centroid_x": 0.3536784661510003,
+    "centroid_y": 1.358579338921441,
+    "bbox_json": {
+      "x0": 0.35211932469928076,
+      "y0": 1.3538055419921875,
+      "x1": 0.3552376076027199,
+      "y1": 1.3633531358506945
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "DATE",
+    "text_normalized": "date"
+  },
+  {
+    "id": 537,
+    "page": 1,
+    "centroid_x": 0.020100132498160873,
+    "centroid_y": 0.040545558929443365,
+    "bbox_json": {
+      "x0": 0.017162697655814036,
+      "y0": 0.03763514977914316,
+      "x1": 0.02303756734050771,
+      "y1": 0.043455968079743564
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Plot",
+    "text_normalized": "plot"
+  },
+  {
+    "id": 538,
+    "page": 1,
+    "centroid_x": 0.028060107004074825,
+    "centroid_y": 0.040545558929443365,
+    "bbox_json": {
+      "x0": 0.023985532225755158,
+      "y0": 0.03763514977914316,
+      "x1": 0.03213468178239449,
+      "y1": 0.043455968079743564
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Date:",
+    "text_normalized": "date:"
+  },
+  {
+    "id": 539,
+    "page": 1,
+    "centroid_x": 0.054195262767650465,
+    "centroid_y": 0.04072617778071651,
+    "bbox_json": {
+      "x0": 0.04755952118565797,
+      "y0": 0.0378157686304163,
+      "x1": 0.06083100434964296,
+      "y1": 0.04363658693101671
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "2/8/2024",
+    "text_normalized": "2/8/2024"
+  },
+  {
+    "id": 540,
+    "page": 1,
+    "centroid_x": 0.06841471333983083,
+    "centroid_y": 0.04072617778071651,
+    "bbox_json": {
+      "x0": 0.061778971757838336,
+      "y0": 0.0378157686304163,
+      "x1": 0.07505045492182333,
+      "y1": 0.04363658693101671
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "10:48:13",
+    "text_normalized": "10:48:13"
+  },
+  {
+    "id": 541,
+    "page": 1,
+    "centroid_x": 0.07855541996224216,
+    "centroid_y": 0.04072617778071651,
+    "bbox_json": {
+      "x0": 0.07599841728412285,
+      "y0": 0.0378157686304163,
+      "x1": 0.08111242264036149,
+      "y1": 0.04363658693101671
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "AM",
+    "text_normalized": "am"
+  },
+  {
+    "id": 542,
+    "page": 1,
+    "centroid_x": 0.1057863992358011,
+    "centroid_y": 0.040545558929443365,
+    "bbox_json": {
+      "x0": 0.1001984126984127,
+      "y0": 0.03763514977914316,
+      "x1": 0.11137438577318949,
+      "y1": 0.043455968079743564
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "START",
+    "text_normalized": "start"
+  },
+  {
+    "id": 543,
+    "page": 1,
+    "centroid_x": 0.11677735444729921,
+    "centroid_y": 0.040545558929443365,
+    "bbox_json": {
+      "x0": 0.11232234813548901,
+      "y0": 0.03763514977914316,
+      "x1": 0.12123236075910941,
+      "y1": 0.043455968079743564
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Sheet",
+    "text_normalized": "sheet"
+  },
+  {
+    "id": 544,
+    "page": 1,
+    "centroid_x": 0.6925341893756201,
+    "centroid_y": 1.0602685433846932,
+    "bbox_json": {
+      "x0": 0.6883764519262566,
+      "y0": 1.036333324291088,
+      "x1": 0.6966919268249835,
+      "y1": 1.0842037624782985
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "LEGEND",
+    "text_normalized": "legend"
+  },
+  {
+    "id": 545,
+    "page": 1,
+    "centroid_x": 0.08650309951217086,
+    "centroid_y": 1.298600995099103,
+    "bbox_json": {
+      "x0": 0.08286508428987371,
+      "y0": 1.2793333830656828,
+      "x1": 0.09014111473446801,
+      "y1": 1.3178686071325232
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "OVERALL",
+    "text_normalized": "overall"
+  },
+  {
+    "id": 546,
+    "page": 1,
+    "centroid_x": 0.08650309951217086,
+    "centroid_y": 1.3357407746491607,
+    "bbox_json": {
+      "x0": 0.08286508428987371,
+      "y0": 1.32019122088397,
+      "x1": 0.09014111473446801,
+      "y1": 1.3512903284143518
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "UTILITY",
+    "text_normalized": "utility"
+  },
+  {
+    "id": 547,
+    "page": 1,
+    "centroid_x": 0.08650309951217086,
+    "centroid_y": 1.3645226372612846,
+    "bbox_json": {
+      "x0": 0.08286508428987371,
+      "y0": 1.3536129421657985,
+      "x1": 0.09014111473446801,
+      "y1": 1.3754323323567708
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "PLAN",
+    "text_normalized": "plan"
+  },
+  {
+    "id": 548,
+    "page": 1,
+    "centroid_x": 0.027639827400288253,
+    "centroid_y": 1.3531265258789062,
+    "bbox_json": {
+      "x0": 0.020883513506127414,
+      "y0": 1.3203611020688657,
+      "x1": 0.034396141294449095,
+      "y1": 1.3858919496889468
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "U2.C4.00",
+    "text_normalized": "u2.c4.00"
+  },
+  {
+    "id": 549,
+    "page": 1,
+    "centroid_x": 0.01903486314904753,
+    "centroid_y": 0.9629967583550347,
+    "bbox_json": {
+      "x0": 0.017334183687886234,
+      "y0": 0.9617777506510417,
+      "x1": 0.020735542610208824,
+      "y1": 0.9642157660590278
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "0'",
+    "text_normalized": "0'"
+  },
+  {
+    "id": 550,
+    "page": 1,
+    "centroid_x": 0.014485543367093203,
+    "centroid_y": 0.9625337388780382,
+    "bbox_json": {
+      "x0": 0.01235969482906281,
+      "y0": 0.9616944489655671,
+      "x1": 0.016611391905123594,
+      "y1": 0.9633730287905092
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "1",
+    "text_normalized": "1"
+  },
+  {
+    "id": 551,
+    "page": 1,
+    "centroid_x": 0.014485543367093203,
+    "centroid_y": 0.9682123254846644,
+    "bbox_json": {
+      "x0": 0.01235969482906281,
+      "y0": 0.9641587999131944,
+      "x1": 0.016611391905123594,
+      "y1": 0.9722658510561343
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "INCH",
+    "text_normalized": "inch"
+  },
+  {
+    "id": 552,
+    "page": 1,
+    "centroid_x": 0.014485543367093203,
+    "centroid_y": 0.9740992228190104,
+    "bbox_json": {
+      "x0": 0.01235969482906281,
+      "y0": 0.9730516221788195,
+      "x1": 0.016611391905123594,
+      "y1": 0.9751468234592013
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "=",
+    "text_normalized": "="
+  },
+  {
+    "id": 553,
+    "page": 1,
+    "centroid_x": 0.01903486314904753,
+    "centroid_y": 1.0296614470305268,
+    "bbox_json": {
+      "x0": 0.017334183687886234,
+      "y0": 1.02751385724103,
+      "x1": 0.020735542610208824,
+      "y1": 1.0318090368200232
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "40'",
+    "text_normalized": "40'"
+  },
+  {
+    "id": 554,
+    "page": 1,
+    "centroid_x": 0.01903486314904753,
+    "centroid_y": 0.9963245533130787,
+    "bbox_json": {
+      "x0": 0.017334183687886234,
+      "y0": 0.9942222312644676,
+      "x1": 0.020735542610208824,
+      "y1": 0.9984268753616898
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "20'",
+    "text_normalized": "20'"
+  },
+  {
+    "id": 555,
+    "page": 1,
+    "centroid_x": 0.01903486314904753,
+    "centroid_y": 0.9796543262622974,
+    "bbox_json": {
+      "x0": 0.017334183687886234,
+      "y0": 0.9777638753255208,
+      "x1": 0.020735542610208824,
+      "y1": 0.9815447771990741
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "10'",
+    "text_normalized": "10'"
+  },
+  {
+    "id": 556,
+    "page": 1,
+    "centroid_x": 0.01903486314904753,
+    "centroid_y": 0.9696555243598091,
+    "bbox_json": {
+      "x0": 0.017334183687886234,
+      "y0": 0.9683888753255209,
+      "x1": 0.020735542610208824,
+      "y1": 0.9709221733940973
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "4'",
+    "text_normalized": "4'"
+  },
+  {
+    "id": 557,
+    "page": 1,
+    "centroid_x": 0.014485543367093203,
+    "centroid_y": 0.9783859252929688,
+    "bbox_json": {
+      "x0": 0.01235969482906281,
+      "y0": 0.976180578161169,
+      "x1": 0.016611391905123594,
+      "y1": 0.9805912724247685
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "20",
+    "text_normalized": "20"
+  },
+  {
+    "id": 558,
+    "page": 1,
+    "centroid_x": 0.014485543367093203,
+    "centroid_y": 0.9833294338650174,
+    "bbox_json": {
+      "x0": 0.01235969482906281,
+      "y0": 0.9813770435474537,
+      "x1": 0.016611391905123594,
+      "y1": 0.985281824182581
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "FT",
+    "text_normalized": "ft"
+  },
+  {
+    "id": 559,
+    "page": 1,
+    "centroid_x": 0.5224647118300988,
+    "centroid_y": 0.3179283142089844,
+    "bbox_json": {
+      "x0": 0.5183069945643188,
+      "y0": 0.2965833875868056,
+      "x1": 0.5266224290958788,
+      "y1": 0.33927324083116317
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "SEWER",
+    "text_normalized": "sewer"
+  },
+  {
+    "id": 560,
+    "page": 1,
+    "centroid_x": 0.5224647118300988,
+    "centroid_y": 0.35789407800745077,
+    "bbox_json": {
+      "x0": 0.5183069945643188,
+      "y0": 0.3423699273003472,
+      "x1": 0.5266224290958788,
+      "y1": 0.3734182287145544
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "TANK",
+    "text_normalized": "tank"
+  },
+  {
+    "id": 561,
+    "page": 1,
+    "centroid_x": 0.5224647118300988,
+    "centroid_y": 0.40238842434353295,
+    "bbox_json": {
+      "x0": 0.5183069945643188,
+      "y0": 0.3765149151837384,
+      "x1": 0.5266224290958788,
+      "y1": 0.42826193350332753
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "SECTION",
+    "text_normalized": "section"
+  },
+  {
+    "id": 562,
+    "page": 1,
+    "centroid_x": 0.5224647118300988,
+    "centroid_y": 0.4410619382505063,
+    "bbox_json": {
+      "x0": 0.5183069945643188,
+      "y0": 0.43135861997251157,
+      "x1": 0.5266224290958788,
+      "y1": 0.45076525652850113
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "A-A",
+    "text_normalized": "a-a"
+  },
+  {
+    "id": 563,
+    "page": 1,
+    "centroid_x": 0.46990516702964824,
+    "centroid_y": 1.0573523062246817,
+    "bbox_json": {
+      "x0": 0.4657474497638682,
+      "y0": 1.036333324291088,
+      "x1": 0.47406288429542826,
+      "y1": 1.0783712881582754
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "STORM",
+    "text_normalized": "storm"
+  },
+  {
+    "id": 564,
+    "page": 1,
+    "centroid_x": 0.46990516702964824,
+    "centroid_y": 1.0995765968605324,
+    "bbox_json": {
+      "x0": 0.4657474497638682,
+      "y0": 1.081468031141493,
+      "x1": 0.47406288429542826,
+      "y1": 1.1176851625795718
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "DRAIN",
+    "text_normalized": "drain"
+  },
+  {
+    "id": 565,
+    "page": 1,
+    "centroid_x": 0.46990516702964824,
+    "centroid_y": 1.1408346670645255,
+    "bbox_json": {
+      "x0": 0.4657474497638682,
+      "y0": 1.1207819055627894,
+      "x1": 0.47406288429542826,
+      "y1": 1.1608874285662616
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "NOTES",
+    "text_normalized": "notes"
+  },
+  {
+    "id": 566,
+    "page": 1,
+    "centroid_x": 0.6108195390650835,
+    "centroid_y": 1.283935546875,
+    "bbox_json": {
+      "x0": 0.6085477152829448,
+      "y0": 1.2793059172453705,
+      "x1": 0.6130913628472222,
+      "y1": 1.2885651765046295
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "April",
+    "text_normalized": "april"
+  },
+  {
+    "id": 567,
+    "page": 1,
+    "centroid_x": 0.6108195390650835,
+    "centroid_y": 1.2930697970920138,
+    "bbox_json": {
+      "x0": 0.6085477152829448,
+      "y0": 1.2898522271050348,
+      "x1": 0.6130913628472222,
+      "y1": 1.296287367078993
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "09,",
+    "text_normalized": "09,"
+  },
+  {
+    "id": 568,
+    "page": 1,
+    "centroid_x": 0.6108195390650835,
+    "centroid_y": 1.302722563566985,
+    "bbox_json": {
+      "x0": 0.6085477152829448,
+      "y0": 1.2975744176793982,
+      "x1": 0.6130913628472222,
+      "y1": 1.3078707094545718
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "2026",
+    "text_normalized": "2026"
+  },
+  {
+    "id": 569,
+    "page": 1,
+    "centroid_x": 0.6210801260811942,
+    "centroid_y": 1.2875285961009837,
+    "bbox_json": {
+      "x0": 0.6190354685304026,
+      "y0": 1.2798890290436922,
+      "x1": 0.6231247836319858,
+      "y1": 1.2951681631582754
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "OFFICE",
+    "text_normalized": "office"
+  },
+  {
+    "id": 570,
+    "page": 1,
+    "centroid_x": 0.6210801260811942,
+    "centroid_y": 1.2992203323929399,
+    "bbox_json": {
+      "x0": 0.6190354685304026,
+      "y0": 1.296326587818287,
+      "x1": 0.6231247836319858,
+      "y1": 1.3021140769675925
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "OF",
+    "text_normalized": "of"
+  },
+  {
+    "id": 571,
+    "page": 1,
+    "centroid_x": 0.6210801260811942,
+    "centroid_y": 1.3074390552662036,
+    "bbox_json": {
+      "x0": 0.6190354685304026,
+      "y0": 1.303272388599537,
+      "x1": 0.6231247836319858,
+      "y1": 1.3116057219328703
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "THE",
+    "text_normalized": "the"
+  },
+  {
+    "id": 572,
+    "page": 1,
+    "centroid_x": 0.6210801260811942,
+    "centroid_y": 1.3194786354347512,
+    "bbox_json": {
+      "x0": 0.6190354685304026,
+      "y0": 1.3127640335648147,
+      "x1": 0.6231247836319858,
+      "y1": 1.3261932373046874
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "STATE",
+    "text_normalized": "state"
+  },
+  {
+    "id": 573,
+    "page": 1,
+    "centroid_x": 0.6210801260811942,
+    "centroid_y": 1.3320973714192708,
+    "bbox_json": {
+      "x0": 0.6190354685304026,
+      "y0": 1.3273515489366319,
+      "x1": 0.6231247836319858,
+      "y1": 1.3368431939019096
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "FIRE",
+    "text_normalized": "fire"
+  },
+  {
+    "id": 574,
+    "page": 1,
+    "centroid_x": 0.6210801260811942,
+    "centroid_y": 1.3480723628291376,
+    "bbox_json": {
+      "x0": 0.6190354685304026,
+      "y0": 1.338001505533854,
+      "x1": 0.6231247836319858,
+      "y1": 1.3581432201244212
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "MARSHAL",
+    "text_normalized": "marshal"
+  },
+  {
+    "id": 575,
+    "page": 1,
+    "centroid_x": 0.6176574747398418,
+    "centroid_y": 1.2955161765769676,
+    "bbox_json": {
+      "x0": 0.6156128171890501,
+      "y0": 1.283939050745081,
+      "x1": 0.6197021322906333,
+      "y1": 1.3070933024088542
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "APPROVED",
+    "text_normalized": "approved"
+  },
+  {
+    "id": 576,
+    "page": 1,
+    "centroid_x": 0.6176574747398418,
+    "centroid_y": 1.3129973800094041,
+    "bbox_json": {
+      "x0": 0.6156128171890501,
+      "y0": 1.3082516140407987,
+      "x1": 0.6197021322906333,
+      "y1": 1.3177431459780093
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "FIRE",
+    "text_normalized": "fire"
+  },
+  {
+    "id": 577,
+    "page": 1,
+    "centroid_x": 0.6176574747398418,
+    "centroid_y": 1.3232994927300348,
+    "bbox_json": {
+      "x0": 0.6156128171890501,
+      "y0": 1.318901570638021,
+      "x1": 0.6197021322906333,
+      "y1": 1.3276974148220486
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "AND",
+    "text_normalized": "and"
+  },
+  {
+    "id": 578,
+    "page": 1,
+    "centroid_x": 0.6176574747398418,
+    "centroid_y": 1.3352224279333043,
+    "bbox_json": {
+      "x0": 0.6156128171890501,
+      "y0": 1.328855726453993,
+      "x1": 0.6197021322906333,
+      "y1": 1.3415891294126157
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "PANIC",
+    "text_normalized": "panic"
+  },
+  {
+    "id": 579,
+    "page": 1,
+    "centroid_x": 0.6176574747398418,
+    "centroid_y": 1.3484203197337963,
+    "bbox_json": {
+      "x0": 0.6156128171890501,
+      "y0": 1.3427474410445601,
+      "x1": 0.6197021322906333,
+      "y1": 1.3540931984230324
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "ONLY",
+    "text_normalized": "only"
+  },
+  {
+    "id": 580,
+    "page": 1,
+    "centroid_x": 0.6108122527914703,
+    "centroid_y": 1.273687235514323,
+    "bbox_json": {
+      "x0": 0.6087675952406787,
+      "y0": 1.268708066587095,
+      "x1": 0.6128569103422619,
+      "y1": 1.278666404441551
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Date:",
+    "text_normalized": "date:"
+  },
+  {
+    "id": 581,
+    "page": 1,
+    "centroid_x": 0.6073896821844516,
+    "centroid_y": 1.2757705688476562,
+    "bbox_json": {
+      "x0": 0.6053450246336599,
+      "y0": 1.268708066587095,
+      "x1": 0.6094343397352431,
+      "y1": 1.2828330711082176
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Project:",
+    "text_normalized": "project:"
+  },
+  {
+    "id": 582,
+    "page": 1,
+    "centroid_x": 0.6005444602360801,
+    "centroid_y": 1.2805640326605903,
+    "bbox_json": {
+      "x0": 0.5984998026852886,
+      "y0": 1.2723431622540509,
+      "x1": 0.6025891177868717,
+      "y1": 1.2887849030671297
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Approval",
+    "text_normalized": "approval"
+  },
+  {
+    "id": 583,
+    "page": 1,
+    "centroid_x": 0.6005444602360801,
+    "centroid_y": 1.2916806821469908,
+    "bbox_json": {
+      "x0": 0.5984998026852886,
+      "y0": 1.2899432146990741,
+      "x1": 0.6025891177868717,
+      "y1": 1.2934181495949073
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "of",
+    "text_normalized": "of"
+  },
+  {
+    "id": 584,
+    "page": 1,
+    "centroid_x": 0.6005444602360801,
+    "centroid_y": 1.2978182192201966,
+    "bbox_json": {
+      "x0": 0.5984998026852886,
+      "y0": 1.294576574254919,
+      "x1": 0.6025891177868717,
+      "y1": 1.3010598641854745
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "this",
+    "text_normalized": "this"
+  },
+  {
+    "id": 585,
+    "page": 1,
+    "centroid_x": 0.6005444602360801,
+    "centroid_y": 1.3061556780779804,
+    "bbox_json": {
+      "x0": 0.5984998026852886,
+      "y0": 1.302218175817419,
+      "x1": 0.6025891177868717,
+      "y1": 1.3100931803385416
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "plan",
+    "text_normalized": "plan"
+  },
+  {
+    "id": 586,
+    "page": 1,
+    "centroid_x": 0.6005444602360801,
+    "centroid_y": 1.3157682065610532,
+    "bbox_json": {
+      "x0": 0.5984998026852886,
+      "y0": 1.311251491970486,
+      "x1": 0.6025891177868717,
+      "y1": 1.3202849211516203
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "does",
+    "text_normalized": "does"
+  },
+  {
+    "id": 587,
+    "page": 1,
+    "centroid_x": 0.6005444602360801,
+    "centroid_y": 1.324339011863426,
+    "bbox_json": {
+      "x0": 0.5984998026852886,
+      "y0": 1.3214432327835648,
+      "x1": 0.6025891177868717,
+      "y1": 1.3272347909432871
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "not",
+    "text_normalized": "not"
+  },
+  {
+    "id": 588,
+    "page": 1,
+    "centroid_x": 0.6005444602360801,
+    "centroid_y": 1.3369619298864295,
+    "bbox_json": {
+      "x0": 0.5984998026852886,
+      "y0": 1.3283932156032987,
+      "x1": 0.6025891177868717,
+      "y1": 1.3455306441695603
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "authorize",
+    "text_normalized": "authorize"
+  },
+  {
+    "id": 589,
+    "page": 1,
+    "centroid_x": 0.6005444602360801,
+    "centroid_y": 1.3485411467375579,
+    "bbox_json": {
+      "x0": 0.5984998026852886,
+      "y0": 1.3466890688295718,
+      "x1": 0.6025891177868717,
+      "y1": 1.350393224645544
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "or",
+    "text_normalized": "or"
+  },
+  {
+    "id": 590,
+    "page": 1,
+    "centroid_x": 0.6005444602360801,
+    "centroid_y": 1.3590785838939525,
+    "bbox_json": {
+      "x0": 0.5984998026852886,
+      "y0": 1.3515515362774884,
+      "x1": 0.6025891177868717,
+      "y1": 1.3666056315104167
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "approve",
+    "text_normalized": "approve"
+  },
+  {
+    "id": 591,
+    "page": 1,
+    "centroid_x": 0.5971218088947277,
+    "centroid_y": 1.2732765480324075,
+    "bbox_json": {
+      "x0": 0.595077151343936,
+      "y0": 1.2699182581018518,
+      "x1": 0.5991664664455192,
+      "y1": 1.276634837962963
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "any",
+    "text_normalized": "any"
+  },
+  {
+    "id": 592,
+    "page": 1,
+    "centroid_x": 0.5971218088947277,
+    "centroid_y": 1.2860119289822047,
+    "bbox_json": {
+      "x0": 0.595077151343936,
+      "y0": 1.2777931495949073,
+      "x1": 0.5991664664455192,
+      "y1": 1.2942307083695024
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "omission",
+    "text_normalized": "omission"
+  },
+  {
+    "id": 593,
+    "page": 1,
+    "centroid_x": 0.5971218088947277,
+    "centroid_y": 1.2972411544234665,
+    "bbox_json": {
+      "x0": 0.595077151343936,
+      "y0": 1.2953890200014468,
+      "x1": 0.5991664664455192,
+      "y1": 1.299093288845486
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "or",
+    "text_normalized": "or"
+  },
+  {
+    "id": 594,
+    "page": 1,
+    "centroid_x": 0.5971218088947277,
+    "centroid_y": 1.3085890028211806,
+    "bbox_json": {
+      "x0": 0.595077151343936,
+      "y0": 1.3002514874493634,
+      "x1": 0.5991664664455192,
+      "y1": 1.3169265181929977
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "deviation",
+    "text_normalized": "deviation"
+  },
+  {
+    "id": 595,
+    "page": 1,
+    "centroid_x": 0.5971218088947277,
+    "centroid_y": 1.3222515530056422,
+    "bbox_json": {
+      "x0": 0.595077151343936,
+      "y0": 1.3180848298249421,
+      "x1": 0.5991664664455192,
+      "y1": 1.3264182761863426
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "from",
+    "text_normalized": "from"
+  },
+  {
+    "id": 596,
+    "page": 1,
+    "centroid_x": 0.5971218088947277,
+    "centroid_y": 1.3369556568287035,
+    "bbox_json": {
+      "x0": 0.595077151343936,
+      "y0": 1.32757647479022,
+      "x1": 0.5991664664455192,
+      "y1": 1.3463348388671874
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "applicable",
+    "text_normalized": "applicable"
+  },
+  {
+    "id": 597,
+    "page": 1,
+    "centroid_x": 0.5971218088947277,
+    "centroid_y": 1.3582618995949074,
+    "bbox_json": {
+      "x0": 0.595077151343936,
+      "y0": 1.3474931504991319,
+      "x1": 0.5991664664455192,
+      "y1": 1.369030648690683
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "regulations.",
+    "text_normalized": "regulations."
+  },
+  {
+    "id": 598,
+    "page": 1,
+    "centroid_x": 0.5936992382877087,
+    "centroid_y": 1.2741973876953125,
+    "bbox_json": {
+      "x0": 0.5916545807369171,
+      "y0": 1.2696828206380208,
+      "x1": 0.5957438958385003,
+      "y1": 1.2787119547526042
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Final",
+    "text_normalized": "final"
+  },
+  {
+    "id": 599,
+    "page": 1,
+    "centroid_x": 0.5936992382877087,
+    "centroid_y": 1.287859881365741,
+    "bbox_json": {
+      "x0": 0.5916545807369171,
+      "y0": 1.2798702663845487,
+      "x1": 0.5957438958385003,
+      "y1": 1.295849496346933
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "approval",
+    "text_normalized": "approval"
+  },
+  {
+    "id": 600,
+    "page": 1,
+    "centroid_x": 0.5936992382877087,
+    "centroid_y": 1.2985119854962384,
+    "bbox_json": {
+      "x0": 0.5916545807369171,
+      "y0": 1.2970078079788774,
+      "x1": 0.5957438958385003,
+      "y1": 1.3000161630135996
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "is",
+    "text_normalized": "is"
+  },
+  {
+    "id": 601,
+    "page": 1,
+    "centroid_x": 0.5936992382877087,
+    "centroid_y": 1.307774466055411,
+    "bbox_json": {
+      "x0": 0.5916545807369171,
+      "y0": 1.301174474645544,
+      "x1": 0.5957438958385003,
+      "y1": 1.3143744574652778
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "subject",
+    "text_normalized": "subject"
+  },
+  {
+    "id": 602,
+    "page": 1,
+    "centroid_x": 0.5936992382877087,
+    "centroid_y": 1.3172702365451388,
+    "bbox_json": {
+      "x0": 0.5916545807369171,
+      "y0": 1.3155327690972223,
+      "x1": 0.5957438958385003,
+      "y1": 1.3190077039930554
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "to",
+    "text_normalized": "to"
+  },
+  {
+    "id": 603,
+    "page": 1,
+    "centroid_x": 0.5936992382877087,
+    "centroid_y": 1.3239869294343172,
+    "bbox_json": {
+      "x0": 0.5916545807369171,
+      "y0": 1.320166128653067,
+      "x1": 0.5957438958385003,
+      "y1": 1.327807730215567
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "field",
+    "text_normalized": "field"
+  },
+  {
+    "id": 604,
+    "page": 1,
+    "centroid_x": 0.5936992382877087,
+    "centroid_y": 1.338924436216001,
+    "bbox_json": {
+      "x0": 0.5916545807369171,
+      "y0": 1.3289661548755787,
+      "x1": 0.5957438958385003,
+      "y1": 1.3488827175564235
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "inspection.",
+    "text_normalized": "inspection."
+  },
+  {
+    "id": 605,
+    "page": 1,
+    "centroid_x": 0.5936992382877087,
+    "centroid_y": 1.3539785879629629,
+    "bbox_json": {
+      "x0": 0.5916545807369171,
+      "y0": 1.3500411422164351,
+      "x1": 0.5957438958385003,
+      "y1": 1.3579160337094907
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "One",
+    "text_normalized": "one"
+  },
+  {
+    "id": 606,
+    "page": 1,
+    "centroid_x": 0.5936992382877087,
+    "centroid_y": 1.3618535924840858,
+    "bbox_json": {
+      "x0": 0.5916545807369171,
+      "y0": 1.3590744583695022,
+      "x1": 0.5957438958385003,
+      "y1": 1.364632726598669
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "set",
+    "text_normalized": "set"
+  },
+  {
+    "id": 607,
+    "page": 1,
+    "centroid_x": 0.5936992382877087,
+    "centroid_y": 1.3675286187065971,
+    "bbox_json": {
+      "x0": 0.5916545807369171,
+      "y0": 1.3657911512586804,
+      "x1": 0.5957438958385003,
+      "y1": 1.3692660861545138
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "of",
+    "text_normalized": "of"
+  },
+  {
+    "id": 608,
+    "page": 1,
+    "centroid_x": 0.5902765869463562,
+    "centroid_y": 1.2780181884765625,
+    "bbox_json": {
+      "x0": 0.5882319293955647,
+      "y0": 1.2693327727141204,
+      "x1": 0.5923212444971478,
+      "y1": 1.2867036042390045
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "approved",
+    "text_normalized": "approved"
+  },
+  {
+    "id": 609,
+    "page": 1,
+    "centroid_x": 0.5902765869463562,
+    "centroid_y": 1.292841084798177,
+    "bbox_json": {
+      "x0": 0.5882319293955647,
+      "y0": 1.287861915870949,
+      "x1": 0.5923212444971478,
+      "y1": 1.297820253725405
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "plans",
+    "text_normalized": "plans"
+  },
+  {
+    "id": 610,
+    "page": 1,
+    "centroid_x": 0.5902765869463562,
+    "centroid_y": 1.303261990017361,
+    "bbox_json": {
+      "x0": 0.5882319293955647,
+      "y0": 1.2989786783854167,
+      "x1": 0.5923212444971478,
+      "y1": 1.3075453016493055
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "shall",
+    "text_normalized": "shall"
+  },
+  {
+    "id": 611,
+    "page": 1,
+    "centroid_x": 0.5902765869463562,
+    "centroid_y": 1.3110202365451389,
+    "bbox_json": {
+      "x0": 0.5882319293955647,
+      "y0": 1.30870361328125,
+      "x1": 0.5923212444971478,
+      "y1": 1.3133368598090278
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "be",
+    "text_normalized": "be"
+  },
+  {
+    "id": 612,
+    "page": 1,
+    "centroid_x": 0.5902765869463562,
+    "centroid_y": 1.3227160983615451,
+    "bbox_json": {
+      "x0": 0.5882319293955647,
+      "y0": 1.3144952844690394,
+      "x1": 0.5923212444971478,
+      "y1": 1.3309369122540509
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "available",
+    "text_normalized": "available"
+  },
+  {
+    "id": 613,
+    "page": 1,
+    "centroid_x": 0.5902765869463562,
+    "centroid_y": 1.3344119036639177,
+    "bbox_json": {
+      "x0": 0.5882319293955647,
+      "y0": 1.3320952238859953,
+      "x1": 0.5923212444971478,
+      "y1": 1.3367285834418403
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "on",
+    "text_normalized": "on"
+  },
+  {
+    "id": 614,
+    "page": 1,
+    "centroid_x": 0.5902765869463562,
+    "centroid_y": 1.3407827306676794,
+    "bbox_json": {
+      "x0": 0.5882319293955647,
+      "y0": 1.3378868950737848,
+      "x1": 0.5923212444971478,
+      "y1": 1.343678566261574
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "the",
+    "text_normalized": "the"
+  },
+  {
+    "id": 615,
+    "page": 1,
+    "centroid_x": 0.5902765869463562,
+    "centroid_y": 1.351089025426794,
+    "bbox_json": {
+      "x0": 0.5882319293955647,
+      "y0": 1.3448369909215856,
+      "x1": 0.5923212444971478,
+      "y1": 1.3573410599320024
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "project",
+    "text_normalized": "project"
+  },
+  {
+    "id": 616,
+    "page": 1,
+    "centroid_x": 0.5902765869463562,
+    "centroid_y": 1.3617411295572919,
+    "bbox_json": {
+      "x0": 0.5882319293955647,
+      "y0": 1.358499484592014,
+      "x1": 0.5923212444971478,
+      "y1": 1.3649827745225696
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "site",
+    "text_normalized": "site"
+  },
+  {
+    "id": 617,
+    "page": 1,
+    "centroid_x": 0.5902765869463562,
+    "centroid_y": 1.3678786101164642,
+    "bbox_json": {
+      "x0": 0.5882319293955647,
+      "y0": 1.3661410861545138,
+      "x1": 0.5923212444971478,
+      "y1": 1.3696161340784143
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "at",
+    "text_normalized": "at"
+  },
+  {
+    "id": 618,
+    "page": 1,
+    "centroid_x": 0.5868540163393374,
+    "centroid_y": 1.3133390073423032,
+    "bbox_json": {
+      "x0": 0.5848093587885458,
+      "y0": 1.3112556740089698,
+      "x1": 0.588898673890129,
+      "y1": 1.3154223406756367
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "all",
+    "text_normalized": "all"
+  },
+  {
+    "id": 619,
+    "page": 1,
+    "centroid_x": 0.5868540163393374,
+    "centroid_y": 1.3221368860315392,
+    "bbox_json": {
+      "x0": 0.5848093587885458,
+      "y0": 1.316580652307581,
+      "x1": 0.588898673890129,
+      "y1": 1.3276931197554978
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "times.",
+    "text_normalized": "times."
+  },
+  {
+    "id": 620,
+    "page": 1,
+    "centroid_x": 0.5798804873511905,
+    "centroid_y": 1.314858952275029,
+    "bbox_json": {
+      "x0": 0.5780630363989129,
+      "y0": 1.271925636574074,
+      "x1": 0.581697938303468,
+      "y1": 1.3577922679759837
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Signature__________________________________",
+    "text_normalized": "signature__________________________________"
+  },
+  {
+    "id": 621,
+    "page": 1,
+    "centroid_x": 0.5762012219302869,
+    "centroid_y": 1.2788218745478876,
+    "bbox_json": {
+      "x0": 0.5748381438078703,
+      "y0": 1.2717968976056133,
+      "x1": 0.5775643000527034,
+      "y1": 1.285846851490162
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Designated",
+    "text_normalized": "designated"
+  },
+  {
+    "id": 622,
+    "page": 1,
+    "centroid_x": 0.5762012219302869,
+    "centroid_y": 1.2917899802879051,
+    "bbox_json": {
+      "x0": 0.5748381438078703,
+      "y0": 1.2866191722728588,
+      "x1": 0.5775643000527034,
+      "y1": 1.2969607883029515
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Campus",
+    "text_normalized": "campus"
+  },
+  {
+    "id": 623,
+    "page": 1,
+    "centroid_x": 0.5762012219302869,
+    "centroid_y": 1.300124669958044,
+    "bbox_json": {
+      "x0": 0.5748381438078703,
+      "y0": 1.297732996057581,
+      "x1": 0.5775643000527034,
+      "y1": 1.302516343858507
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Fire",
+    "text_normalized": "fire"
+  },
+  {
+    "id": 624,
+    "page": 1,
+    "centroid_x": 0.5762012219302869,
+    "centroid_y": 1.3082274825484665,
+    "bbox_json": {
+      "x0": 0.5748381438078703,
+      "y0": 1.3032885516131365,
+      "x1": 0.5775643000527034,
+      "y1": 1.3131664134837964
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Marshal",
+    "text_normalized": "marshal"
+  },
+  {
+    "id": 625,
+    "page": 1,
+    "centroid_x": 0.6072818816654266,
+    "centroid_y": 1.293710666232639,
+    "bbox_json": {
+      "x0": 0.6050100578832879,
+      "y0": 1.2839305736400464,
+      "x1": 0.6095537054475653,
+      "y1": 1.3034907588252316
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "612034.F",
+    "text_normalized": "612034.f"
+  },
+  {
+    "id": 626,
+    "page": 1,
+    "centroid_x": 0.6072818816654266,
+    "centroid_y": 1.3104375203450522,
+    "bbox_json": {
+      "x0": 0.6050100578832879,
+      "y0": 1.3047778094256366,
+      "x1": 0.6095537054475653,
+      "y1": 1.3160972312644676
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Make",
+    "text_normalized": "make"
+  },
+  {
+    "id": 627,
+    "page": 1,
+    "centroid_x": 0.6072818816654266,
+    "centroid_y": 1.3382245664243344,
+    "bbox_json": {
+      "x0": 0.6050100578832879,
+      "y0": 1.3173842818648727,
+      "x1": 0.6095537054475653,
+      "y1": 1.3590648509837964
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Ready-BPS_ACD01",
+    "text_normalized": "ready-bps_acd01"
+  },
+  {
+    "id": 628,
+    "page": 1,
+    "centroid_x": 0.6034789716125165,
+    "centroid_y": 1.2928079110604744,
+    "bbox_json": {
+      "x0": 0.6012071478303778,
+      "y0": 1.2839305736400464,
+      "x1": 0.6057507953946553,
+      "y1": 1.3016852484809027
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "BKCK01",
+    "text_normalized": "bkck01"
+  },
+  {
+    "id": 629,
+    "page": 1,
+    "centroid_x": 0.03911509841838211,
+    "centroid_y": 1.1878302680121529,
+    "bbox_json": {
+      "x0": 0.037675484147652115,
+      "y0": 1.1819756401909722,
+      "x1": 0.0405547126891121,
+      "y1": 1.1936848958333333
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Building",
+    "text_normalized": "building"
+  },
+  {
+    "id": 630,
+    "page": 1,
+    "centroid_x": 0.03911509841838211,
+    "centroid_y": 1.1990535594798901,
+    "bbox_json": {
+      "x0": 0.037675484147652115,
+      "y0": 1.1944986979166667,
+      "x1": 0.0405547126891121,
+      "y1": 1.2036084210431135
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Permit",
+    "text_normalized": "permit"
+  },
+  {
+    "id": 631,
+    "page": 1,
+    "centroid_x": 0.03911509841838211,
+    "centroid_y": 1.2104437934027779,
+    "bbox_json": {
+      "x0": 0.037675484147652115,
+      "y0": 1.2044223361545139,
+      "x1": 0.0405547126891121,
+      "y1": 1.2164652506510416
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Services",
+    "text_normalized": "services"
+  },
+  {
+    "id": 632,
+    "page": 1,
+    "centroid_x": 0.036465905961536225,
+    "centroid_y": 1.1869551482024017,
+    "bbox_json": {
+      "x0": 0.03537933914749711,
+      "y0": 1.182094884801794,
+      "x1": 0.03755247277557534,
+      "y1": 1.1918154116030093
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Reviewed",
+    "text_normalized": "reviewed"
+  },
+  {
+    "id": 633,
+    "page": 1,
+    "centroid_x": 0.036465905961536225,
+    "centroid_y": 1.1937230428059897,
+    "bbox_json": {
+      "x0": 0.03537933914749711,
+      "y0": 1.1924309624565972,
+      "x1": 0.03755247277557534,
+      "y1": 1.195015123155382
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "for",
+    "text_normalized": "for"
+  },
+  {
+    "id": 634,
+    "page": 1,
+    "centroid_x": 0.036465905961536225,
+    "centroid_y": 1.2017829047309028,
+    "bbox_json": {
+      "x0": 0.03537933914749711,
+      "y0": 1.1956305609809028,
+      "x1": 0.03755247277557534,
+      "y1": 1.2079352484809027
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Compliance:",
+    "text_normalized": "compliance:"
+  },
+  {
+    "id": 635,
+    "page": 1,
+    "centroid_x": 0.024221604463284606,
+    "centroid_y": 1.1858829074435764,
+    "bbox_json": {
+      "x0": 0.023309992734717313,
+      "y0": 1.1820123743127893,
+      "x1": 0.025133216191851902,
+      "y1": 1.1897534405743635
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Reviewer",
+    "text_normalized": "reviewer"
+  },
+  {
+    "id": 636,
+    "page": 1,
+    "centroid_x": 0.024221604463284606,
+    "centroid_y": 1.1930054841218172,
+    "bbox_json": {
+      "x0": 0.023309992734717313,
+      "y0": 1.190269978841146,
+      "x1": 0.025133216191851902,
+      "y1": 1.1957409894024884
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Name:",
+    "text_normalized": "name:"
+  },
+  {
+    "id": 637,
+    "page": 1,
+    "centroid_x": 0.020214173528883193,
+    "centroid_y": 1.185946881329572,
+    "bbox_json": {
+      "x0": 0.01930256243105288,
+      "y0": 1.1820763481987848,
+      "x1": 0.021125784626713506,
+      "y1": 1.1898174144603588
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Reviewer",
+    "text_normalized": "reviewer"
+  },
+  {
+    "id": 638,
+    "page": 1,
+    "centroid_x": 0.020214173528883193,
+    "centroid_y": 1.1945677015516494,
+    "bbox_json": {
+      "x0": 0.01930256243105288,
+      "y0": 1.1903339527271413,
+      "x1": 0.021125784626713506,
+      "y1": 1.1988014503761575
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Signature:",
+    "text_normalized": "signature:"
+  },
+  {
+    "id": 639,
+    "page": 1,
+    "centroid_x": 0.03250906454823005,
+    "centroid_y": 1.190062967936198,
+    "bbox_json": {
+      "x0": 0.03159745281966275,
+      "y0": 1.185005357530382,
+      "x1": 0.03342067627679734,
+      "y1": 1.1951205783420138
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Accessibility",
+    "text_normalized": "accessibility"
+  },
+  {
+    "id": 640,
+    "page": 1,
+    "centroid_x": 0.030454032635562636,
+    "centroid_y": 1.1883092809606484,
+    "bbox_json": {
+      "x0": 0.02954242090699534,
+      "y0": 1.185005357530382,
+      "x1": 0.03136564436412993,
+      "y1": 1.1916132043909144
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Building",
+    "text_normalized": "building"
+  },
+  {
+    "id": 641,
+    "page": 1,
+    "centroid_x": 0.03259092916256536,
+    "centroid_y": 1.2133893613462094,
+    "bbox_json": {
+      "x0": 0.031679317433998065,
+      "y0": 1.2094147858796296,
+      "x1": 0.03350254089113266,
+      "y1": 1.2173639368127893
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Structural",
+    "text_normalized": "structural"
+  },
+  {
+    "id": 642,
+    "page": 1,
+    "centroid_x": 0.030388133235709373,
+    "centroid_y": 1.2141123453776042,
+    "bbox_json": {
+      "x0": 0.02947652150714208,
+      "y0": 1.209415124963831,
+      "x1": 0.03129974496427667,
+      "y1": 1.2188095657913773
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Mechanical",
+    "text_normalized": "mechanical"
+  },
+  {
+    "id": 643,
+    "page": 1,
+    "centroid_x": 0.03256955474772781,
+    "centroid_y": 1.237621053059896,
+    "bbox_json": {
+      "x0": 0.03165794301916052,
+      "y0": 1.233853601526331,
+      "x1": 0.03348116647629511,
+      "y1": 1.2413885045934607
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Electrical",
+    "text_normalized": "electrical"
+  },
+  {
+    "id": 644,
+    "page": 1,
+    "centroid_x": 0.030379696497841488,
+    "centroid_y": 1.23772543447989,
+    "bbox_json": {
+      "x0": 0.02946808476927419,
+      "y0": 1.2338539406105324,
+      "x1": 0.031291308226408784,
+      "y1": 1.2415969283492476
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Plumbing",
+    "text_normalized": "plumbing"
+  },
+  {
+    "id": 645,
+    "page": 1,
+    "centroid_x": 0.02020733634000102,
+    "centroid_y": 1.2409194946289062,
+    "bbox_json": {
+      "x0": 0.01899005370165305,
+      "y0": 1.2354025381582754,
+      "x1": 0.021424618978348988,
+      "y1": 1.246436451099537
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "4/13/2026",
+    "text_normalized": "4/13/2026"
+  },
+  {
+    "id": 646,
+    "page": 1,
+    "centroid_x": 0.028119241119061826,
+    "centroid_y": 1.1958608556676793,
+    "bbox_json": {
+      "x0": 0.02690195911145084,
+      "y0": 1.1935191966869212,
+      "x1": 0.029336523126672814,
+      "y1": 1.1982025146484374
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Civil",
+    "text_normalized": "civil"
+  },
+  {
+    "id": 647,
+    "page": 1,
+    "centroid_x": 0.024559026041989604,
+    "centroid_y": 1.200834090621383,
+    "bbox_json": {
+      "x0": 0.023638205553488757,
+      "y0": 1.1990091959635416,
+      "x1": 0.02547984653049045,
+      "y1": 1.2026589852792244
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Moe",
+    "text_normalized": "moe"
+  },
+  {
+    "id": 648,
+    "page": 1,
+    "centroid_x": 0.024559026041989604,
+    "centroid_y": 1.2068829006618924,
+    "bbox_json": {
+      "x0": 0.023638205553488757,
+      "y0": 1.2031806098090279,
+      "x1": 0.02547984653049045,
+      "y1": 1.210585191514757
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Heivand,",
+    "text_normalized": "heivand,"
+  },
+  {
+    "id": 649,
+    "page": 1,
+    "centroid_x": 0.024559026041989604,
+    "centroid_y": 1.2148092764395253,
+    "bbox_json": {
+      "x0": 0.023638205553488757,
+      "y0": 1.2111069290726273,
+      "x1": 0.02547984653049045,
+      "y1": 1.2185116238064235
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Rebecca",
+    "text_normalized": "rebecca"
+  },
+  {
+    "id": 650,
+    "page": 1,
+    "centroid_x": 0.024559026041989604,
+    "centroid_y": 1.2239327324761287,
+    "bbox_json": {
+      "x0": 0.023638205553488757,
+      "y0": 1.219033248336227,
+      "x1": 0.02547984653049045,
+      "y1": 1.2288322166160301
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Wisniewski,",
+    "text_normalized": "wisniewski,"
+  },
+  {
+    "id": 651,
+    "page": 1,
+    "centroid_x": 0.024559026041989604,
+    "centroid_y": 1.2321695963541668,
+    "bbox_json": {
+      "x0": 0.023638205553488757,
+      "y0": 1.2293539541739005,
+      "x1": 0.02547984653049045,
+      "y1": 1.2349852385344329
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Orland",
+    "text_normalized": "orland"
+  },
+  {
+    "id": 652,
+    "page": 1,
+    "centroid_x": 0.024559026041989604,
+    "centroid_y": 1.2383751763237847,
+    "bbox_json": {
+      "x0": 0.023638205553488757,
+      "y0": 1.2355069760923032,
+      "x1": 0.02547984653049045,
+      "y1": 1.2412433765552662
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Obtera",
+    "text_normalized": "obtera"
+  },
+  {
+    "id": 653,
+    "page": 1,
+    "centroid_x": 0.020214173528883193,
+    "centroid_y": 1.2314867938006366,
+    "bbox_json": {
+      "x0": 0.01930256243105288,
+      "y0": 1.2292668095341435,
+      "x1": 0.021125784626713506,
+      "y1": 1.2337067780671296
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Date:",
+    "text_normalized": "date:"
+  },
+  {
+    "id": 654,
+    "page": 1,
+    "centroid_x": 0.028319376486319082,
+    "centroid_y": 1.1877928557219328,
+    "bbox_json": {
+      "x0": 0.027407764757751786,
+      "y0": 1.185005357530382,
+      "x1": 0.02923098821488638,
+      "y1": 1.1905803539134838
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Others",
+    "text_normalized": "others"
+  },
+  {
+    "id": 655,
+    "page": 1,
+    "centroid_x": 0.028640297985581493,
+    "centroid_y": 1.1832299691659434,
+    "bbox_json": {
+      "x0": 0.02797730763753255,
+      "y0": 1.182779382776331,
+      "x1": 0.029303288333630436,
+      "y1": 1.1836805555555556
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "X",
+    "text_normalized": "x"
+  },
+  {
+    "id": 656,
+    "page": 1,
+    "centroid_x": 0.03283927049586382,
+    "centroid_y": 1.232142526132089,
+    "bbox_json": {
+      "x0": 0.03217628014781488,
+      "y0": 1.2316919397424768,
+      "x1": 0.03350226084391276,
+      "y1": 1.2325931125217013
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "X",
+    "text_normalized": "x"
+  },
+  {
+    "id": 657,
+    "page": 1,
+    "centroid_x": 0.020775449339044155,
+    "centroid_y": 1.211988208912037,
+    "bbox_json": {
+      "x0": 0.019431883695895078,
+      "y0": 1.2098325376157408,
+      "x1": 0.022119014982193236,
+      "y1": 1.2141438802083333
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Moe",
+    "text_normalized": "moe"
+  },
+  {
+    "id": 658,
+    "page": 1,
+    "centroid_x": 0.020775449339044155,
+    "centroid_y": 1.2189987182617186,
+    "bbox_json": {
+      "x0": 0.019431883695895078,
+      "y0": 1.2149845829716435,
+      "x1": 0.022119014982193236,
+      "y1": 1.223012853551794
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Heivand",
+    "text_normalized": "heivand"
+  },
+  {
+    "id": 659,
+    "page": 1,
+    "centroid_x": 0.5511147635323661,
+    "centroid_y": 1.3109618010344328,
+    "bbox_json": {
+      "x0": 0.5485589567315642,
+      "y0": 1.3016988118489583,
+      "x1": 0.553670570333168,
+      "y1": 1.3202247902199074
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Building",
+    "text_normalized": "building"
+  },
+  {
+    "id": 660,
+    "page": 1,
+    "centroid_x": 0.5511147635323661,
+    "centroid_y": 1.3291962235062211,
+    "bbox_json": {
+      "x0": 0.5485589567315642,
+      "y0": 1.321672792787905,
+      "x1": 0.553670570333168,
+      "y1": 1.336719654224537
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Permit",
+    "text_normalized": "permit"
+  },
+  {
+    "id": 661,
+    "page": 1,
+    "centroid_x": 0.5511147635323661,
+    "centroid_y": 1.348151934588397,
+    "bbox_json": {
+      "x0": 0.5485589567315642,
+      "y0": 1.3381675437644676,
+      "x1": 0.553670570333168,
+      "y1": 1.3581363254123264
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Services",
+    "text_normalized": "services"
+  },
+  {
+    "id": 662,
+    "page": 1,
+    "centroid_x": 0.5471637463443493,
+    "centroid_y": 1.310703870985243,
+    "bbox_json": {
+      "x0": 0.5451986322958002,
+      "y0": 1.3011348017939814,
+      "x1": 0.5491288603928984,
+      "y1": 1.3202729401765045
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "*Reviewed",
+    "text_normalized": "*reviewed"
+  },
+  {
+    "id": 663,
+    "page": 1,
+    "centroid_x": 0.5471637463443493,
+    "centroid_y": 1.3237229523835359,
+    "bbox_json": {
+      "x0": 0.5451986322958002,
+      "y0": 1.3213862666377314,
+      "x1": 0.5491288603928984,
+      "y1": 1.3260596381293404
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "for",
+    "text_normalized": "for"
+  },
+  {
+    "id": 664,
+    "page": 1,
+    "centroid_x": 0.5471637463443493,
+    "centroid_y": 1.3319584599247687,
+    "bbox_json": {
+      "x0": 0.5451986322958002,
+      "y0": 1.3271729645905672,
+      "x1": 0.5491288603928984,
+      "y1": 1.33674395525897
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Code",
+    "text_normalized": "code"
+  },
+  {
+    "id": 665,
+    "page": 1,
+    "centroid_x": 0.5471637463443493,
+    "centroid_y": 1.3492063734266493,
+    "bbox_json": {
+      "x0": 0.5451986322958002,
+      "y0": 1.3378572817201968,
+      "x1": 0.5491288603928984,
+      "y1": 1.3605554651331018
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Compliance*",
+    "text_normalized": "compliance*"
+  },
+  {
+    "id": 666,
+    "page": 1,
+    "centroid_x": 0.5268074116378865,
+    "centroid_y": 1.291639087818287,
+    "bbox_json": {
+      "x0": 0.5252398536318824,
+      "y0": 1.2826769793475117,
+      "x1": 0.5283749696438905,
+      "y1": 1.3006011962890625
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Reviewer(s):",
+    "text_normalized": "reviewer(s):"
+  },
+  {
+    "id": 667,
+    "page": 1,
+    "centroid_x": 0.518301423895296,
+    "centroid_y": 1.2872222900390624,
+    "bbox_json": {
+      "x0": 0.5169724156616857,
+      "y0": 1.2824054859302663,
+      "x1": 0.5196304321289062,
+      "y1": 1.2920390941478588
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Building",
+    "text_normalized": "building"
+  },
+  {
+    "id": 668,
+    "page": 1,
+    "centroid_x": 0.518301423895296,
+    "centroid_y": 1.29693032723886,
+    "bbox_json": {
+      "x0": 0.5169724156616857,
+      "y0": 1.2927919741030092,
+      "x1": 0.5196304321289062,
+      "y1": 1.3010686803747107
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Official",
+    "text_normalized": "official"
+  },
+  {
+    "id": 669,
+    "page": 1,
+    "centroid_x": 0.518301423895296,
+    "centroid_y": 1.3030254222728588,
+    "bbox_json": {
+      "x0": 0.5169724156616857,
+      "y0": 1.301821560329861,
+      "x1": 0.5196304321289062,
+      "y1": 1.3042292842158565
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "or",
+    "text_normalized": "or"
+  },
+  {
+    "id": 670,
+    "page": 1,
+    "centroid_x": 0.518301423895296,
+    "centroid_y": 1.3107022885923032,
+    "bbox_json": {
+      "x0": 0.5169724156616857,
+      "y0": 1.304982277199074,
+      "x1": 0.5196304321289062,
+      "y1": 1.3164222999855324
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Designee",
+    "text_normalized": "designee"
+  },
+  {
+    "id": 671,
+    "page": 1,
+    "centroid_x": 0.5219864012703063,
+    "centroid_y": 1.3741457903826677,
+    "bbox_json": {
+      "x0": 0.5204269166976686,
+      "y0": 1.368844943576389,
+      "x1": 0.5235458858429439,
+      "y1": 1.3794466371889467
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "4/15/26",
+    "text_normalized": "4/15/26"
+  },
+  {
+    "id": 672,
+    "page": 1,
+    "centroid_x": 0.527386640114759,
+    "centroid_y": 1.3099572075737846,
+    "bbox_json": {
+      "x0": 0.5258271555421213,
+      "y0": 1.3048343234592015,
+      "x1": 0.5289461246873967,
+      "y1": 1.315080091688368
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Bureau",
+    "text_normalized": "bureau"
+  },
+  {
+    "id": 673,
+    "page": 1,
+    "centroid_x": 0.527386640114759,
+    "centroid_y": 1.320908553512008,
+    "bbox_json": {
+      "x0": 0.5258271555421213,
+      "y0": 1.3159636320891204,
+      "x1": 0.5289461246873967,
+      "y1": 1.3258534749348958
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Veritas",
+    "text_normalized": "veritas"
+  },
+  {
+    "id": 674,
+    "page": 1,
+    "centroid_x": 0.5216098765216808,
+    "centroid_y": 1.3640990080656827,
+    "bbox_json": {
+      "x0": 0.5200650250470197,
+      "y0": 1.3603369818793403,
+      "x1": 0.5231547279963418,
+      "y1": 1.3678610342520254
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Date:",
+    "text_normalized": "date:"
+  },
+  {
+    "id": 675,
+    "page": 1,
+    "centroid_x": 0.5583110789142589,
+    "centroid_y": 1.3180657845956307,
+    "bbox_json": {
+      "x0": 0.5526447598896329,
+      "y0": 1.3078952365451388,
+      "x1": 0.5639773979388848,
+      "y1": 1.3282363326461226
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "UCSF",
+    "text_normalized": "ucsf"
+  },
+  {
+    "id": 676,
+    "page": 1,
+    "centroid_x": 0.5211256723555308,
+    "centroid_y": 1.2875029952437789,
+    "bbox_json": {
+      "x0": 0.5194558844995246,
+      "y0": 1.2824924045138888,
+      "x1": 0.5227954602115369,
+      "y1": 1.292513585973669
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Name:",
+    "text_normalized": "name:"
+  },
+  {
+    "id": 677,
+    "page": 1,
+    "centroid_x": 0.5211513660572193,
+    "centroid_y": 1.2992011176215277,
+    "bbox_json": {
+      "x0": 0.5195918814845817,
+      "y0": 1.2933711299189814,
+      "x1": 0.522710850629857,
+      "y1": 1.3050311053240742
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Afsaneh",
+    "text_normalized": "afsaneh"
+  },
+  {
+    "id": 678,
+    "page": 1,
+    "centroid_x": 0.5211513660572193,
+    "centroid_y": 1.311301224320023,
+    "bbox_json": {
+      "x0": 0.5195918814845817,
+      "y0": 1.3059145326967592,
+      "x1": 0.522710850629857,
+      "y1": 1.316687915943287
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Ahmadi",
+    "text_normalized": "ahmadi"
+  },
+  {
+    "id": 679,
+    "page": 1,
+    "centroid_x": 0.521310493428871,
+    "centroid_y": 1.3269329494900173,
+    "bbox_json": {
+      "x0": 0.5197315922489872,
+      "y0": 1.3196000840928819,
+      "x1": 0.5228893946087549,
+      "y1": 1.3342658148871527
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Signature:",
+    "text_normalized": "signature:"
+  },
+  {
+    "id": 680,
+    "page": 1,
+    "centroid_x": 0.5420802888416109,
+    "centroid_y": 1.2959998801902488,
+    "bbox_json": {
+      "x0": 0.5403536841982887,
+      "y0": 1.2890578658492478,
+      "x1": 0.543806893484933,
+      "y1": 1.30294189453125
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Approval",
+    "text_normalized": "approval"
+  },
+  {
+    "id": 681,
+    "page": 1,
+    "centroid_x": 0.5420802888416109,
+    "centroid_y": 1.3053872567635996,
+    "bbox_json": {
+      "x0": 0.5403536841982887,
+      "y0": 1.3039200394241899,
+      "x1": 0.543806893484933,
+      "y1": 1.3068544741030093
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "of",
+    "text_normalized": "of"
+  },
+  {
+    "id": 682,
+    "page": 1,
+    "centroid_x": 0.5420802888416109,
+    "centroid_y": 1.3105700457537615,
+    "bbox_json": {
+      "x0": 0.5403536841982887,
+      "y0": 1.307832618995949,
+      "x1": 0.543806893484933,
+      "y1": 1.313307472511574
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "this",
+    "text_normalized": "this"
+  },
+  {
+    "id": 683,
+    "page": 1,
+    "centroid_x": 0.5420802888416109,
+    "centroid_y": 1.3176105640552662,
+    "bbox_json": {
+      "x0": 0.5403536841982887,
+      "y0": 1.3142856174045139,
+      "x1": 0.543806893484933,
+      "y1": 1.3209355107060186
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "plan",
+    "text_normalized": "plan"
+  },
+  {
+    "id": 684,
+    "page": 1,
+    "centroid_x": 0.5420802888416109,
+    "centroid_y": 1.3257277312102143,
+    "bbox_json": {
+      "x0": 0.5403536841982887,
+      "y0": 1.3219136555989583,
+      "x1": 0.543806893484933,
+      "y1": 1.32954180682147
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "does",
+    "text_normalized": "does"
+  },
+  {
+    "id": 685,
+    "page": 1,
+    "centroid_x": 0.5420802888416109,
+    "centroid_y": 1.3329653139467592,
+    "bbox_json": {
+      "x0": 0.5403536841982887,
+      "y0": 1.3305199517144097,
+      "x1": 0.543806893484933,
+      "y1": 1.3354106761791087
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "not",
+    "text_normalized": "not"
+  },
+  {
+    "id": 686,
+    "page": 1,
+    "centroid_x": 0.5420802888416109,
+    "centroid_y": 1.3436246518735533,
+    "bbox_json": {
+      "x0": 0.5403536841982887,
+      "y0": 1.3363888210720487,
+      "x1": 0.543806893484933,
+      "y1": 1.3508604826750579
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "authorize",
+    "text_normalized": "authorize"
+  },
+  {
+    "id": 687,
+    "page": 1,
+    "centroid_x": 0.5420802888416109,
+    "centroid_y": 1.3534025969328702,
+    "bbox_json": {
+      "x0": 0.5403536841982887,
+      "y0": 1.3518386275679977,
+      "x1": 0.543806893484933,
+      "y1": 1.354966566297743
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "or",
+    "text_normalized": "or"
+  },
+  {
+    "id": 688,
+    "page": 1,
+    "centroid_x": 0.5420802888416109,
+    "centroid_y": 1.3626914695457177,
+    "bbox_json": {
+      "x0": 0.5403536841982887,
+      "y0": 1.3559447111906828,
+      "x1": 0.543806893484933,
+      "y1": 1.3694382279007524
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "approval",
+    "text_normalized": "approval"
+  },
+  {
+    "id": 689,
+    "page": 1,
+    "centroid_x": 0.5420802888416109,
+    "centroid_y": 1.373252190483941,
+    "bbox_json": {
+      "x0": 0.5403536841982887,
+      "y0": 1.370416259765625,
+      "x1": 0.543806893484933,
+      "y1": 1.3760881212022569
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "any",
+    "text_normalized": "any"
+  },
+  {
+    "id": 690,
+    "page": 1,
+    "centroid_x": 0.5390952579558841,
+    "centroid_y": 1.2957161797417536,
+    "bbox_json": {
+      "x0": 0.5373573101386822,
+      "y0": 1.2887301974826388,
+      "x1": 0.5408332057730861,
+      "y1": 1.302702162000868
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "omission",
+    "text_normalized": "omission"
+  },
+  {
+    "id": 691,
+    "page": 1,
+    "centroid_x": 0.5390952579558841,
+    "centroid_y": 1.3052610044126158,
+    "bbox_json": {
+      "x0": 0.5373573101386822,
+      "y0": 1.3036867494936342,
+      "x1": 0.5408332057730861,
+      "y1": 1.3068352593315973
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "or",
+    "text_normalized": "or"
+  },
+  {
+    "id": 692,
+    "page": 1,
+    "centroid_x": 0.5390952579558841,
+    "centroid_y": 1.3149067631474247,
+    "bbox_json": {
+      "x0": 0.5373573101386822,
+      "y0": 1.3078198468243634,
+      "x1": 0.5408332057730861,
+      "y1": 1.321993679470486
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "deviation",
+    "text_normalized": "deviation"
+  },
+  {
+    "id": 693,
+    "page": 1,
+    "centroid_x": 0.5390952579558841,
+    "centroid_y": 1.3265199449327256,
+    "bbox_json": {
+      "x0": 0.5373573101386822,
+      "y0": 1.3229782669632524,
+      "x1": 0.5408332057730861,
+      "y1": 1.330061622902199
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "from",
+    "text_normalized": "from"
+  },
+  {
+    "id": 694,
+    "page": 1,
+    "centroid_x": 0.5390952579558841,
+    "centroid_y": 1.3390184190538195,
+    "bbox_json": {
+      "x0": 0.5373573101386822,
+      "y0": 1.331046097366898,
+      "x1": 0.5408332057730861,
+      "y1": 1.3469907407407407
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "applicable",
+    "text_normalized": "applicable"
+  },
+  {
+    "id": 695,
+    "page": 1,
+    "centroid_x": 0.5390952579558841,
+    "centroid_y": 1.357128793221933,
+    "bbox_json": {
+      "x0": 0.5373573101386822,
+      "y0": 1.347975328233507,
+      "x1": 0.5408332057730861,
+      "y1": 1.3662822582103589
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "regulations.",
+    "text_normalized": "regulations."
+  },
+  {
+    "id": 696,
+    "page": 1,
+    "centroid_x": 0.5390952579558841,
+    "centroid_y": 1.3711042050962094,
+    "bbox_json": {
+      "x0": 0.5373573101386822,
+      "y0": 1.367266845703125,
+      "x1": 0.5408332057730861,
+      "y1": 1.374941564489294
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "Final",
+    "text_normalized": "final"
+  },
+  {
+    "id": 697,
+    "page": 1,
+    "centroid_x": 0.5325867789132255,
+    "centroid_y": 1.2930059927481192,
+    "bbox_json": {
+      "x0": 0.5308488310960234,
+      "y0": 1.2887737132884838,
+      "x1": 0.5343247267304274,
+      "y1": 1.2972382722077547
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "plans",
+    "text_normalized": "plans"
+  },
+  {
+    "id": 698,
+    "page": 1,
+    "centroid_x": 0.5325867789132255,
+    "centroid_y": 1.301863776312934,
+    "bbox_json": {
+      "x0": 0.5308488310960234,
+      "y0": 1.2982229727285879,
+      "x1": 0.5343247267304274,
+      "y1": 1.3055045798972802
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "shall",
+    "text_normalized": "shall"
+  },
+  {
+    "id": 699,
+    "page": 1,
+    "centroid_x": 0.5325867789132255,
+    "centroid_y": 1.3084583423755787,
+    "bbox_json": {
+      "x0": 0.5308488310960234,
+      "y0": 1.3064891673900463,
+      "x1": 0.5343247267304274,
+      "y1": 1.310427517361111
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "be",
+    "text_normalized": "be"
+  },
+  {
+    "id": 700,
+    "page": 1,
+    "centroid_x": 0.5325867789132255,
+    "centroid_y": 1.3183998390480325,
+    "bbox_json": {
+      "x0": 0.5308488310960234,
+      "y0": 1.3114121048538774,
+      "x1": 0.5343247267304274,
+      "y1": 1.3253875732421876
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "available",
+    "text_normalized": "available"
+  },
+  {
+    "id": 701,
+    "page": 1,
+    "centroid_x": 0.5325867789132255,
+    "centroid_y": 1.328341335720486,
+    "bbox_json": {
+      "x0": 0.5308488310960234,
+      "y0": 1.3263721607349537,
+      "x1": 0.5343247267304274,
+      "y1": 1.3303105107060185
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "on",
+    "text_normalized": "on"
+  },
+  {
+    "id": 702,
+    "page": 1,
+    "centroid_x": 0.5325867789132255,
+    "centroid_y": 1.3337565669307003,
+    "bbox_json": {
+      "x0": 0.5308488310960234,
+      "y0": 1.3312950981987848,
+      "x1": 0.5343247267304274,
+      "y1": 1.3362180356626157
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "the",
+    "text_normalized": "the"
+  },
+  {
+    "id": 703,
+    "page": 1,
+    "centroid_x": 0.5325867789132255,
+    "centroid_y": 1.3425169203016494,
+    "bbox_json": {
+      "x0": 0.5308488310960234,
+      "y0": 1.337202623155382,
+      "x1": 0.5343247267304274,
+      "y1": 1.3478312174479166
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "project",
+    "text_normalized": "project"
+  },
+  {
+    "id": 704,
+    "page": 1,
+    "centroid_x": 0.5325867789132255,
+    "centroid_y": 1.3515712596752025,
+    "bbox_json": {
+      "x0": 0.5308488310960234,
+      "y0": 1.3488158049406829,
+      "x1": 0.5343247267304274,
+      "y1": 1.3543267144097222
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "site",
+    "text_normalized": "site"
+  },
+  {
+    "id": 705,
+    "page": 1,
+    "centroid_x": 0.5325867789132255,
+    "centroid_y": 1.3567880701135706,
+    "bbox_json": {
+      "x0": 0.5308488310960234,
+      "y0": 1.3553111888744214,
+      "x1": 0.5343247267304274,
+      "y1": 1.3582649513527199
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "at",
+    "text_normalized": "at"
+  },
+  {
+    "id": 706,
+    "page": 1,
+    "centroid_x": 0.5325867789132255,
+    "centroid_y": 1.361020349573206,
+    "bbox_json": {
+      "x0": 0.5308488310960234,
+      "y0": 1.3592495388454862,
+      "x1": 0.5343247267304274,
+      "y1": 1.362791160300926
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "all",
+    "text_normalized": "all"
+  },
+  {
+    "id": 707,
+    "page": 1,
+    "centroid_x": 0.5325867789132255,
+    "centroid_y": 1.3684986820927372,
+    "bbox_json": {
+      "x0": 0.5308488310960234,
+      "y0": 1.3637758608217592,
+      "x1": 0.5343247267304274,
+      "y1": 1.3732215033637152
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "times.",
+    "text_normalized": "times."
+  },
+  {
+    "id": 708,
+    "page": 1,
+    "centroid_x": 0.5358206733824715,
+    "centroid_y": 1.2926418163158275,
+    "bbox_json": {
+      "x0": 0.5340713823913897,
+      "y0": 1.2858062744140626,
+      "x1": 0.5375699643735532,
+      "y1": 1.2994773582175927
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "approval",
+    "text_normalized": "approval"
+  },
+  {
+    "id": 709,
+    "page": 1,
+    "centroid_x": 0.5358206733824715,
+    "centroid_y": 1.3017553258825232,
+    "bbox_json": {
+      "x0": 0.5340713823913897,
+      "y0": 1.300468388310185,
+      "x1": 0.5375699643735532,
+      "y1": 1.303042263454861
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "is",
+    "text_normalized": "is"
+  },
+  {
+    "id": 710,
+    "page": 1,
+    "centroid_x": 0.5358206733824715,
+    "centroid_y": 1.3096798366970486,
+    "bbox_json": {
+      "x0": 0.5340713823913897,
+      "y0": 1.3040331805193865,
+      "x1": 0.5375699643735532,
+      "y1": 1.3153264928747106
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "subject",
+    "text_normalized": "subject"
+  },
+  {
+    "id": 711,
+    "page": 1,
+    "centroid_x": 0.5358206733824715,
+    "centroid_y": 1.317804068106192,
+    "bbox_json": {
+      "x0": 0.5340713823913897,
+      "y0": 1.3163175229673032,
+      "x1": 0.5375699643735532,
+      "y1": 1.319290613245081
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "to",
+    "text_normalized": "to"
+  },
+  {
+    "id": 712,
+    "page": 1,
+    "centroid_x": 0.5358206733824715,
+    "centroid_y": 1.323550584581163,
+    "bbox_json": {
+      "x0": 0.5340713823913897,
+      "y0": 1.3202816433376736,
+      "x1": 0.5375699643735532,
+      "y1": 1.3268195258246527
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "field",
+    "text_normalized": "field"
+  },
+  {
+    "id": 713,
+    "page": 1,
+    "centroid_x": 0.5358206733824715,
+    "centroid_y": 1.336330442075376,
+    "bbox_json": {
+      "x0": 0.5340713823913897,
+      "y0": 1.3278105559172453,
+      "x1": 0.5375699643735532,
+      "y1": 1.344850328233507
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "inspection.",
+    "text_normalized": "inspection."
+  },
+  {
+    "id": 714,
+    "page": 1,
+    "centroid_x": 0.5358206733824715,
+    "centroid_y": 1.3502011334454571,
+    "bbox_json": {
+      "x0": 0.5340713823913897,
+      "y0": 1.3468323884186921,
+      "x1": 0.5375699643735532,
+      "y1": 1.3535698784722223
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "One",
+    "text_normalized": "one"
+  },
+  {
+    "id": 715,
+    "page": 1,
+    "centroid_x": 0.5358206733824715,
+    "centroid_y": 1.3569386234989873,
+    "bbox_json": {
+      "x0": 0.5340713823913897,
+      "y0": 1.354560908564815,
+      "x1": 0.5375699643735532,
+      "y1": 1.3593163384331597
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "set",
+    "text_normalized": "set"
+  },
+  {
+    "id": 716,
+    "page": 1,
+    "centroid_x": 0.5358206733824715,
+    "centroid_y": 1.3617938571506076,
+    "bbox_json": {
+      "x0": 0.5340713823913897,
+      "y0": 1.3603073685257523,
+      "x1": 0.5375699643735532,
+      "y1": 1.363280345775463
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "of",
+    "text_normalized": "of"
+  },
+  {
+    "id": 717,
+    "page": 1,
+    "centroid_x": 0.5358206733824715,
+    "centroid_y": 1.3717022365993925,
+    "bbox_json": {
+      "x0": 0.5340713823913897,
+      "y0": 1.3642713758680556,
+      "x1": 0.5375699643735532,
+      "y1": 1.3791330973307292
+    },
+    "source": "native_pdf",
+    "ocr_confidence": 1.0,
+    "text": "approved",
+    "text_normalized": "approved"
+  }
+]

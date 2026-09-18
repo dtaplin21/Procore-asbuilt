@@ -34,6 +34,7 @@ import fitz  # PyMuPDF
 class SourceFormat(str, Enum):
     NATIVE_PDF = "native_pdf"  # PDF with an extractable text layer
     SCANNED_PDF = "scanned_pdf"  # PDF that is just rasterized images
+    HYBRID_PDF = "hybrid_pdf"  # native text layer merged with OCR (master drawings)
     IMAGE = "image"  # standalone photo / scanned page (jpg, png, etc.)
 
 
@@ -88,6 +89,8 @@ class PositionedWord:
     # (did we read the right characters), independent of and upstream from
     # the *vocabulary match* confidence computed later in term_extractor.
     ocr_confidence: float = 1.0
+    # Per-token ingest source when a document mixes native PDF + OCR (master hybrid index).
+    token_source: str | None = None
 
 
 @dataclass(frozen=True)
@@ -159,6 +162,17 @@ def _pdf_has_text_layer(file_path: str | Path) -> bool:
         doc.close()
 
 
+def _word_rect_in_page_display_space(
+    page: fitz.Page,
+    x0: float,
+    y0: float,
+    x1: float,
+    y1: float,
+) -> fitz.Rect:
+    """Map PDF user-space word box to the same display coordinates as ``page.get_pixmap``."""
+    return fitz.Rect(x0, y0, x1, y1) * page.transformation_matrix
+
+
 def _pdf_text_layer(file_path: str | Path) -> ExtractedDocument:
     """Extract words + boxes directly from a native PDF's text layer."""
     doc = fitz.open(str(file_path))
@@ -171,15 +185,21 @@ def _pdf_text_layer(file_path: str | Path) -> ExtractedDocument:
                 x0, y0, x1, y1, text, *_ = w
                 if not str(text).strip():
                     continue
-                fx0, fy0, fx1, fy1 = float(x0), float(y0), float(x1), float(y1)
+                display = _word_rect_in_page_display_space(
+                    page,
+                    float(x0),
+                    float(y0),
+                    float(x1),
+                    float(y1),
+                )
                 words.append(
                     PositionedWord(
                         text=str(text),
                         bbox=BoundingBox(
-                            x=fx0,
-                            y=fy0,
-                            width=fx1 - fx0,
-                            height=fy1 - fy0,
+                            x=float(display.x0),
+                            y=float(display.y0),
+                            width=float(display.width),
+                            height=float(display.height),
                             page_width=float(pw),
                             page_height=float(ph),
                         ),
