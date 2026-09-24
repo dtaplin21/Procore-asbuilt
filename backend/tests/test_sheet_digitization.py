@@ -158,3 +158,110 @@ def test_digitize_drawing_page_sets_viewport_warning_when_empty(
     assert graph.meta["viewport_warning"] is True
     assert graph.viewports == ()
     assert graph.symbols == ()
+
+
+def test_digitize_uses_pdf_vector_lines_when_gated(
+    db_session,
+    project,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    import fitz
+
+    from ai.pipelines.pdf_line_source_gate import PdfLineSource, PdfLineSourceStats
+    from ai.pipelines.pdf_vector_line_extractor import PdfVectorChain, LineStyleSignature
+
+    storage = StorageService(db_session)
+    drawing = storage.create_drawing(
+        project_id=cast(int, project.id),
+        source="upload",
+        name="Vector.pdf",
+        storage_key="projects/2/drawings/vector.pdf",
+        content_type="application/pdf",
+    )
+    drawing_id = cast(int, drawing.id)
+    db_session.add(
+        DrawingViewport(
+            drawing_id=drawing_id,
+            page=1,
+            viewport_id="plan",
+            kind="plan",
+            bbox_json={"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 0.85},
+            scale_json={
+                "raw_text": '1"=10\'',
+                "real_feet_per_paper_inch": 10.0,
+                "confidence": 0.9,
+            },
+            source="manual",
+        )
+    )
+    db_session.commit()
+
+    pdf_path = tmp_path / "source.pdf"
+    doc = fitz.open()
+    page = doc.new_page(width=800, height=600)
+    page.draw_line((80, 200), (720, 200), width=0.72)
+    doc.save(str(pdf_path))
+    doc.close()
+
+    png = tmp_path / "page.png"
+    _write_blank_png(png)
+
+    fake_style = LineStyleSignature(
+        stroke_width_bucket=0.72,
+        mean_segment_len_frac=0.05,
+        mean_gap_len_frac=0.0,
+        segment_count=1,
+        kind_guess="solid",
+    )
+    fake_chain = PdfVectorChain(
+        points=((0.1, 0.33), (0.9, 0.33)),
+        stroke_width=0.72,
+        color=None,
+        style=fake_style,
+        source_path_indices=(0,),
+    )
+
+    stats = PdfLineSourceStats(path_count=100, line_op_count=600, stroked_path_count=120)
+
+    monkeypatch.setattr(
+        "ai.pipelines.pdf_line_source_gate.classify_pdf_line_source",
+        lambda *args, **kwargs: (PdfLineSource.VECTOR, stats),
+    )
+    monkeypatch.setattr(
+        "ai.pipelines.pdf_vector_line_extractor.extract_pdf_vector_chains",
+        lambda *args, **kwargs: [fake_chain],
+    )
+    monkeypatch.setattr(
+        "services.sheet_digitization.MIN_VECTOR_CHAINS_BEFORE_RASTER_FALLBACK",
+        1,
+    )
+    monkeypatch.setattr(
+        "ai.pipelines.legend_line_row_builder.cluster_legend_line_rows",
+        lambda *args, **kwargs: [],
+    )
+    monkeypatch.setattr(
+        "ai.pipelines.legend_line_swatch.build_legend_line_templates",
+        lambda *args, **kwargs: [],
+    )
+    monkeypatch.setattr(
+        "services.sheet_digitization.detect_symbols",
+        lambda *args, **kwargs: [],
+    )
+    monkeypatch.setattr(
+        "services.sheet_digitization.resolve_symbol_detector_weights_path",
+        lambda *args, **kwargs: Path("/fake/weights.pt"),
+    )
+
+    graph = digitize_drawing_page(
+        db_session,
+        drawing_id,
+        page=1,
+        rendition_png=png,
+        source_pdf=pdf_path,
+        persist=False,
+    )
+
+    assert graph.meta.get("pdf_line_source") == "vector"
+    assert len(graph.lines) == 1
+    assert graph.lines[0].source == "pdf_vector"

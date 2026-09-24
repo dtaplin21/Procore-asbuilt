@@ -34,6 +34,8 @@ _PLAN_VIEW_MAX_Y = 0.55
 _PLAN_VIEW_MIN_Y = 0.10
 # Prefer digitized SheetLine over vision when line confidence meets this floor.
 _SHEET_LINE_HIGH_CONFIDENCE = 0.7
+# Break ties vs. legacy untyped lines when a typed line already matched legend codes.
+_TYPED_SHEET_LINE_MATCH_BONUS = 0.2
 
 
 @dataclass(frozen=True)
@@ -314,6 +316,7 @@ def _trace_utility_line(
         expanded_anchor=expanded_anchor,
         base_meta={**meta, "legend_codes": sorted(legend_codes)},
         source_drawing_id=source_drawing_id,
+        legend_codes=legend_codes,
     )
     if sheet_line_geometry is not None:
         return sheet_line_geometry
@@ -347,6 +350,7 @@ def _prefer_plan_sheet_line(
     expanded_anchor: tuple[float, float, float, float],
     base_meta: dict[str, Any],
     source_drawing_id: int | None,
+    legend_codes: set[str] | None = None,
 ) -> ScopeGeometry | None:
     """Use high-confidence SheetLine polylines inside plan viewports over vision."""
     if session is None:
@@ -356,6 +360,7 @@ def _prefer_plan_sheet_line(
         drawing_id=drawing_id,
         page=page,
         expanded_anchor=expanded_anchor,
+        legend_codes=legend_codes or set(),
     )
     if candidate is None:
         return None
@@ -377,12 +382,35 @@ def _prefer_plan_sheet_line(
     )
 
 
+def _line_matches_utility_legend(
+    raw: dict[str, Any],
+    *,
+    legend_codes: set[str],
+    session: Session | None,
+) -> bool:
+    line_type = raw.get("line_type")
+    if not line_type:
+        return True
+    type_id = raw.get("legend_line_type_id")
+    if type_id is not None and session is not None:
+        from models.legend_reference import DrawingLegendLineType
+
+        row = session.get(DrawingLegendLineType, int(type_id))
+        if row is not None:
+            code = cast(str | None, row.abbreviation_code)
+            if code and code in legend_codes:
+                return True
+    upper = str(line_type).upper()
+    return any(code in upper for code in legend_codes)
+
+
 def _best_plan_sheet_line(
     session: Session,
     *,
     drawing_id: int,
     page: int,
     expanded_anchor: tuple[float, float, float, float],
+    legend_codes: set[str] | None = None,
 ) -> tuple[tuple[tuple[float, float], ...], str | None, float] | None:
     drawing = session.get(Drawing, int(drawing_id))
     if drawing is None:
@@ -405,6 +433,7 @@ def _best_plan_sheet_line(
     if not plan_ids:
         return None
 
+    codes = legend_codes or set()
     ax0, ay0, ax1, ay1 = expanded_anchor
     anchor_cx = (ax0 + ax1) / 2.0
     anchor_cy = (ay0 + ay1) / 2.0
@@ -418,6 +447,8 @@ def _best_plan_sheet_line(
         except (TypeError, ValueError):
             continue
         if confidence < _SHEET_LINE_HIGH_CONFIDENCE:
+            continue
+        if not _line_matches_utility_legend(raw, legend_codes=codes, session=session):
             continue
         viewport_id = raw.get("viewport_id")
         if viewport_id is None or str(viewport_id) not in plan_ids:
@@ -438,6 +469,8 @@ def _best_plan_sheet_line(
         # Prefer lines that intersect the anchor; otherwise nearest midpoint.
         distance = 0.0 if intersects else ((mid_x - anchor_cx) ** 2 + (mid_y - anchor_cy) ** 2)
         score = distance - confidence  # lower is better
+        if raw.get("line_type"):
+            score -= _TYPED_SHEET_LINE_MATCH_BONUS
         if best is None or score < best[3]:
             best = (tuple(points), str(viewport_id), confidence, score)
 

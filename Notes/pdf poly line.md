@@ -294,121 +294,25 @@ def extract_pdf_vector_chains(
 - Clusters by centroid Y (`_ROW_Y_TOLERANCE`), joins tokens left-to-right  
 - `swatch_bbox` = strip `_SWATCH_WIDTH_FRAC` left of label union box  
 
-### 2b — Swatch templates ✅ (partial)
+### 2b — Swatch templates + DB link ✅
 
-**Added:** `backend/ai/pipelines/legend_line_swatch.py`, `services/legend_lookup.match_line_type_by_name`  
-**Tests:** `backend/tests/test_legend_line_swatch.py`, `test_legend_lookup_line_type.py`
+**Module:** `backend/ai/pipelines/legend_line_swatch.py`  
+**Lookup:** `services/legend_lookup.match_line_type_by_name`  
+**Tests:** `tests/test_legend_line_swatch.py`, `tests/test_legend_lookup_line_type.py`
 
-### 2b — Swatch template extraction + DB link
+| Function | Role |
+|----------|------|
+| `LegendLineTemplate` | DB id + name + abbrev + `LineStyleSignature` from swatch |
+| `extract_swatch_template()` | Segments in display-space `swatch_bbox` → longest chain’s style (`min_polyline_length_frac=1e-4` for tiny swatches) |
+| `build_legend_line_templates()` | Rows → swatch style + `match_line_type_by_name`; skips rows with no vectors or no DB match |
 
-```python
-from ai.pipelines.pdf_vector_line_extractor import (
-    LineStyleSignature,
-    extract_pdf_vector_segments,
-    segments_to_chains,
-)
-from services.legend_lookup import match_line_type_by_name  # new helper or fuzzy on line_type_name
+### 2c — Classify plan chains ✅
 
+**Same module:** `classify_chains_with_templates()`, `_signature_distance()`, `legend_line_templates_to_meta()`
 
-@dataclass(frozen=True)
-class LegendLineTemplate:
-    legend_line_type_id: int
-    line_type_name: str
-    abbreviation_code: str | None
-    style: LineStyleSignature
-
-
-def extract_swatch_template(
-    pdf_path: str | Path,
-    swatch_bbox: tuple[float, float, float, float],
-    *,
-    page: int = 1,
-) -> LineStyleSignature | None:
-    x0, y0, x1, y1 = swatch_bbox
-    segments = extract_pdf_vector_segments(pdf_path, page=page)
-    inside = [
-        s for s in segments
-        if x0 <= (s.x0 + s.x1) / 2 <= x1 and y0 <= (s.y0 + s.y1) / 2 <= y1
-    ]
-    if not inside:
-        return None
-    chains = segments_to_chains(inside)
-    if not chains:
-        return None
-    return chains[0].style
-
-
-def build_legend_line_templates(
-    session,
-    pdf_path: str | Path,
-    rows: list[LegendLineRow],
-    *,
-    project_id: int | None,
-    page: int = 1,
-) -> list[LegendLineTemplate]:
-    templates: list[LegendLineTemplate] = []
-    for row in rows:
-        style = extract_swatch_template(pdf_path, row.swatch_bbox, page=page)
-        if style is None:
-            continue
-        db_row = match_line_type_by_name(session, row.text, project_id=project_id)
-        if db_row is None:
-            continue
-        templates.append(
-            LegendLineTemplate(
-                legend_line_type_id=int(db_row.id),
-                line_type_name=str(db_row.line_type_name),
-                abbreviation_code=db_row.abbreviation_code,
-                style=style,
-            )
-        )
-    return templates
-```
-
-### 2c — Classify plan chains
-
-```python
-def _signature_distance(a: LineStyleSignature, b: LineStyleSignature) -> float:
-    return (
-        abs(a.stroke_width_bucket - b.stroke_width_bucket) * 10.0
-        + abs(a.mean_gap_len_frac - b.mean_gap_len_frac)
-        + abs(a.mean_segment_len_frac - b.mean_segment_len_frac)
-    )
-
-
-def classify_chains_with_templates(
-    chains: list[PdfVectorChain],
-    templates: list[LegendLineTemplate],
-) -> list[tuple[PdfVectorChain, str | None, int | None]]:
-    """Returns (chain, line_type_name, legend_line_type_id)."""
-    out: list[tuple[PdfVectorChain, str | None, int | None]] = []
-    for chain in chains:
-        if not templates:
-            out.append((chain, None, None))
-            continue
-        best = min(templates, key=lambda t: _signature_distance(chain.style, t.style))
-        out.append((chain, best.line_type_name, best.legend_line_type_id))
-    return out
-```
-
-Persist templates on graph meta (no migration required v1):
-
-```python
-graph.meta["legend_line_templates"] = [
-    {
-        "legend_line_type_id": t.legend_line_type_id,
-        "line_type_name": t.line_type_name,
-        "abbreviation_code": t.abbreviation_code,
-        "style": {
-            "stroke_width_bucket": t.style.stroke_width_bucket,
-            "mean_segment_len_frac": t.style.mean_segment_len_frac,
-            "mean_gap_len_frac": t.style.mean_gap_len_frac,
-            "kind_guess": t.style.kind_guess,
-        },
-    }
-    for t in templates
-]
-```
+- Nearest template by width + gap + segment-length deltas  
+- Persist v1: `graph.meta["legend_line_templates"] = legend_line_templates_to_meta(templates)`  
+- **Tests:** `test_classify_chains_with_templates` in `test_legend_line_swatch.py`
 
 ---
 
@@ -419,168 +323,53 @@ graph.meta["legend_line_templates"] = [
 Fields added (defaults keep raster / legacy JSON rows valid): `source`, `style_signature`, `legend_line_type_id`.  
 `sheet_entity_graph_to_json` uses `asdict(line)` — new fields persist automatically when set.
 
-### 3b — Orchestrator (`sheet_digitization.py`)
+### 3b — Orchestrator (`sheet_digitization.py`) ✅
 
-Replace `_extract_lines` with gated dual path:
+**Implemented:** `_extract_lines()`, `_text_elements_for_page()`, `_resolve_source_pdf()`  
+**Entry:** `digitize_drawing_page(..., source_pdf: Path | None = None)` — when omitted, resolves `Drawing.storage_key` via `file_storage.resolve_stored_file_path`
 
-```python
-def _extract_lines(
-    *,
-    pdf_path: Path | None,
-    rendition_png: Path,
-    viewports: tuple[DrawingViewport, ...],
-    page: int,
-    session: Session,
-    drawing_id: int,
-    project_id: int | None,
-) -> list[SheetLine]:
-    from ai.pipelines.pdf_line_source_gate import PdfLineSource, classify_pdf_line_source
-    from ai.pipelines.line_extractor import extract_line_polylines
-    from ai.pipelines.pdf_vector_line_extractor import (
-        chains_to_sheet_lines,
-        extract_pdf_vector_chains,
-        classify_chains_with_templates,
-    )
-    from ai.pipelines.legend_line_row_builder import cluster_legend_line_rows
-    from ai.pipelines.legend_line_swatch import build_legend_line_templates
+| Path | Behavior |
+|------|----------|
+| Vector gate + PDF on disk | `extract_pdf_vector_chains` → legend rows/templates → `classify_chains_with_templates` → `chains_to_sheet_lines` |
+| Raster / missing PDF | PNG `extract_line_polylines` (unchanged) |
 
-    if pdf_path is not None and pdf_path.is_file():
-        source, _ = classify_pdf_line_source(pdf_path, page=page)
-        if source is PdfLineSource.VECTOR:
-            chains = extract_pdf_vector_chains(pdf_path, page=page)
-            # Legend rows from DB text elements (same as _labels_from_text_elements query)
-            rows = cluster_legend_line_rows(_text_elements_for_page(session, drawing_id, page))
-            templates = build_legend_line_templates(
-                session, pdf_path, rows, project_id=project_id, page=page,
-            )
-            classified = classify_chains_with_templates(chains, templates)
-            lines: list[SheetLine] = []
-            for chain, type_name, type_id in classified:
-                for sl in chains_to_sheet_lines([chain], viewports, line_type=type_name):
-                    lines.append(
-                        SheetLine(
-                            points=sl.points,
-                            viewport_id=sl.viewport_id,
-                            confidence=sl.confidence,
-                            line_type=type_name,
-                            source="pdf_vector",
-                            style_signature={
-                                "stroke_width_bucket": chain.style.stroke_width_bucket,
-                                "mean_gap_len_frac": chain.style.mean_gap_len_frac,
-                                "kind_guess": chain.style.kind_guess,
-                            },
-                            legend_line_type_id=type_id,
-                        )
-                    )
-            return lines
+**Graph meta:** `pdf_line_source`, `pdf_line_source_stats`, optional `legend_line_templates`  
+**Tests:** `test_digitize_uses_pdf_vector_lines_when_gated`  
+**Jobs:** `maybe_digitize_drawing_after_index` auto-resolves PDF from drawing record (no API change).
 
-    # Fallback: existing raster path
-    if not viewports:
-        return extract_line_polylines(rendition_png)
-    lines = []
-    for viewport in viewports:
-        lines.extend(extract_line_polylines(rendition_png, viewport=viewport))
-    return lines
-```
+### 3c — Scope tracer (`scope_line_tracer.py`) ✅
 
-**Indexer / render job:** pass `pdf_path` into `digitize_drawing_page` (local file from storage, same path used for native text extract).
+**Added:** `_line_matches_utility_legend()`; `_best_plan_sheet_line(..., legend_codes=)`; `_prefer_plan_sheet_line` threads codes from `_utility_legend_codes`.
 
-### 3c — Scope tracer (`scope_line_tracer.py`)
+- Untyped lines (`line_type` missing) — unchanged (still eligible)
+- Typed lines — must match dossier legend codes via `legend_line_type_id` → DB `abbreviation_code`, or substring match on `line_type` text
 
-Filter `_best_plan_sheet_line` by legend intent when `line_type` / `legend_line_type_id` present:
+**Tests:** `test_trace_utility_line_skips_mismatched_typed_sheet_line`, `test_trace_utility_line_prefers_typed_over_untyped_sheet_line` (uses `_TYPED_SHEET_LINE_MATCH_BONUS`)
 
-```python
-def _line_matches_utility_legend(
-    raw: dict,
-    *,
-    legend_codes: set[str],
-    session: Session | None,
-) -> bool:
-    line_type = raw.get("line_type")
-    if not line_type:
-        return True  # legacy untyped lines — keep current behavior
-    type_id = raw.get("legend_line_type_id")
-    if type_id is not None and session is not None:
-        from models.legend_reference import DrawingLegendLineType
-        row = session.get(DrawingLegendLineType, int(type_id))
-        if row and row.abbreviation_code and row.abbreviation_code in legend_codes:
-            return True
-    # Fuzzy: line_type text contains utility/property keywords from dossier
-    upper = str(line_type).upper()
-    return any(code in upper for code in legend_codes)
+### 3d — Tests ✅
 
+| File | Requirement | Test(s) |
+|------|-------------|---------|
+| `test_pdf_line_source_gate.py` | empty PDF → `RASTER`; vector-rich PDF → `VECTOR` | `test_classify_blank_pdf_as_raster`, `test_classify_vector_rich_pdf_as_vector` |
+| `test_pdf_vector_line_extractor.py` | display-space mapping, titleblock filter, chains | `test_extract_segments_maps_to_fractional_display_space`, `test_extract_segments_skips_titleblock_linework`, `test_solid_line_chain_kind` |
+| `test_legend_line_swatch.py` | swatch bbox → template | `test_extract_swatch_template_from_bbox`, `test_build_legend_line_templates_links_swatch_and_db` |
+| `test_sheet_digitization.py` | vector gate → `pdf_vector` lines | `test_digitize_uses_pdf_vector_lines_when_gated` |
+| `test_scope_line_tracer.py` | typed vs untyped; wrong type skipped | `test_trace_utility_line_prefers_typed_over_untyped_sheet_line`, `test_trace_utility_line_skips_mismatched_typed_sheet_line` |
+| `test_line_dash_classifier.py` | raster dash profile + classify | `test_profile_detects_dashed_pattern`, `test_classify_raster_line_sets_source_and_style` |
 
-# Inside _best_plan_sheet_line loop, after confidence check:
-if not _line_matches_utility_legend(raw, legend_codes=legend_codes, session=session):
-    continue
-```
-
-Thread `legend_codes` from existing `_utility_legend_codes(dossier, session=session)` into `_best_plan_sheet_line`.
-
-### 3d — Tests to add
-
-| Test file | Covers |
-|-----------|--------|
-| `test_pdf_line_source_gate.py` | 1691 fixture → `VECTOR`; empty PDF → `RASTER` |
-| `test_pdf_vector_line_extractor.py` | segment count, display-space mapping, titleblock filter |
-| `test_legend_line_swatch.py` | swatch bbox → template signature |
-| `test_sheet_digitization.py` | mock vector path → `source=pdf_vector` lines in graph |
-| `test_scope_line_tracer.py` | typed line preferred over untyped; wrong type skipped |
+Optional live check (1691 on disk): `scripts/audit_pdf_vector_lines.py --drawing-id 1691`
 
 ---
 
-## Step 4 — Raster dash classifier (fallback only)
+## Step 4 — Raster dash classifier (fallback) ✅
 
-**When:** Step 0 returns `RASTER`, or vector path yields `< N` chains in plan viewport.
+**When:** Step 0 → `RASTER`, vector gate with `< 50` chains (`MIN_VECTOR_CHAINS_BEFORE_RASTER_FALLBACK`), or `pdf_line_source=raster_fallback`.
 
-**Add:** `backend/ai/pipelines/line_dash_classifier.py`  
-**Modify:** `line_extractor.py` — optional post-pass before returning `SheetLine`
+**Added:** `backend/ai/pipelines/line_dash_classifier.py` — Bresenham ink profile → `LineStyleSignature` → optional legend template match  
+**Modified:** `line_extractor.extract_line_polylines(..., classify_dash=, dash_templates=)`; raster path in `sheet_digitization._extract_lines_raster` always classifies  
+**Tests:** `tests/test_line_dash_classifier.py`
 
-Sample along a Bresenham ray in the **binary ink** image; measure run/gap lengths in pixels; compare to legend templates from Step 2 (PNG crop) or default thresholds.
-
-```python
-"""Dash-pattern typing for raster-extracted polylines."""
-
-from __future__ import annotations
-
-import numpy as np
-
-from ai.pipelines.sheet_entity_graph import SheetLine
-from ai.pipelines.legend_line_swatch import LegendLineTemplate
-from ai.pipelines.pdf_vector_line_extractor import LineStyleSignature
-
-
-def profile_along_polyline(
-    binary_ink: np.ndarray,
-    points_frac: tuple[tuple[float, float], ...],
-    page_w: int,
-    page_h: int,
-) -> tuple[list[float], list[float]]:
-    """Return (run_lengths_px, gap_lengths_px) sampled along polyline."""
-    ...
-
-
-def classify_raster_line(
-    line: SheetLine,
-    binary_ink: np.ndarray,
-    page_w: int,
-    page_h: int,
-    templates: list[LegendLineTemplate] | None = None,
-) -> SheetLine:
-    runs, gaps = profile_along_polyline(binary_ink, line.points, page_w, page_h)
-    # Build LineStyleSignature from px stats normalized by page diagonal
-    # Nearest template or kind_guess from gap/run ratio
-    return SheetLine(
-        points=line.points,
-        viewport_id=line.viewport_id,
-        confidence=line.confidence * 0.85,  # raster typing less certain
-        line_type=...,
-        source="raster",
-        style_signature={...},
-    )
-```
-
-**Do not** use Step 4 as the primary path for **1691** — vector Step 1–2 supersedes it.
+**Not for 1691-class CAD PDFs** — vector Steps 1–2 remain primary when the gate passes and chain count is sufficient.
 
 ---
 
@@ -592,7 +381,7 @@ def classify_raster_line(
 | 1 | `pdf_vector_line_extractor.py` | optional `line_geometry.py` split from `line_extractor.py` |
 | 2 | `legend_line_row_builder.py`, `legend_line_swatch.py` | `services/legend_lookup.py` (name → `DrawingLegendLineType`) |
 | 3 | — | `sheet_entity_graph.py`, `sheet_digitization.py`, `scope_line_tracer.py`, master index/render caller |
-| 4 | `line_dash_classifier.py` | `line_extractor.py` |
+| 4 | `line_dash_classifier.py`, `line_style_match.py` ✅ | `line_extractor.py`, `sheet_digitization.py` ✅ |
 
 ---
 

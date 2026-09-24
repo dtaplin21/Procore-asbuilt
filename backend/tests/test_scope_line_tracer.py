@@ -447,3 +447,222 @@ def test_trace_utility_line_prefers_plan_sheet_line_over_vision(
     assert scope.meta.get("source") == "sheet_line"
     assert scope.meta.get("viewport_id") == "plan"
     assert scope.points == ((0.20, 0.25), (0.45, 0.30))
+
+
+def test_trace_utility_line_skips_mismatched_typed_sheet_line(
+    db_session,
+    project,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    from dataclasses import replace
+
+    from models.legend_reference import DrawingLegendLineType
+    from models.models import Drawing
+    from scripts.seed_legend_reference import seed
+    from sqlalchemy.orm import Session
+
+    session = cast(Session, db_session)
+    seed(session, project_id=None)
+    ss_row = (
+        session.query(DrawingLegendLineType)
+        .filter(DrawingLegendLineType.line_type_name == "Sanitary Sewer Main")
+        .one()
+    )
+    water_row = (
+        session.query(DrawingLegendLineType)
+        .filter(DrawingLegendLineType.line_type_name == "Water Main")
+        .one()
+    )
+
+    master = Drawing(
+        project_id=cast(int, project.id),
+        source="upload",
+        name="Master.pdf",
+        content_type="application/pdf",
+        processing_status="ready",
+        index_status="ready",
+        index_stats_json={
+            "sheetEntityGraph": {
+                "1": {
+                    "drawing_id": 0,
+                    "page": 1,
+                    "viewports": [
+                        {
+                            "viewport_id": "plan",
+                            "kind": "plan",
+                            "page": 1,
+                            "bbox_fractional": [0.05, 0.05, 0.95, 0.55],
+                            "scale": None,
+                            "source": "manual",
+                            "notes": "",
+                        }
+                    ],
+                    "labels": [],
+                    "symbols": [],
+                    "lines": [
+                        {
+                            "points": [[0.20, 0.25], [0.45, 0.30]],
+                            "viewport_id": "plan",
+                            "confidence": 0.95,
+                            "line_type": "Water Main",
+                            "legend_line_type_id": cast(int, water_row.id),
+                            "source": "pdf_vector",
+                        },
+                        {
+                            "points": [[0.19, 0.24], [0.44, 0.29]],
+                            "viewport_id": "plan",
+                            "confidence": 0.85,
+                            "line_type": "Sanitary Sewer Main",
+                            "legend_line_type_id": cast(int, ss_row.id),
+                            "source": "pdf_vector",
+                        },
+                    ],
+                    "associations": [],
+                    "meta": {},
+                }
+            }
+        },
+    )
+    session.add(master)
+    session.commit()
+    master_id = cast(int, master.id)
+
+    master_png = tmp_path / "master.png"
+    master_png.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+    monkeypatch.setattr(
+        "ai.pipelines.vision_location_reasoner.reason_over_master_crop",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("vision must not run when matching typed plan line exists")
+        ),
+    )
+
+    dossier = replace(
+        _dossier(
+            evidence_text="Sanitary sewer lateral run in corridor",
+            tiles=(
+                _tile(text="ROOF", bbox=(0.80, 0.80, 0.84, 0.82), text_element_id=3),
+            ),
+            legend_codes=("SS",),
+        ),
+        master_drawing_id=master_id,
+    )
+
+    scope = trace_scope_geometry(
+        dossier,
+        anchor_bbox=(0.18, 0.22, 0.48, 0.35),
+        scope_kind=ScopeKind.UTILITY_LINE,
+        page=1,
+        session=session,
+        master_png_path=master_png,
+    )
+
+    assert scope.meta is not None
+    assert scope.meta.get("source") == "sheet_line"
+    assert scope.points == ((0.19, 0.24), (0.44, 0.29))
+
+
+def test_trace_utility_line_prefers_typed_over_untyped_sheet_line(
+    db_session,
+    project,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    from dataclasses import replace
+
+    from models.legend_reference import DrawingLegendLineType
+    from models.models import Drawing
+    from scripts.seed_legend_reference import seed
+    from sqlalchemy.orm import Session
+
+    session = cast(Session, db_session)
+    seed(session, project_id=None)
+    ss_row = (
+        session.query(DrawingLegendLineType)
+        .filter(DrawingLegendLineType.line_type_name == "Sanitary Sewer Main")
+        .one()
+    )
+
+    master = Drawing(
+        project_id=cast(int, project.id),
+        source="upload",
+        name="Master.pdf",
+        content_type="application/pdf",
+        processing_status="ready",
+        index_status="ready",
+        index_stats_json={
+            "sheetEntityGraph": {
+                "1": {
+                    "drawing_id": 0,
+                    "page": 1,
+                    "viewports": [
+                        {
+                            "viewport_id": "plan",
+                            "kind": "plan",
+                            "page": 1,
+                            "bbox_fractional": [0.05, 0.05, 0.95, 0.55],
+                            "scale": None,
+                            "source": "manual",
+                            "notes": "",
+                        }
+                    ],
+                    "labels": [],
+                    "symbols": [],
+                    "lines": [
+                        {
+                            "points": [[0.20, 0.25], [0.45, 0.30]],
+                            "viewport_id": "plan",
+                            "confidence": 0.95,
+                            "line_type": None,
+                        },
+                        {
+                            "points": [[0.19, 0.24], [0.44, 0.29]],
+                            "viewport_id": "plan",
+                            "confidence": 0.85,
+                            "line_type": "Sanitary Sewer Main",
+                            "legend_line_type_id": cast(int, ss_row.id),
+                            "source": "pdf_vector",
+                        },
+                    ],
+                    "associations": [],
+                    "meta": {},
+                }
+            }
+        },
+    )
+    session.add(master)
+    session.commit()
+    master_id = cast(int, master.id)
+
+    master_png = tmp_path / "master.png"
+    master_png.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+    monkeypatch.setattr(
+        "ai.pipelines.vision_location_reasoner.reason_over_master_crop",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("vision must not run when typed plan line is preferred")
+        ),
+    )
+
+    dossier = replace(
+        _dossier(
+            evidence_text="Sanitary sewer lateral run in corridor",
+            tiles=(
+                _tile(text="ROOF", bbox=(0.80, 0.80, 0.84, 0.82), text_element_id=3),
+            ),
+            legend_codes=("SS",),
+        ),
+        master_drawing_id=master_id,
+    )
+
+    scope = trace_scope_geometry(
+        dossier,
+        anchor_bbox=(0.18, 0.22, 0.48, 0.35),
+        scope_kind=ScopeKind.UTILITY_LINE,
+        page=1,
+        session=session,
+        master_png_path=master_png,
+    )
+
+    assert scope.points == ((0.19, 0.24), (0.44, 0.29))

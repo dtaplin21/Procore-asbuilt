@@ -13,6 +13,7 @@ from typing import Any, Mapping, Sequence, cast
 
 from sqlalchemy.orm import Session
 
+from ai.pipelines.legend_line_swatch import LegendLineTemplate
 from ai.pipelines.sheet_association import associate_labels_to_symbols
 from ai.pipelines.sheet_entity_graph import (
     DrawingViewport,
@@ -32,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 MAX_LABELS_PER_PAGE = 800
 SHEET_ENTITY_GRAPH_KEY = "sheetEntityGraph"
+MIN_VECTOR_CHAINS_BEFORE_RASTER_FALLBACK = 50
 
 
 def _bbox_json_from_symbol(symbol: SheetSymbol | Mapping[str, Any]) -> dict[str, float]:
@@ -167,19 +169,152 @@ def _labels_from_text_elements(
     return labels
 
 
-def _extract_lines(
+def _text_elements_for_page(
+    session: Session,
+    drawing_id: int,
+    page: int,
+) -> list[DrawingTextElement]:
+    return (
+        session.query(DrawingTextElement)
+        .filter(
+            DrawingTextElement.master_drawing_id == int(drawing_id),
+            DrawingTextElement.page == int(page),
+        )
+        .order_by(DrawingTextElement.id.asc())
+        .limit(MAX_LABELS_PER_PAGE)
+        .all()
+    )
+
+
+def _resolve_source_pdf(
+    session: Session,
+    drawing_id: int,
+    source_pdf: Path | None,
+) -> Path | None:
+    if source_pdf is not None:
+        path = Path(source_pdf)
+        return path if path.is_file() else None
+    drawing = session.get(Drawing, int(drawing_id))
+    if drawing is None:
+        return None
+    storage_key = cast(str | None, drawing.storage_key)
+    if not storage_key or not str(storage_key).strip():
+        return None
+    from services.file_storage import resolve_stored_file_path
+
+    resolved = resolve_stored_file_path(storage_key)
+    if resolved is None or not resolved.is_file():
+        return None
+    return resolved
+
+
+def _legend_templates_for_page(
+    session: Session,
+    *,
+    pdf_path: Path | None,
+    drawing_id: int,
+    page: int,
+    project_id: int | None,
+    line_meta: dict[str, Any],
+) -> tuple[LegendLineTemplate, ...]:
+    if pdf_path is None or not pdf_path.is_file():
+        return ()
+    from ai.pipelines.legend_line_row_builder import cluster_legend_line_rows
+    from ai.pipelines.legend_line_swatch import (
+        build_legend_line_templates,
+        legend_line_templates_to_meta,
+    )
+
+    rows = cluster_legend_line_rows(_text_elements_for_page(session, drawing_id, page))
+    templates = build_legend_line_templates(
+        session,
+        pdf_path,
+        rows,
+        project_id=project_id,
+        page=page,
+    )
+    if templates:
+        line_meta["legend_line_templates"] = legend_line_templates_to_meta(templates)
+    return tuple(templates)
+
+
+def _extract_lines_raster(
     rendition_png: Path,
     viewports: tuple[DrawingViewport, ...],
+    *,
+    dash_templates: tuple[LegendLineTemplate, ...] = (),
 ) -> list[SheetLine]:
     from ai.pipelines.line_extractor import extract_line_polylines
 
+    kwargs: dict[str, Any] = {"classify_dash": True}
+    if dash_templates:
+        kwargs["dash_templates"] = dash_templates
     if not viewports:
-        return extract_line_polylines(rendition_png)
-
+        return extract_line_polylines(rendition_png, **kwargs)
     lines: list[SheetLine] = []
     for viewport in viewports:
-        lines.extend(extract_line_polylines(rendition_png, viewport=viewport))
+        lines.extend(extract_line_polylines(rendition_png, viewport=viewport, **kwargs))
     return lines
+
+
+def _extract_lines(
+    *,
+    pdf_path: Path | None,
+    rendition_png: Path,
+    viewports: tuple[DrawingViewport, ...],
+    page: int,
+    session: Session,
+    drawing_id: int,
+    project_id: int | None,
+    line_meta: dict[str, Any],
+) -> list[SheetLine]:
+    from ai.pipelines.legend_line_swatch import classify_chains_with_templates
+    from ai.pipelines.pdf_line_source_gate import PdfLineSource, classify_pdf_line_source
+    from ai.pipelines.pdf_vector_line_extractor import (
+        chains_to_sheet_lines,
+        extract_pdf_vector_chains,
+    )
+
+    dash_templates = _legend_templates_for_page(
+        session,
+        pdf_path=pdf_path,
+        drawing_id=drawing_id,
+        page=page,
+        project_id=project_id,
+        line_meta=line_meta,
+    )
+
+    if pdf_path is not None and pdf_path.is_file():
+        source, line_stats = classify_pdf_line_source(pdf_path, page=page)
+        line_meta["pdf_line_source"] = source.value
+        line_meta["pdf_line_source_stats"] = {
+            "path_count": line_stats.path_count,
+            "line_op_count": line_stats.line_op_count,
+            "stroked_path_count": line_stats.stroked_path_count,
+        }
+        if source is PdfLineSource.VECTOR:
+            chains = extract_pdf_vector_chains(pdf_path, page=page)
+            if len(chains) >= MIN_VECTOR_CHAINS_BEFORE_RASTER_FALLBACK:
+                classified = classify_chains_with_templates(chains, list(dash_templates))
+                lines: list[SheetLine] = []
+                for chain, type_name, type_id in classified:
+                    lines.extend(
+                        chains_to_sheet_lines(
+                            [chain],
+                            viewports,
+                            line_type=type_name,
+                            legend_line_type_id=type_id,
+                        )
+                    )
+                return lines
+            line_meta["pdf_line_source"] = "raster_fallback"
+
+    line_meta.setdefault("pdf_line_source", "raster")
+    return _extract_lines_raster(
+        rendition_png,
+        viewports,
+        dash_templates=dash_templates,
+    )
 
 
 def sheet_entity_graph_to_json(graph: SheetEntityGraph) -> dict[str, Any]:
@@ -228,6 +363,7 @@ def digitize_drawing_page(
     page: int = 1,
     *,
     rendition_png: Path,
+    source_pdf: Path | None = None,
     persist: bool = True,
     project_id: int | None = None,
 ) -> SheetEntityGraph:
@@ -248,8 +384,23 @@ def digitize_drawing_page(
         "rendition_png": str(rendition_png),
     }
 
+    drawing = session.get(Drawing, int(drawing_id))
+    resolved_project_id = project_id
+    if resolved_project_id is None and drawing is not None:
+        resolved_project_id = cast(int | None, drawing.project_id)
+
     labels = _labels_from_text_elements(session, int(drawing_id), int(page), viewports)
-    lines = _extract_lines(rendition_png, viewports)
+    pdf_path = _resolve_source_pdf(session, int(drawing_id), source_pdf)
+    lines = _extract_lines(
+        pdf_path=pdf_path,
+        rendition_png=rendition_png,
+        viewports=viewports,
+        page=int(page),
+        session=session,
+        drawing_id=int(drawing_id),
+        project_id=resolved_project_id,
+        line_meta=meta,
+    )
 
     weights = resolve_symbol_detector_weights_path()
     symbols = detect_symbols(
@@ -270,11 +421,6 @@ def digitize_drawing_page(
         )
         for symbol in symbols
     ]
-
-    drawing = session.get(Drawing, int(drawing_id))
-    resolved_project_id = project_id
-    if resolved_project_id is None and drawing is not None:
-        resolved_project_id = cast(int | None, drawing.project_id)
 
     associations = associate_labels_to_symbols(
         labels,

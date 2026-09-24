@@ -5,10 +5,13 @@ from __future__ import annotations
 import logging
 import math
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ai.pipelines.landmark_extractor import TITLE_BLOCK_X_MIN, TITLE_BLOCK_Y_MIN
 from ai.pipelines.sheet_entity_graph import DrawingViewport, SheetLine
+
+if TYPE_CHECKING:
+    from ai.pipelines.legend_line_swatch import LegendLineTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +196,8 @@ def extract_line_polylines(
     *,
     viewport: DrawingViewport | None = None,
     max_lines: int = 200,
+    dash_templates: tuple["LegendLineTemplate", ...] | None = None,
+    classify_dash: bool = False,
 ) -> list[SheetLine]:
     """Extract page-fractional polylines from a drawing PNG.
 
@@ -216,22 +221,29 @@ def extract_line_polylines(
 
     offset_x = 0
     offset_y = 0
-    work = image
+    px0, py0 = 0, 0
+    px1, py1 = page_w, page_h
     if viewport is not None:
         x0, y0, x1, y1 = viewport.bbox_fractional
         px0 = max(0, min(page_w - 1, int(x0 * page_w)))
         py0 = max(0, min(page_h - 1, int(y0 * page_h)))
         px1 = max(px0 + 1, min(page_w, int(math.ceil(x1 * page_w))))
         py1 = max(py0 + 1, min(page_h, int(math.ceil(y1 * page_h))))
-        work = image[py0:py1, px0:px1]
         offset_x, offset_y = px0, py0
-        if work.size == 0:
+        if px1 <= px0 or py1 <= py0:
             return []
 
-    blurred = cv2.GaussianBlur(work, (5, 5), 0)
-    _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    page_blurred = cv2.GaussianBlur(image, (5, 5), 0)
+    _, page_binary = cv2.threshold(
+        page_blurred,
+        0,
+        255,
+        cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU,
+    )
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    closed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+    page_closed = cv2.morphologyEx(page_binary, cv2.MORPH_CLOSE, kernel)
+
+    closed = page_closed[py0:py1, px0:px1]
 
     segments = _detect_segments(closed)
     # Shift crop-local pixels into full-page pixel space before merge.
@@ -271,4 +283,18 @@ def extract_line_polylines(
 
     # Prefer longer polylines first.
     results.sort(key=lambda line: -_polyline_length_frac(line.points))
-    return results[:max_lines]
+    results = results[:max_lines]
+
+    if classify_dash and results:
+        from ai.pipelines.line_dash_classifier import classify_raster_lines
+
+        template_list = list(dash_templates) if dash_templates else None
+        results = classify_raster_lines(
+            results,
+            page_closed,
+            page_w,
+            page_h,
+            templates=template_list,
+        )
+
+    return results

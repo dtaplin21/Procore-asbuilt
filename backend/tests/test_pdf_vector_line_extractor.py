@@ -37,6 +37,23 @@ def _write_dashed_shape_pdf(path: Path) -> None:
     doc.close()
 
 
+def test_extract_segments_skips_titleblock_linework(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "titleblock.pdf"
+    doc = fitz.open()
+    page = doc.new_page(width=800, height=600)
+    # Display-space title block corner (see landmark_extractor thresholds).
+    page.draw_line((620, 520), (760, 520), width=0.72)
+    doc.save(str(pdf_path))
+    doc.close()
+
+    segments = extract_pdf_vector_segments(pdf_path)
+
+    for seg in segments:
+        mx = (seg.x0 + seg.x1) / 2.0
+        my = (seg.y0 + seg.y1) / 2.0
+        assert not (mx >= TITLE_BLOCK_X_MIN and my >= TITLE_BLOCK_Y_MIN)
+
+
 def test_extract_segments_maps_to_fractional_display_space(tmp_path: Path) -> None:
     pdf_path = tmp_path / "solid.pdf"
     _write_solid_plan_line_pdf(pdf_path)

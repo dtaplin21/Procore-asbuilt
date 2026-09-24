@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
+from ai.pipelines.line_style_match import signature_distance
 from ai.pipelines.pdf_vector_line_extractor import (
     LineStyleSignature,
+    PdfVectorChain,
     extract_pdf_vector_segments,
     segments_to_chains,
 )
@@ -88,3 +90,36 @@ def _abbreviation_code(row: DrawingLegendLineType) -> str | None:
     if code is None:
         return None
     return str(code)
+
+
+def classify_chains_with_templates(
+    chains: list[PdfVectorChain],
+    templates: list[LegendLineTemplate],
+) -> list[tuple[PdfVectorChain, str | None, int | None]]:
+    """Returns (chain, line_type_name, legend_line_type_id) per plan chain."""
+    out: list[tuple[PdfVectorChain, str | None, int | None]] = []
+    for chain in chains:
+        if not templates:
+            out.append((chain, None, None))
+            continue
+        best = min(templates, key=lambda t: signature_distance(chain.style, t.style))
+        out.append((chain, best.line_type_name, best.legend_line_type_id))
+    return out
+
+
+def legend_line_templates_to_meta(templates: list[LegendLineTemplate]) -> list[dict[str, Any]]:
+    """JSON-serializable template list for ``SheetEntityGraph.meta``."""
+    return [
+        {
+            "legend_line_type_id": t.legend_line_type_id,
+            "line_type_name": t.line_type_name,
+            "abbreviation_code": t.abbreviation_code,
+            "style": {
+                "stroke_width_bucket": t.style.stroke_width_bucket,
+                "mean_segment_len_frac": t.style.mean_segment_len_frac,
+                "mean_gap_len_frac": t.style.mean_gap_len_frac,
+                "kind_guess": t.style.kind_guess,
+            },
+        }
+        for t in templates
+    ]
