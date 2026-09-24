@@ -164,6 +164,10 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
       selectedMasterDrawingId != null &&
       selectedProjectId > 0 &&
       selectedMasterDrawingId > 0,
+    refetchInterval: (query) => {
+      const status = (query.state.data?.processingStatus ?? "").toLowerCase();
+      return status === "pending" || status === "processing" ? 2000 : false;
+    },
   });
 
   const queryClient = useQueryClient();
