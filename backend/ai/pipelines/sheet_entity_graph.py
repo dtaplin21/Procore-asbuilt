@@ -51,6 +51,9 @@ class SheetLine:
     viewport_id: str | None
     confidence: float
     line_type: str | None = None
+    source: str = "raster"  # raster | pdf_vector
+    style_signature: dict[str, float | str] | None = None
+    legend_line_type_id: int | None = None
 
 
 @dataclass(frozen=True)

@@ -120,3 +120,43 @@ def find_codes_for_term(
                 codes.add(code)
 
     return sorted(codes)
+
+
+def match_line_type_by_name(
+    session: Session,
+    label_text: str,
+    *,
+    project_id: int | None = None,
+) -> DrawingLegendLineType | None:
+    """Match clustered legend row text to a seeded ``DrawingLegendLineType`` name."""
+    normalized = " ".join(label_text.strip().upper().split())
+    if not normalized:
+        return None
+
+    line_type_query = session.query(DrawingLegendLineType)
+    if project_id is not None:
+        line_type_query = line_type_query.filter(
+            (DrawingLegendLineType.project_id == project_id)
+            | (DrawingLegendLineType.project_id.is_(None))
+        )
+    else:
+        line_type_query = line_type_query.filter(DrawingLegendLineType.project_id.is_(None))
+
+    best: DrawingLegendLineType | None = None
+    best_score = -1
+    for row in line_type_query.all():
+        name = " ".join(str(row.line_type_name).strip().upper().split())
+        if not name:
+            continue
+        if normalized == name:
+            return row
+        score = 0
+        if normalized in name or name in normalized:
+            score = min(len(normalized), len(name))
+        elif all(part in name for part in normalized.split()):
+            score = len(normalized.split())
+        if score > best_score:
+            best_score = score
+            best = row
+
+    return best if best_score > 0 else None

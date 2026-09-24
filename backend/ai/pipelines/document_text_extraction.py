@@ -170,7 +170,11 @@ def _word_rect_in_page_display_space(
     y1: float,
 ) -> fitz.Rect:
     """Map PDF user-space word box to the same display coordinates as ``page.get_pixmap``."""
-    return fitz.Rect(x0, y0, x1, y1) * page.transformation_matrix
+    from ai.pipelines.pdf_display_space import pdf_rect_to_display_fractional
+
+    pw, ph = page.rect.width, page.rect.height
+    fx0, fy0, fx1, fy1 = pdf_rect_to_display_fractional(page, x0, y0, x1, y1)
+    return fitz.Rect(fx0 * pw, fy0 * ph, fx1 * pw, fy1 * ph)
 
 
 def _pdf_text_layer(file_path: str | Path) -> ExtractedDocument:

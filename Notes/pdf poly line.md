@@ -134,11 +134,11 @@ meta["pdf_line_source_stats"] = {
 
 ---
 
-## Step 1 — Vector ingest (segments → chains → style)
+## Step 1 — Vector ingest (segments → chains → style) ✅ (in repo)
 
-**Add:** `backend/ai/pipelines/pdf_vector_line_extractor.py`  
-**Reuse:** merge helpers from `line_extractor.py` (extract shared `line_geometry.py` later if duplication hurts)  
-**Test:** `backend/tests/test_pdf_vector_line_extractor.py` (golden segments from fixture PDF snippet)
+**Added:** `backend/ai/pipelines/pdf_vector_line_extractor.py` — types, `extract_pdf_vector_segments`, `segments_to_chains` (per-path dash preservation + solid colinear merge), `extract_pdf_vector_chains`, `chains_to_sheet_lines`  
+**Tests:** `backend/tests/test_pdf_vector_line_extractor.py`  
+**Reuse:** `_merge_colinear_segments` from `line_extractor.py` (fractional `dist_tol` for solid merge only)
 
 ### 1a — Types
 
@@ -182,62 +182,19 @@ class PdfVectorChain:
     source_path_indices: tuple[int, ...]
 ```
 
-### 1b — Display-space segment extraction
+### 1b — Display-space segment extraction ✅
 
-Same display space as `document_text_extraction._word_rect_in_page_display_space` (pixmap / OCR bboxes).
+**Shared helper:** `backend/ai/pipelines/pdf_display_space.py`  
+- `pdf_point_to_display_fractional(page, x, y)` — vector `'l'` endpoints  
+- `pdf_rect_to_display_fractional(page, x0, y0, x1, y1)` — same math as `document_text_extraction._word_rect_in_page_display_space` (OCR / native word boxes)
 
-```python
-import fitz
+**Implementation:** `extract_pdf_vector_segments()` in `pdf_vector_line_extractor.py`  
+- Stroked paths only (`type == "s"`), `'l'` items only  
+- Skips segments shorter than `min_segment_len_frac` (default `0.0005`)  
+- Skips segments whose midpoint falls in the title block (`TITLE_BLOCK_X_MIN/Y_MIN`)  
+- Stroke color via `_parse_stroke_color()` (0–1 or 0–255 RGB tuples)
 
-from ai.pipelines.landmark_extractor import TITLE_BLOCK_X_MIN, TITLE_BLOCK_Y_MIN
-
-
-def _map_point(page: fitz.Page, x: float, y: float, pw: float, ph: float) -> tuple[float, float]:
-    rect = fitz.Rect(x, y, x, y) * page.transformation_matrix
-    return float(rect.x0) / pw, float(rect.y0) / ph
-
-
-def _in_titleblock_frac(x: float, y: float) -> bool:
-    return x >= TITLE_BLOCK_X_MIN and y >= TITLE_BLOCK_Y_MIN
-
-
-def extract_pdf_vector_segments(
-    pdf_path: str | Path,
-    *,
-    page: int = 1,
-    min_segment_len_frac: float = 0.0005,
-) -> list[PdfVectorSegment]:
-    doc = fitz.open(str(pdf_path))
-    segments: list[PdfVectorSegment] = []
-    try:
-        page_obj = doc.load_page(page - 1)
-        pw, ph = page_obj.rect.width, page_obj.rect.height
-        for path_index, path in enumerate(page_obj.get_drawings()):
-            if path.get("type") != "s":
-                continue
-            width = float(path.get("width") or 0.0)
-            color = path.get("color")  # optional RGB tuple
-            seg_i = 0
-            for item in path.get("items") or []:
-                if not item or item[0] != "l":
-                    continue
-                _, p0, p1 = item
-                x0, y0 = _map_point(page_obj, p0.x, p0.y, pw, ph)
-                x1, y1 = _map_point(page_obj, p1.x, p1.y, pw, ph)
-                if (x0 - x1) ** 2 + (y0 - y1) ** 2 < min_segment_len_frac**2:
-                    continue
-                mx, my = (x0 + x1) / 2, (y0 + y1) / 2
-                if _in_titleblock_frac(mx, my):
-                    continue
-                rgb = tuple(int(c * 255) for c in color[:3]) if isinstance(color, (list, tuple)) else None
-                segments.append(
-                    PdfVectorSegment(x0, y0, x1, y1, width, rgb, path_index, seg_i)
-                )
-                seg_i += 1
-    finally:
-        doc.close()
-    return segments
-```
+**Tests:** `test_extract_segments_maps_to_fractional_display_space`, `test_extract_segments_on_rotated_page_stays_in_fractional_range`
 
 ### 1c — Chain merge + faux-dash style signature
 
@@ -311,33 +268,16 @@ def extract_pdf_vector_chains(
     return chains[:max_chains]
 ```
 
-### 1d — Convert chains → `SheetLine`
+### 1d — Convert chains → `SheetLine` ✅
 
-```python
-from ai.pipelines.sheet_entity_graph import DrawingViewport, SheetLine, assign_viewport_id
+**Implementation:** `chains_to_sheet_lines()` + `style_signature_as_dict()` in `pdf_vector_line_extractor.py`
 
+- Assigns `viewport_id` via `assign_viewport_id(chain.points[0], viewports)`
+- `line_type`: explicit arg (Step 2) or `chain.style.kind_guess` (`unknown` → `None`)
+- `source="pdf_vector"`, `style_signature` from `LineStyleSignature`, optional `legend_line_type_id`
+- **`SheetLine`** extended in `sheet_entity_graph.py` (`source` defaults to `"raster"` for PNG `line_extractor`)
 
-def chains_to_sheet_lines(
-    chains: list[PdfVectorChain],
-    viewports: tuple[DrawingViewport, ...],
-    *,
-    line_type: str | None = None,  # filled in Step 2
-) -> list[SheetLine]:
-    lines: list[SheetLine] = []
-    for chain in chains:
-        viewport_id = assign_viewport_id(chain.points[0], viewports)
-        lines.append(
-            SheetLine(
-                points=chain.points,
-                viewport_id=viewport_id,
-                confidence=0.9,
-                line_type=line_type or chain.style.kind_guess,
-            )
-        )
-    return lines
-```
-
-*(Step 3 adds `source` / `style_signature` on `SheetLine` — see below.)*
+**Tests:** `test_chains_to_sheet_lines_assigns_viewport`
 
 ---
 
@@ -345,44 +285,19 @@ def chains_to_sheet_lines(
 
 **Depends on:** indexed `DrawingTextElement` rows in legend band (`master_drawing_region_builder`: `_LEGEND_BLOCK_X_MAX`, `_LEGEND_BLOCK_Y_MIN/Y_MAX`).
 
-**Add:**
-- `backend/ai/pipelines/legend_line_row_builder.py` — cluster tokens into rows (“PROPERTY” + “LINE” → one row)
-- `backend/ai/pipelines/legend_line_swatch.py` — crop swatch strip, build `LineStyleSignature`, map to `DrawingLegendLineType`
+### 2a — Row clustering ✅
 
-**Test:** `backend/tests/test_legend_line_swatch.py` with synthetic row bboxes + fixture segments.
+**Added:** `backend/ai/pipelines/legend_line_row_builder.py` — `cluster_legend_line_rows()`, `LegendLineRow`  
+**Tests:** `backend/tests/test_legend_line_row_builder.py`
 
-### 2a — Row clustering
+- Filters legend band (defaults match region builder), skips junk + `LEGEND` header tokens  
+- Clusters by centroid Y (`_ROW_Y_TOLERANCE`), joins tokens left-to-right  
+- `swatch_bbox` = strip `_SWATCH_WIDTH_FRAC` left of label union box  
 
-```python
-from dataclasses import dataclass
+### 2b — Swatch templates ✅ (partial)
 
-from models.drawing_text_element import DrawingTextElement
-
-
-@dataclass(frozen=True)
-class LegendLineRow:
-    text: str
-    label_bbox: tuple[float, float, float, float]  # x0,y0,x1,y1 frac
-    swatch_bbox: tuple[float, float, float, float]
-    legend_line_type_id: int | None  # FK when matched to DB seed
-
-
-_SWATCH_WIDTH_FRAC = 0.06
-_ROW_Y_TOLERANCE = 0.008
-
-
-def cluster_legend_line_rows(
-    elements: list[DrawingTextElement],
-    *,
-    legend_x_max: float = 0.35,
-) -> list[LegendLineRow]:
-    """Group legend-band tokens by similar cy; join text left-to-right."""
-    rows: list[LegendLineRow] = []
-    # Filter x <= legend_x_max, sort by cy then cx, merge rows within _ROW_Y_TOLERANCE
-    # swatch_bbox = (label.x0 - _SWATCH_WIDTH_FRAC, label.y0, label.x0, label.y1)
-    ...
-    return rows
-```
+**Added:** `backend/ai/pipelines/legend_line_swatch.py`, `services/legend_lookup.match_line_type_by_name`  
+**Tests:** `backend/tests/test_legend_line_swatch.py`, `test_legend_lookup_line_type.py`
 
 ### 2b — Swatch template extraction + DB link
 
@@ -499,21 +414,10 @@ graph.meta["legend_line_templates"] = [
 
 ## Step 3 — Wire digitization + scope tracer
 
-### 3a — Extend `SheetLine` (`sheet_entity_graph.py`)
+### 3a — Extend `SheetLine` (`sheet_entity_graph.py`) ✅
 
-```python
-@dataclass(frozen=True)
-class SheetLine:
-    points: tuple[tuple[float, float], ...]
-    viewport_id: str | None
-    confidence: float
-    line_type: str | None = None
-    source: str = "raster"  # raster | pdf_vector
-    style_signature: dict[str, float | str] | None = None
-    legend_line_type_id: int | None = None
-```
-
-Update `sheet_entity_graph_to_json` / consumers to tolerate new fields (backward compatible defaults).
+Fields added (defaults keep raster / legacy JSON rows valid): `source`, `style_signature`, `legend_line_type_id`.  
+`sheet_entity_graph_to_json` uses `asdict(line)` — new fields persist automatically when set.
 
 ### 3b — Orchestrator (`sheet_digitization.py`)
 
