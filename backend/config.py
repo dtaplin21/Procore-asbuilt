@@ -51,6 +51,17 @@ Sheet digitization (optional symbol YOLO)::
 
     SYMBOL_DETECTOR_WEIGHTS_PATH           # path to .pt/.onnx weights; unset → symbols=[]
     SHEET_DIGITIZATION_ENABLED             # default false — run digitize after OCR index
+
+Google Document AI (master drawing batch OCR — see Notes/ai google implementation.md)::
+
+    GOOGLE_CLOUD_PROJECT                   # GCP project id
+    DOCUMENT_AI_LOCATION                   # us | eu
+    DOCUMENT_AI_PROCESSOR_ID               # full processor resource name (Phase 1)
+    DOCUMENT_AI_GCS_INPUT_BUCKET           # batch input bucket name
+    DOCUMENT_AI_GCS_OUTPUT_BUCKET          # batch output bucket name
+    DOCUMENT_AI_ENABLED                    # default false — master index uses Doc AI when true
+    DOCUMENT_AI_PARALLEL_TESSERACT         # default false — A/B Tesseract alongside Doc AI
+    GOOGLE_APPLICATION_CREDENTIALS         # read by google-cloud libs; not stored in Settings
 """
 
 from urllib.parse import urlparse
@@ -168,6 +179,36 @@ class Settings(BaseSettings):
         description="SHEET_DIGITIZATION_ENABLED",
     )
 
+    #: GCP project for Document AI batch OCR. Env: ``GOOGLE_CLOUD_PROJECT``.
+    google_cloud_project: Optional[str] = Field(default=None, description="GOOGLE_CLOUD_PROJECT")
+    #: Document AI regional endpoint location. Env: ``DOCUMENT_AI_LOCATION``.
+    document_ai_location: Literal["us", "eu"] = Field(
+        default="us",
+        description="DOCUMENT_AI_LOCATION",
+    )
+    #: Full processor resource name from one-time create. Env: ``DOCUMENT_AI_PROCESSOR_ID``.
+    document_ai_processor_id: Optional[str] = Field(
+        default=None,
+        description="DOCUMENT_AI_PROCESSOR_ID",
+    )
+    #: GCS bucket for batch input PDFs (bucket name only). Env: ``DOCUMENT_AI_GCS_INPUT_BUCKET``.
+    document_ai_gcs_input_bucket: Optional[str] = Field(
+        default=None,
+        description="DOCUMENT_AI_GCS_INPUT_BUCKET",
+    )
+    #: GCS bucket for batch output JSON. Env: ``DOCUMENT_AI_GCS_OUTPUT_BUCKET``.
+    document_ai_gcs_output_bucket: Optional[str] = Field(
+        default=None,
+        description="DOCUMENT_AI_GCS_OUTPUT_BUCKET",
+    )
+    #: Use Document AI for master drawing OCR leg (requires batch module + indexer wiring). Env: ``DOCUMENT_AI_ENABLED``.
+    document_ai_enabled: bool = Field(default=False, description="DOCUMENT_AI_ENABLED")
+    #: When Doc AI is on, also run Tesseract for merge A/B. Env: ``DOCUMENT_AI_PARALLEL_TESSERACT``.
+    document_ai_parallel_tesseract: bool = Field(
+        default=False,
+        description="DOCUMENT_AI_PARALLEL_TESSERACT",
+    )
+
     # In some environments (CI, sandboxes), extra env vars may be present.
     # Ignore unknown keys instead of erroring at import time.
     model_config = SettingsConfigDict(
@@ -217,6 +258,26 @@ class Settings(BaseSettings):
     def _empty_symbol_weights_to_none(cls, v: object) -> object:
         if isinstance(v, str) and not v.strip():
             return None
+        return v
+
+    @field_validator(
+        "google_cloud_project",
+        "document_ai_processor_id",
+        "document_ai_gcs_input_bucket",
+        "document_ai_gcs_output_bucket",
+        mode="before",
+    )
+    @classmethod
+    def _empty_document_ai_str_to_none(cls, v: object) -> object:
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
+    @field_validator("document_ai_location", mode="before")
+    @classmethod
+    def _normalize_document_ai_location(cls, v: object) -> object:
+        if isinstance(v, str):
+            return v.strip().lower()
         return v
 
     @field_validator("database_url", mode="before")
@@ -375,4 +436,15 @@ def procore_api_base_url() -> str:
     if settings.procore_environment == "sandbox":
         return "https://sandbox.procore.com"
     return "https://api.procore.com"
+
+
+def document_ai_configured(s: Optional[Settings] = None) -> bool:
+    """True when required Document AI env vars are set (independent of ``DOCUMENT_AI_ENABLED``)."""
+    cfg = s or settings
+    return bool(
+        cfg.google_cloud_project
+        and cfg.document_ai_processor_id
+        and cfg.document_ai_gcs_input_bucket
+        and cfg.document_ai_gcs_output_bucket
+    )
 

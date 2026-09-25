@@ -19,4 +19,7 @@ numpy>=1.24.0
 pymupdf>=1.27,<1.28
 pytesseract>=0.3.10
 Pillow>=10.0.0
+google-api-core>=2.19.0
+google-cloud-documentai>=2.29.0
+google-cloud-storage>=2.18.0
 
