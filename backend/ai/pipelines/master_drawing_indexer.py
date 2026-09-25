@@ -77,6 +77,9 @@ class IndexResult:
         }
         if self.document_ai_stats:
             stats["document_ai"] = self.document_ai_stats
+            pages_processed = self.document_ai_stats.get("document_ai_pages_processed")
+            if pages_processed is not None:
+                stats["document_ai_pages_processed"] = pages_processed
         return stats
 
 

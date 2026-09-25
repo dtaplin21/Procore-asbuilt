@@ -134,6 +134,8 @@ def _plain_text_to_positioned_words(
                     ),
                     page_index=page_index,
                     ocr_confidence=_SYNTHETIC_OCR_CONFIDENCE,
+                    token_source="openai_vision",
+                    geometry_synthetic=True,
                 )
             )
     return words
@@ -226,8 +228,8 @@ def ocr_image(
     """
     Dispatch OCR to the configured backend.
 
-    ``auto`` tries Tesseract first, then falls back to OpenAI vision when
-    Tesseract is missing or raises.
+    ``auto`` tries Tesseract first, then OpenAI vision (synthetic geometry only).
+    Prefer ``extract_document_via_ocr`` with Document AI for evidence PDFs.
     """
     if file_path is None and image_bytes is None:
         raise ValueError("Provide file_path or image_bytes")
@@ -262,6 +264,10 @@ def ocr_image(
             logger.warning("tesseract_ocr_failed", extra={"error": str(exc)})
 
     if _openai_vision_is_available():
+        logger.warning(
+            "ocr_openai_vision_synthetic_geometry",
+            extra={"page_index": page_index},
+        )
         return ocr_image_openai_vision(
             file_path=file_path,
             image_bytes=image_bytes,
@@ -269,7 +275,8 @@ def ocr_image(
         )
 
     raise RuntimeError(
-        "No OCR backend available — install tesseract + pytesseract or set OPENAI_API_KEY"
+        "No OCR backend available — install tesseract + pytesseract, enable Document AI "
+        "for evidence PDFs (DOCUMENT_AI_EVIDENCE_ENABLED), or set OPENAI_API_KEY"
     )
 
 
@@ -363,6 +370,8 @@ def ocr_pdf_page_in_memory(
             ),
             page_index=w.page_index,
             ocr_confidence=w.ocr_confidence,
+            token_source=w.token_source,
+            geometry_synthetic=w.geometry_synthetic,
         )
         for w in words
     ]

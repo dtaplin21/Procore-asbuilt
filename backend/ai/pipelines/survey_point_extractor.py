@@ -53,6 +53,16 @@ class _TextElementLike(Protocol):
     ocr_confidence: float
 
 
+def _element_geometry_untrusted(element: _TextElementLike) -> bool:
+    """Skip N/E pairing on fabricated or legacy vision-OCR boxes."""
+    if getattr(element, "geometry_synthetic", False):
+        return True
+    source = getattr(element, "source", None)
+    if isinstance(source, str) and source.strip().lower() == "openai_vision":
+        return True
+    return False
+
+
 @dataclass(frozen=True)
 class SurveyPointRecord:
     page: int
@@ -255,6 +265,8 @@ def extract_survey_points_from_elements(
         n_tokens: list[tuple[float, dict[str, float], float]] = []
         e_tokens: list[tuple[float, dict[str, float], float]] = []
         for element in page_elements:
+            if _element_geometry_untrusted(element):
+                continue
             bbox = _valid_bbox(element.bbox_json)
             if bbox is None:
                 continue

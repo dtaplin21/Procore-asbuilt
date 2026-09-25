@@ -291,8 +291,26 @@ def extract_pdf_vector_chains(
 **Tests:** `backend/tests/test_legend_line_row_builder.py`
 
 - Filters legend band (defaults match region builder), skips junk + `LEGEND` header tokens  
+- **Dominant x-column** (`_COLUMN_X_GAP` on horizontal whitespace): keeps the label column before Y-row clustering so title-block text at the same row height is dropped  
 - Clusters by centroid Y (`_ROW_Y_TOLERANCE`), joins tokens left-to-right  
 - `swatch_bbox` = strip `_SWATCH_WIDTH_FRAC` left of label union box  
+- **Audit:** `backend/scripts/audit_legend_line_rows.py` — e.g. `--drawing-id 1691 --project-id 688 --export legend_manifest_1691.json` (needs OCR/Doc AI tokens in DB)  
+- **Optional `legend_rect`:** pass fractional `(x0,y0,x1,y1)` for title-block legends (right side) instead of default left band  
+- **Raster icon crops:** `backend/ai/pipelines/legend_icon_extraction.py` — PNG reference left of each label row; indexed tokens first, Tesseract crop fallback  
+- **CLI:** `backend/scripts/extract_legend_icons.py` — `--legend-bbox 0.70,0.02,0.98,0.135 --drawing-id …`  
+
+### 2a-ground — Legend exemplar grounding (Document AI env) ✅
+
+**Module:** `backend/ai/pipelines/legend_grounding.py` — `DocumentAiGroundingProvider`, `GroundingHit`  
+**Persist:** `drawing_legend_grounding_hits` via `services/legend_grounding_service.py`  
+**CLI:** `backend/scripts/run_legend_grounding.py` (requires `DOCUMENT_AI_GROUNDING_ENABLED=true`)
+
+| Method | Role |
+|--------|------|
+| `document_ai_text` | Match legend label token sequences on the sheet from indexed Doc AI / OCR tokens |
+| `template_match` | OpenCV `matchTemplate` on rendered page vs icon crop (symbols / line swatches) |
+
+Exemplar legend sample area is excluded using `icon_fractional_bbox` from icon extraction.
 
 ### 2b — Swatch templates + DB link ✅
 

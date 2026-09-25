@@ -118,6 +118,8 @@ def test_ocr_image_openai_vision_returns_synthetic_words(
     assert page_w == 400.0
     assert page_h == 300.0
     assert [w.text for w in words] == ["Rough", "In", "Passed"]
+    assert all(w.geometry_synthetic for w in words)
+    assert all(w.token_source == "openai_vision" for w in words)
     mock_extract.assert_called_once_with(file_path=None, image_bytes=b"img")
 
 

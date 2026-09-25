@@ -62,3 +62,40 @@ def test_cluster_skips_legend_header_token() -> None:
 
     assert len(rows) == 1
     assert rows[0].text == "WATER LINE"
+
+
+def test_cluster_ignores_title_block_column_on_same_row() -> None:
+    """Dominant x-column filter drops far-right tokens at the same row height."""
+    elements = [
+        _element(text="PROPERTY", x0=0.10, y0=0.25, x1=0.17, y1=0.27),
+        _element(text="LINE", x0=0.18, y0=0.251, x1=0.22, y1=0.271),
+        _element(text="UCSF", x0=0.32, y0=0.25, x1=0.36, y1=0.27),
+        _element(text="APPROVAL", x0=0.37, y0=0.251, x1=0.42, y1=0.271),
+    ]
+
+    rows = cluster_legend_line_rows(elements)
+
+    assert len(rows) == 1
+    assert rows[0].text == "PROPERTY LINE"
+
+
+def test_cluster_respects_legend_rect_over_default_band() -> None:
+    elements = [
+        _element(text="IN_BAND", x0=0.10, y0=0.30, x1=0.16, y1=0.32),
+        _element(text="IN_RECT", x0=0.75, y0=0.05, x1=0.82, y1=0.07),
+    ]
+    rows = cluster_legend_line_rows(elements, legend_rect=(0.70, 0.02, 0.98, 0.14))
+    assert len(rows) == 1
+    assert rows[0].text == "IN_RECT"
+
+
+def test_dominant_column_disabled_merges_same_row_across_columns() -> None:
+    elements = [
+        _element(text="PROPERTY", x0=0.10, y0=0.25, x1=0.17, y1=0.27),
+        _element(text="UCSF", x0=0.32, y0=0.25, x1=0.36, y1=0.27),
+    ]
+
+    rows = cluster_legend_line_rows(elements, use_dominant_text_column=False)
+
+    assert len(rows) == 1
+    assert "UCSF" in rows[0].text

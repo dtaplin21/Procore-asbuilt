@@ -3,7 +3,9 @@ OpenAI vision helpers for image OCR and other image→text tasks.
 
 Images are base64-encoded into data URLs and sent via ``chat.completions``
 with an ``image_url`` content part. ``extract_plain_text_from_image`` is the
-OCR fallback used when Tesseract is unavailable or ``OCR_BACKEND=openai_vision``.
+OCR fallback when Tesseract is unavailable or ``OCR_BACKEND=openai_vision``.
+Outputs plain text only — ``ocr_engine`` lays out synthetic boxes (``geometry_synthetic``);
+do not use for survey N/E pairing. Prefer Document AI for evidence PDFs.
 """
 
 from __future__ import annotations

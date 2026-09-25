@@ -28,6 +28,25 @@ from services.document_ai_storage import (
 logger = logging.getLogger(__name__)
 
 
+def pdf_page_count_for_document_ai(
+    file_path: str | Path,
+    *,
+    max_pages: int | None = None,
+) -> int:
+    """Pages that would be billed for a batch OCR run (after index page cap)."""
+    import fitz
+
+    path = Path(file_path)
+    doc = fitz.open(str(path))
+    try:
+        total = int(doc.page_count)
+    finally:
+        doc.close()
+    if max_pages is not None and max_pages > 0:
+        return min(total, max_pages)
+    return max(total, 0)
+
+
 @dataclass(frozen=True)
 class BatchJobResult:
     """Output of a completed batch job."""
@@ -250,11 +269,15 @@ def extract_document_via_document_ai(
         on_batch_started=on_batch_started,
     )
     elapsed = time.monotonic() - started
+    pages_in_document = pdf_page_count_for_document_ai(path, max_pages=max_pages)
+    pages_billed = 0 if result.cache_hit else pages_in_document
     if document_ai_stats is not None:
         document_ai_stats.update(
             {
                 "document_ai_content_hash": result.content_hash or content_hash,
                 "document_ai_cache_hit": result.cache_hit,
+                "document_ai_pages_in_document": pages_in_document,
+                "document_ai_pages_processed": pages_billed,
                 "document_ai_input_gcs_uri": result.input_gcs_uri,
                 "document_ai_output_gcs_prefix": result.output_gcs_prefix,
                 "document_ai_json_shards": len(result.output_blob_names),

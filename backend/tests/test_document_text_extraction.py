@@ -403,3 +403,35 @@ def test_extract_document_via_ocr_forces_pdf_ocr(tmp_path: Path) -> None:
     assert extracted.source_format == SourceFormat.SCANNED_PDF
     assert "Sewer" in extracted.full_text()
     assert "garbage" not in extracted.full_text()
+
+
+def test_extract_document_via_ocr_uses_document_ai_when_evidence_enabled(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from config import settings
+
+    from ai.pipelines.document_text_extraction import extract_document_via_ocr
+
+    monkeypatch.setattr(settings, "document_ai_evidence_enabled", True)
+    monkeypatch.setattr(
+        "ai.pipelines.document_text_extraction._use_document_ai_for_evidence",
+        lambda: True,
+    )
+    pdf_path = tmp_path / "evidence.pdf"
+    pdf_path.write_bytes(b"%PDF")
+
+    docai = ExtractedDocument(
+        source_format=SourceFormat.SCANNED_PDF,
+        page_count=1,
+        words=[_word("N 2131764.84")],
+    )
+
+    with patch(
+        "ai.pipelines.document_text_extraction._extract_pdf_via_document_ai",
+        return_value=docai,
+    ) as docai_mock:
+        extracted = extract_document_via_ocr(pdf_path)
+
+    docai_mock.assert_called_once()
+    assert "2131764" in extracted.full_text()

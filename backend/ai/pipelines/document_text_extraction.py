@@ -91,6 +91,8 @@ class PositionedWord:
     ocr_confidence: float = 1.0
     # Per-token ingest source when a document mixes native PDF + OCR (master hybrid index).
     token_source: str | None = None
+    #: True when bbox is layout-synthetic (e.g. OpenAI vision plain-text OCR), not measured.
+    geometry_synthetic: bool = False
 
 
 @dataclass(frozen=True)
@@ -261,6 +263,27 @@ def _ocr_scanned_pdf(
 # Public orchestration
 # ---------------------------------------------------------------------------
 
+def _use_document_ai_for_evidence() -> bool:
+    from config import document_ai_configured, settings
+
+    return bool(settings.document_ai_evidence_enabled and document_ai_configured())
+
+
+def _extract_pdf_via_document_ai(
+    file_path: str | Path,
+    *,
+    max_pages: int | None = None,
+) -> ExtractedDocument:
+    from ai.pipelines.document_ai_batch import extract_document_via_document_ai
+
+    document = extract_document_via_document_ai(file_path, max_pages=max_pages)
+    return ExtractedDocument(
+        source_format=SourceFormat.SCANNED_PDF,
+        page_count=document.page_count,
+        words=document.words,
+    )
+
+
 def extract_document(file_path: str | Path) -> ExtractedDocument:
     """Main entry point: take any supported evidence file and return its
     normalized, positioned text — the single function inspection_mapping.py
@@ -278,6 +301,8 @@ def extract_document(file_path: str | Path) -> ExtractedDocument:
         )
 
     if fmt == SourceFormat.SCANNED_PDF:
+        if _use_document_ai_for_evidence():
+            return _extract_pdf_via_document_ai(file_path)
         return _ocr_scanned_pdf(file_path)
 
     raise AssertionError(f"unhandled format: {fmt}")  # exhaustiveness guard
@@ -291,6 +316,8 @@ def extract_document_via_ocr(
     """Force OCR for PDFs and images — for link-fetched files with unreliable text layers."""
     suffix = Path(file_path).suffix.lower()
     if suffix == ".pdf":
+        if _use_document_ai_for_evidence():
+            return _extract_pdf_via_document_ai(file_path, max_pages=max_pages)
         return _ocr_scanned_pdf(file_path, max_pages=max_pages)
     if suffix in {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}:
         words, _, _ = _ocr_image(file_path, page_index=0)

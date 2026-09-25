@@ -22,7 +22,7 @@ from services.evidence_linking import load_linked_drawings
 
 
 class _WordElement:
-    __slots__ = ("page", "text", "bbox_json", "ocr_confidence")
+    __slots__ = ("page", "text", "bbox_json", "ocr_confidence", "geometry_synthetic", "source")
 
     def __init__(
         self,
@@ -31,11 +31,15 @@ class _WordElement:
         text: str,
         bbox_json: dict[str, float],
         ocr_confidence: float,
+        geometry_synthetic: bool = False,
+        source: str | None = None,
     ) -> None:
         self.page = page
         self.text = text
         self.bbox_json = bbox_json
         self.ocr_confidence = ocr_confidence
+        self.geometry_synthetic = geometry_synthetic
+        self.source = source
 
 
 def _word_bbox_json(word: PositionedWord) -> dict[str, float]:
@@ -55,6 +59,8 @@ def words_to_pseudo_elements(words: list[PositionedWord]) -> list[_WordElement]:
                 text=text,
                 bbox_json=_word_bbox_json(word),
                 ocr_confidence=float(word.ocr_confidence),
+                geometry_synthetic=bool(word.geometry_synthetic),
+                source=word.token_source,
             )
         )
     return elements

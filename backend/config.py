@@ -30,7 +30,7 @@ Application environment::
     OPENAI_API_KEY              # API host only — required for inspection/GPT features (beta)
     OPENAI_CHAT_MODEL           # optional — defaults to gpt-4o-mini
     OPENAI_VISION_MODEL         # optional — defaults to gpt-4o-mini
-    OCR_BACKEND                 # auto | tesseract | openai_vision
+    OCR_BACKEND                 # auto | tesseract | openai_vision (not openai_vision when DOCUMENT_AI_ENABLED)
     TESSERACT_CMD               # optional — path to tesseract binary when not on PATH
 
 PDF link enrichment (hyperlinks in uploaded evidence PDFs)::
@@ -60,8 +60,12 @@ Google Document AI (master drawing batch OCR — see Notes/ai google implementat
     DOCUMENT_AI_GCS_INPUT_BUCKET           # batch input bucket name
     DOCUMENT_AI_GCS_OUTPUT_BUCKET          # batch output bucket name
     DOCUMENT_AI_ENABLED                    # default false — master index uses Doc AI when true
+    DOCUMENT_AI_EVIDENCE_ENABLED           # default false — evidence PDF OCR via Doc AI batch
     DOCUMENT_AI_PARALLEL_TESSERACT         # default false — A/B Tesseract alongside Doc AI
     DOCUMENT_AI_BATCH_TIMEOUT_SECONDS      # batch LRO wait during index (default 3600)
+    DOCUMENT_AI_GROUNDING_ENABLED          # legend exemplar grounding (default false)
+    DOCUMENT_AI_GROUNDING_MIN_CONFIDENCE   # persist threshold (default 0.5)
+    DOCUMENT_AI_GROUNDING_TEMPLATE_THRESHOLD  # OpenCV matchTemplate (default 0.55)
     GOOGLE_APPLICATION_CREDENTIALS         # read by google-cloud libs; not stored in Settings
 """
 
@@ -204,6 +208,11 @@ class Settings(BaseSettings):
     )
     #: Use Document AI for master drawing OCR leg (requires batch module + indexer wiring). Env: ``DOCUMENT_AI_ENABLED``.
     document_ai_enabled: bool = Field(default=False, description="DOCUMENT_AI_ENABLED")
+    #: Use Document AI batch OCR for evidence / linked PDFs (``extract_document*``). Env: ``DOCUMENT_AI_EVIDENCE_ENABLED``.
+    document_ai_evidence_enabled: bool = Field(
+        default=False,
+        description="DOCUMENT_AI_EVIDENCE_ENABLED",
+    )
     #: When Doc AI is on, also run Tesseract for merge A/B. Env: ``DOCUMENT_AI_PARALLEL_TESSERACT``.
     document_ai_parallel_tesseract: bool = Field(
         default=False,
@@ -213,6 +222,21 @@ class Settings(BaseSettings):
     document_ai_batch_timeout_seconds: float = Field(
         default=3600.0,
         description="DOCUMENT_AI_BATCH_TIMEOUT_SECONDS",
+    )
+    #: Run legend exemplar grounding (Doc AI words + template match). Env: ``DOCUMENT_AI_GROUNDING_ENABLED``.
+    document_ai_grounding_enabled: bool = Field(
+        default=False,
+        description="DOCUMENT_AI_GROUNDING_ENABLED",
+    )
+    #: Minimum hit confidence to persist. Env: ``DOCUMENT_AI_GROUNDING_MIN_CONFIDENCE``.
+    document_ai_grounding_min_confidence: float = Field(
+        default=0.5,
+        description="DOCUMENT_AI_GROUNDING_MIN_CONFIDENCE",
+    )
+    #: OpenCV ``matchTemplate`` threshold (TM_CCOEFF_NORMED). Env: ``DOCUMENT_AI_GROUNDING_TEMPLATE_THRESHOLD``.
+    document_ai_grounding_template_threshold: float = Field(
+        default=0.55,
+        description="DOCUMENT_AI_GROUNDING_TEMPLATE_THRESHOLD",
     )
 
     # In some environments (CI, sandboxes), extra env vars may be present.
@@ -316,6 +340,17 @@ class Settings(BaseSettings):
     def _never_insecure_db_ssl_in_production(self) -> "Settings":
         if self.app_env == "production" and self.database_ssl_insecure_dev:
             object.__setattr__(self, "database_ssl_insecure_dev", False)
+        return self
+
+    @model_validator(mode="after")
+    def _reject_openai_vision_ocr_with_document_ai(self) -> "Settings":
+        """Master index uses Document AI when enabled; OpenAI vision OCR is for evidence only."""
+        if self.document_ai_enabled and self.ocr_backend == "openai_vision":
+            raise ValueError(
+                "OCR_BACKEND=openai_vision cannot be used with DOCUMENT_AI_ENABLED=true. "
+                "Set OCR_BACKEND to auto or tesseract (evidence/linked PDFs). "
+                "Master drawings use Document AI batch OCR."
+            )
         return self
 
     @field_validator("procore_environment", mode="before")

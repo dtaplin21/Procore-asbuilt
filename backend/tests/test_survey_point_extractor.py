@@ -19,6 +19,8 @@ class _FakeElement:
     text: str
     bbox_json: dict[str, float]
     ocr_confidence: float = 0.95
+    geometry_synthetic: bool = False
+    source: str | None = None
 
 
 ARCH_PAGE_META = [
@@ -190,3 +192,53 @@ def test_survey_point_extractor_prefers_plan_view_station_over_profile() -> None
 
     assert len(points) == 1
     assert points[0].station == "10+00"
+
+
+def test_survey_point_extractor_skips_synthetic_geometry_for_n_e_pairing() -> None:
+    elements = [
+        _FakeElement(
+            1,
+            "N 2131764.84",
+            {"x0": 0.10, "y0": 0.20, "x1": 0.14, "y1": 0.22},
+            geometry_synthetic=True,
+        ),
+        _FakeElement(
+            1,
+            "E 6051541.82",
+            {"x0": 0.12, "y0": 0.20, "x1": 0.16, "y1": 0.22},
+            geometry_synthetic=True,
+        ),
+    ]
+    assert (
+        extract_survey_points_from_elements(
+            elements,
+            scale_json=SCALE_1_IN_10_FT,
+            page_meta_json=ARCH_PAGE_META,
+        )
+        == []
+    )
+
+
+def test_survey_point_extractor_skips_openai_vision_source_for_n_e_pairing() -> None:
+    elements = [
+        _FakeElement(
+            1,
+            "N 2131764.84",
+            {"x0": 0.10, "y0": 0.20, "x1": 0.14, "y1": 0.22},
+            source="openai_vision",
+        ),
+        _FakeElement(
+            1,
+            "E 6051541.82",
+            {"x0": 0.12, "y0": 0.20, "x1": 0.16, "y1": 0.22},
+            source="openai_vision",
+        ),
+    ]
+    assert (
+        extract_survey_points_from_elements(
+            elements,
+            scale_json=SCALE_1_IN_10_FT,
+            page_meta_json=ARCH_PAGE_META,
+        )
+        == []
+    )

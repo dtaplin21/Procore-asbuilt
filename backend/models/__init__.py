@@ -14,6 +14,7 @@ from .drawing_landmark import DrawingLandmark
 from .drawing_survey_point import DrawingSurveyPoint
 from .drawing_text_element import DrawingTextElement
 from .drawing_viewport import DrawingViewport
+from .drawing_legend_grounding_hit import DrawingLegendGroundingHit
 from .drawing_symbol import DrawingSymbol
 from .drawing_overlay import DrawingOverlay, UnresolvedEvidence
 from .drawing_region import DrawingRegion
@@ -38,6 +39,7 @@ __all__ = [
     "DrawingSurveyPoint",
     "DrawingTextElement",
     "DrawingViewport",
+    "DrawingLegendGroundingHit",
     "DrawingSymbol",
     "DrawingRegion",
     "DrawingOverlay",

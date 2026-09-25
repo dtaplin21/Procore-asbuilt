@@ -311,16 +311,25 @@ cd backend && PYTHONPATH=. ./venv/bin/python scripts/compare_index_sources.py \\
 
 ## Phase 7 — Remove / deprecate (after sign-off)
 
-**Deprecate then delete (masters only first):**
+**Done (code / ops guardrails):**
 
 | Item | Action |
 |------|--------|
-| `OCR_BACKEND=openai_vision` for master index | Remove from docs; reject in config when `DOCUMENT_AI_ENABLED=true` |
-| `ocr_engine.ocr_image_openai_vision` | Stop calling from `extract_document_via_ocr` for PDF masters |
-| `ai/pipelines/openai_vision.py` | **Keep file** if inspection/GPT still imports it; remove OCR-only helpers if unused |
-| Tesseract master path | Make opt-in (`DOCUMENT_AI_PARALLEL_TESSERACT=false` default off) |
-| Multi-orientation Tesseract plan (if not built) | **Cancel** for masters if Doc AI validates rotation |
-| Health `/health` emphasis on `tesseract_available` | Add `document_ai_configured` |
+| `OCR_BACKEND=openai_vision` + `DOCUMENT_AI_ENABLED=true` | ✅ **Rejected** at `Settings` load (`config.py`) |
+| Master index OCR | ✅ Document AI when enabled; Tesseract only if `DOCUMENT_AI_PARALLEL_TESSERACT=true` |
+| Evidence PDF OCR | ✅ `DOCUMENT_AI_EVIDENCE_ENABLED` → `extract_document*` batch Doc AI |
+| OpenAI vision OCR | ✅ **Demoted** — `geometry_synthetic` on tokens; excluded from survey N/E pairing |
+| `vision_location_reasoner.py` | **Keep** — scope/match visual reasoning (not OCR) |
+| `ai/pipelines/openai_vision.py` | **Keep** — text-only fallback for raster when Tesseract fails |
+| Health `/health` + startup log | ✅ `document_ai_enabled`, `document_ai_configured` |
+| `.env.example` | ✅ Documents master vs evidence OCR split |
+
+**After Phase 5 sign-off (manual):**
+
+| Item | Action |
+|------|--------|
+| Multi-orientation Tesseract for masters | Cancel if Doc AI checklist passes on 1691 |
+| Remove dead OpenAI-vision master wiring | Grep + delete only if unused outside evidence |
 
 **Do not delete:**
 - `ocr_engine.py` entirely — photos, aux sheets, dev fallback.
@@ -338,7 +347,7 @@ cd backend && PYTHONPATH=. ./venv/bin/python scripts/compare_index_sources.py \\
 | **Add** | `tests/test_document_ai_parser.py`, `tests/fixtures/document_ai/` |
 | **Modify** | `hybrid_text_merge.py`, `master_drawing_indexer.py`, `document_text_extraction.py`, `drawing_index_jobs.py`, `config.py`, `.env.example` |
 | **Modify** | `drawing_text_element.py` (comment + any index on source) |
-| **Delete later** | OpenAI-vision-as-OCR wiring for masters; optional Tesseract default for masters |
+| **Delete later** | Unused OpenAI-vision master-only paths (masters already on Doc AI when enabled) |
 
 ---
 
@@ -356,39 +365,43 @@ google-cloud-storage
 ## Cost / ops
 
 - **OCR_PROCESSOR:** ~ **$0.01/page**, one-time ingest per master revision → negligible at current volume.
-- Enable **GCP budget alerts**; log `document_ai_pages_processed` in `index_stats_json`.
+- Enable **GCP budget alerts** on the GCP project.
+- **Billing pages logged:** `drawing.index_stats_json["document_ai_pages_processed"]` (0 on GCS cache hit) and nested under `document_ai` with `document_ai_pages_in_document`, `document_ai_cache_hit`.
 
 ---
 
-## PROMPT — Phase 2 + 3 (Agent)
+## Agent prompts (archive)
+
+Phases **0–7** are implemented in code; use the prompts below only for onboarding or re-run context.
+
+### Phase 2 + 3 ✅ Done
+
+- `document_ai_parser.py`, `document_ai_batch.py`, `document_ai_storage.py`, `document_ai_client.py`
+- `hybrid_text_merge.merge_native_ocr_and_document_ai_words`
+- `config.py` / `.env.example` `DOCUMENT_AI_*`
+
+### Phase 4–7 ✅ Done
+
+- `master_drawing_indexer` + `drawing_index_jobs` + backfill script + GCS cache + evidence OCR flags + page billing stats
+
+### PROMPT — Live validation (Agent / manual)
 
 ```text
-Implement Google Document AI batch OCR for master drawings:
+GCP + backend/.env configured (Phase 0–1). Then:
 
-1. Add document_ai_parser.py: fixture-driven tests, map tokens to PositionedWord with token_source=document_ai.
-2. Add document_ai_batch.py skeleton: GCS upload, batch_process_documents, poll LRO, download JSON (integration script gated by env).
-3. Extend hybrid_text_merge.py with merge_native_ocr_and_document_ai_words (3-way, prefer native > document_ai > tesseract).
-4. Add config fields DOCUMENT_AI_* to config.py and .env.example.
-Do NOT remove Tesseract or openai_vision yet. Do NOT wire master_drawing_indexer until tests pass.
-```
-
----
-
-## PROMPT — Phase 4 (Agent)
-
-```text
-Wire document AI into master_drawing_indexer.extract_drawing_document:
-- When DOCUMENT_AI_ENABLED, call extract_document_via_document_ai instead of extract_document_via_ocr for the OCR leg.
-- Persist DrawingTextElement.source=document_ai from token_source.
-- Extend index_stats_json with document_ai_pages, batch_operation_id, parse timing.
-- Update test_master_drawing_indexer.py with mocked document AI words.
-Keep native extract unconditional. Keep merge 3-way with tesseract optional via flag.
+1. DOCUMENT_AI_ENABLED=true — backfill master 1691:
+   ./venv/bin/python scripts/backfill_document_ai_index.py --project-id 688 --drawing-ids 1691
+2. Audit + checklist:
+   scripts/compare_index_sources.py --drawing-id 1691 --project-id 688 --gutter-x-max 0.15
+3. Optional evidence: DOCUMENT_AI_EVIDENCE_ENABLED=true after PDF parity spot-check.
+4. Record decision gate in this note (Doc AI vs Tesseract on HIGHWAY / N-E tokens).
 ```
 
 ---
 
 ## Summary
 
-- **Add:** GCP batch OCR path, parser to `PositionedWord`, 3-way merge, indexer + job wiring, validation scripts.
-- **Keep:** Native PDF, rendition pipeline, vision scope tracer, inspection GPT.
-- **Remove (later):** OpenAI vision as master OCR; default Tesseract on masters after Doc AI proves coverage on **1691** / checklist.
+- **Shipped:** GCP batch OCR, parser, 3-way merge, indexer, jobs, backfill, cache, validation scripts, evidence Doc AI opt-in, synthetic-box guard for survey pairing.
+- **Keep:** Native PDF, rendition pipeline, `vision_location_reasoner`, inspection GPT.
+- **Ops:** GCP budget alerts; track `index_stats_json.document_ai_pages_processed`.
+- **Still manual:** Phase 5 sign-off on **1691** before turning off `DOCUMENT_AI_PARALLEL_TESSERACT` / legacy master OCR assumptions.

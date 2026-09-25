@@ -181,6 +181,7 @@ async def startup_event():
     """Initialize database on startup"""
     init_db()
     from ai.pipelines.ocr_engine import tesseract_is_available
+    from config import document_ai_configured
 
     logger.info(
         "startup_complete",
@@ -190,6 +191,9 @@ async def startup_event():
             "openai_vision_model": app_settings.openai_vision_model,
             "ocr_backend": app_settings.ocr_backend,
             "tesseract_available": tesseract_is_available(),
+            "document_ai_enabled": app_settings.document_ai_enabled,
+            "document_ai_evidence_enabled": app_settings.document_ai_evidence_enabled,
+            "document_ai_configured": document_ai_configured(app_settings),
         },
     )
 
@@ -197,6 +201,7 @@ async def startup_event():
 async def health_check():
     """Health check endpoint"""
     from ai.pipelines.ocr_engine import tesseract_is_available
+    from config import document_ai_configured
 
     return {
         "status": "ok",
@@ -208,6 +213,9 @@ async def health_check():
         "openai_vision_model": app_settings.openai_vision_model,
         "ocr_backend": app_settings.ocr_backend,
         "tesseract_available": tesseract_is_available(),
+        "document_ai_enabled": app_settings.document_ai_enabled,
+        "document_ai_evidence_enabled": app_settings.document_ai_evidence_enabled,
+        "document_ai_configured": document_ai_configured(app_settings),
     }
 
 @app.get("/")
