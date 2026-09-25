@@ -30,7 +30,7 @@ class DrawingTextElement(Base):
     ocr_confidence = Column(Float, nullable=False, server_default="1.0")
     legend_expansion = Column(Text, nullable=True)
     legend_codes_json = Column(JSON, nullable=True)
-    source = Column(String, nullable=False)  # native_pdf | tesseract | openai_vision
+    source = Column(String, nullable=False)  # native_pdf | document_ai | tesseract | openai_vision | hybrid_pdf
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     master_drawing = relationship("Drawing", back_populates="text_elements")

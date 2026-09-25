@@ -16,6 +16,7 @@ from typing import Any, cast
 import fitz  # PyMuPDF
 from sqlalchemy.orm import Session
 
+from ai.pipelines.document_ai_batch import extract_document_via_document_ai
 from ai.pipelines.document_text_extraction import (
     ExtractedDocument,
     PositionedWord,
@@ -23,7 +24,11 @@ from ai.pipelines.document_text_extraction import (
     extract_document,
     extract_document_via_ocr,
 )
-from ai.pipelines.hybrid_text_merge import merge_native_and_ocr_words
+from ai.pipelines.hybrid_text_merge import (
+    OCR_SOURCE_DOCUMENT_AI,
+    merge_native_and_ocr_words,
+    merge_native_ocr_and_document_ai_words,
+)
 from ai.pipelines.drawing_scale_parser import page_size_inches_from_points, parse_scale_from_words
 from ai.pipelines.landmark_extractor import LandmarkRecord, extract_landmarks_from_page
 from ai.pipelines.master_drawing_region_builder import build_auto_regions_from_text_elements
@@ -32,7 +37,7 @@ from ai.pipelines.sheet_orientation_detector import (
     enrich_page_meta_with_orientation,
 )
 from ai.pipelines.survey_point_extractor import extract_survey_points_from_elements
-from config import settings
+from config import document_ai_configured, settings
 from models.drawing_text_element import DrawingTextElement
 from models.models import Drawing, DrawingRendition
 from services.landmark_storage import persist_landmarks
@@ -59,9 +64,10 @@ class IndexResult:
     scale_found: bool = False
     scale_json: dict[str, Any] | None = None
     page_meta_json: list[dict[str, Any]] | None = None
+    document_ai_stats: dict[str, Any] | None = None
 
     def to_stats_json(self) -> dict[str, Any]:
-        return {
+        stats: dict[str, Any] = {
             "pages": self.pages,
             "text_elements": self.text_elements,
             "regions": self.regions,
@@ -69,6 +75,9 @@ class IndexResult:
             "landmarks": self.landmarks,
             "scale_found": self.scale_found,
         }
+        if self.document_ai_stats:
+            stats["document_ai"] = self.document_ai_stats
+        return stats
 
 
 def normalize_token_text(text: str) -> str:
@@ -92,6 +101,8 @@ def element_source(source_format: SourceFormat) -> str:
 
 
 def _ocr_token_source() -> str:
+    if settings.document_ai_enabled and document_ai_configured():
+        return OCR_SOURCE_DOCUMENT_AI
     backend = settings.ocr_backend
     if backend == "openai_vision":
         return "openai_vision"
@@ -145,7 +156,48 @@ def _merge_native_and_ocr_documents(
     )
 
 
-def extract_drawing_document(file_path: Path, *, force_ocr: bool = False) -> ExtractedDocument:
+def _merge_native_document_ai_and_tesseract(
+    native: ExtractedDocument,
+    document_ai: ExtractedDocument,
+    tesseract: ExtractedDocument,
+) -> ExtractedDocument:
+    page_count = max(
+        native.page_count,
+        document_ai.page_count,
+        tesseract.page_count,
+    )
+    merged_words = merge_native_ocr_and_document_ai_words(
+        native.words,
+        document_ai.words,
+        tesseract.words if tesseract.words else None,
+    )
+    return ExtractedDocument(
+        source_format=SourceFormat.HYBRID_PDF,
+        page_count=page_count,
+        words=merged_words,
+    )
+
+
+def _use_document_ai_for_master_index() -> bool:
+    if not settings.document_ai_enabled:
+        return False
+    if not document_ai_configured():
+        logger.warning(
+            "master_drawing_index_document_ai_enabled_but_not_configured",
+            extra={"path": "extract_drawing_document"},
+        )
+        return False
+    return True
+
+
+def extract_drawing_document(
+    file_path: Path,
+    *,
+    force_ocr: bool = False,
+    document_ai_stats: dict[str, Any] | None = None,
+    drawing_id: int | None = None,
+    on_document_ai_batch_started: Any | None = None,
+) -> ExtractedDocument:
     max_pages = _index_max_pages()
     if force_ocr:
         return _limit_extracted_document(
@@ -154,6 +206,40 @@ def extract_drawing_document(file_path: Path, *, force_ocr: bool = False) -> Ext
         )
 
     native = _limit_extracted_document(extract_document(file_path), max_pages)
+
+    if _use_document_ai_for_master_index():
+        document_ai = _limit_extracted_document(
+            extract_document_via_document_ai(
+                file_path,
+                max_pages=max_pages,
+                document_ai_stats=document_ai_stats,
+                drawing_id=drawing_id,
+                on_batch_started=on_document_ai_batch_started,
+            ),
+            max_pages,
+        )
+        tesseract = ExtractedDocument(
+            source_format=SourceFormat.SCANNED_PDF,
+            page_count=0,
+            words=[],
+        )
+        if settings.document_ai_parallel_tesseract:
+            tesseract = _limit_extracted_document(
+                extract_document_via_ocr(file_path, max_pages=max_pages),
+                max_pages,
+            )
+        if _native_text_looks_garbled(native):
+            logger.info(
+                "master_drawing_index_native_text_garbled_diagnostic",
+                extra={
+                    "path": str(file_path),
+                    "native_tokens": len(native.words),
+                    "document_ai_tokens": len(document_ai.words),
+                    "tesseract_tokens": len(tesseract.words),
+                },
+            )
+        return _merge_native_document_ai_and_tesseract(native, document_ai, tesseract)
+
     ocr = _limit_extracted_document(
         extract_document_via_ocr(file_path, max_pages=max_pages),
         max_pages,
@@ -350,7 +436,23 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         raise FileNotFoundError(f"Drawing source file not found: {source_path}")
 
     is_linked_evidence = cast(str | None, drawing.source) == _LINKED_DRAWING_SOURCE
-    extracted = extract_drawing_document(source_path, force_ocr=is_linked_evidence)
+    document_ai_stats: dict[str, Any] = {}
+    drawing_id = cast(int, drawing.id)
+
+    def _on_document_ai_batch_started(pending: dict[str, Any]) -> None:
+        if not _use_document_ai_for_master_index():
+            return
+        from services.drawing_index_jobs import set_document_ai_pending
+
+        set_document_ai_pending(session, drawing, pending)
+
+    extracted = extract_drawing_document(
+        source_path,
+        force_ocr=is_linked_evidence,
+        document_ai_stats=document_ai_stats,
+        drawing_id=drawing_id if not is_linked_evidence else None,
+        on_document_ai_batch_started=_on_document_ai_batch_started,
+    )
     page_meta_json = build_page_meta_json(
         session,
         drawing_id,
@@ -424,4 +526,5 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         scale_found=scale_json is not None,
         scale_json=scale_json,
         page_meta_json=page_meta_json,
+        document_ai_stats=document_ai_stats or None,
     )

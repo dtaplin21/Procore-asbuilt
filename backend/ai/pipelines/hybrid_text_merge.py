@@ -15,6 +15,9 @@ _DEFAULT_TEXT_SIMILARITY = 0.88
 
 NATIVE_SOURCE = "native_pdf"
 OCR_SOURCE_TESSERACT = "tesseract"
+OCR_SOURCE_DOCUMENT_AI = "document_ai"
+
+_DEFAULT_PREFER_ORDER = (NATIVE_SOURCE, OCR_SOURCE_DOCUMENT_AI, OCR_SOURCE_TESSERACT)
 
 
 def normalize_merge_text(text: str) -> str:
@@ -59,21 +62,60 @@ def words_are_duplicates(
     return _text_similarity(left.text, right.text) >= min_text_similarity
 
 
+def _tag_for_source(
+    word: PositionedWord,
+    source_key: str,
+    *,
+    tesseract_source: str,
+) -> PositionedWord:
+    if source_key == OCR_SOURCE_TESSERACT:
+        return replace(word, token_source=tesseract_source)
+    return replace(word, token_source=source_key)
+
+
+def merge_native_ocr_and_document_ai_words(
+    native_words: list[PositionedWord],
+    document_ai_words: list[PositionedWord],
+    tesseract_words: list[PositionedWord] | None = None,
+    *,
+    prefer_order: tuple[str, ...] = _DEFAULT_PREFER_ORDER,
+    tesseract_source: str = OCR_SOURCE_TESSERACT,
+) -> list[PositionedWord]:
+    """Dedupe by page + fractional center + text similarity.
+
+    On duplicate, keep the token from the source listed earlier in ``prefer_order``.
+    """
+    pools: dict[str, list[PositionedWord]] = {
+        NATIVE_SOURCE: native_words,
+        OCR_SOURCE_DOCUMENT_AI: document_ai_words,
+        OCR_SOURCE_TESSERACT: tesseract_words or [],
+    }
+    merged: list[PositionedWord] = []
+    for source_key in prefer_order:
+        for word in pools.get(source_key, []):
+            tagged = _tag_for_source(word, source_key, tesseract_source=tesseract_source)
+            if any(words_are_duplicates(tagged, kept) for kept in merged):
+                continue
+            merged.append(tagged)
+    return merged
+
+
 def merge_native_and_ocr_words(
     native_words: list[PositionedWord],
     ocr_words: list[PositionedWord],
     *,
     ocr_source: str = OCR_SOURCE_TESSERACT,
 ) -> list[PositionedWord]:
-    """Union native + OCR tokens; drop OCR when a native token matches (bbox + text).
-
-    On duplicate, the native ``PositionedWord`` is kept (better character precision).
-    """
-    merged: list[PositionedWord] = [
-        replace(word, token_source=NATIVE_SOURCE) for word in native_words
-    ]
-    for ocr_word in ocr_words:
-        if any(words_are_duplicates(ocr_word, native_word) for native_word in native_words):
-            continue
-        merged.append(replace(ocr_word, token_source=ocr_source))
-    return merged
+    """Union native + OCR tokens (two-way); delegates to the three-way merge."""
+    if ocr_source == OCR_SOURCE_DOCUMENT_AI:
+        return merge_native_ocr_and_document_ai_words(
+            native_words,
+            document_ai_words=ocr_words,
+            tesseract_words=None,
+        )
+    return merge_native_ocr_and_document_ai_words(
+        native_words,
+        document_ai_words=[],
+        tesseract_words=ocr_words,
+        tesseract_source=ocr_source,
+    )

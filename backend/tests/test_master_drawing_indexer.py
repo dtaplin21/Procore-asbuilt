@@ -153,6 +153,63 @@ def test_extract_drawing_document_force_ocr_for_linked_evidence(tmp_path: Path) 
     assert any("2131764" in word.text for word in extracted.words)
 
 
+def test_extract_drawing_document_uses_document_ai_when_enabled(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from config import settings
+
+    monkeypatch.setattr(settings, "document_ai_enabled", True)
+    monkeypatch.setattr(
+        "ai.pipelines.master_drawing_indexer.document_ai_configured",
+        lambda: True,
+    )
+
+    pdf_path = tmp_path / "cad.pdf"
+    pdf_path.write_bytes(b"%PDF")
+    native_doc = ExtractedDocument(
+        source_format=SourceFormat.NATIVE_PDF,
+        page_count=1,
+        words=[_word("UCSF")],
+    )
+    docai_doc = ExtractedDocument(
+        source_format=SourceFormat.SCANNED_PDF,
+        page_count=1,
+        words=[
+            PositionedWord(
+                text="HIGHWAY",
+                bbox=_word("x").bbox,
+                page_index=0,
+                ocr_confidence=0.9,
+                token_source="document_ai",
+            )
+        ],
+    )
+
+    with (
+        patch(
+            "ai.pipelines.master_drawing_indexer.extract_document",
+            return_value=native_doc,
+        ),
+        patch(
+            "ai.pipelines.master_drawing_indexer.extract_document_via_document_ai",
+            return_value=docai_doc,
+        ) as docai_mock,
+        patch(
+            "ai.pipelines.master_drawing_indexer.extract_document_via_ocr",
+        ) as ocr_mock,
+    ):
+        extracted = extract_drawing_document(pdf_path)
+
+    docai_mock.assert_called_once()
+    ocr_mock.assert_not_called()
+    assert extracted.source_format == SourceFormat.HYBRID_PDF
+    texts = {word.text for word in extracted.words}
+    assert texts == {"UCSF", "HIGHWAY"}
+    by_source = {word.text: word.token_source for word in extracted.words}
+    assert by_source["HIGHWAY"] == "document_ai"
+
+
 def test_extract_drawing_document_always_hybrid_for_masters(tmp_path: Path) -> None:
     pdf_path = tmp_path / "cad.pdf"
     pdf_path.write_bytes(b"%PDF")
@@ -183,6 +240,35 @@ def test_extract_drawing_document_always_hybrid_for_masters(tmp_path: Path) -> N
     assert extracted.source_format == SourceFormat.HYBRID_PDF
     assert any("11+14" in word.text for word in extracted.words)
     assert any(word.text == "UCSF" for word in extracted.words)
+
+
+def test_persist_text_elements_uses_token_source_document_ai(
+    db_session: Session,
+    seeded_ready_pdf_drawing: Drawing,
+) -> None:
+    drawing_id = cast(int, seeded_ready_pdf_drawing.id)
+    words = [
+        PositionedWord(
+            text="MLK",
+            bbox=_word("MLK").bbox,
+            page_index=0,
+            token_source="document_ai",
+        )
+    ]
+    count = persist_text_elements(
+        db_session,
+        drawing_id,
+        words,
+        SourceFormat.HYBRID_PDF,
+    )
+    db_session.commit()
+    row = (
+        db_session.query(DrawingTextElement)
+        .filter(DrawingTextElement.master_drawing_id == drawing_id)
+        .one()
+    )
+    assert count == 1
+    assert cast(str, row.source) == "document_ai"
 
 
 def test_persist_text_elements(db_session: Session, seeded_ready_pdf_drawing: Drawing) -> None:

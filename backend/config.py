@@ -61,6 +61,7 @@ Google Document AI (master drawing batch OCR — see Notes/ai google implementat
     DOCUMENT_AI_GCS_OUTPUT_BUCKET          # batch output bucket name
     DOCUMENT_AI_ENABLED                    # default false — master index uses Doc AI when true
     DOCUMENT_AI_PARALLEL_TESSERACT         # default false — A/B Tesseract alongside Doc AI
+    DOCUMENT_AI_BATCH_TIMEOUT_SECONDS      # batch LRO wait during index (default 3600)
     GOOGLE_APPLICATION_CREDENTIALS         # read by google-cloud libs; not stored in Settings
 """
 
@@ -207,6 +208,11 @@ class Settings(BaseSettings):
     document_ai_parallel_tesseract: bool = Field(
         default=False,
         description="DOCUMENT_AI_PARALLEL_TESSERACT",
+    )
+    #: Max seconds to wait on Document AI batch LRO during master index. Env: ``DOCUMENT_AI_BATCH_TIMEOUT_SECONDS``.
+    document_ai_batch_timeout_seconds: float = Field(
+        default=3600.0,
+        description="DOCUMENT_AI_BATCH_TIMEOUT_SECONDS",
     )
 
     # In some environments (CI, sandboxes), extra env vars may be present.

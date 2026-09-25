@@ -113,6 +113,17 @@ def main() -> int:
         default="",
         help="Write all tokens as JSON array",
     )
+    parser.add_argument(
+        "--checklist",
+        action="store_true",
+        help="Run Phase 5 keyword checklist (see compare_index_sources.py)",
+    )
+    parser.add_argument(
+        "--gutter-x-max",
+        type=float,
+        default=None,
+        help="With --checklist: only tokens with centroid_x <= this (0-1)",
+    )
     args = parser.parse_args()
 
     db = SessionLocal()
@@ -160,6 +171,44 @@ def main() -> int:
             f"(max 1.0 if one full page)"
         )
         print(f"Page 1 grid coverage (50x50 cells with any token): {grid_cov * 100:.1f}%")
+
+        if args.checklist:
+            from services.drawing_index_validation import (
+                IndexToken,
+                default_validation_keywords,
+                keyword_hits,
+            )
+
+            index_tokens = [
+                IndexToken(
+                    page=cast(int, row.page),
+                    centroid_x=_centroid(
+                        cast(dict[str, Any], row.bbox_json)
+                        if isinstance(row.bbox_json, dict)
+                        else {}
+                    )[0],
+                    centroid_y=_centroid(
+                        cast(dict[str, Any], row.bbox_json)
+                        if isinstance(row.bbox_json, dict)
+                        else {}
+                    )[1],
+                    source=str(row.source),
+                    text=str(row.text),
+                    ocr_confidence=float(cast(float, row.ocr_confidence)),
+                )
+                for row in rows
+            ]
+            hits = keyword_hits(
+                index_tokens,
+                default_validation_keywords(),
+                gutter_x_max=args.gutter_x_max,
+                page=1,
+            )
+            print("\n--- Phase 5 keyword checklist (page 1) ---")
+            for keyword in default_validation_keywords():
+                matched = hits.get(keyword, [])
+                status = "OK" if matched else "MISSING"
+                print(f"  [{status}] {keyword}: {len(matched)}")
 
         print("\n--- ALL INDEXED TEXT TOKENS (page, cx, cy, source, conf, text) ---\n")
         lines_out: list[str] = []

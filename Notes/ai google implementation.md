@@ -207,7 +207,7 @@ def merge_native_ocr_and_document_ai_words(
 
 **Delete (Phase 7 only):** Tesseract branch inside merge when A/B complete.
 
-**TEST:** `backend/tests/test_hybrid_text_merge.py` — native+DocAI duplicate drops DocAI; DocAI-only token kept; three-way overlap.
+**TEST:** `./venv/bin/python -m pytest tests/test_hybrid_text_merge.py -q` ✅
 
 ---
 
@@ -242,7 +242,7 @@ def merge_native_ocr_and_document_ai_words(
 
 **Do not wire Doc AI into:** evidence photo ingest, arbitrary `ocr_engine.ocr_image` callers, unless explicitly scoped later.
 
-**TEST:** Re-index 1691; `audit_drawing_index_coverage.py --drawing-id 1691`; assert `source=document_ai` rows > 0 when native misses gutter.
+**TEST:** Unit tests in `test_master_drawing_indexer.py` (Doc AI path mocked). Live: re-index 1691 with `DOCUMENT_AI_ENABLED=true`; `audit_drawing_index_coverage.py --drawing-id 1691`.
 
 ---
 
@@ -268,7 +268,27 @@ cd backend && PYTHONPATH=. ./venv/bin/python scripts/audit_drawing_index_coverag
 - If Doc AI ≥ Tesseract on checklist **without** multi-orientation Tesseract → **skip** planned multi-orientation OCR for masters.
 - If not → keep Tesseract as secondary source in 3-way merge until tuned.
 
-**Add:** `scripts/compare_index_sources.py` — diff token sets by source (optional).
+**Add:** `scripts/compare_index_sources.py` ✅ — DB and/or TSV diff + keyword checklist.
+
+```bash
+# After re-index with Document AI — source mix + checklist
+cd backend && PYTHONPATH=. ./venv/bin/python scripts/compare_index_sources.py \\
+  --drawing-id 1691 --project-id 688 --gutter-x-max 0.15
+
+# A/B: export baseline before re-index, then diff
+./venv/bin/python scripts/audit_drawing_index_coverage.py --drawing-id 1691 --project-id 688 \\
+  --export tokens_1691_baseline.tsv
+# ... re-index ...
+./venv/bin/python scripts/audit_drawing_index_coverage.py --drawing-id 1691 --project-id 688 \\
+  --export tokens_1691_docai.tsv
+./venv/bin/python scripts/compare_index_sources.py \\
+  --baseline tokens_1691_baseline.tsv --current tokens_1691_docai.tsv
+
+# Quick checklist on audit alone
+./venv/bin/python scripts/audit_drawing_index_coverage.py --drawing-id 1691 --project-id 688 --checklist
+```
+
+**TEST:** `./venv/bin/python -m pytest tests/test_drawing_index_validation.py -q`
 
 **Delete:** Nothing until gate passes.
 
@@ -276,14 +296,16 @@ cd backend && PYTHONPATH=. ./venv/bin/python scripts/audit_drawing_index_coverag
 
 ## Phase 6 — Index worker / backfill
 
-**Add:**
-- Backfill script: `scripts/backfill_document_ai_index.py --project-id 688 --drawing-ids ...`
-- Job states: `index_status=pending_document_ai` → `processing` → `ready` | `failed`
-- Cache: store raw Doc AI JSON in GCS output prefix keyed by `drawing_id` / content hash (re-parse without re-billing).
+**Add:** ✅
+- Backfill: `scripts/backfill_document_ai_index.py --project-id 688 --drawing-ids 1691` (or `--all-masters`, `--dry-run`)
+- Cache: `services/document_ai_cache.py` — `batch-output/by-drawing/{drawing_id}/{sha256}/` (reuse JSON, skip batch when shards exist)
+- While batch LRO runs: `index_status=pending_document_ai` + `index_stats_json.document_ai_pending`
 
-**Modify:** `services/drawing_index_jobs.py` — orchestrate upload → batch → poll → parse → persist.
+**Modify:** ✅ `drawing_index_jobs.py` (`set_document_ai_pending`, clear on success); `document_ai_batch.py` + indexer pass `drawing_id`.
 
-**TEST:** Single drawing end-to-end; worker restart idempotent (same GCS output, skip re-batch if hash matches).
+**TEST:** `./venv/bin/python -m pytest tests/test_document_ai_cache.py -q`; live backfill after GCP + `DOCUMENT_AI_ENABLED=true`.
+
+**Note:** Index job still **blocks** on batch LRO in-process; cache avoids **re-billing** on re-index. Split poll worker is future work if timeouts bite.
 
 ---
 

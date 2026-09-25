@@ -3,6 +3,10 @@ Master drawing auto-index job queue integration.
 
 Enqueues index jobs after successful drawing render. OCR ingest and region
 building run in :mod:`ai.pipelines.master_drawing_indexer` (Phase 2+).
+
+When ``DOCUMENT_AI_ENABLED`` is true, the index worker blocks on the Document AI
+batch LRO (see ``DOCUMENT_AI_BATCH_TIMEOUT_SECONDS``). Async poll/retry jobs are
+a future optimization if masters routinely exceed the worker timeout.
 """
 
 from __future__ import annotations
@@ -11,7 +15,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, cast
+from typing import Any, Optional, cast
 
 from sqlalchemy.orm import Session
 
@@ -35,6 +39,30 @@ logger = logging.getLogger(__name__)
 
 JOB_TYPE = "drawing_index"
 _LINKED_DRAWING_SOURCE = "linked_evidence"
+INDEX_STATUS_PENDING_DOCUMENT_AI = "pending_document_ai"
+
+
+def set_document_ai_pending(
+    session: Session,
+    drawing: Drawing,
+    pending: dict[str, object],
+) -> None:
+    """Record in-flight Document AI batch metadata on the drawing row."""
+    drawing.index_status = INDEX_STATUS_PENDING_DOCUMENT_AI  # type: ignore[assignment]
+    existing = cast(dict[str, Any] | None, drawing.index_stats_json)
+    stats: dict[str, Any] = dict(existing) if isinstance(existing, dict) else {}
+    stats["document_ai_pending"] = pending
+    drawing.index_stats_json = stats  # type: ignore[assignment]
+    session.flush()
+
+
+def clear_document_ai_pending(drawing: Drawing) -> None:
+    existing = cast(dict[str, Any] | None, drawing.index_stats_json)
+    if not isinstance(existing, dict):
+        return
+    stats: dict[str, Any] = dict(existing)
+    stats.pop("document_ai_pending", None)
+    drawing.index_stats_json = stats  # type: ignore[assignment]
 
 
 def region_geometry_source(geometry: object) -> str | None:
@@ -253,7 +281,9 @@ def _apply_index_result(drawing: Drawing, result: IndexResult) -> None:
     drawing.index_status = "ready"  # type: ignore[assignment]
     drawing.index_error = None  # type: ignore[assignment]
     drawing.indexed_at = datetime.now(timezone.utc)  # type: ignore[assignment]
-    drawing.index_stats_json = result.to_stats_json()  # type: ignore[assignment]
+    stats = result.to_stats_json()
+    drawing.index_stats_json = stats  # type: ignore[assignment]
+    clear_document_ai_pending(drawing)
     if result.scale_json is not None:
         drawing.scale_json = result.scale_json  # type: ignore[assignment]
     if result.page_meta_json is not None:
