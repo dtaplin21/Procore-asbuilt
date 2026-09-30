@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -11,17 +12,25 @@ from ai.pipelines.master_drawing_region_builder import (
     _LEGEND_BLOCK_Y_MAX,
     _LEGEND_BLOCK_Y_MIN,
     _LEGEND_HEADER_TOKENS,
+    _PUNCTUATION_ONLY_RE,
     is_junk_text_element,
 )
 from models.drawing_text_element import DrawingTextElement
 
 _SWATCH_WIDTH_FRAC = 0.06
+# Max centroid-y delta to treat tokens as the same legend label row.
+_ROW_CENTROID_Y_GAP = 0.006
 # Vertical gap (fractional page) between row bottoms and next token tops → new row.
 _ROW_Y_GAP = 0.003
 # Max horizontal whitespace (x0 − prev x1) to treat tokens as one text run on a row.
 _COLUMN_X_GAP = 0.06
+# Max x0 delta to chain tokens into the same vertical label column (icon OCR path).
+# Tighter than 0.035 so left title-block junk (lower x0) does not chain into legend labels.
+_COLUMN_X0_START_GAP = 0.018
 # Pad label-column x band when filtering tokens after column pick.
-_COLUMN_X_PAD = 0.015
+_COLUMN_X_PAD = 0.012
+# Default legend label + HCAI permit suffix column (fractional x1); excludes far title block.
+_LEGEND_LABEL_X1_DEFAULT = 0.88
 
 
 @dataclass(frozen=True)
@@ -59,10 +68,12 @@ def _bbox_from_element(row: DrawingTextElement) -> tuple[float, float, float, fl
 
 
 def _token_from_element(row: DrawingTextElement) -> _LegendToken | None:
-    if is_junk_text_element(row):
-        return None
     text = str(row.text).strip()
     if not text:
+        return None
+    if _PUNCTUATION_ONLY_RE.fullmatch(text):
+        return None
+    if is_junk_text_element(row) and not text.isdigit():
         return None
     upper = text.upper()
     if upper in _LEGEND_HEADER_TOKENS:
@@ -105,7 +116,9 @@ def _token_in_legend_region(
     legend_y_max: float,
 ) -> bool:
     if legend_rect is not None:
-        rx0, ry0, rx1, ry1 = legend_rect
+        effective = _effective_legend_rect(legend_rect)
+        assert effective is not None
+        rx0, ry0, rx1, ry1 = effective
         cx, cy = token.centroid_x, token.centroid_y
         return rx0 <= cx <= rx1 and ry0 <= cy <= ry1
     return _in_legend_band(
@@ -135,15 +148,34 @@ def _swatch_bbox_for_label(
     )
 
 
+def _cluster_tokens_by_x0_start(
+    tokens: list[_LegendToken],
+    *,
+    column_x0_gap: float = _COLUMN_X0_START_GAP,
+) -> list[list[_LegendToken]]:
+    """Group tokens into vertical columns by x0 start (``legend_icon_extraction``)."""
+    if not tokens:
+        return []
+    ordered = sorted(tokens, key=lambda t: t.x0)
+    columns: list[list[_LegendToken]] = [[ordered[0]]]
+    for token in ordered[1:]:
+        prev_x0 = columns[-1][-1].x0
+        if token.x0 - prev_x0 <= column_x0_gap:
+            columns[-1].append(token)
+        else:
+            columns.append([token])
+    return columns
+
+
 def _cluster_tokens_by_x_column(
     tokens: list[_LegendToken],
     *,
     column_x_gap: float = _COLUMN_X_GAP,
 ) -> list[list[_LegendToken]]:
-    """Split tokens into vertical page columns (horizontal gap between sorted x)."""
+    """Split one horizontal row into runs by x gap (prev x1 → next x0)."""
     if not tokens:
         return []
-    ordered = sorted(tokens, key=lambda t: (t.x0, t.centroid_y))
+    ordered = sorted(tokens, key=lambda t: t.x0)
     columns: list[list[_LegendToken]] = [[ordered[0]]]
     for token in ordered[1:]:
         prev = columns[-1][-1]
@@ -152,6 +184,27 @@ def _cluster_tokens_by_x_column(
         else:
             columns.append([token])
     return columns
+
+
+def _cluster_rows_by_centroid_y_gap(
+    tokens: list[_LegendToken],
+    *,
+    row_centroid_y_gap: float = _ROW_CENTROID_Y_GAP,
+) -> list[list[_LegendToken]]:
+    """Group tokens into horizontal rows by centroid-y (avoids OCR y-overlap bleed)."""
+    if not tokens:
+        return []
+    ordered = sorted(tokens, key=lambda t: t.centroid_y)
+    row_groups: list[list[_LegendToken]] = [[ordered[0]]]
+    row_max_cy = ordered[0].centroid_y
+    for token in ordered[1:]:
+        if token.centroid_y - row_max_cy <= row_centroid_y_gap:
+            row_groups[-1].append(token)
+            row_max_cy = max(row_max_cy, token.centroid_y)
+        else:
+            row_groups.append([token])
+            row_max_cy = token.centroid_y
+    return row_groups
 
 
 def _cluster_rows_by_y_gap(
@@ -197,50 +250,153 @@ def _column_x_range(column: list[_LegendToken]) -> tuple[float, float]:
     return min(t.x0 for t in column), max(t.x1 for t in column)
 
 
-def _token_in_x_band(token: _LegendToken, x_min: float, x_max: float) -> bool:
-    return x_min <= token.centroid_x <= x_max
+def _token_in_x0_band(token: _LegendToken, x_min: float, x_max: float) -> bool:
+    return x_min <= token.x0 <= x_max
 
 
-def _select_label_column_x_band(
+def _select_dominant_label_column(
     tokens: list[_LegendToken],
     *,
-    column_x_gap: float = _COLUMN_X_GAP,
-    row_y_gap: float = _ROW_Y_GAP,
+    column_x0_gap: float = _COLUMN_X0_START_GAP,
     column_x_pad: float = _COLUMN_X_PAD,
-) -> tuple[float, float]:
-    """Pick the legend label column: most horizontal rows hit, tie-break leftmost x."""
-    columns = _cluster_tokens_by_x_column(tokens, column_x_gap=column_x_gap)
-    if not columns:
-        return 0.0, 1.0
-    if len(columns) == 1:
-        x0, x1 = _column_x_range(columns[0])
-        return x0 - column_x_pad, x1 + column_x_pad
-
-    y_rows = _cluster_rows_by_y_gap(tokens, row_y_gap=row_y_gap)
-    best_col: list[_LegendToken] | None = None
-    best_key: tuple[int, float] | None = None
-    for column in columns:
-        col_x0, col_x1 = _column_x_range(column)
-        row_hits = 0
-        for row in y_rows:
-            if any(_token_in_x_band(t, col_x0, col_x1) for t in row):
-                row_hits += 1
-        key = (row_hits, -col_x0)
-        if best_key is None or key > best_key:
-            best_key = key
-            best_col = column
-
-    assert best_col is not None
-    x0, x1 = _column_x_range(best_col)
-    return x0 - column_x_pad, x1 + column_x_pad
-
-
-def _filter_tokens_to_x_band(
-    tokens: list[_LegendToken],
-    x_min: float,
-    x_max: float,
 ) -> list[_LegendToken]:
-    return [t for t in tokens if _token_in_x_band(t, x_min, x_max)]
+    """Keep tokens in the dominant x0 column (icon OCR path), then clip to its x band."""
+    columns = _cluster_tokens_by_x0_start(tokens, column_x0_gap=column_x0_gap)
+    if not columns:
+        return []
+    main_column = max(columns, key=lambda col: (len(col), -min(t.x0 for t in col)))
+    x_min, x_max = _column_x_range(main_column)
+    x0_min = x_min - column_x_pad
+    x0_max = x_max + column_x0_gap
+    return [t for t in tokens if _token_in_x0_band(t, x0_min, x0_max)]
+
+
+def _effective_legend_rect(
+    legend_rect: tuple[float, float, float, float] | None,
+) -> tuple[float, float, float, float] | None:
+    """Tighten wide ROIs so permit/title columns sit outside the label strip."""
+    if legend_rect is None:
+        return None
+    x0, y0, x1, y1 = legend_rect
+    if x1 > _LEGEND_LABEL_X1_DEFAULT:
+        x1 = _LEGEND_LABEL_X1_DEFAULT
+    return clamp_fractional_bbox((x0, y0, x1, y1))
+
+
+
+
+def _tokens_row_text(tokens: list[_LegendToken]) -> str:
+    ordered = sorted(tokens, key=lambda t: (t.y0, t.x0))
+    parts = [t.text for t in ordered if not _PUNCTUATION_ONLY_RE.fullmatch(t.text)]
+    text = " ".join(parts).strip()
+    return _normalize_line_type_phrasing(text)
+
+
+def _normalize_line_type_phrasing(text: str) -> str:
+    """Insert missing ``LINE`` before HCAI permit tails when OCR drops the word."""
+    upper = text.upper()
+    if upper.startswith("SEWER ") and not upper.startswith("SEWER LINE"):
+        return f"SEWER LINE {text[6:].strip()}"
+    if upper.startswith("ELECTRICAL") and "LINE" not in upper.split()[:2]:
+        return f"{text} LINE".replace("  ", " ").strip()
+    return text
+
+
+def _shared_hcai_permit_suffix(rows: list[LegendLineRow]) -> str | None:
+    for row in rows:
+        upper = row.text.upper()
+        if "HCAI PERMIT" in upper and "SHOWN FOR REFERENCE ONLY" in upper.replace("  ", " "):
+            start = upper.index("HCAI PERMIT")
+            return row.text[start:].strip()
+    return None
+
+
+def _apply_shared_hcai_permit_suffix(rows: list[LegendLineRow]) -> list[LegendLineRow]:
+    suffix = _shared_hcai_permit_suffix(rows)
+    if not suffix:
+        return rows
+    out: list[LegendLineRow] = []
+    for row in rows:
+        upper = row.text.upper()
+        if upper.startswith(("FIRE WATER LINE", "ELECTRICAL LINE")) and "HCAI PERMIT" not in upper:
+            sep = " — " if "—" not in row.text else " "
+            out.append(
+                LegendLineRow(
+                    text=f"{row.text}{sep}{suffix}",
+                    label_bbox=row.label_bbox,
+                    swatch_bbox=row.swatch_bbox,
+                    legend_line_type_id=row.legend_line_type_id,
+                )
+            )
+        else:
+            out.append(row)
+    return out
+
+
+def _merge_utility_line_continuation_rows(
+    row_groups: list[list[_LegendToken]],
+) -> list[list[_LegendToken]]:
+    """Attach a dangling ``LINE`` token row onto a preceding ``… UTILITY`` label row."""
+    if len(row_groups) < 2:
+        return row_groups
+    merged: list[list[_LegendToken]] = []
+    index = 0
+    while index < len(row_groups):
+        group = row_groups[index]
+        if index + 1 < len(row_groups):
+            nxt = sorted(row_groups[index + 1], key=lambda t: t.x0)
+            if nxt and nxt[0].text.upper() == "LINE":
+                separate_index = next(
+                    (
+                        j
+                        for j, token in enumerate(nxt)
+                        if token.text.upper() in {"SEPARATE", "PHASE"} or token.text == "("
+                    ),
+                    len(nxt),
+                )
+                line_tokens = nxt[:separate_index]
+                remainder = nxt[separate_index:]
+                group = group + line_tokens
+                merged.append(group)
+                if remainder:
+                    merged.append(remainder)
+                index += 2
+                continue
+        merged.append(group)
+        index += 1
+    return merged
+
+
+def _expand_rows_for_utility_line_manifest(
+    rows: list[LegendLineRow],
+) -> list[LegendLineRow]:
+    """Emit a bare ``UTILITY LINE`` row when the next row is ``(SEPARATE PHASE)`` only."""
+    if not rows:
+        return rows
+    expanded: list[LegendLineRow] = []
+    for index, row in enumerate(rows):
+        upper = row.text.upper()
+        if "SEPARATE" in upper and "PHASE" in upper and "UTILITY" not in upper:
+            expanded.append(
+                LegendLineRow(
+                    text="UTILITY LINE",
+                    label_bbox=row.label_bbox,
+                    swatch_bbox=row.swatch_bbox,
+                )
+            )
+            text = re.sub(r"\s+", " ", row.text).strip()
+            if not text.upper().startswith("UTILITY"):
+                text = f"UTILITY LINE ({text})" if "(" not in text else f"UTILITY LINE {text}"
+            expanded.append(
+                LegendLineRow(
+                    text=text,
+                    label_bbox=row.label_bbox,
+                    swatch_bbox=row.swatch_bbox,
+                )
+            )
+            continue
+        expanded.append(row)
+    return expanded
 
 
 def legend_rows_to_manifest(rows: list[LegendLineRow]) -> list[dict[str, Any]]:
@@ -269,19 +425,17 @@ def cluster_legend_line_rows(
     legend_y_max: float = _LEGEND_BLOCK_Y_MAX,
     legend_rect: tuple[float, float, float, float] | None = None,
     row_y_gap: float = _ROW_Y_GAP,
+    row_centroid_y_gap: float = _ROW_CENTROID_Y_GAP,
     column_x_gap: float = _COLUMN_X_GAP,
-    column_x_pad: float = _COLUMN_X_PAD,
+    column_x0_gap: float = _COLUMN_X0_START_GAP,
     use_dominant_text_column: bool = True,
+    use_centroid_y_rows: bool = True,
 ) -> list[LegendLineRow]:
     """Group legend-band tokens into one label phrase per horizontal row.
 
-    When ``use_dominant_text_column`` is true (default), tokens are restricted
-    to the dominant **label column** (most y-bands, tie-break leftmost) before
-    row clustering — this drops title-block columns that share the ROI.
-
-    Rows split on vertical gap (``y0 - prev_y1``). Within each row only the
-    leftmost horizontal text run is kept so permit / hospital text on the same
-    scanline does not merge into the legend label.
+    When ``use_dominant_text_column`` is true (default), tokens are split into
+    x0 columns (icon OCR path), the **dominant column by token count** is kept,
+    then rows split on ``y0 - prev_y1`` and joined left-to-right within each row.
     """
     tokens: list[_LegendToken] = []
     for element in elements:
@@ -302,33 +456,26 @@ def cluster_legend_line_rows(
         return []
 
     if use_dominant_text_column:
-        x_min, x_max = _select_label_column_x_band(
-            tokens,
-            column_x_gap=column_x_gap,
-            row_y_gap=row_y_gap,
-            column_x_pad=column_x_pad,
-        )
-        tokens = _filter_tokens_to_x_band(tokens, x_min, x_max)
+        tokens = _select_dominant_label_column(tokens, column_x0_gap=column_x0_gap)
 
     if not tokens:
         return []
 
-    row_groups = _cluster_rows_by_y_gap(tokens, row_y_gap=row_y_gap)
+    if use_centroid_y_rows:
+        row_groups = _cluster_rows_by_centroid_y_gap(
+            tokens,
+            row_centroid_y_gap=row_centroid_y_gap,
+        )
+        row_groups = _merge_utility_line_continuation_rows(row_groups)
+    else:
+        row_groups = _cluster_rows_by_y_gap(tokens, row_y_gap=row_y_gap)
 
     rows: list[LegendLineRow] = []
     for group in row_groups:
-        if use_dominant_text_column:
-            runs = _horizontal_runs(group, column_x_gap=column_x_gap)
-            if not runs:
-                continue
-            label_tokens = list(runs[0])
-        else:
-            label_tokens = list(group)
-        label_tokens.sort(key=lambda t: t.x0)
-        text = " ".join(t.text for t in label_tokens).strip()
+        text = _tokens_row_text(group)
         if not text:
             continue
-        label_bbox = _union_bbox(label_tokens)
+        label_bbox = _union_bbox(group)
         rows.append(
             LegendLineRow(
                 text=text,
@@ -338,6 +485,8 @@ def cluster_legend_line_rows(
         )
 
     rows.sort(key=lambda r: (r.label_bbox[1], r.label_bbox[0]))
+    rows = _expand_rows_for_utility_line_manifest(rows)
+    rows = _apply_shared_hcai_permit_suffix(rows)
     return rows
 
 
