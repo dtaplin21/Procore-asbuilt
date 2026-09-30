@@ -204,6 +204,11 @@ class Settings(BaseSettings):
         default=0.95,
         description="DRAWING_INDEX_GUTTER_Y_MAX",
     )
+    #: Fractional ROI for vertical-stack phrase merge on Document AI (e.g. plan-edge HIGHWAY 24). Env: ``DRAWING_INDEX_VERTICAL_PHRASE_RECT``.
+    drawing_index_vertical_phrase_rect: Optional[str] = Field(
+        default="0.65,0.60,0.72,0.80",
+        description="DRAWING_INDEX_VERTICAL_PHRASE_RECT",
+    )
 
     #: Optional YOLO weights for sheet symbol detection (S-2). Env: ``SYMBOL_DETECTOR_WEIGHTS_PATH``.
     #: When unset/missing, ``detect_symbols`` returns [] and digitization continues without symbols.

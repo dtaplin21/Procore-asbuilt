@@ -1,9 +1,15 @@
-"""Tests for adjacent OCR token phrase merge."""
+"""Tests for gutter-scoped adjacent OCR token phrase merge."""
 
 from __future__ import annotations
 
 from ai.pipelines.document_text_extraction import BoundingBox, PositionedWord
-from ai.pipelines.proximity_phrase_merge import merge_proximate_phrases
+from ai.pipelines.proximity_phrase_merge import (
+    MAX_MERGE_CHAIN_LEN,
+    MAX_MERGED_STRING_LEN,
+    boxes_are_vertically_stacked,
+    merge_proximate_phrases,
+    should_merge_token,
+)
 
 
 def _word(
@@ -13,7 +19,7 @@ def _word(
     y0: float,
     x1: float,
     y1: float,
-    source: str = "document_ai",
+    source: str = "gutter_rotated_ocr",
 ) -> PositionedWord:
     pw, ph = 1000.0, 1000.0
     return PositionedWord(
@@ -31,30 +37,89 @@ def _word(
     )
 
 
-def test_merges_vertical_gutter_stack() -> None:
+def test_gutter_tokens_in_band_are_eligible() -> None:
+    w = _word("HIGHWAY", x0=0.05, y0=0.50, x1=0.08, y1=0.53)
+    assert should_merge_token(w) is True
+
+
+def test_document_ai_never_eligible_even_in_gutter_x() -> None:
+    w = _word("HIGHWAY", x0=0.05, y0=0.50, x1=0.08, y1=0.53, source="document_ai")
+    assert should_merge_token(w) is False
+
+
+def test_merges_vertical_gutter_stack_in_left_band() -> None:
+    # Match plan-edge geometry: "24" above "HIGHWAY" (smaller y), read as HIGHWAY 24.
     words = [
-        _word("HIGHWAY", x0=0.68, y0=0.68, x1=0.70, y1=0.71),
-        _word("24", x0=0.685, y0=0.715, x1=0.695, y1=0.735),
+        _word("24", x0=0.055, y0=0.50, x1=0.07, y1=0.515),
+        _word("HIGHWAY", x0=0.05, y0=0.518, x1=0.08, y1=0.55),
     ]
     merged = merge_proximate_phrases(words)
     assert len(merged) == 1
     assert merged[0].text == "HIGHWAY 24"
 
 
-def test_merges_horizontal_gap_on_same_row() -> None:
+def test_document_ai_dense_page_passes_through_unchanged() -> None:
     words = [
-        _word("HIGHWAY", x0=0.68, y0=0.70, x1=0.695, y1=0.72),
-        _word("24", x0=0.697, y0=0.701, x1=0.705, y1=0.721),
+        _word("A", x0=0.70, y0=0.05, x1=0.72, y1=0.06, source="document_ai"),
+        _word("B", x0=0.721, y0=0.051, x1=0.74, y1=0.061, source="document_ai"),
+        _word("C", x0=0.75, y0=0.05, x1=0.77, y1=0.06, source="document_ai"),
     ]
     merged = merge_proximate_phrases(words)
-    assert len(merged) == 1
-    assert merged[0].text == "HIGHWAY 24"
+    assert len(merged) == 3
+    assert [w.text for w in merged] == ["A", "B", "C"]
 
 
-def test_does_not_merge_different_sources() -> None:
+def test_mixed_gutter_and_document_ai_preserves_doc_ai_count() -> None:
     words = [
-        _word("HIGHWAY", x0=0.68, y0=0.68, x1=0.70, y1=0.71, source="document_ai"),
-        _word("24", x0=0.685, y0=0.715, x1=0.695, y1=0.735, source="gutter_rotated_ocr"),
+        _word("LINE", x0=0.72, y0=0.05, x1=0.75, y1=0.06, source="document_ai"),
+        _word("24", x0=0.055, y0=0.50, x1=0.07, y1=0.515),
+        _word("HIGHWAY", x0=0.05, y0=0.518, x1=0.08, y1=0.55),
+        _word("WATER", x0=0.76, y0=0.05, x1=0.79, y1=0.06, source="document_ai"),
+    ]
+    merged = merge_proximate_phrases(words)
+    assert len(merged) == 3
+    assert merged[0].text == "LINE"
+    assert merged[1].text == "HIGHWAY 24"
+    assert merged[2].text == "WATER"
+
+
+def test_max_merged_string_len_blocks_runaway_chain() -> None:
+    long_a = "X" * (MAX_MERGED_STRING_LEN // 2)
+    long_b = "Y" * (MAX_MERGED_STRING_LEN // 2 + 5)
+    words = [
+        _word(long_a, x0=0.05, y0=0.50, x1=0.08, y1=0.53),
+        _word(long_b, x0=0.081, y0=0.501, x1=0.10, y1=0.531),
     ]
     merged = merge_proximate_phrases(words)
     assert len(merged) == 2
+
+
+def test_boxes_are_vertically_stacked_highway_24_bboxes() -> None:
+    """Document AI HIGHWAY + 24 on master 1722 (overlapping y, close x0)."""
+    highway = (0.68089604, 0.67869824, 0.69991547, 0.73609465)
+    two_four = (0.69273037, 0.66213018, 0.70329672, 0.68047339)
+    assert boxes_are_vertically_stacked(highway, two_four) is True
+
+
+def test_merges_document_ai_vertical_stack_in_phrase_rect() -> None:
+    words = [
+        _word("HIGHWAY", x0=0.68089604, y0=0.67869824, x1=0.69991547, y1=0.73609465, source="document_ai"),
+        _word("24", x0=0.69273037, y0=0.66213018, x1=0.70329672, y1=0.68047339, source="document_ai"),
+    ]
+    merged = merge_proximate_phrases(words)
+    assert len(merged) == 1
+    assert merged[0].text == "HIGHWAY 24"
+
+
+def test_max_chain_len_blocks_fourth_merge() -> None:
+    words = [
+        _word("A", x0=0.05, y0=0.50, x1=0.06, y1=0.52),
+        _word("B", x0=0.061, y0=0.501, x1=0.07, y1=0.521),
+        _word("C", x0=0.071, y0=0.502, x1=0.08, y1=0.522),
+        _word("D", x0=0.081, y0=0.503, x1=0.09, y1=0.523),
+        _word("E", x0=0.091, y0=0.504, x1=0.10, y1=0.524),
+    ]
+    merged = merge_proximate_phrases(words)
+    assert len(merged) >= 2
+    max_parts = max(len(w.text.split()) for w in merged)
+    assert max_parts <= MAX_MERGE_CHAIN_LEN

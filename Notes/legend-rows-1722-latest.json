@@ -1,0 +1,50 @@
+{
+  "drawing_id": 1722,
+  "project_id": 1348,
+  "page": 1,
+  "legend_rect": [
+    0.7,
+    0.02,
+    0.98,
+    0.135
+  ],
+  "cluster_sources": "native_pdf,document_ai,gutter_rotated_ocr",
+  "indexed_token_count": 261,
+  "legend_row_count": 2,
+  "rows": [
+    {
+      "index": 1,
+      "text": "NO PARKING SIGN",
+      "legend_line_type_id": null,
+      "label_bbox": {
+        "x0": 0.71301776,
+        "y0": 0.056804735,
+        "x1": 0.7371090700000001,
+        "y1": 0.064497039
+      },
+      "swatch_bbox": {
+        "x0": 0.65301776,
+        "y0": 0.056804735,
+        "x1": 0.71301776,
+        "y1": 0.064497039
+      }
+    },
+    {
+      "index": 2,
+      "text": "( PHASE SDMH , SEWER HCAI PERMIT ( FIRE WATER LINE ELECTRICAL",
+      "legend_line_type_id": null,
+      "label_bbox": {
+        "x0": 0.78317839,
+        "y0": 0.069822483,
+        "x1": 0.8347421900000002,
+        "y1": 0.11715976000000002
+      },
+      "swatch_bbox": {
+        "x0": 0.72317839,
+        "y0": 0.069822483,
+        "x1": 0.78317839,
+        "y1": 0.11715976000000002
+      }
+    }
+  ]
+}
