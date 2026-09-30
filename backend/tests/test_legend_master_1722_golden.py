@@ -11,6 +11,10 @@ from services.legend_index_helpers import (
     resolved_legend_rect,
     text_elements_for_legend_clustering,
 )
+from tests.fixtures.drawing_index_regression import (
+    build_legend_rows,
+    load_master_1722_legend_token_fixture,
+)
 
 EXPECTED_LEGEND_ROWS = [
     "PROPERTY LINE",
@@ -26,7 +30,7 @@ EXPECTED_LEGEND_ROWS = [
 
 
 def normalize_legend_manifest_text(text: str) -> str:
-    """Compare OCR/index tokens to hand-verified legend labels."""
+    """Compare live DB OCR to hand-verified legend labels (integration path)."""
     s = text.upper().replace("—", "-").replace("–", "-")
     s = s.replace("(", " ").replace(")", " ")
     s = re.sub(r"[^A-Z0-9]+", " ", s)
@@ -35,6 +39,20 @@ def normalize_legend_manifest_text(text: str) -> str:
     if s.startswith("CATCH BASIN") and "1 AND 2" in s:
         return "CATCH BASIN SEE DETAILS 1 AND 2 SHEET U2 C6 00"
     return s
+
+
+def test_legend_produces_nine_clean_rows() -> None:
+    """Golden fixture: OCR tokens from Master.pdf legend ROI (frozen snapshot)."""
+    tokens = load_master_1722_legend_token_fixture()
+    rows = build_legend_rows(tokens)
+    assert len(rows) == 9
+    assert rows == EXPECTED_LEGEND_ROWS
+
+
+def test_legend_fixture_is_frozen_snapshot() -> None:
+    tokens = load_master_1722_legend_token_fixture()
+    assert len(tokens) >= 30
+    assert all("bbox_json" in row and "source" in row for row in tokens)
 
 
 @pytest.mark.integration
@@ -51,9 +69,8 @@ def test_master_1722_legend_rows_match_golden_manifest(db_session) -> None:
         assert row_text == exp, f"row {index}: expected {exp!r}, got {row_text!r}"
 
 
-def test_master_1722_golden_no_title_block_contamination(db_session) -> None:
-    elements = text_elements_for_legend_clustering(db_session, 1722, page=1)
-    rows = cluster_legend_line_rows(elements, legend_rect=resolved_legend_rect())
-    blob = " ".join(row.text.upper() for row in rows)
+def test_master_1722_golden_no_title_block_contamination() -> None:
+    rows = build_legend_rows()
+    blob = " ".join(rows).upper()
     for junk in ("DCFM", "MARSHAL", "PARKING", "OFFICE APPROVED", "WTR NO"):
         assert junk not in blob, f"legend contaminated with {junk!r}"

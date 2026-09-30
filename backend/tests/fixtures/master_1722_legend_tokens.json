@@ -1,0 +1,509 @@
+[
+  {
+    "text": "PROPERTY",
+    "text_normalized": "property",
+    "bbox_json": {
+      "x0": 0.78360099,
+      "y0": 0.045562129,
+      "x1": 0.8013525,
+      "y1": 0.05029586
+    },
+    "ocr_confidence": 0.99181521,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "LINE",
+    "text_normalized": "line",
+    "bbox_json": {
+      "x0": 0.80177516,
+      "y0": 0.045562129,
+      "x1": 0.8093829200000001,
+      "y1": 0.05029586
+    },
+    "ocr_confidence": 0.99323022,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "SD",
+    "text_normalized": "sd",
+    "bbox_json": {
+      "x0": 0.75316989,
+      "y0": 0.054437868,
+      "x1": 0.75950974,
+      "y1": 0.058579881
+    },
+    "ocr_confidence": 0.98320597,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "EXISTING",
+    "text_normalized": "existing",
+    "bbox_json": {
+      "x0": 0.78402364,
+      "y0": 0.05384615400000001,
+      "x1": 0.79754859,
+      "y1": 0.058579881
+    },
+    "ocr_confidence": 0.96855074,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "UTILITY",
+    "text_normalized": "utility",
+    "bbox_json": {
+      "x0": 0.79923922,
+      "y0": 0.05384615400000001,
+      "x1": 0.81107354,
+      "y1": 0.058579881
+    },
+    "ocr_confidence": 0.97286934,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "NO",
+    "text_normalized": "no",
+    "bbox_json": {
+      "x0": 0.71301776,
+      "y0": 0.056804735,
+      "x1": 0.71724427,
+      "y1": 0.063313611
+    },
+    "ocr_confidence": 0.89513969,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "PARKING",
+    "text_normalized": "parking",
+    "bbox_json": {
+      "x0": 0.71893489,
+      "y0": 0.056804735,
+      "x1": 0.72950125,
+      "y1": 0.063905329
+    },
+    "ocr_confidence": 0.95905936,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "SIGN",
+    "text_normalized": "sign",
+    "bbox_json": {
+      "x0": 0.73161453,
+      "y0": 0.057396449,
+      "x1": 0.7371090700000001,
+      "y1": 0.064497039
+    },
+    "ocr_confidence": 0.86764425,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "WTR",
+    "text_normalized": "wtr",
+    "bbox_json": {
+      "x0": 0.70202875,
+      "y0": 0.065680474,
+      "x1": 0.71005917,
+      "y1": 0.069230773
+    },
+    "ocr_confidence": 0.98397774,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "LINE",
+    "text_normalized": "line",
+    "bbox_json": {
+      "x0": 0.79670328,
+      "y0": 0.069822483,
+      "x1": 0.8043111,
+      "y1": 0.075147927
+    },
+    "ocr_confidence": 0.96643358,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "SEPARATE",
+    "text_normalized": "separate",
+    "bbox_json": {
+      "x0": 0.80600166,
+      "y0": 0.069822483,
+      "x1": 0.8229078699999999,
+      "y1": 0.075147927
+    },
+    "ocr_confidence": 0.98509157,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "PHASE",
+    "text_normalized": "phase",
+    "bbox_json": {
+      "x0": 0.82333052,
+      "y0": 0.069822483,
+      "x1": 0.8347421900000002,
+      "y1": 0.075147927
+    },
+    "ocr_confidence": 0.9868238,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "SS",
+    "text_normalized": "ss",
+    "bbox_json": {
+      "x0": 0.72400677,
+      "y0": 0.075739644,
+      "x1": 0.72907859,
+      "y1": 0.078698225
+    },
+    "ocr_confidence": 0.95100844,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "SSMH",
+    "text_normalized": "ssmh",
+    "bbox_json": {
+      "x0": 0.78360099,
+      "y0": 0.078698225,
+      "x1": 0.7928994300000001,
+      "y1": 0.08343195200000002
+    },
+    "ocr_confidence": 0.97921014,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "OR",
+    "text_normalized": "or",
+    "bbox_json": {
+      "x0": 0.79374474,
+      "y0": 0.078698225,
+      "x1": 0.79881656,
+      "y1": 0.08343195200000002
+    },
+    "ocr_confidence": 0.9783622,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "SDMH",
+    "text_normalized": "sdmh",
+    "bbox_json": {
+      "x0": 0.79966187,
+      "y0": 0.078698225,
+      "x1": 0.8085375999999999,
+      "y1": 0.08343195200000002
+    },
+    "ocr_confidence": 0.95004928,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "SEE",
+    "text_normalized": "see",
+    "bbox_json": {
+      "x0": 0.81107354,
+      "y0": 0.078698225,
+      "x1": 0.81741333,
+      "y1": 0.08343195200000002
+    },
+    "ocr_confidence": 0.98557913,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "DETAIL",
+    "text_normalized": "detail",
+    "bbox_json": {
+      "x0": 0.81910396,
+      "y0": 0.078698225,
+      "x1": 0.82967031,
+      "y1": 0.08343195200000002
+    },
+    "ocr_confidence": 0.98238605,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "3.",
+    "text_normalized": "3.",
+    "bbox_json": {
+      "x0": 0.83051562,
+      "y0": 0.078698225,
+      "x1": 0.83389688,
+      "y1": 0.08343195200000002
+    },
+    "ocr_confidence": 0.68228382,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "SHEET",
+    "text_normalized": "sheet",
+    "bbox_json": {
+      "x0": 0.83516484,
+      "y0": 0.078698225,
+      "x1": 0.8457312,
+      "y1": 0.08343195200000002
+    },
+    "ocr_confidence": 0.98431998,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "U2.06.00",
+    "text_normalized": "u2.06.00",
+    "bbox_json": {
+      "x0": 0.8457312,
+      "y0": 0.078698225,
+      "x1": 0.86094677,
+      "y1": 0.08343195200000002
+    },
+    "ocr_confidence": 0.88662791,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "CATCH",
+    "text_normalized": "catch",
+    "bbox_json": {
+      "x0": 0.78317839,
+      "y0": 0.08698225,
+      "x1": 0.79501265,
+      "y1": 0.092899412
+    },
+    "ocr_confidence": 0.97653919,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "BASIN",
+    "text_normalized": "basin",
+    "bbox_json": {
+      "x0": 0.79585797,
+      "y0": 0.08698225,
+      "x1": 0.80557901,
+      "y1": 0.092899412
+    },
+    "ocr_confidence": 0.913059,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "DETAILS",
+    "text_normalized": "details",
+    "bbox_json": {
+      "x0": 0.81445479,
+      "y0": 0.08698225,
+      "x1": 0.82797968,
+      "y1": 0.092899412
+    },
+    "ocr_confidence": 0.87293422,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "1",
+    "text_normalized": "1",
+    "bbox_json": {
+      "x0": 0.82924765,
+      "y0": 0.08698225,
+      "x1": 0.8305156200000001,
+      "y1": 0.092899412
+    },
+    "ocr_confidence": 0.89922911,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "AND",
+    "text_normalized": "and",
+    "bbox_json": {
+      "x0": 0.83178359,
+      "y0": 0.08698225,
+      "x1": 0.83896869,
+      "y1": 0.092899412
+    },
+    "ocr_confidence": 0.96194059,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "2",
+    "text_normalized": "2",
+    "bbox_json": {
+      "x0": 0.84065932,
+      "y0": 0.08698225,
+      "x1": 0.8431952599999999,
+      "y1": 0.092899412
+    },
+    "ocr_confidence": 0.93912327,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "SD",
+    "text_normalized": "sd",
+    "bbox_json": {
+      "x0": 0.71513104,
+      "y0": 0.092899412,
+      "x1": 0.72062552,
+      "y1": 0.09704142100000002
+    },
+    "ocr_confidence": 0.97672093,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "SEWER",
+    "text_normalized": "sewer",
+    "bbox_json": {
+      "x0": 0.78402364,
+      "y0": 0.093491122,
+      "x1": 0.79501265,
+      "y1": 0.10059172
+    },
+    "ocr_confidence": 0.96673435,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "HCAI",
+    "text_normalized": "hcai",
+    "bbox_json": {
+      "x0": 0.80811495,
+      "y0": 0.093491122,
+      "x1": 0.81614542,
+      "y1": 0.10059172
+    },
+    "ocr_confidence": 0.90218478,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "PERMIT",
+    "text_normalized": "permit",
+    "bbox_json": {
+      "x0": 0.81783599,
+      "y0": 0.093491122,
+      "x1": 0.828825,
+      "y1": 0.10059172
+    },
+    "ocr_confidence": 0.9821372,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "SHOWN",
+    "text_normalized": "shown",
+    "bbox_json": {
+      "x0": 0.83136094,
+      "y0": 0.093491122,
+      "x1": 0.84234995,
+      "y1": 0.10059172
+    },
+    "ocr_confidence": 0.97014976,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "FOR",
+    "text_normalized": "for",
+    "bbox_json": {
+      "x0": 0.84404057,
+      "y0": 0.09408284,
+      "x1": 0.85038036,
+      "y1": 0.10118343
+    },
+    "ocr_confidence": 0.98184836,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "REFERENCE",
+    "text_normalized": "reference",
+    "bbox_json": {
+      "x0": 0.85038036,
+      "y0": 0.09408284,
+      "x1": 0.8698225,
+      "y1": 0.10118343
+    },
+    "ocr_confidence": 0.98479521,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "ONLY",
+    "text_normalized": "only",
+    "bbox_json": {
+      "x0": 0.87024516,
+      "y0": 0.09408284,
+      "x1": 0.8799662,
+      "y1": 0.10118343
+    },
+    "ocr_confidence": 0.97207648,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "FIRE",
+    "text_normalized": "fire",
+    "bbox_json": {
+      "x0": 0.78402364,
+      "y0": 0.10236685999999999,
+      "x1": 0.79163146,
+      "y1": 0.10887574
+    },
+    "ocr_confidence": 0.98339307,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "WATER",
+    "text_normalized": "water",
+    "bbox_json": {
+      "x0": 0.79247677,
+      "y0": 0.10236685999999999,
+      "x1": 0.8034657800000001,
+      "y1": 0.10887574
+    },
+    "ocr_confidence": 0.98547488,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "LINE",
+    "text_normalized": "line",
+    "bbox_json": {
+      "x0": 0.80473375,
+      "y0": 0.10236685999999999,
+      "x1": 0.81191885,
+      "y1": 0.10887574
+    },
+    "ocr_confidence": 0.98527485,
+    "source": "document_ai",
+    "page": 1
+  },
+  {
+    "text": "ELECTRICAL",
+    "text_normalized": "electrical",
+    "bbox_json": {
+      "x0": 0.78317839,
+      "y0": 0.11065089,
+      "x1": 0.8026204699999999,
+      "y1": 0.11715976000000002
+    },
+    "ocr_confidence": 0.98160291,
+    "source": "document_ai",
+    "page": 1
+  }
+]

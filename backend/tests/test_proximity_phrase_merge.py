@@ -10,6 +10,10 @@ from ai.pipelines.proximity_phrase_merge import (
     merge_proximate_phrases,
     should_merge_token,
 )
+from tests.fixtures.drawing_index_regression import (
+    generate_dense_page_fixture,
+    make_token,
+)
 
 
 def _word(
@@ -107,6 +111,47 @@ def test_merges_document_ai_vertical_stack_in_phrase_rect() -> None:
         _word("24", x0=0.69273037, y0=0.66213018, x1=0.70329672, y1=0.68047339, source="document_ai"),
     ]
     merged = merge_proximate_phrases(words)
+    assert len(merged) == 1
+    assert merged[0].text == "HIGHWAY 24"
+
+
+def test_phrase_merge_has_a_floor() -> None:
+    """A dense synthetic Doc AI page must not collapse below a token floor."""
+    synthetic_tokens = generate_dense_page_fixture(n_tokens=1000)
+    merged = merge_proximate_phrases(synthetic_tokens)
+    assert len(merged) >= 900
+
+
+def test_no_merge_outside_gutter_band() -> None:
+    tokens = [
+        make_token(text="A", x0=0.5, source="document_ai"),
+        make_token(text="B", x0=0.52, source="document_ai"),
+    ]
+    merged = merge_proximate_phrases(tokens)
+    assert len(merged) == 2
+    assert [word.text for word in merged] == ["A", "B"]
+
+
+def test_highway_24_merges_as_vertical_stack() -> None:
+    tokens = [
+        make_token(
+            text="HIGHWAY",
+            x0=0.68089604,
+            y0=0.67869824,
+            x1=0.69991547,
+            y1=0.73609465,
+            source="document_ai",
+        ),
+        make_token(
+            text="24",
+            x0=0.69273037,
+            y0=0.66213018,
+            x1=0.70329672,
+            y1=0.68047339,
+            source="document_ai",
+        ),
+    ]
+    merged = merge_proximate_phrases(tokens)
     assert len(merged) == 1
     assert merged[0].text == "HIGHWAY 24"
 

@@ -109,14 +109,18 @@ def test_run_drawing_index_job_sets_ready_status(
     assert cast(str, seeded_ready_pdf_drawing.index_status) == "ready"
     assert seeded_ready_pdf_drawing.index_error is None
     assert seeded_ready_pdf_drawing.indexed_at is not None
-    assert cast(dict[str, object], seeded_ready_pdf_drawing.index_stats_json) == {
-        "pages": result.pages,
-        "text_elements": result.text_elements,
-        "regions": 0,
-        "survey_points": result.survey_points,
-        "landmarks": result.landmarks,
-        "scale_found": False,
-    }
+    stats = cast(dict[str, object], seeded_ready_pdf_drawing.index_stats_json)
+    assert stats["pages"] == result.pages
+    assert stats["text_elements"] == result.text_elements
+    assert stats["regions"] == 0
+    assert stats["survey_points"] == result.survey_points
+    assert stats["landmarks"] == result.landmarks
+    assert stats["scale_found"] is False
+    assert stats["text_elements_persisted"] == result.text_elements
+    assert stats["merge_scope"] == "gutter_rotated_ocr_only"
+    assert stats["text_elements_dropped_by_merge"] == stats["text_elements_pre_merge"] - stats[
+        "text_elements_post_merge"
+    ]
     page_meta = cast(list[object], seeded_ready_pdf_drawing.page_meta_json)
     assert len(page_meta) >= 1
 

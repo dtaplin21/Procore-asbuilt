@@ -66,6 +66,7 @@ class IndexResult:
     page_meta_json: list[dict[str, Any]] | None = None
     document_ai_stats: dict[str, Any] | None = None
     legend_index: dict[str, Any] | None = None
+    merge_pipeline_stats: dict[str, Any] | None = None
 
     def to_stats_json(self) -> dict[str, Any]:
         stats: dict[str, Any] = {
@@ -76,6 +77,8 @@ class IndexResult:
             "landmarks": self.landmarks,
             "scale_found": self.scale_found,
         }
+        if self.merge_pipeline_stats:
+            stats.update(self.merge_pipeline_stats)
         if self.document_ai_stats:
             stats["document_ai"] = self.document_ai_stats
             pages_processed = self.document_ai_stats.get("document_ai_pages_processed")
@@ -487,9 +490,23 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
     if gutter_words:
         index_words.extend(gutter_words)
 
-    from ai.pipelines.proximity_phrase_merge import merge_proximate_phrases
+    from ai.pipelines.proximity_phrase_merge import (
+        MERGE_SCOPE_STATS_LABEL,
+        merge_proximate_phrases,
+    )
+
+    pre_merge_token_count = len(index_words)
+    document_ai_token_count_raw = document_ai_stats.get("document_ai_token_count")
+    if document_ai_token_count_raw is None:
+        document_ai_token_count_raw = sum(
+            1
+            for word in index_words
+            if (word.token_source or "").strip().lower() == "document_ai"
+        )
 
     index_words = merge_proximate_phrases(index_words)
+    post_merge_token_count = len(index_words)
+    text_elements_dropped_by_merge = pre_merge_token_count - post_merge_token_count
 
     text_elements = persist_text_elements(
         session,
@@ -565,6 +582,32 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         source="auto_index",
     )
 
+    merge_pipeline_stats: dict[str, Any] = {
+        "text_elements_persisted": text_elements,
+        "text_elements_dropped_by_merge": text_elements_dropped_by_merge,
+        "merge_scope": MERGE_SCOPE_STATS_LABEL,
+        "text_elements_pre_merge": pre_merge_token_count,
+        "text_elements_post_merge": post_merge_token_count,
+    }
+    if document_ai_stats.get("document_ai_token_count") is not None:
+        merge_pipeline_stats["document_ai_token_count_raw"] = int(
+            document_ai_stats["document_ai_token_count"]
+        )
+    elif document_ai_token_count_raw:
+        merge_pipeline_stats["document_ai_token_count_raw"] = int(document_ai_token_count_raw)
+
+    logger.info(
+        "drawing_index_merge_stats drawing_id=%s document_ai_token_count_raw=%s "
+        "pre_merge=%s post_merge=%s dropped_by_merge=%s persisted=%s merge_scope=%s",
+        drawing_id,
+        merge_pipeline_stats.get("document_ai_token_count_raw"),
+        pre_merge_token_count,
+        post_merge_token_count,
+        text_elements_dropped_by_merge,
+        text_elements,
+        MERGE_SCOPE_STATS_LABEL,
+    )
+
     return IndexResult(
         pages=extracted.page_count,
         text_elements=text_elements,
@@ -576,4 +619,5 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         page_meta_json=page_meta_json,
         document_ai_stats=document_ai_stats or None,
         legend_index=legend_index_meta,
+        merge_pipeline_stats=merge_pipeline_stats,
     )

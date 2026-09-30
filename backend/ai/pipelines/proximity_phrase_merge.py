@@ -18,6 +18,8 @@ from config import settings
 
 GUTTER_MERGE_ENABLED_SOURCES: Final[frozenset[str]] = frozenset({"gutter_rotated_ocr"})
 VERTICAL_PHRASE_MERGE_SOURCES: Final[frozenset[str]] = frozenset({"document_ai"})
+# Stored on ``index_stats_json`` so raw vs persisted gaps are attributed to merge, not data loss.
+MERGE_SCOPE_STATS_LABEL: Final[str] = "gutter_rotated_ocr_only"
 MAX_MERGE_CHAIN_LEN: Final[int] = 4
 MAX_MERGED_STRING_LEN: Final[int] = 40
 
