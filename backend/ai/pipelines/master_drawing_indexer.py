@@ -65,6 +65,7 @@ class IndexResult:
     scale_json: dict[str, Any] | None = None
     page_meta_json: list[dict[str, Any]] | None = None
     document_ai_stats: dict[str, Any] | None = None
+    legend_index: dict[str, Any] | None = None
 
     def to_stats_json(self) -> dict[str, Any]:
         stats: dict[str, Any] = {
@@ -80,6 +81,8 @@ class IndexResult:
             pages_processed = self.document_ai_stats.get("document_ai_pages_processed")
             if pages_processed is not None:
                 stats["document_ai_pages_processed"] = pages_processed
+        if self.legend_index:
+            stats["legend_index"] = self.legend_index
         return stats
 
 
@@ -462,10 +465,36 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         source_path,
         page_count=extracted.page_count,
     )
+    gutter_words: list[Any] = []
+    if not is_linked_evidence and settings.drawing_index_gutter_ocr_enabled:
+        from ai.pipelines.gutter_rotated_ocr import supplement_gutter_rotated_ocr
+
+        first_meta = page_meta_json[0] if page_meta_json else {}
+        rotation = (
+            float(first_meta.get("rotation"))
+            if isinstance(first_meta, dict) and first_meta.get("rotation") is not None
+            else None
+        )
+        gutter_words = supplement_gutter_rotated_ocr(
+            str(source_path),
+            page=1,
+            page_rotation_deg=rotation,
+        )
+        if gutter_words:
+            document_ai_stats["gutter_rotated_ocr_tokens"] = len(gutter_words)
+
+    index_words = list(extracted.words)
+    if gutter_words:
+        index_words.extend(gutter_words)
+
+    from ai.pipelines.proximity_phrase_merge import merge_proximate_phrases
+
+    index_words = merge_proximate_phrases(index_words)
+
     text_elements = persist_text_elements(
         session,
         drawing_id,
-        extracted.words,
+        index_words,
         extracted.source_format,
     )
 
@@ -474,6 +503,22 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         drawing_id,
         cast(int, drawing.project_id),
     )
+
+    legend_index_meta: dict[str, Any] | None = None
+    if not is_linked_evidence:
+        from services.legend_index_helpers import (
+            cluster_legend_rows_for_drawing,
+            legend_rows_to_audit_meta,
+            resolved_legend_rect,
+        )
+
+        legend_rows = cluster_legend_rows_for_drawing(session, drawing_id, page=1)
+        rect = resolved_legend_rect()
+        legend_index_meta = {
+            "legend_rect": list(rect) if rect else None,
+            "legend_line_row_count": len(legend_rows),
+            "legend_line_rows": legend_rows_to_audit_meta(legend_rows),
+        }
 
     regions = build_auto_regions_from_text_elements(session, drawing_id)
 
@@ -530,4 +575,5 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         scale_json=scale_json,
         page_meta_json=page_meta_json,
         document_ai_stats=document_ai_stats or None,
+        legend_index=legend_index_meta,
     )

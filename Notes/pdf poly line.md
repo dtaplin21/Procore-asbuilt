@@ -303,7 +303,9 @@ def extract_pdf_vector_chains(
 
 **Module:** `backend/ai/pipelines/legend_grounding.py` — `DocumentAiGroundingProvider`, `GroundingHit`  
 **Persist:** `drawing_legend_grounding_hits` via `services/legend_grounding_service.py`  
-**CLI:** `backend/scripts/run_legend_grounding.py` (requires `DOCUMENT_AI_GROUNDING_ENABLED=true`)
+**CLI:** `backend/scripts/run_legend_grounding.py` (requires `DOCUMENT_AI_GROUNDING_ENABLED=true` for DB persist; `--dry-run --manifest` works offline)  
+**Manifest:** bare JSON array or `{rows: [...]}`; `page_fractional_bbox` accepted as icon exclude region — see `tests/fixtures/legend_manifest_u2_c4_00_golden.json`  
+**Loader:** `load_legend_manifest_file()` in `legend_grounding.py` resolves `icon_crop_path` next to the manifest file
 
 | Method | Role |
 |--------|------|

@@ -22,6 +22,11 @@ backend/ENV/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
-backend/.env
-# Repo root (e.g. Drizzle); do not commit secrets
+# Local env / secrets — never commit (backend/.env is loaded by FastAPI)
 .env
+backend/.env
+backend/secrets/
+# GCP service account keys (use GOOGLE_APPLICATION_CREDENTIALS → backend/secrets/)
+**/qc-procore-integrator-*.json
+backend/ai/pipelines/JSON_Google_Document*/
+**/JSON_Google_Document*/

@@ -1,0 +1,4 @@
+# Local secrets — keep out of Cursor indexing and source-control UI
+.env
+backend/.env
+backend/secrets/

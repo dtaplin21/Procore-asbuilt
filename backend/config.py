@@ -46,6 +46,10 @@ Master drawing auto-index::
     DRAWING_INDEX_MIN_CLUSTER_WORDS        # min words per OCR cluster for auto-regions (default 2)
     DRAWING_INDEX_OCR_MAX_PAGES            # max pages to OCR; 0 = all (default 0)
     DRAWING_INDEX_AUTO_REGION_MODE         # cluster | grid | hybrid (default cluster)
+    DRAWING_INDEX_LEGEND_RECT              # optional x0,y0,x1,y1 title-block legend ROI for row clustering
+    DRAWING_INDEX_LEGEND_CLUSTER_SOURCES   # comma-separated text element sources for legend rows
+    DRAWING_INDEX_GUTTER_OCR_ENABLED       # supplemental deskew OCR on left gutter (e.g. HIGHWAY 24)
+    DRAWING_INDEX_GUTTER_X_MAX             # gutter crop max x (fractional page)
 
 Sheet digitization (optional symbol YOLO)::
 
@@ -69,6 +73,8 @@ Google Document AI (master drawing batch OCR — see Notes/ai google implementat
     GOOGLE_APPLICATION_CREDENTIALS         # read by google-cloud libs; not stored in Settings
 """
 
+import os
+from pathlib import Path
 from urllib.parse import urlparse
 
 from pydantic import Field, field_validator, model_validator
@@ -170,6 +176,34 @@ class Settings(BaseSettings):
         default="cluster",
         description="DRAWING_INDEX_AUTO_REGION_MODE",
     )
+    #: Fractional ``x0,y0,x1,y1`` for title-block legend row clustering (Step 2a). Env: ``DRAWING_INDEX_LEGEND_RECT``.
+    drawing_index_legend_rect: Optional[str] = Field(
+        default=None,
+        description="DRAWING_INDEX_LEGEND_RECT",
+    )
+    #: Comma-separated ``DrawingTextElement.source`` values for legend row clustering. Env: ``DRAWING_INDEX_LEGEND_CLUSTER_SOURCES``.
+    drawing_index_legend_cluster_sources: Optional[str] = Field(
+        default="native_pdf,document_ai",
+        description="DRAWING_INDEX_LEGEND_CLUSTER_SOURCES",
+    )
+    #: Run gutter-band Tesseract with deskew for vertical labels (e.g. HIGHWAY 24). Env: ``DRAWING_INDEX_GUTTER_OCR_ENABLED``.
+    drawing_index_gutter_ocr_enabled: bool = Field(
+        default=True,
+        description="DRAWING_INDEX_GUTTER_OCR_ENABLED",
+    )
+    #: Left gutter max x (fractional page) for supplemental OCR. Env: ``DRAWING_INDEX_GUTTER_X_MAX``.
+    drawing_index_gutter_x_max: float = Field(
+        default=0.15,
+        description="DRAWING_INDEX_GUTTER_X_MAX",
+    )
+    drawing_index_gutter_y_min: float = Field(
+        default=0.05,
+        description="DRAWING_INDEX_GUTTER_Y_MIN",
+    )
+    drawing_index_gutter_y_max: float = Field(
+        default=0.95,
+        description="DRAWING_INDEX_GUTTER_Y_MAX",
+    )
 
     #: Optional YOLO weights for sheet symbol detection (S-2). Env: ``SYMBOL_DETECTOR_WEIGHTS_PATH``.
     #: When unset/missing, ``detect_symbols`` returns [] and digitization continues without symbols.
@@ -237,6 +271,11 @@ class Settings(BaseSettings):
     document_ai_grounding_template_threshold: float = Field(
         default=0.55,
         description="DOCUMENT_AI_GROUNDING_TEMPLATE_THRESHOLD",
+    )
+    #: Service account JSON path for google-cloud-* (also read from shell env). Env: ``GOOGLE_APPLICATION_CREDENTIALS``.
+    google_application_credentials: Optional[str] = Field(
+        default=None,
+        description="GOOGLE_APPLICATION_CREDENTIALS",
     )
 
     # In some environments (CI, sandboxes), extra env vars may be present.
@@ -351,6 +390,23 @@ class Settings(BaseSettings):
                 "Set OCR_BACKEND to auto or tesseract (evidence/linked PDFs). "
                 "Master drawings use Document AI batch OCR."
             )
+        return self
+
+    @field_validator("google_application_credentials", mode="before")
+    @classmethod
+    def _strip_google_application_credentials(cls, v: object) -> object:
+        if isinstance(v, str):
+            s = v.strip()
+            return s if s else None
+        return v
+
+    @model_validator(mode="after")
+    def _apply_google_application_credentials(self) -> "Settings":
+        """Expose credentials path to google-cloud client libraries (ADC)."""
+        path = self.google_application_credentials
+        if path:
+            resolved = str(Path(path).expanduser().resolve())
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = resolved
         return self
 
     @field_validator("procore_environment", mode="before")

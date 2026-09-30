@@ -12,6 +12,7 @@ import {
   Eye,
   AlertTriangle,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +61,7 @@ import { toOverlayRegions } from "@/lib/drawing-overlays/inspection_overlay";
 import type { RenderableRegion } from "@/lib/drawing-regions/region_display";
 import { objectsPagePathWithParams } from "@/lib/objectsRoute";
 import { useActiveProject } from "@/contexts/active_project_context";
+import { toast } from "@/hooks/use-toast";
 import { replaceDashboardProjectIdInUrl } from "@/lib/active_project";
 import {
   setDrawingReturnPath,
@@ -184,11 +186,36 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
     setReindexPending(true);
     try {
       await reindexDrawing(selectedProjectId, selectedMasterDrawingId);
-      await queryClient.invalidateQueries({
-        queryKey: drawingIndexStatusQueryKey(
-          selectedProjectId,
-          selectedMasterDrawingId,
-        ),
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: drawingIndexStatusQueryKey(
+            selectedProjectId,
+            selectedMasterDrawingId,
+          ),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: projectDrawingsQueryKey(selectedProjectId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: [
+            "objects-workspace-drawing",
+            selectedProjectId,
+            selectedMasterDrawingId,
+          ],
+        }),
+      ]);
+      toast({
+        title: "Master index queued",
+        description:
+          "Re-running OCR, regions, and index pipelines. Status updates below.",
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not enqueue re-index";
+      toast({
+        variant: "destructive",
+        title: "Re-index failed",
+        description: message,
       });
     } finally {
       setReindexPending(false);
@@ -525,31 +552,41 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
                       Indexing…
                     </p>
                   ) : null}
-                  {selectedMasterDrawingId != null && indexSummary ? (
-                    <p
-                      className="text-xs text-muted-foreground"
-                      data-testid="objects-index-summary"
-                    >
-                      {indexSummary}
-                    </p>
-                  ) : null}
                   {selectedMasterDrawingId != null &&
                   drawingIndexQuery.data?.status === "failed" ? (
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="text-destructive" data-testid="objects-index-error">
-                        Index failed{drawingIndexQuery.data.error
-                          ? `: ${drawingIndexQuery.data.error}`
-                          : ""}
-                      </span>
+                    <p className="text-xs text-destructive" data-testid="objects-index-error">
+                      Index failed
+                      {drawingIndexQuery.data.error
+                        ? `: ${drawingIndexQuery.data.error}`
+                        : ""}
+                    </p>
+                  ) : null}
+                  {selectedMasterDrawingId != null ? (
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                      {indexSummary ? (
+                        <p
+                          className="text-xs text-muted-foreground"
+                          data-testid="objects-index-summary"
+                        >
+                          {indexSummary}
+                        </p>
+                      ) : null}
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         data-testid="objects-reindex-button"
-                        disabled={reindexPending}
+                        disabled={reindexPending || indexInProgress}
                         onClick={() => void handleReindexDrawing()}
                       >
-                        {reindexPending ? "Reindexing…" : "Reindex drawing"}
+                        <RefreshCw
+                          className={`mr-1.5 h-3.5 w-3.5 ${
+                            reindexPending || indexInProgress ? "animate-spin" : ""
+                          }`}
+                        />
+                        {reindexPending || indexInProgress
+                          ? "Re-running master…"
+                          : "Re-run master index"}
                       </Button>
                     </div>
                   ) : null}

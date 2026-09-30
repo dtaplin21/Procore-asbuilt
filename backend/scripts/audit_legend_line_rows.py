@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Audit legend line rows clustered from indexed drawing text (Step 2a).
 
-Uses ``drawing_text_elements`` in the legend band — OCR/Document AI tokens
-required for line-item labels on CAD exports.
+Uses ``drawing_text_elements`` (Document AI / native / gutter OCR) with
+``DRAWING_INDEX_LEGEND_RECT`` or ``--legend-rect`` — not auto-region labels.
 
 Usage (from ``backend/``)::
 
-    ./venv/bin/python scripts/audit_legend_line_rows.py --drawing-id 1691 --project-id 688
-    ./venv/bin/python scripts/audit_legend_line_rows.py --drawing-id 1691 --export legend_manifest_1691.json
+    ./venv/bin/python scripts/audit_legend_line_rows.py --drawing-id 1722 --project-id 1348
+    ./venv/bin/python scripts/audit_legend_line_rows.py --drawing-id 1722 --legend-rect 0.70,0.02,0.98,0.135 --export Notes/legend-rows.json
 """
 
 from __future__ import annotations
@@ -26,37 +26,16 @@ os.chdir(_BACKEND_ROOT)
 
 from sqlalchemy.orm import Session  # noqa: E402
 
-from ai.pipelines.legend_line_row_builder import (  # noqa: E402
-    cluster_legend_line_rows,
-    legend_rows_to_manifest,
-)
+from ai.pipelines.legend_line_row_builder import legend_rows_to_manifest  # noqa: E402
+from config import settings  # noqa: E402
 from database import SessionLocal  # noqa: E402
-from models.drawing_text_element import DrawingTextElement  # noqa: E402
 from models.models import Drawing  # noqa: E402
-
-
-def _load_elements(
-    session: Session,
-    *,
-    project_id: int,
-    drawing_id: int,
-    page: int | None,
-) -> tuple[Drawing | None, list[DrawingTextElement]]:
-    drawing = session.get(Drawing, drawing_id)
-    if drawing is None:
-        return None, []
-    if cast(int, drawing.project_id) != project_id:
-        print(
-            f"Warning: drawing project_id={drawing.project_id} != {project_id}",
-            file=sys.stderr,
-        )
-    query = session.query(DrawingTextElement).filter(
-        DrawingTextElement.master_drawing_id == int(drawing_id),
-    )
-    if page is not None:
-        query = query.filter(DrawingTextElement.page == int(page))
-    rows = query.order_by(DrawingTextElement.page.asc(), DrawingTextElement.id.asc()).all()
-    return drawing, rows
+from services.legend_index_helpers import (  # noqa: E402
+    cluster_legend_rows_for_drawing,
+    parse_fractional_rect,
+    resolved_legend_rect,
+    text_elements_for_legend_clustering,
+)
 
 
 def main() -> int:
@@ -65,39 +44,51 @@ def main() -> int:
     parser.add_argument("--drawing-id", type=int, default=1691)
     parser.add_argument("--page", type=int, default=1, help="1-based page (default 1)")
     parser.add_argument(
+        "--legend-rect",
+        type=str,
+        default="",
+        help="Fractional x0,y0,x1,y1 (default: DRAWING_INDEX_LEGEND_RECT from .env)",
+    )
+    parser.add_argument(
         "--export",
         type=str,
         default="",
         help="Write manifest JSON (legend rows + bboxes)",
     )
-    parser.add_argument(
-        "--no-column-filter",
-        action="store_true",
-        help="Disable dominant x-column filter (debug title-block bleed)",
-    )
     args = parser.parse_args()
+
+    legend_rect = parse_fractional_rect(args.legend_rect.strip()) if args.legend_rect.strip() else resolved_legend_rect()
 
     session = SessionLocal()
     try:
-        drawing, elements = _load_elements(
-            session,
-            project_id=int(args.project_id),
-            drawing_id=int(args.drawing_id),
-            page=int(args.page),
-        )
+        drawing = session.get(Drawing, int(args.drawing_id))
         if drawing is None:
             print(f"Drawing {args.drawing_id} not found.")
             return 1
+        if cast(int, drawing.project_id) != int(args.project_id):
+            print(
+                f"Warning: drawing project_id={drawing.project_id} != {args.project_id}",
+                file=sys.stderr,
+            )
 
-        rows = cluster_legend_line_rows(
-            elements,
-            use_dominant_text_column=not args.no_column_filter,
+        elements = text_elements_for_legend_clustering(
+            session,
+            int(args.drawing_id),
+            page=int(args.page),
+        )
+        rows = cluster_legend_rows_for_drawing(
+            session,
+            int(args.drawing_id),
+            page=int(args.page),
+            legend_rect=legend_rect,
         )
         manifest = legend_rows_to_manifest(rows)
 
         name = cast(str | None, drawing.name)
+        sources = (settings.drawing_index_legend_cluster_sources or "native_pdf,document_ai").strip()
         print(f"Drawing id={drawing.id} name={name!r} project_id={drawing.project_id}")
-        print(f"page={args.page} indexed_tokens={len(elements)} legend_rows={len(rows)}")
+        print(f"page={args.page} cluster_sources={sources!r} legend_rect={legend_rect}")
+        print(f"indexed_tokens_for_cluster={len(elements)} legend_rows={len(rows)}")
         print()
         for entry in manifest:
             print(f"  [{entry['index']}] {entry['text']!r}")
@@ -109,6 +100,8 @@ def main() -> int:
                 "drawing_id": int(args.drawing_id),
                 "project_id": int(args.project_id),
                 "page": int(args.page),
+                "legend_rect": list(legend_rect) if legend_rect else None,
+                "cluster_sources": sources,
                 "indexed_token_count": len(elements),
                 "legend_row_count": len(rows),
                 "rows": manifest,

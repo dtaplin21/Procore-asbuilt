@@ -219,13 +219,19 @@ def _legend_templates_for_page(
 ) -> tuple[LegendLineTemplate, ...]:
     if pdf_path is None or not pdf_path.is_file():
         return ()
-    from ai.pipelines.legend_line_row_builder import cluster_legend_line_rows
     from ai.pipelines.legend_line_swatch import (
         build_legend_line_templates,
         legend_line_templates_to_meta,
     )
+    from services.legend_index_helpers import (
+        cluster_legend_rows_for_drawing,
+        legend_rows_to_audit_meta,
+    )
 
-    rows = cluster_legend_line_rows(_text_elements_for_page(session, drawing_id, page))
+    rows = cluster_legend_rows_for_drawing(session, drawing_id, page=page)
+    line_meta["legend_line_row_count"] = len(rows)
+    if rows:
+        line_meta["legend_line_rows"] = legend_rows_to_audit_meta(rows)
     templates = build_legend_line_templates(
         session,
         pdf_path,

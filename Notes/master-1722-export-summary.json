@@ -1,0 +1,281 @@
+{
+  "drawing_id": 1722,
+  "project_id": 1348,
+  "name": "Master.pdf",
+  "indexed_at": "2026-09-29 20:41:04.794268",
+  "counts": {
+    "text_elements": 1305,
+    "regions": 177,
+    "survey_points": 0,
+    "landmarks": 17,
+    "viewports": 4,
+    "symbols": 0,
+    "grounding_hits": 0
+  },
+  "text_by_source": {
+    "gutter_rotated_ocr": 52,
+    "native_pdf": 262,
+    "document_ai": 991
+  },
+  "legend_index": {
+    "legend_rect": [
+      0.7,
+      0.02,
+      0.98,
+      0.135
+    ],
+    "legend_line_row_count": 7,
+    "legend_line_rows": [
+      {
+        "text": "PROPERTY LINE",
+        "label_bbox": {
+          "x0": 0.78360099,
+          "y0": 0.045562129,
+          "x1": 0.8093829200000001,
+          "y1": 0.05029586
+        },
+        "swatch_bbox": {
+          "x0": 0.72360099,
+          "y0": 0.045562129,
+          "x1": 0.78360099,
+          "y1": 0.05029586
+        }
+      },
+      {
+        "text": "WTR NO PARKING SIGN SD EXISTING UTILITY UCSF Benioff Children's",
+        "label_bbox": {
+          "x0": 0.70202875,
+          "y0": 0.05384615400000001,
+          "x1": 0.98858833,
+          "y1": 0.069822483
+        },
+        "swatch_bbox": {
+          "x0": 0.6420287499999999,
+          "y0": 0.05384615400000001,
+          "x1": 0.70202875,
+          "y1": 0.069822483
+        }
+      },
+      {
+        "text": "SS SSMH OR LINE SDMH SEPARATE SEE DETAIL PHASE 3. SHEET U2.06.00 Hospital",
+        "label_bbox": {
+          "x0": 0.72400677,
+          "y0": 0.069822483,
+          "x1": 0.9577345800000001,
+          "y1": 0.08343195200000002
+        },
+        "swatch_bbox": {
+          "x0": 0.6640067700000001,
+          "y0": 0.069822483,
+          "x1": 0.72400677,
+          "y1": 0.08343195200000002
+        }
+      },
+      {
+        "text": "SD CATCH SEWER BASIN HCAI DETAILS PERMIT SHOWN AND FOR REFERENCE ONLY Oakland",
+        "label_bbox": {
+          "x0": 0.71513104,
+          "y0": 0.085207097,
+          "x1": 0.9484362,
+          "y1": 0.10118343
+        },
+        "swatch_bbox": {
+          "x0": 0.6551310400000001,
+          "y0": 0.085207097,
+          "x1": 0.71513104,
+          "y1": 0.10118343
+        }
+      },
+      {
+        "text": "FIRE WATER LINE",
+        "label_bbox": {
+          "x0": 0.78402364,
+          "y0": 0.10236685999999999,
+          "x1": 0.81191885,
+          "y1": 0.10887574
+        },
+        "swatch_bbox": {
+          "x0": 0.72402364,
+          "y0": 0.10236685999999999,
+          "x1": 0.78402364,
+          "y1": 0.10887574
+        }
+      },
+      {
+        "text": "ELECTRICAL DCFM APPROVAL",
+        "label_bbox": {
+          "x0": 0.78317839,
+          "y0": 0.11065089,
+          "x1": 0.92899406,
+          "y1": 0.12248521
+        },
+        "swatch_bbox": {
+          "x0": 0.72317839,
+          "y0": 0.11065089,
+          "x1": 0.78317839,
+          "y1": 0.12248521
+        }
+      },
+      {
+        "text": "OFFICE APPROVED OF THE STATE AND FIRE PANIC MARSHAL ONLY",
+        "label_bbox": {
+          "x0": 0.91293323,
+          "y0": 0.12899408,
+          "x1": 0.96956891,
+          "y1": 0.13727811
+        },
+        "swatch_bbox": {
+          "x0": 0.8529332300000001,
+          "y0": 0.12899408,
+          "x1": 0.91293323,
+          "y1": 0.13727811
+        }
+      }
+    ]
+  },
+  "document_ai": {
+    "document_ai_content_hash": "cfc20c3d8ac3beef5f95edadf0560449f6417fdbb6c343fcf2c4ac0050a53129",
+    "document_ai_cache_hit": true,
+    "document_ai_pages_in_document": 1,
+    "document_ai_pages_processed": 0,
+    "document_ai_input_gcs_uri": "",
+    "document_ai_output_gcs_prefix": "gs://qc-procore-integrator-document-ai-output/batch-output/by-drawing/1722/cfc20c3d8ac3beef5f95edadf0560449f6417fdbb6c343fcf2c4ac0050a53129/",
+    "document_ai_json_shards": 1,
+    "document_ai_token_count": 1092,
+    "document_ai_seconds": 1.821,
+    "gutter_rotated_ocr_tokens": 52
+  },
+  "sheetEntityGraph_summary": {
+    "1": {
+      "viewports": 4,
+      "labels": 800,
+      "lines": 2000,
+      "symbols": 0,
+      "associations": 0,
+      "meta": {
+        "viewport_warning": false,
+        "rendition_png": "/Users/dtaplin21/Desktop/Procore-Integrator/backend/uploads/drawings/rendered/project-1348/drawing-1722/page-1.png",
+        "legend_line_row_count": 7,
+        "legend_line_rows": [
+          {
+            "text": "PROPERTY LINE",
+            "label_bbox": {
+              "x0": 0.78360099,
+              "y0": 0.045562129,
+              "x1": 0.8093829200000001,
+              "y1": 0.05029586
+            },
+            "swatch_bbox": {
+              "x0": 0.72360099,
+              "y0": 0.045562129,
+              "x1": 0.78360099,
+              "y1": 0.05029586
+            }
+          },
+          {
+            "text": "WTR NO PARKING SIGN SD EXISTING UTILITY UCSF Benioff Children's",
+            "label_bbox": {
+              "x0": 0.70202875,
+              "y0": 0.05384615400000001,
+              "x1": 0.98858833,
+              "y1": 0.069822483
+            },
+            "swatch_bbox": {
+              "x0": 0.6420287499999999,
+              "y0": 0.05384615400000001,
+              "x1": 0.70202875,
+              "y1": 0.069822483
+            }
+          },
+          {
+            "text": "SS SSMH OR LINE SDMH SEPARATE SEE DETAIL PHASE 3. SHEET U2.06.00 Hospital",
+            "label_bbox": {
+              "x0": 0.72400677,
+              "y0": 0.069822483,
+              "x1": 0.9577345800000001,
+              "y1": 0.08343195200000002
+            },
+            "swatch_bbox": {
+              "x0": 0.6640067700000001,
+              "y0": 0.069822483,
+              "x1": 0.72400677,
+              "y1": 0.08343195200000002
+            }
+          },
+          {
+            "text": "SD CATCH SEWER BASIN HCAI DETAILS PERMIT SHOWN AND FOR REFERENCE ONLY Oakland",
+            "label_bbox": {
+              "x0": 0.71513104,
+              "y0": 0.085207097,
+              "x1": 0.9484362,
+              "y1": 0.10118343
+            },
+            "swatch_bbox": {
+              "x0": 0.6551310400000001,
+              "y0": 0.085207097,
+              "x1": 0.71513104,
+              "y1": 0.10118343
+            }
+          },
+          {
+            "text": "FIRE WATER LINE",
+            "label_bbox": {
+              "x0": 0.78402364,
+              "y0": 0.10236685999999999,
+              "x1": 0.81191885,
+              "y1": 0.10887574
+            },
+            "swatch_bbox": {
+              "x0": 0.72402364,
+              "y0": 0.10236685999999999,
+              "x1": 0.78402364,
+              "y1": 0.10887574
+            }
+          },
+          {
+            "text": "ELECTRICAL DCFM APPROVAL",
+            "label_bbox": {
+              "x0": 0.78317839,
+              "y0": 0.11065089,
+              "x1": 0.92899406,
+              "y1": 0.12248521
+            },
+            "swatch_bbox": {
+              "x0": 0.72317839,
+              "y0": 0.11065089,
+              "x1": 0.78317839,
+              "y1": 0.12248521
+            }
+          },
+          {
+            "text": "OFFICE APPROVED OF THE STATE AND FIRE PANIC MARSHAL ONLY",
+            "label_bbox": {
+              "x0": 0.91293323,
+              "y0": 0.12899408,
+              "x1": 0.96956891,
+              "y1": 0.13727811
+            },
+            "swatch_bbox": {
+              "x0": 0.8529332300000001,
+              "y0": 0.12899408,
+              "x1": 0.91293323,
+              "y1": 0.13727811
+            }
+          }
+        ],
+        "pdf_line_source": "vector",
+        "pdf_line_source_stats": {
+          "path_count": 41053,
+          "line_op_count": 135074,
+          "stroked_path_count": 33645
+        }
+      }
+    }
+  },
+  "files": {
+    "full": "/Users/dtaplin21/Desktop/Procore-Integrator/Notes/master-1722-full-index-export.json",
+    "text_only": "/Users/dtaplin21/Desktop/Procore-Integrator/Notes/master-1722-text-elements.json",
+    "graph_only": "/Users/dtaplin21/Desktop/Procore-Integrator/Notes/master-1722-sheetEntityGraph.json",
+    "summary": "/Users/dtaplin21/Desktop/Procore-Integrator/Notes/master-1722-export-summary.json"
+  }
+}

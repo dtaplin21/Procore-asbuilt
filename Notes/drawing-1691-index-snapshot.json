@@ -1,0 +1,77 @@
+{
+  "drawing_id": 1691,
+  "project_id": 688,
+  "name": "Master.pdf",
+  "index_status": "ready",
+  "indexed_at": "2026-09-25 13:19:44.543446",
+  "scale_json": {
+    "raw_text": "1\" = 10'",
+    "paper_inches_per_real_foot": 0.1,
+    "real_feet_per_paper_inch": 10.0,
+    "horizontal": {
+      "numerator": 1.0,
+      "denominator": 10.0,
+      "units": "in=ft"
+    },
+    "vertical": {
+      "numerator": 1.0,
+      "denominator": 10.0,
+      "units": "in=ft"
+    },
+    "confidence": 0.85,
+    "page": 1,
+    "source_bbox": [
+      0.01235969482906281,
+      0.014108050311053241,
+      0.9959523809523809,
+      1.362364818431713
+    ],
+    "page_width_in": 42.0,
+    "page_height_in": 30.0
+  },
+  "page_meta_json": [
+    {
+      "page": 1,
+      "width_pt": 3024.0,
+      "height_pt": 2160.0,
+      "page_width_in": 42.0,
+      "page_height_in": 30.0,
+      "width_px": 8400,
+      "height_px": 6000,
+      "rotation": 270,
+      "true_north_rotation_deg": 270.0,
+      "true_north_source": "pdf_rotation",
+      "orientation_text": null,
+      "keyplan_bbox": null,
+      "keyplan_match_score": null
+    }
+  ],
+  "index_stats_json": {
+    "pages": 1,
+    "text_elements": 1336,
+    "regions": 149,
+    "survey_points": 0,
+    "landmarks": 17,
+    "scale_found": false
+  },
+  "meta_legend_line_templates": null,
+  "sheetEntityGraph_page1_meta": {
+    "viewport_warning": true,
+    "rendition_png": "/Users/dtaplin21/Desktop/Procore-Integrator/backend/uploads/drawings/rendered/project-688/drawing-1691/page-1.png",
+    "pdf_line_source": "vector",
+    "pdf_line_source_stats": {
+      "path_count": 41053,
+      "line_op_count": 135074,
+      "stroked_path_count": 33645
+    }
+  },
+  "drawing_text_elements_by_source": {
+    "tesseract": 1074,
+    "native_pdf": 262
+  },
+  "drawing_legend_grounding_hits_count": 0,
+  "drawing_landmarks_by_type": {
+    "other": 15,
+    "tank": 2
+  }
+}

@@ -12,10 +12,13 @@ Both emit ``GroundingHit`` bboxes in master fractional coordinates.
 
 from __future__ import annotations
 
+import json
 import re
 from abc import ABC, abstractmethod
+import dataclasses
 from dataclasses import dataclass
 from io import BytesIO
+from pathlib import Path
 from typing import Any, Sequence, cast
 
 import numpy as np
@@ -367,3 +370,60 @@ def manifest_entry_to_legend_icon(entry: dict[str, Any]) -> LegendIconEntry:
         label_fractional_bbox=clamp_fractional_bbox(label_bbox),
         source=cast(LegendIconSource, entry.get("source", "indexed_tokens")),
     )
+
+
+def load_legend_manifest_raw_entries(data: Any) -> list[dict[str, Any]]:
+    """Accept ``{"rows": [...]}``, a bare JSON array, or a single entry dict."""
+    if isinstance(data, list):
+        return [item for item in data if isinstance(item, dict)]
+    if isinstance(data, dict):
+        rows = data.get("rows", data.get("entries"))
+        if isinstance(rows, list):
+            return [item for item in rows if isinstance(item, dict)]
+        if "label_text" in data and "icon_crop_path" in data:
+            return [data]
+    raise ValueError("Legend manifest must be a list of entries or an object with a rows array")
+
+
+def load_legend_manifest_entries(
+    data: Any,
+    *,
+    manifest_path: Path | None = None,
+) -> list[LegendIconEntry]:
+    """Parse manifest JSON (already loaded) into ``LegendIconEntry`` rows."""
+    entries = [
+        manifest_entry_to_legend_icon(item)
+        for item in load_legend_manifest_raw_entries(data)
+    ]
+    if manifest_path is not None:
+        entries = resolve_manifest_icon_paths(entries, manifest_path)
+    return entries
+
+
+def load_legend_manifest_file(path: str | Path) -> list[LegendIconEntry]:
+    """Load ``legend_manifest.json`` from disk (array or ``{rows: [...]}``)."""
+    manifest_path = Path(path)
+    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    return load_legend_manifest_entries(data, manifest_path=manifest_path)
+
+
+def resolve_manifest_icon_paths(
+    entries: list[LegendIconEntry],
+    manifest_path: Path,
+) -> list[LegendIconEntry]:
+    """If ``icon_crop_path`` is missing on disk, try the manifest directory + basename."""
+    base = manifest_path.parent
+    resolved: list[LegendIconEntry] = []
+    for entry in entries:
+        crop = Path(entry.icon_crop_path)
+        if crop.is_file():
+            resolved.append(entry)
+            continue
+        candidate = base / crop.name
+        if candidate.is_file():
+            resolved.append(
+                dataclasses.replace(entry, icon_crop_path=str(candidate.resolve()))
+            )
+            continue
+        resolved.append(entry)
+    return resolved

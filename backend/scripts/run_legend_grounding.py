@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Run legend exemplar grounding and persist hits to the database.
 
-Requires ``DOCUMENT_AI_GROUNDING_ENABLED=true`` and Document AI env vars.
+Requires ``DOCUMENT_AI_GROUNDING_ENABLED=true`` and Document AI env vars for
+persisted runs (``--dry-run`` only needs a PDF + manifest).
 
 Usage (from ``backend/``)::
 
@@ -9,6 +10,12 @@ Usage (from ``backend/``)::
         --drawing-id 1691 --project-id 688 \\
         --legend-bbox 0.70,0.02,0.98,0.135 \\
         --output-dir /tmp/legend_icons_1691
+
+    ./venv/bin/python scripts/run_legend_grounding.py \\
+        --drawing-id 1691 --project-id 688 \\
+        --manifest tests/fixtures/legend_manifest_u2_c4_00_golden.json \\
+        --legend-bbox 0.70,0.02,0.98,0.135 \\
+        --dry-run
 """
 
 from __future__ import annotations
@@ -29,7 +36,7 @@ from sqlalchemy.orm import Session  # noqa: E402
 
 from ai.pipelines.legend_grounding import (  # noqa: E402
     DocumentAiGroundingProvider,
-    manifest_entry_to_legend_icon,
+    load_legend_manifest_file,
     run_grounding_for_legend_entries,
 )
 from ai.pipelines.legend_icon_extraction import (  # noqa: E402
@@ -47,6 +54,8 @@ from services.legend_grounding_service import (  # noqa: E402
     page_words_from_text_elements,
     run_and_persist_legend_grounding,
 )
+
+_DEFAULT_LEGEND_BBOX = "0.70,0.02,0.98,0.135"
 
 
 def _resolve_pdf(session: Session, drawing_id: int) -> Path | None:
@@ -79,19 +88,25 @@ def main() -> int:
     parser.add_argument("--project-id", type=int, default=688)
     parser.add_argument("--drawing-id", type=int, required=True)
     parser.add_argument("--page", type=int, default=1)
-    parser.add_argument("--legend-bbox", type=str, required=True)
+    parser.add_argument(
+        "--legend-bbox",
+        type=str,
+        default="",
+        help=f"Fractional legend ROI (default {_DEFAULT_LEGEND_BBOX} when extracting icons)",
+    )
     parser.add_argument("--output-dir", type=str, default="legend_icons_out")
     parser.add_argument(
         "--manifest",
         type=str,
         default="",
-        help="Optional existing legend_manifest.json (skip icon re-extract)",
+        help="legend_manifest.json — bare array or {rows: [...]}; icon PNGs resolved beside file",
     )
     parser.add_argument("--dry-run", action="store_true", help="Do not write DB rows")
     parser.add_argument("--list-only", action="store_true", help="Print persisted hits and exit")
     args = parser.parse_args()
 
-    if not grounding_is_available() and not args.list_only:
+    needs_persist = not args.list_only and not args.dry_run
+    if needs_persist and not grounding_is_available():
         print(
             "Legend grounding disabled or Document AI not configured. "
             "Set DOCUMENT_AI_GROUNDING_ENABLED=true and DOCUMENT_AI_* vars.",
@@ -99,7 +114,9 @@ def main() -> int:
         )
         return 1
 
-    legend_bbox = parse_legend_bbox_arg(args.legend_bbox)
+    bbox_arg = args.legend_bbox.strip() or _DEFAULT_LEGEND_BBOX
+    legend_bbox = parse_legend_bbox_arg(bbox_arg)
+
     session = SessionLocal()
     try:
         if args.list_only:
@@ -117,27 +134,26 @@ def main() -> int:
             return 1
 
         elements = _load_elements(session, int(args.drawing_id), int(args.page))
+        manifest_entries = (
+            load_legend_manifest_file(args.manifest) if args.manifest.strip() else None
+        )
 
-        if args.dry_run and args.manifest:
-            manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
-            raw_entries = manifest.get("rows", manifest)
-            entries = [manifest_entry_to_legend_icon(item) for item in raw_entries]
+        if args.dry_run:
+            if manifest_entries is None:
+                print("--dry-run requires --manifest", file=sys.stderr)
+                return 1
             full_image = render_pdf_page_image(pdf_path, page=int(args.page))
             provider = DocumentAiGroundingProvider()
             hits = run_grounding_for_legend_entries(
                 full_page_image=full_image,
-                entries=entries,
+                entries=manifest_entries,
                 provider=provider,
                 full_page_words=page_words_from_text_elements(elements),
             )
             print(json.dumps({k: [h.__dict__ for h in v] for k, v in hits.items()}, indent=2))
             return 0
 
-        if args.dry_run:
-            print("--dry-run requires --manifest", file=sys.stderr)
-            return 1
-
-        run_id, hits_by_label, persisted = run_and_persist_legend_grounding(
+        run_id, hits_by_label, _persisted = run_and_persist_legend_grounding(
             session,
             pdf_path=str(pdf_path),
             master_drawing_id=int(args.drawing_id),
@@ -145,6 +161,8 @@ def main() -> int:
             legend_bbox_fractional=legend_bbox,
             elements=elements,
             output_dir=args.output_dir,
+            project_id=int(args.project_id),
+            legend_entries=manifest_entries,
         )
         total = sum(len(v) for v in hits_by_label.values())
         print(f"grounding_run_id={run_id} persisted_hits={total}")

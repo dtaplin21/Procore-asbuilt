@@ -23,6 +23,7 @@ from ai.pipelines.legend_icon_extraction import (
 from config import document_ai_configured, settings
 from models.drawing_legend_grounding_hit import DrawingLegendGroundingHit
 from models.drawing_text_element import DrawingTextElement
+from services.legend_lookup import match_line_type_by_name
 
 
 def grounding_is_available() -> bool:
@@ -88,11 +89,19 @@ def persist_grounding_hits(
     grounding_run_id: str,
     legend_entries: list[LegendIconEntry],
     hits_by_label: dict[str, list[GroundingHit]],
+    project_id: int | None = None,
 ) -> list[DrawingLegendGroundingHit]:
     rows: list[DrawingLegendGroundingHit] = []
     row_id_by_label = {entry.label_text: entry.row_id for entry in legend_entries}
+    line_type_id_by_label: dict[str, int | None] = {}
+    for entry in legend_entries:
+        db_row = match_line_type_by_name(session, entry.label_text, project_id=project_id)
+        line_type_id_by_label[entry.label_text] = (
+            cast(int, db_row.id) if db_row is not None else None
+        )
 
     for label, hits in hits_by_label.items():
+        legend_line_type_id = line_type_id_by_label.get(label)
         for hit in hits:
             x0, y0, x1, y1 = hit.page_fractional_bbox
             row = DrawingLegendGroundingHit(
@@ -107,6 +116,7 @@ def persist_grounding_hits(
                 confidence=float(hit.confidence),
                 meta_json={
                     "raw_model_output": hit.raw_model_output,
+                    "legend_line_type_id": legend_line_type_id,
                 },
             )
             session.add(row)
@@ -127,20 +137,25 @@ def run_and_persist_legend_grounding(
     output_dir: str,
     replace_existing: bool = True,
     provider: DocumentAiGroundingProvider | None = None,
+    project_id: int | None = None,
+    legend_entries: list[LegendIconEntry] | None = None,
 ) -> tuple[str, dict[str, list[GroundingHit]], list[DrawingLegendGroundingHit]]:
     if not grounding_is_available():
         raise RuntimeError(
             "Legend grounding requires DOCUMENT_AI_GROUNDING_ENABLED=true and Document AI config",
         )
 
-    entries = extract_legend_icons(
-        pdf_path,
-        page=page,
-        legend_bbox_fractional=legend_bbox_fractional,
-        output_dir=output_dir,
-        elements=elements,
-        prefer_indexed=True,
-    )
+    if legend_entries:
+        entries = legend_entries
+    else:
+        entries = extract_legend_icons(
+            pdf_path,
+            page=page,
+            legend_bbox_fractional=legend_bbox_fractional,
+            output_dir=output_dir,
+            elements=elements,
+            prefer_indexed=True,
+        )
     if not entries:
         raise ValueError("No legend icon entries to ground")
 
@@ -169,6 +184,7 @@ def run_and_persist_legend_grounding(
         grounding_run_id=run_id,
         legend_entries=entries,
         hits_by_label=hits_by_label,
+        project_id=project_id,
     )
     session.commit()
     return run_id, hits_by_label, persisted

@@ -1,0 +1,56 @@
+[
+  {
+    "row_id": 0,
+    "label_text": "PROPERTY LINE",
+    "icon_crop_path": "legend_icon_00.png",
+    "page_fractional_bbox": [0.7, 0.04455598455598456, 0.7846280991735537, 0.05220077220077221]
+  },
+  {
+    "row_id": 1,
+    "label_text": "EXISTING UTILITY LINE",
+    "icon_crop_path": "legend_icon_01.png",
+    "page_fractional_bbox": [0.7, 0.05289575289575289, 0.7846280991735537, 0.06054054054054055]
+  },
+  {
+    "row_id": 2,
+    "label_text": "UTILITY LINE",
+    "icon_crop_path": "legend_icon_02.png",
+    "page_fractional_bbox": [0.7, 0.06123552123552124, 0.7846280991735537, 0.06888030888030888]
+  },
+  {
+    "row_id": 3,
+    "label_text": "UTILITY LINE (SEPARATE PHASE)",
+    "icon_crop_path": "legend_icon_03.png",
+    "page_fractional_bbox": [0.7, 0.06888030888030888, 0.7846280991735537, 0.07791505791505791]
+  },
+  {
+    "row_id": 4,
+    "label_text": "SSMH OR SDMH, SEE DETAIL 3, SHEET U2.C6.00",
+    "icon_crop_path": "legend_icon_04.png",
+    "page_fractional_bbox": [0.7, 0.07768339768339769, 0.7846280991735537, 0.0857915057915058]
+  },
+  {
+    "row_id": 5,
+    "label_text": "CATCH BASIN, 1 AND_2, SHEET U2.C6.00",
+    "icon_crop_path": "legend_icon_05.png",
+    "page_fractional_bbox": [0.7, 0.08602316602316604, 0.7846280991735537, 0.09413127413127415]
+  },
+  {
+    "row_id": 6,
+    "label_text": "SEWER LINE — HCAI PERMIT (SHOWN FOR REFERENCE ONLY)",
+    "icon_crop_path": "legend_icon_06.png",
+    "page_fractional_bbox": [0.7, 0.0938996138996139, 0.7846280991735537, 0.10293436293436294]
+  },
+  {
+    "row_id": 7,
+    "label_text": "FIRE WATER LINE — HCAI PERMIT (SHOWN FOR REFERENCE ONLY)",
+    "icon_crop_path": "legend_icon_07.png",
+    "page_fractional_bbox": [0.7, 0.10223938223938224, 0.7846280991735537, 0.11127413127413129]
+  },
+  {
+    "row_id": 8,
+    "label_text": "ELECTRICAL LINE — HCAI PERMIT (SHOWN FOR REFERENCE ONLY)",
+    "icon_crop_path": "legend_icon_08.png",
+    "page_fractional_bbox": [0.7, 0.11057915057915059, 0.7846280991735537, 0.11961389961389962]
+  }
+]

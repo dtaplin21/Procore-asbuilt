@@ -1,0 +1,294 @@
+{
+  "drawing_id": 1722,
+  "project_id": 1348,
+  "indexed_at": "2026-09-28 22:40:32.340991",
+  "SHEET_DIGITIZATION_ENABLED": true,
+  "SYMBOL_DETECTOR_WEIGHTS_PATH_set": false,
+  "index_stats_json": {
+    "pages": 1,
+    "text_elements": 1253,
+    "regions": 175,
+    "survey_points": 0,
+    "landmarks": 17,
+    "scale_found": false,
+    "document_ai": {
+      "document_ai_content_hash": "cfc20c3d8ac3beef5f95edadf0560449f6417fdbb6c343fcf2c4ac0050a53129",
+      "document_ai_cache_hit": true,
+      "document_ai_pages_in_document": 1,
+      "document_ai_pages_processed": 0,
+      "document_ai_input_gcs_uri": "",
+      "document_ai_output_gcs_prefix": "gs://qc-procore-integrator-document-ai-output/batch-output/by-drawing/1722/cfc20c3d8ac3beef5f95edadf0560449f6417fdbb6c343fcf2c4ac0050a53129/",
+      "document_ai_json_shards": 1,
+      "document_ai_token_count": 1092,
+      "document_ai_seconds": 1.736
+    },
+    "document_ai_pages_processed": 0
+  },
+  "sheetEntityGraph_page1": {
+    "labels": 800,
+    "lines": 2000,
+    "symbols": 0,
+    "viewports": 4,
+    "associations": 0,
+    "legend_line_templates": [
+      {
+        "legend_line_type_id": 27,
+        "line_type_name": "Underground Electric Line",
+        "abbreviation_code": "UGE",
+        "style": {
+          "stroke_width_bucket": 0.9,
+          "mean_segment_len_frac": 0.04123280458212587,
+          "mean_gap_len_frac": 0.0,
+          "kind_guess": "solid"
+        }
+      },
+      {
+        "legend_line_type_id": 20,
+        "line_type_name": "Trench Drain",
+        "abbreviation_code": "TD",
+        "style": {
+          "stroke_width_bucket": 1.08,
+          "mean_segment_len_frac": 0.0009708056061712046,
+          "mean_gap_len_frac": 0.0008971179445803186,
+          "kind_guess": "dashed"
+        }
+      }
+    ],
+    "meta": {
+      "viewport_warning": false,
+      "pdf_line_source": "vector",
+      "pdf_line_source_stats": {
+        "path_count": 41053,
+        "line_op_count": 135074,
+        "stroked_path_count": 33645
+      }
+    },
+    "viewports_in_graph": [
+      {
+        "viewport_id": "detail",
+        "kind": "detail",
+        "page": 1,
+        "bbox_fractional": [
+          0.09259508999999999,
+          0.03751479000000002,
+          0.34442941,
+          0.32224852000000004
+        ],
+        "scale": null,
+        "source": "ocr",
+        "notes": "OCR kind hit 'DETAIL'; no nearby scale parsed"
+      },
+      {
+        "viewport_id": "plan",
+        "kind": "plan",
+        "page": 1,
+        "bbox_fractional": [
+          0.03,
+          0.03,
+          0.82,
+          0.45
+        ],
+        "scale": {
+          "raw_text": "1 INCH = 40'",
+          "real_feet_per_paper_inch": 40.0,
+          "confidence": 0.9,
+          "horizontal": {
+            "numerator": 1.0,
+            "denominator": 40.0,
+            "units": "in=ft"
+          },
+          "vertical": {
+            "numerator": 1.0,
+            "denominator": 40.0,
+            "units": "in=ft"
+          }
+        },
+        "source": "ocr",
+        "notes": "OCR kind hit 'PLAN'; scale from nearby OCR"
+      },
+      {
+        "viewport_id": "profile",
+        "kind": "profile",
+        "page": 1,
+        "bbox_fractional": [
+          0.03,
+          0.45,
+          0.82,
+          0.94
+        ],
+        "scale": {
+          "raw_text": "1 INCH = 40'",
+          "real_feet_per_paper_inch": 40.0,
+          "confidence": 0.9,
+          "horizontal": {
+            "numerator": 1.0,
+            "denominator": 40.0,
+            "units": "in=ft"
+          },
+          "vertical": {
+            "numerator": 1.0,
+            "denominator": 40.0,
+            "units": "in=ft"
+          }
+        },
+        "source": "ocr",
+        "notes": "OCR kind hit 'PROFILE'; scale from nearby OCR"
+      },
+      {
+        "viewport_id": "section",
+        "kind": "section",
+        "page": 1,
+        "bbox_fractional": [
+          0.39830699456431884,
+          0.8317380099826389,
+          0.6466224290958787,
+          1.0
+        ],
+        "scale": null,
+        "source": "ocr",
+        "notes": "OCR kind hit 'SECTION'; no nearby scale parsed"
+      }
+    ],
+    "labels_sample_first_5": [
+      {
+        "text": "1",
+        "bbox_fractional": [
+          0.5441075885106647,
+          0.5353157326027199,
+          0.5445994624385128,
+          0.5358222678855613
+        ],
+        "viewport_id": "profile",
+        "confidence": 1.0
+      },
+      {
+        "text": "CU",
+        "bbox_fractional": [
+          0.5438757598715485,
+          0.5343622278284144,
+          0.5444871609803861,
+          0.5353604917173033
+        ],
+        "viewport_id": "profile",
+        "confidence": 1.0
+      },
+      {
+        "text": "YD",
+        "bbox_fractional": [
+          0.5436513184239624,
+          0.5334391841182002,
+          0.5442553727084367,
+          0.5344069869429977
+        ],
+        "viewport_id": "profile",
+        "confidence": 1.0
+      },
+      {
+        "text": "UP",
+        "bbox_fractional": [
+          0.029925608761096126,
+          0.8882592095269097,
+          0.03210197680841678,
+          0.8909967493127894
+        ],
+        "viewport_id": "profile",
+        "confidence": 1.0
+      },
+      {
+        "text": "FEC",
+        "bbox_fractional": [
+          0.05058116509170128,
+          0.7979275738751447,
+          0.05380295950268942,
+          0.8011523211443866
+        ],
+        "viewport_id": "profile",
+        "confidence": 1.0
+      }
+    ],
+    "lines_sample_first_3": [
+      {
+        "points": [
+          [
+            0.7142757839626737,
+            0.0
+          ],
+          [
+            0.7142757839626737,
+            1.399986097547743
+          ],
+          [
+            0.0,
+            1.399986097547743
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "viewport_id": null,
+        "confidence": 0.9,
+        "line_type": "Underground Electric Line",
+        "source": "pdf_vector",
+        "style_signature": {
+          "stroke_width_bucket": 0.36,
+          "mean_segment_len_frac": 1.1714159930193866,
+          "mean_gap_len_frac": 1.0571309407552083,
+          "segment_count": 3.0,
+          "kind_guess": "dashed"
+        },
+        "legend_line_type_id": 27
+      },
+      {
+        "points": [
+          [
+            0.09821428571428571,
+            0.0056111653645833336
+          ],
+          [
+            0.09821428571428571,
+            1.3568749321831597
+          ]
+        ],
+        "viewport_id": null,
+        "confidence": 0.9,
+        "line_type": "Underground Electric Line",
+        "source": "pdf_vector",
+        "style_signature": {
+          "stroke_width_bucket": 0.36,
+          "mean_segment_len_frac": 1.3512637668185763,
+          "mean_gap_len_frac": 0.0,
+          "segment_count": 1.0,
+          "kind_guess": "solid"
+        },
+        "legend_line_type_id": 27
+      },
+      {
+        "points": [
+          [
+            0.18452380952380953,
+            0.0056111653645833336
+          ],
+          [
+            0.18452380952380953,
+            1.3568749321831597
+          ]
+        ],
+        "viewport_id": null,
+        "confidence": 0.9,
+        "line_type": "Underground Electric Line",
+        "source": "pdf_vector",
+        "style_signature": {
+          "stroke_width_bucket": 0.36,
+          "mean_segment_len_frac": 1.3512637668185763,
+          "mean_gap_len_frac": 0.0,
+          "segment_count": 1.0,
+          "kind_guess": "solid"
+        },
+        "legend_line_type_id": 27
+      }
+    ],
+    "symbols_in_graph": []
+  },
+  "drawing_symbols_table_count": 0
+}

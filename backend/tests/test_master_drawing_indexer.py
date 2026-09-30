@@ -45,6 +45,20 @@ def _word(text: str, page_index: int = 0) -> PositionedWord:
     )
 
 
+def test_index_result_stats_includes_legend_index() -> None:
+    result = IndexResult(
+        pages=1,
+        text_elements=10,
+        legend_index={
+            "legend_rect": [0.7, 0.02, 0.98, 0.135],
+            "legend_line_row_count": 9,
+            "legend_line_rows": [{"text": "Property line"}],
+        },
+    )
+    stats = result.to_stats_json()
+    assert stats["legend_index"]["legend_line_row_count"] == 9
+
+
 def test_index_result_stats_includes_landmarks() -> None:
     result = IndexResult(pages=2, text_elements=100, survey_points=3, landmarks=7)
     assert result.to_stats_json() == {
@@ -97,6 +111,10 @@ def test_extract_drawing_document_respects_max_pages(tmp_path: Path) -> None:
         patch(
             "ai.pipelines.master_drawing_indexer._index_max_pages",
             return_value=2,
+        ),
+        patch(
+            "ai.pipelines.master_drawing_indexer._use_document_ai_for_master_index",
+            return_value=False,
         ),
     ):
         extracted = extract_drawing_document(pdf_path)
@@ -233,6 +251,10 @@ def test_extract_drawing_document_always_hybrid_for_masters(tmp_path: Path) -> N
             "ai.pipelines.master_drawing_indexer.extract_document_via_ocr",
             return_value=ocr_doc,
         ) as ocr_mock,
+        patch(
+            "ai.pipelines.master_drawing_indexer._use_document_ai_for_master_index",
+            return_value=False,
+        ),
     ):
         extracted = extract_drawing_document(pdf_path)
 

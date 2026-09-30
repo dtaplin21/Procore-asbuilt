@@ -30,6 +30,10 @@ vi.mock("@/components/drawing-workspace/inspection_runs_panel", () => ({
   default: () => <div data-testid="inspection-runs-panel-mock" />,
 }));
 
+vi.mock("@/hooks/use-toast", () => ({
+  toast: vi.fn(),
+}));
+
 function jsonResponse(body: unknown, status = 200) {
   return Promise.resolve(
     new Response(JSON.stringify(body), {
@@ -161,11 +165,27 @@ function installDefaultFetchMock(
       });
     }
 
+    if (url.includes("/index-status")) {
+      return jsonResponse({
+        status: "ready",
+        stats: { regions: 2, pages: 1, text_elements: 50 },
+        scale: { raw_text: '1"=20\'' },
+        error: null,
+        indexed_at: "2026-06-24T00:00:00Z",
+      });
+    }
+
+    if (url.includes("/reindex")) {
+      return jsonResponse({ job_id: 99, index_status: "pending" });
+    }
+
     if (
       url.includes(`/api/projects/${PROJECT_ID}/drawings/${DRAWING_ID}`) &&
       !url.includes("/overlays") &&
       !url.includes("/region") &&
-      !url.includes("/regions")
+      !url.includes("/regions") &&
+      !url.includes("/index-status") &&
+      !url.includes("/reindex")
     ) {
       if (masterDrawing === "error") {
         return jsonResponse({ detail: "Not found" }, 404);
@@ -402,6 +422,25 @@ describe("ObjectsPage", () => {
 
     expect(await screen.findByTestId("region-editor")).toBeInTheDocument();
     expect(screen.queryByTestId("drawing-comparison-workspace")).not.toBeInTheDocument();
+  });
+
+  it("shows re-run master index and POSTs reindex", async () => {
+    installDefaultFetchMock(fetchMock);
+
+    renderObjects(`/objects?projectId=${PROJECT_ID}&drawingId=${DRAWING_ID}`);
+
+    const button = await screen.findByTestId("objects-reindex-button");
+    expect(button).toHaveTextContent("Re-run master index");
+
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some((call) =>
+          String(call[0]).includes("/reindex"),
+        ),
+      ).toBe(true);
+    });
   });
 
   it("clicking a region shape updates the ?region= URL param (PR5 click sync)", async () => {
