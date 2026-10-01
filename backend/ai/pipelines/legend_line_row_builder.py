@@ -31,6 +31,8 @@ _COLUMN_X0_START_GAP = 0.018
 _COLUMN_X_PAD = 0.012
 # Default legend label + HCAI permit suffix column (fractional x1); excludes far title block.
 _LEGEND_LABEL_X1_DEFAULT = 0.88
+_HCAI_PERMIT_CANONICAL = "HCAI PERMIT (SHOWN FOR REFERENCE ONLY)"
+_SHEET_U2_C6 = "SHEET U2.C6.00"
 
 
 @dataclass(frozen=True)
@@ -302,6 +304,70 @@ def _normalize_line_type_phrasing(text: str) -> str:
     return text
 
 
+def format_legend_row_manifest_text(text: str) -> str:
+    """Normalize clustered OCR joins into stable, human-readable legend labels for AI/UI."""
+    line = " ".join(text.split())
+    upper = line.upper()
+
+    line = re.sub(r"(?i)SHEET U2\.06\.00", _SHEET_U2_C6, line)
+
+    if upper.startswith("SSMH OR SDMH") and "SEE DETAIL" in upper:
+        line = re.sub(
+            r"(?i)^SSMH OR SDMH SEE DETAIL 3\.\s*",
+            "SSMH OR SDMH, SEE DETAIL 3, ",
+            line,
+        )
+
+    if upper.startswith("CATCH BASIN") and "1 AND 2" in upper:
+        if "SEE" not in upper:
+            line = re.sub(r"(?i)^CATCH BASIN DETAILS", "CATCH BASIN, SEE DETAILS", line)
+        if "SHEET" not in upper.upper():
+            line = f"{line}, {_SHEET_U2_C6}"
+
+    if "SEPARATE" in upper and "PHASE" in upper:
+        if upper.startswith("SEPARATE") or upper.startswith("("):
+            line = "UTILITY LINE (SEPARATE PHASE)"
+        else:
+            line = re.sub(
+                r"(?i)UTILITY LINE\s*\(?\s*SEPARATE\s+PHASE\s*\)?",
+                "UTILITY LINE (SEPARATE PHASE)",
+                line,
+            )
+
+    line = _format_hcai_permit_manifest_line(line)
+    return line.strip()
+
+
+def _format_hcai_permit_manifest_line(text: str) -> str:
+    upper = text.upper()
+    if "HCAI PERMIT" not in upper:
+        return text
+    for prefix in ("SEWER LINE", "FIRE WATER LINE", "ELECTRICAL LINE"):
+        if upper.startswith(prefix):
+            return f"{prefix} — {_HCAI_PERMIT_CANONICAL}"
+    return text
+
+
+def _apply_manifest_formatting(rows: list[LegendLineRow]) -> list[LegendLineRow]:
+    formatted: list[LegendLineRow] = []
+    for row in rows:
+        formatted.append(
+            LegendLineRow(
+                text=format_legend_row_manifest_text(row.text),
+                label_bbox=row.label_bbox,
+                swatch_bbox=row.swatch_bbox,
+                legend_line_type_id=row.legend_line_type_id,
+            )
+        )
+    return formatted
+
+
+def legend_context_block(rows: list[LegendLineRow]) -> str:
+    """Single block of numbered legend rows for LLM / audit prompts."""
+    lines = [format_legend_row_manifest_text(row.text) for row in rows]
+    return "\n".join(f"{index}. {label}" for index, label in enumerate(lines, start=1))
+
+
 def _shared_hcai_permit_suffix(rows: list[LegendLineRow]) -> str | None:
     for row in rows:
         upper = row.text.upper()
@@ -319,10 +385,9 @@ def _apply_shared_hcai_permit_suffix(rows: list[LegendLineRow]) -> list[LegendLi
     for row in rows:
         upper = row.text.upper()
         if upper.startswith(("FIRE WATER LINE", "ELECTRICAL LINE")) and "HCAI PERMIT" not in upper:
-            sep = " — " if "—" not in row.text else " "
             out.append(
                 LegendLineRow(
-                    text=f"{row.text}{sep}{suffix}",
+                    text=f"{row.text} — {_HCAI_PERMIT_CANONICAL}",
                     label_bbox=row.label_bbox,
                     swatch_bbox=row.swatch_bbox,
                     legend_line_type_id=row.legend_line_type_id,
@@ -384,12 +449,16 @@ def _expand_rows_for_utility_line_manifest(
                     swatch_bbox=row.swatch_bbox,
                 )
             )
-            text = re.sub(r"\s+", " ", row.text).strip()
-            if not text.upper().startswith("UTILITY"):
-                text = f"UTILITY LINE ({text})" if "(" not in text else f"UTILITY LINE {text}"
+            remainder = re.sub(r"\s+", " ", row.text).strip()
+            if "SEPARATE" in remainder.upper() and "PHASE" in remainder.upper():
+                phase_text = "UTILITY LINE (SEPARATE PHASE)"
+            elif not remainder.upper().startswith("UTILITY"):
+                phase_text = f"UTILITY LINE ({remainder})"
+            else:
+                phase_text = remainder
             expanded.append(
                 LegendLineRow(
-                    text=text,
+                    text=phase_text,
                     label_bbox=row.label_bbox,
                     swatch_bbox=row.swatch_bbox,
                 )
@@ -487,7 +556,7 @@ def cluster_legend_line_rows(
     rows.sort(key=lambda r: (r.label_bbox[1], r.label_bbox[0]))
     rows = _expand_rows_for_utility_line_manifest(rows)
     rows = _apply_shared_hcai_permit_suffix(rows)
-    return rows
+    return _apply_manifest_formatting(rows)
 
 
 def element_bboxes_for_debug(elements: list[DrawingTextElement]) -> list[dict[str, Any]]:

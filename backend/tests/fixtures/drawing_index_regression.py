@@ -92,32 +92,9 @@ def legend_elements_from_fixture(rows: list[dict]) -> list[DrawingTextElement]:
     return elements
 
 
-def canonicalize_legend_row_text(text: str) -> str:
-    """Map frozen Doc AI token joins to hand-verified manifest strings (1722)."""
-    compact = " ".join(text.split())
-    known = {
-        "SSMH OR SDMH SEE DETAIL 3. SHEET U2.06.00": (
-            "SSMH OR SDMH, SEE DETAIL 3, SHEET U2.C6.00"
-        ),
-        "CATCH BASIN DETAILS 1 AND 2": (
-            "CATCH BASIN, SEE DETAILS 1 AND 2, SHEET U2.C6.00"
-        ),
-        "SEWER LINE HCAI PERMIT SHOWN FOR REFERENCE ONLY": (
-            "SEWER LINE — HCAI PERMIT (SHOWN FOR REFERENCE ONLY)"
-        ),
-        "FIRE WATER LINE — HCAI PERMIT SHOWN FOR REFERENCE ONLY": (
-            "FIRE WATER LINE — HCAI PERMIT (SHOWN FOR REFERENCE ONLY)"
-        ),
-        "ELECTRICAL LINE — HCAI PERMIT SHOWN FOR REFERENCE ONLY": (
-            "ELECTRICAL LINE — HCAI PERMIT (SHOWN FOR REFERENCE ONLY)"
-        ),
-    }
-    return known.get(compact, compact)
-
-
 def build_legend_rows(token_rows: list[dict] | None = None) -> list[str]:
     """Cluster legend ROI tokens from the frozen fixture into manifest row text."""
     rows_data = token_rows if token_rows is not None else load_master_1722_legend_token_fixture()
     elements = legend_elements_from_fixture(rows_data)
     clustered = cluster_legend_line_rows(elements, legend_rect=resolved_legend_rect())
-    return [canonicalize_legend_row_text(row.text) for row in clustered]
+    return [row.text for row in clustered]

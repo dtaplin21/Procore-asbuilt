@@ -525,6 +525,7 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
     if not is_linked_evidence:
         from services.legend_index_helpers import (
             cluster_legend_rows_for_drawing,
+            legend_index_ai_payload,
             legend_rows_to_audit_meta,
             resolved_legend_rect,
         )
@@ -535,6 +536,7 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
             "legend_rect": list(rect) if rect else None,
             "legend_line_row_count": len(legend_rows),
             "legend_line_rows": legend_rows_to_audit_meta(legend_rows),
+            **legend_index_ai_payload(legend_rows),
         }
 
     regions = build_auto_regions_from_text_elements(session, drawing_id)

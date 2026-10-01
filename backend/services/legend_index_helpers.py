@@ -6,7 +6,12 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from ai.pipelines.legend_line_row_builder import LegendLineRow, cluster_legend_line_rows
+from ai.pipelines.legend_line_row_builder import (
+    LegendLineRow,
+    cluster_legend_line_rows,
+    format_legend_row_manifest_text,
+    legend_context_block,
+)
 from config import settings
 from models.drawing_text_element import DrawingTextElement
 
@@ -69,7 +74,8 @@ def cluster_legend_rows_for_drawing(
 def legend_rows_to_audit_meta(rows: list[LegendLineRow]) -> list[dict[str, Any]]:
     return [
         {
-            "text": row.text,
+            "index": index,
+            "text": format_legend_row_manifest_text(row.text),
             "label_bbox": {
                 "x0": row.label_bbox[0],
                 "y0": row.label_bbox[1],
@@ -83,5 +89,14 @@ def legend_rows_to_audit_meta(rows: list[LegendLineRow]) -> list[dict[str, Any]]
                 "y1": row.swatch_bbox[3],
             },
         }
-        for row in rows
+        for index, row in enumerate(rows, start=1)
     ]
+
+
+def legend_index_ai_payload(rows: list[LegendLineRow]) -> dict[str, Any]:
+    """Structured legend summary for index stats / LLM context."""
+    labels = [format_legend_row_manifest_text(row.text) for row in rows]
+    return {
+        "legend_line_labels": labels,
+        "legend_context_block": legend_context_block(rows),
+    }
