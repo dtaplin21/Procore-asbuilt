@@ -36,6 +36,11 @@ _STATION_RE = re.compile(
     r"\b(?:STA\.?\s*)?(\d{1,2}\+\d{2}(?:\.\d{1,2})?)\b",
     re.IGNORECASE,
 )
+# ``STA 10 90.95`` / ``STA. 10 90.95`` when OCR drops the ``+``.
+_STATION_SPACED_RE = re.compile(
+    r"\bSTA\.?\s*(\d{1,2})\s+(\d{2}(?:\.\d{1,2})?)\b",
+    re.IGNORECASE,
+)
 _STRUCTURE_RE = re.compile(
     r"\b(SSMH|SSMH-\d+|MH-?\d+|CO-?\d+|SMH|DMH|CB|DI)\b",
     re.IGNORECASE,
@@ -423,18 +428,45 @@ def _attach_nearest_plan_station(
     return pool[0][2]
 
 
+def _normalize_station_label(major: str, minor: str) -> str | None:
+    try:
+        major_i = int(major)
+        minor_f = float(minor)
+    except (TypeError, ValueError):
+        return None
+    if major_i < 0 or major_i > 99:
+        return None
+    if minor_f < 0 or minor_f >= 100:
+        return None
+    if abs(minor_f - round(minor_f)) < 1e-6:
+        minor_s = f"{int(round(minor_f)):02d}"
+    else:
+        minor_s = f"{minor_f:.2f}".rstrip("0").rstrip(".")
+        if "." not in minor_s:
+            minor_s = f"{minor_s}.0"
+    return f"{major_i}+{minor_s}"
+
+
 def extract_stations_from_text(text: str) -> list[str]:
     """Return normalized station strings found in free text (e.g. ``10+90.95``)."""
     if not text:
         return []
     seen: set[str] = set()
     stations: list[str] = []
+
+    def _add(station: str) -> None:
+        normalized = station.strip().upper()
+        if not normalized or normalized in seen:
+            return
+        seen.add(normalized)
+        stations.append(normalized)
+
     for match in _STATION_RE.finditer(text):
-        station = match.group(1).strip().upper()
-        if not station or station in seen:
-            continue
-        seen.add(station)
-        stations.append(station)
+        _add(match.group(1))
+    for match in _STATION_SPACED_RE.finditer(text):
+        label = _normalize_station_label(match.group(1), match.group(2))
+        if label:
+            _add(label)
     return stations
 
 

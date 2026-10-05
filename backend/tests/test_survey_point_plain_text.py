@@ -13,6 +13,11 @@ def test_extract_stations_from_text() -> None:
     assert stations == ["10+90.95"]
 
 
+def test_extract_stations_from_spaced_sta_label() -> None:
+    stations = extract_stations_from_text("Profile grid STA 10 90.95")
+    assert stations == ["10+90.95"]
+
+
 def test_plain_text_extract_attaches_nearby_station() -> None:
     text = (
         "Install at SSMH STA. 10+90.95 "

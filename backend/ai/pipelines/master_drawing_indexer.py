@@ -36,6 +36,7 @@ from ai.pipelines.sheet_orientation_detector import (
     detect_sheet_orientation,
     enrich_page_meta_with_orientation,
 )
+from ai.pipelines.station_label_composition import extract_station_control_points_from_elements
 from ai.pipelines.survey_point_extractor import extract_survey_points_from_elements
 from config import document_ai_configured, settings
 from models.drawing_text_element import DrawingTextElement
@@ -43,7 +44,7 @@ from models.models import Drawing, DrawingRendition
 from services.landmark_storage import persist_landmarks
 from services.master_drawing_legend_tagger import enrich_text_elements_with_legend
 from services.storage import open_storage_path
-from services.survey_point_storage import persist_survey_points
+from services.survey_point_storage import persist_station_control_points, persist_survey_points
 
 _WHITESPACE_RE = re.compile(r"\s+")
 _READABLE_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9+\-'.]{1,}$")
@@ -571,6 +572,18 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         survey_point_records,
         source="auto_index",
     )
+    station_control_records = extract_station_control_points_from_elements(
+        indexed_text_elements,
+        page_meta_json=page_meta_json,
+        scale_source="master_index",
+    )
+    station_controls = persist_station_control_points(
+        session,
+        drawing_id,
+        station_control_records,
+        source="auto_index_station",
+    )
+    survey_points += station_controls
 
     landmark_records = extract_landmarks_from_drawing_renditions(
         session,

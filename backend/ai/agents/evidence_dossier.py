@@ -142,6 +142,33 @@ def build_evidence_dossier(
         master_drawing_id=master_drawing_id,
     )
     auxiliary_drawings = tuple(load_linked_drawings(session, evidence_id))
+    linked_drawing_ids = [
+        int(cast(int, drawing.id))
+        for drawing in auxiliary_drawings
+        if getattr(drawing, "id", None) is not None
+    ]
+    if linked_drawing_ids:
+        try:
+            from services.match_registration_bootstrap import (
+                ensure_evidence_registration_for_match,
+            )
+
+            ensure_evidence_registration_for_match(
+                session,
+                evidence_id=evidence_id,
+                master_drawing_id=master_drawing_id,
+                linked_drawing_ids=linked_drawing_ids,
+            )
+            session.refresh(evidence)
+            meta = dict(cast(dict[str, Any] | None, evidence.meta) or {})
+        except Exception:
+            logger.exception(
+                "match_registration_bootstrap_failed",
+                extra={
+                    "evidence_id": evidence_id,
+                    "master_drawing_id": master_drawing_id,
+                },
+            )
     linked_attachments = _linked_attachments(
         session,
         evidence=evidence,
@@ -485,11 +512,9 @@ def _maybe_investigate_and_persist(
         session.flush()
         session.refresh(evidence)
         investigation_meta = _pdf_investigation_meta_from_payload(result)
+        evidence_meta = cast(dict[str, Any] | None, evidence.meta) or {}
         match_investigation = dict(
-            cast(dict[str, Any] | None, cast(dict[str, Any] | None, evidence.meta) or {}).get(
-                "matchInvestigation"
-            )
-            or {}
+            cast(dict[str, Any] | None, evidence_meta.get("matchInvestigation")) or {}
         )
         if persist_result.drawing_ids_needing_index:
             investigation_meta["drawing_ids_needing_index"] = (

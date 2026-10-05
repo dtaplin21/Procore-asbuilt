@@ -359,6 +359,21 @@ def _call_fusion_llm(
         return None
 
 
+def _is_unprojected_aux_coordinate(
+    candidate: LocationMatchCandidate,
+    master_drawing_id: int,
+) -> bool:
+    if candidate.method != ResolutionMethod.COORDINATE_LOOKUP:
+        return False
+    if candidate.source_drawing_id is None:
+        return False
+    if int(candidate.source_drawing_id) == int(master_drawing_id):
+        return False
+    if "aux_coords_unprojected" in candidate.notes:
+        return True
+    return "aux_coords_unprojected" in candidate.contradicting_signals
+
+
 def _score_candidate(
     dossier: EvidenceDossier,
     candidate: LocationMatchCandidate,
@@ -406,13 +421,18 @@ def _score_candidate(
 
     generic_only = _generic_location_only(dossier.expanded_clues, hits)
     penalty = 0.0
+    if _is_unprojected_aux_coordinate(candidate, dossier.master_drawing_id):
+        penalty -= 0.28
+        conflicts.append(
+            "coordinate match on linked sheet without master registration projection"
+        )
     if generic_only:
-        penalty = WEIGHTS["generic_location_penalty"]
+        penalty += WEIGHTS["generic_location_penalty"]
         hits.append(
             ClueHit(
                 clue_value="generic location only",
                 dimension="location",
-                weight=penalty,
+                weight=WEIGHTS["generic_location_penalty"],
             )
         )
 
@@ -428,7 +448,7 @@ def _score_candidate(
         )
 
     matcher_base = candidate.confidence * 0.1
-    fused_score = matcher_base + sum(hit.weight for hit in hits)
+    fused_score = matcher_base + sum(hit.weight for hit in hits) + penalty
     fused_score = max(0.0, min(fused_score, 1.5))
 
     rationale_parts = [

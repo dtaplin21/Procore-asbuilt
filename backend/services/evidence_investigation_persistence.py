@@ -363,11 +363,15 @@ def persist_evidence_investigation(
     master_drawing_id = _resolve_master_drawing_id(session, evidence=evidence)
     if linked_drawing_ids and master_drawing_id is not None:
         try:
-            _apply_registration_transform_to_evidence(
-                evidence,
-                linked_drawing_ids=linked_drawing_ids,
+            from services.match_registration_bootstrap import (
+                ensure_evidence_registration_for_match,
+            )
+
+            ensure_evidence_registration_for_match(
+                session,
+                evidence_id=evidence_id,
                 master_drawing_id=master_drawing_id,
-                session=session,
+                linked_drawing_ids=linked_drawing_ids,
             )
             session.flush()
         except Exception:

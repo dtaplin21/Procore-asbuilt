@@ -14,6 +14,7 @@ from ai.pipelines.clue_fusion_scorer import (
     FusedCandidateScore,
     fuse_candidate_scores,
     select_fused_winner,
+    _is_unprojected_aux_coordinate,
 )
 from ai.pipelines.drawing_location_resolver import ResolutionMethod
 from ai.pipelines.drawing_location_resolver import RegistrationTransform
@@ -144,28 +145,11 @@ class InspectionLocationAgent:
             )
 
         winner = select_fused_winner(ranked_scores)
-        if winner is None and _has_unprojected_aux_coordinate_match(candidates):
-            result = AgentMatchResult(
-                status="needs_review",
-                scope=None,
-                region_id=None,
-                page=page,
-                rationale=(
-                    "aux_coords_unprojected: survey coordinates matched on a linked "
-                    "drawing but could not be projected onto the master sheet."
-                ),
-                fused_score=None,
-            )
-            persist_agent_match_result(
-                session,
-                evidence_id=evidence_id,
+        if winner is None:
+            winner = _fallback_fused_score_for_master_placement(
+                ranked_scores,
                 master_drawing_id=master_drawing_id,
-                result=result,
-                ranked_scores=ranked_scores,
-                page=page,
-                inspection_run_id=inspection_run_id,
             )
-            return result
 
         if winner is None:
             result = AgentMatchResult(
@@ -188,10 +172,20 @@ class InspectionLocationAgent:
             return result
 
         scope_kind = infer_scope_kind(dossier)
-        anchor_bbox = winner.candidate.bbox_fractional
+        registration_transform = _load_registration_transform(dossier.evidence)
+        registration_aux_drawing_id = _registration_aux_drawing_id(dossier.evidence)
+        anchor_bbox = _master_scope_anchor_bbox(
+            winner,
+            ranked_scores,
+            master_drawing_id=master_drawing_id,
+            session=session,
+            page=page,
+        )
         scope_source_drawing_id = _resolve_scope_source_drawing_id(
             dossier,
             winner.candidate.source_drawing_id,
+            master_drawing_id=master_drawing_id,
+            registration_transform=registration_transform,
         )
         scope: ScopeGeometry | None = None
         if anchor_bbox is not None:
@@ -215,8 +209,6 @@ class InspectionLocationAgent:
                     scope_kind=scope_kind,
                 )
 
-        registration_transform = _load_registration_transform(dossier.evidence)
-        registration_aux_drawing_id = _registration_aux_drawing_id(dossier.evidence)
         scope, aux_scope_unprojected = _maybe_project_aux_scope_to_master(
             scope,
             master_drawing_id=master_drawing_id,
@@ -225,6 +217,20 @@ class InspectionLocationAgent:
             or winner.candidate.source_drawing_id,
             registration_aux_drawing_id=registration_aux_drawing_id,
         )
+        if aux_scope_unprojected and scope is None and anchor_bbox is not None:
+            safe_anchor = clamp_fractional_bbox(anchor_bbox)
+            try:
+                scope = trace_scope_geometry(
+                    dossier,
+                    anchor_bbox=safe_anchor,
+                    scope_kind=scope_kind,
+                    page=page,
+                    session=session,
+                    master_png_path=master_png_path,
+                    source_drawing_id=None,
+                )
+            except ValueError:
+                scope = None
 
         status = _decide_match_status(
             winner,
@@ -266,8 +272,19 @@ class InspectionLocationAgent:
 def _resolve_scope_source_drawing_id(
     dossier: EvidenceDossier,
     winner_source_drawing_id: int | None,
+    *,
+    master_drawing_id: int,
+    registration_transform: RegistrationTransform | None,
 ) -> int | None:
-    """Prefer the aux sheet used for station range / registration over match winner."""
+    """Prefer the aux sheet used for station range when registration can project to master."""
+    if registration_transform is None:
+        if (
+            winner_source_drawing_id is not None
+            and int(winner_source_drawing_id) == int(master_drawing_id)
+        ):
+            return int(master_drawing_id)
+        return None
+
     meta = cast(dict[str, Any] | None, getattr(dossier.evidence, "meta", None))
     if isinstance(meta, dict):
         raw_station_source = meta.get("station_range_source_drawing_id")
@@ -282,6 +299,98 @@ def _resolve_scope_source_drawing_id(
             return reg_aux_id
 
     return winner_source_drawing_id
+
+
+def _fallback_fused_score_for_master_placement(
+    ranked_scores: Sequence[FusedCandidateScore],
+    *,
+    master_drawing_id: int,
+) -> FusedCandidateScore | None:
+    """Pick a master-local candidate when coordinate fusion penalizes aux-only winners."""
+    candidates = [
+        fused
+        for fused in ranked_scores
+        if fused.fused_score > 0
+        and fused.candidate.bbox_fractional is not None
+        and not _is_unprojected_aux_coordinate(fused.candidate, master_drawing_id)
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda item: (item.fused_score, item.candidate.confidence))
+
+
+def _master_scope_anchor_bbox(
+    winner: FusedCandidateScore,
+    ranked_scores: Sequence[FusedCandidateScore],
+    *,
+    master_drawing_id: int,
+    session: Session | None = None,
+    page: int = 1,
+) -> tuple[float, float, float, float] | None:
+    """Avoid anchoring master scope traces on unprojected auxiliary coordinate boxes."""
+    candidate = winner.candidate
+    bbox = candidate.bbox_fractional
+    if bbox is None:
+        return None
+    if not _is_unprojected_aux_coordinate(candidate, master_drawing_id):
+        return bbox
+
+    for fused in ranked_scores:
+        alt = fused.candidate
+        if alt.bbox_fractional is None:
+            continue
+        if _is_unprojected_aux_coordinate(alt, master_drawing_id):
+            continue
+        if alt.source_drawing_id is None or int(alt.source_drawing_id) == int(
+            master_drawing_id
+        ):
+            return alt.bbox_fractional
+
+    corridor = _utility_corridor_anchor_bbox(ranked_scores, master_drawing_id=master_drawing_id)
+    if corridor is not None:
+        return corridor
+
+    if session is not None:
+        from ai.pipelines.master_utility_anchor import utility_corridor_anchor_for_drawing
+
+        legend_corridor = utility_corridor_anchor_for_drawing(
+            session,
+            master_drawing_id,
+            page=page,
+        )
+        if legend_corridor is not None:
+            return legend_corridor
+
+    # Last resort: search the plan-view band on the master sheet (not the aux pin).
+    return clamp_fractional_bbox((0.12, 0.22, 0.92, 0.78))
+
+
+def _utility_corridor_anchor_bbox(
+    ranked_scores: Sequence[FusedCandidateScore],
+    *,
+    master_drawing_id: int,
+) -> tuple[float, float, float, float] | None:
+    """Expand a search window on the master sheet around legend / clue tile hits."""
+    for fused in ranked_scores:
+        candidate = fused.candidate
+        if candidate.bbox_fractional is None:
+            continue
+        if candidate.source_drawing_id is not None and int(candidate.source_drawing_id) != int(
+            master_drawing_id
+        ):
+            continue
+        x0, y0, x1, y1 = candidate.bbox_fractional
+        pad_x = max(0.08, (x1 - x0) * 4.0)
+        pad_y = max(0.08, (y1 - y0) * 4.0)
+        return clamp_fractional_bbox(
+            (
+                max(0.0, x0 - pad_x),
+                max(0.0, y0 - pad_y),
+                min(1.0, x1 + pad_x),
+                min(1.0, y1 + pad_y),
+            )
+        )
+    return None
 
 
 def _registration_aux_drawing_id(evidence: object) -> int | None:
