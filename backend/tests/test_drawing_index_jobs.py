@@ -235,8 +235,18 @@ def test_clear_drawing_index_artifacts_keeps_manual_regions(
     )
     db_session.commit()
 
+    seeded_ready_pdf_drawing.scale_json = {  # type: ignore[assignment]
+        "raw_text": "1 INCH = 40'",
+        "source": "viewport_promotion",
+        "source_viewport_id": "profile",
+    }
+    db_session.commit()
+
     clear_drawing_index_artifacts(db_session, drawing_id)
     db_session.commit()
+
+    db_session.refresh(seeded_ready_pdf_drawing)
+    assert seeded_ready_pdf_drawing.scale_json is None
 
     regions = (
         db_session.query(DrawingRegion)

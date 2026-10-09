@@ -24,7 +24,7 @@ are delegated to ``ocr_engine.py`` (Tesseract, OpenAI vision, PyMuPDF render).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
 
@@ -104,6 +104,8 @@ class ExtractedDocument:
     source_format: SourceFormat
     page_count: int
     words: list[PositionedWord]
+    # Pre-merge token lists for per-source scale parsing (native vs Document AI, etc.).
+    scale_word_sources: tuple[list[PositionedWord], ...] | None = None
 
     def page_text(self, page_index: int) -> str:
         """Reconstruct plain text for a page, in reading order, for
@@ -164,52 +166,30 @@ def _pdf_has_text_layer(file_path: str | Path) -> bool:
         doc.close()
 
 
-def _word_rect_in_page_display_space(
-    page: fitz.Page,
-    x0: float,
-    y0: float,
-    x1: float,
-    y1: float,
-) -> fitz.Rect:
-    """Map PDF user-space word box to the same display coordinates as ``page.get_pixmap``."""
-    from ai.pipelines.pdf_display_space import pdf_rect_to_display_fractional
-
-    pw, ph = page.rect.width, page.rect.height
-    fx0, fy0, fx1, fy1 = pdf_rect_to_display_fractional(page, x0, y0, x1, y1)
-    return fitz.Rect(fx0 * pw, fy0 * ph, fx1 * pw, fy1 * ph)
-
-
 def _pdf_text_layer(file_path: str | Path) -> ExtractedDocument:
     """Extract words + boxes directly from a native PDF's text layer."""
+    from ai.pipelines.native_pdf_display_frame import native_words_display_fractional
+
     doc = fitz.open(str(file_path))
     words: list[PositionedWord] = []
     try:
         for page_index in range(doc.page_count):
             page = doc.load_page(page_index)
             pw, ph = page.rect.width, page.rect.height
-            for w in page.get_text("words"):  # x0,y0,x1,y1, word, block, line, word_no
-                x0, y0, x1, y1, text, *_ = w
-                if not str(text).strip():
-                    continue
-                display = _word_rect_in_page_display_space(
-                    page,
-                    float(x0),
-                    float(y0),
-                    float(x1),
-                    float(y1),
-                )
+            for display_word in native_words_display_fractional(page):
                 words.append(
                     PositionedWord(
-                        text=str(text),
+                        text=display_word.text,
                         bbox=BoundingBox(
-                            x=float(display.x0),
-                            y=float(display.y0),
-                            width=float(display.width),
-                            height=float(display.height),
+                            x=display_word.x0 * pw,
+                            y=display_word.y0 * ph,
+                            width=(display_word.x1 - display_word.x0) * pw,
+                            height=(display_word.y1 - display_word.y0) * ph,
                             page_width=float(pw),
                             page_height=float(ph),
                         ),
                         page_index=page_index,
+                        token_source="native_pdf",
                     )
                 )
         return ExtractedDocument(

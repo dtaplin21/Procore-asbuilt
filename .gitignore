@@ -19,6 +19,14 @@ __pycache__/
 backend/venv/
 backend/env/
 backend/ENV/
+# Local drawing storage (never commit binaries or rendered pages)
+backend/uploads/
+backend/uploads copy/
+# Regenerate via backend/scripts/export_drawing_index_json.py
+Notes/drawing-*-text-elements.json
+Notes/drawing-*-index-snapshot.json
+Notes/master-*.json
+Notes/legend-rows-*.json
 *.egg-info/
 .pytest_cache/
 .mypy_cache/

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast
 
@@ -29,9 +29,14 @@ from ai.pipelines.hybrid_text_merge import (
     merge_native_and_ocr_words,
     merge_native_ocr_and_document_ai_words,
 )
-from ai.pipelines.drawing_scale_parser import page_size_inches_from_points, parse_scale_from_words
+from ai.pipelines.drawing_scale_parser import (
+    page_size_inches_from_points,
+    parse_scale_from_words,
+    resolve_drawing_scale,
+)
 from ai.pipelines.landmark_extractor import LandmarkRecord, extract_landmarks_from_page
 from ai.pipelines.master_drawing_region_builder import build_auto_regions_from_text_elements
+from ai.pipelines.native_pdf_display_frame import frame_agreement
 from ai.pipelines.sheet_orientation_detector import (
     detect_sheet_orientation,
     enrich_page_meta_with_orientation,
@@ -68,6 +73,7 @@ class IndexResult:
     document_ai_stats: dict[str, Any] | None = None
     legend_index: dict[str, Any] | None = None
     merge_pipeline_stats: dict[str, Any] | None = None
+    gaps_noticed: list[str] | None = None
 
     def to_stats_json(self) -> dict[str, Any]:
         stats: dict[str, Any] = {
@@ -87,6 +93,8 @@ class IndexResult:
                 stats["document_ai_pages_processed"] = pages_processed
         if self.legend_index:
             stats["legend_index"] = self.legend_index
+        if self.gaps_noticed:
+            stats["gaps_noticed"] = list(self.gaps_noticed)
         return stats
 
 
@@ -248,7 +256,14 @@ def extract_drawing_document(
                     "tesseract_tokens": len(tesseract.words),
                 },
             )
-        return _merge_native_document_ai_and_tesseract(native, document_ai, tesseract)
+        if document_ai_stats is not None:
+            report = frame_agreement(native.words, document_ai.words)
+            document_ai_stats["native_docai_frame_agreement"] = report
+        merged = _merge_native_document_ai_and_tesseract(native, document_ai, tesseract)
+        sources: list[list[PositionedWord]] = [native.words, document_ai.words]
+        if tesseract.words:
+            sources.append(tesseract.words)
+        return replace(merged, scale_word_sources=tuple(sources))
 
     ocr = _limit_extracted_document(
         extract_document_via_ocr(file_path, max_pages=max_pages),
@@ -263,7 +278,8 @@ def extract_drawing_document(
                 "ocr_tokens": len(ocr.words),
             },
         )
-    return _merge_native_and_ocr_documents(native, ocr)
+    merged = _merge_native_and_ocr_documents(native, ocr)
+    return replace(merged, scale_word_sources=(native.words, ocr.words))
 
 
 def build_page_meta_json(
@@ -543,10 +559,11 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
     regions = build_auto_regions_from_text_elements(session, drawing_id)
 
     first_page_meta = page_meta_json[0] if page_meta_json else None
-    scale_json = parse_scale_from_words(
+    scale_json, scale_resolution = resolve_drawing_scale(
         extracted.words,
         page=1,
         page_meta=first_page_meta,
+        word_sources=extracted.scale_word_sources,
     )
 
     indexed_text_elements = (
@@ -597,6 +614,39 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         source="auto_index",
     )
 
+    gaps_noticed: list[str] = []
+    frame_report = (
+        document_ai_stats.get("native_docai_frame_agreement")
+        if isinstance(document_ai_stats, dict)
+        else None
+    )
+    if isinstance(frame_report, dict):
+        compared = frame_report.get("compared")
+        agreement = frame_report.get("agreement")
+        if (
+            isinstance(compared, int)
+            and compared >= 20
+            and isinstance(agreement, (int, float))
+            and agreement < 0.5
+        ):
+            gaps_noticed.append(
+                "native_pdf tokens disagree with Document AI positions "
+                "(rotation/frame bug) — native positions not trusted"
+            )
+
+    scale_status = scale_resolution.get("status")
+    if scale_status:
+        merge_pipeline_stats_scale: dict[str, Any] = {
+            "scale_status": scale_status,
+            "scale_resolution_reason": scale_resolution.get("reason", ""),
+        }
+    else:
+        merge_pipeline_stats_scale = {}
+    if scale_status == "conflict" and scale_resolution.get("reason"):
+        gaps_noticed.append(str(scale_resolution["reason"]))
+    if scale_status == "multi_scale" and scale_json is None and scale_resolution.get("reason"):
+        gaps_noticed.append(str(scale_resolution["reason"]))
+
     merge_pipeline_stats: dict[str, Any] = {
         "text_elements_persisted": text_elements,
         "text_elements_dropped_by_merge": text_elements_dropped_by_merge,
@@ -604,6 +654,18 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         "text_elements_pre_merge": pre_merge_token_count,
         "text_elements_post_merge": post_merge_token_count,
     }
+    if isinstance(frame_report, dict):
+        merge_pipeline_stats["native_docai_frame_agreement"] = frame_report
+    merge_pipeline_stats.update(merge_pipeline_stats_scale)
+    if scale_resolution.get("other_scales"):
+        merge_pipeline_stats["scale_other_view_local"] = [
+            {
+                "real_feet_per_paper_inch": item.get("real_feet_per_paper_inch"),
+                "raw_text": item.get("raw_text"),
+            }
+            for item in scale_resolution["other_scales"]
+            if isinstance(item, dict)
+        ]
     if document_ai_stats.get("document_ai_token_count") is not None:
         merge_pipeline_stats["document_ai_token_count_raw"] = int(
             document_ai_stats["document_ai_token_count"]
@@ -635,4 +697,5 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         document_ai_stats=document_ai_stats or None,
         legend_index=legend_index_meta,
         merge_pipeline_stats=merge_pipeline_stats,
+        gaps_noticed=gaps_noticed or None,
     )

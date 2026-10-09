@@ -33,6 +33,7 @@ from services.inspection_matching_jobs import (
     flush_inspection_matches_for_linked_auxiliary_drawing,
 )
 from services.storage import open_storage_path
+from services.drawing_scale_promotion import apply_viewport_scale_promotion
 from services.viewport_seeding import maybe_seed_viewports_after_index
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,11 @@ def _resolve_user_id_for_project(db: Session, project_id: int) -> int:
 
 def clear_drawing_index_artifacts(session: Session, drawing_id: int) -> None:
     """Remove indexed text elements and auto-generated regions before re-index."""
+    drawing = session.get(Drawing, drawing_id)
+    if drawing is not None:
+        # Re-derive scale from title-block parse + viewport promotion each run.
+        drawing.scale_json = None  # type: ignore[assignment]
+
     session.query(DrawingTextElement).filter(
         DrawingTextElement.master_drawing_id == drawing_id
     ).delete(synchronize_session=False)
@@ -250,6 +256,7 @@ def index_linked_attachment_drawing_sync(
         session.flush()
         maybe_seed_viewports_after_index(session, drawing_id)
         maybe_digitize_drawing_after_index(session, drawing_id)
+        apply_viewport_scale_promotion(session, drawing)
         session.commit()
         flush_inspection_matches_for_linked_auxiliary_drawing(session, drawing_id)
         return result
@@ -404,6 +411,7 @@ def run_drawing_index_job(drawing_id: int, session: Session) -> IndexResult:
         session.commit()
         maybe_seed_viewports_after_index(session, drawing_id)
         maybe_digitize_drawing_after_index(session, drawing_id)
+        apply_viewport_scale_promotion(session, drawing)
         session.commit()
         flush_deferred_inspection_matches_for_drawing(session, drawing_id)
         flush_inspection_matches_for_linked_auxiliary_drawing(session, drawing_id)

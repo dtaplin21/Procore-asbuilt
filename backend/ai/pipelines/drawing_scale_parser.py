@@ -8,6 +8,7 @@ import re
 from typing import Any
 
 from ai.pipelines.document_text_extraction import PositionedWord
+from ai.pipelines.scale_resolution import DisplayScaleWord, resolve_scale, resolve_scale_from_sources
 
 logger = logging.getLogger(__name__)
 
@@ -508,13 +509,102 @@ def _words_bbox_fractional(words: list[PositionedWord]) -> list[float]:
     ]
 
 
+def _positioned_words_to_display(words: list[PositionedWord]) -> list[DisplayScaleWord]:
+    out: list[DisplayScaleWord] = []
+    for word in words:
+        x0, y0, x1, y1 = word.bbox.to_fractional()
+        out.append(DisplayScaleWord(text=word.text, x0=x0, y0=y0, x1=x1, y1=y1))
+    return out
+
+
+def _page_width_inches(page_meta: dict[str, Any] | None) -> float | None:
+    if page_meta is None:
+        return None
+    width_in, _ = page_size_inches_from_meta(page_meta)
+    if width_in is not None:
+        return float(width_in)
+    width_pt = page_meta.get("width_pt")
+    if isinstance(width_pt, (int, float)) and width_pt > 0:
+        return float(width_pt) / POINTS_PER_INCH
+    return None
+
+
+def resolve_drawing_scale(
+    words: list[PositionedWord],
+    *,
+    page: int = 1,
+    page_meta: dict[str, Any] | None = None,
+    word_sources: tuple[list[PositionedWord], ...] | None = None,
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Line-local scale parse + scale-bar corroboration; legacy regex fallback."""
+    page_index = page - 1
+    page_width_in = _page_width_inches(page_meta)
+    resolution: dict[str, Any] = {"status": "none", "scale_json": None, "reason": ""}
+
+    if page_width_in is not None and page_width_in > 0:
+        if word_sources:
+            display_sources = [
+                _positioned_words_to_display([w for w in source if w.page_index == page_index])
+                for source in word_sources
+                if source
+            ]
+            display_sources = [s for s in display_sources if s]
+            if display_sources:
+                resolution = resolve_scale_from_sources(
+                    display_sources,
+                    page_width_in,
+                    page=page,
+                )
+        else:
+            page_words = [word for word in words if word.page_index == page_index]
+            if page_words:
+                resolution = resolve_scale(
+                    _positioned_words_to_display(page_words),
+                    page_width_in,
+                    page=page,
+                )
+
+        scale_json = resolution.get("scale_json")
+        if isinstance(scale_json, dict):
+            return _attach_page_dimensions(dict(scale_json), page_meta), resolution
+
+        if resolution.get("status") not in (None, "none"):
+            return None, resolution
+
+    scale_json = _parse_scale_from_words_legacy(words, page=page, page_meta=page_meta)
+    if scale_json is not None:
+        resolution = {
+            "status": "legacy_regex",
+            "scale_json": scale_json,
+            "reason": "Architectural / title-block regex fallback.",
+        }
+    return scale_json, resolution
+
+
 def parse_scale_from_words(
     words: list[PositionedWord],
     *,
     page: int = 1,
     page_meta: dict[str, Any] | None = None,
+    word_sources: tuple[list[PositionedWord], ...] | None = None,
 ) -> dict[str, Any] | None:
-    """Scan page-1 title block first, then the full page, for scale text."""
+    """Promote a sheet-level scale when line parsing + bar corroboration succeed."""
+    scale_json, _resolution = resolve_drawing_scale(
+        words,
+        page=page,
+        page_meta=page_meta,
+        word_sources=word_sources,
+    )
+    return scale_json
+
+
+def _parse_scale_from_words_legacy(
+    words: list[PositionedWord],
+    *,
+    page: int = 1,
+    page_meta: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Scan title block first, then full page, using page-flattened text (legacy)."""
     page_index = page - 1
     page_words = [word for word in words if word.page_index == page_index]
     if not page_words:
