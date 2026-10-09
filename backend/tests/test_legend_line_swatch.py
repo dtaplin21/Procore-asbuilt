@@ -10,6 +10,7 @@ import fitz
 from ai.pipelines.legend_line_row_builder import LegendLineRow, cluster_legend_line_rows
 from ai.pipelines.legend_line_swatch import (
     LegendLineTemplate,
+    SwatchStyleForMatch,
     build_legend_line_templates,
     classify_chains_with_templates,
     extract_swatch_template,
@@ -107,7 +108,7 @@ def test_build_legend_line_templates_links_swatch_and_db(db_session, project, tm
 
     assert len(templates) == 1
     assert templates[0].abbreviation_code == "SS"
-    assert templates[0].style.segment_count >= 1
+    assert templates[0].style.signature.segment_count >= 1
 
 
 def test_classify_chains_with_templates(db_session, project, tmp_path: Path) -> None:
@@ -124,7 +125,12 @@ def test_classify_chains_with_templates(db_session, project, tmp_path: Path) -> 
         legend_line_type_id=1,
         line_type_name="Sanitary Sewer Main",
         abbreviation_code="SS",
-        style=style,
+        style=SwatchStyleForMatch(
+            stroke_width_bucket=style.stroke_width_bucket,
+            color=(0, 0, 0),
+            kind_guess=style.kind_guess,
+            signature=style,
+        ),
     )
 
     classified = classify_chains_with_templates(plan_chains[:1], [template])
@@ -147,7 +153,12 @@ def test_legend_line_templates_to_meta() -> None:
                 legend_line_type_id=5,
                 line_type_name="Water Main",
                 abbreviation_code="W",
-                style=style,
+                style=SwatchStyleForMatch(
+                    stroke_width_bucket=style.stroke_width_bucket,
+                    color=None,
+                    kind_guess=style.kind_guess,
+                    signature=style,
+                ),
             )
         ]
     )

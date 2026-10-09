@@ -490,11 +490,11 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         from ai.pipelines.gutter_rotated_ocr import supplement_gutter_rotated_ocr
 
         first_meta = page_meta_json[0] if page_meta_json else {}
-        rotation = (
-            float(first_meta.get("rotation"))
-            if isinstance(first_meta, dict) and first_meta.get("rotation") is not None
-            else None
-        )
+        rotation: float | None = None
+        if isinstance(first_meta, dict):
+            raw_rotation = first_meta.get("rotation")
+            if isinstance(raw_rotation, (int, float)):
+                rotation = float(raw_rotation)
         gutter_words = supplement_gutter_rotated_ocr(
             str(source_path),
             page=1,
@@ -640,6 +640,11 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
             "scale_status": scale_status,
             "scale_resolution_reason": scale_resolution.get("reason", ""),
         }
+        scale_bar = scale_resolution.get("scale_bar")
+        if isinstance(scale_bar, dict):
+            bar_feet = scale_bar.get("real_feet_per_paper_inch")
+            if isinstance(bar_feet, (int, float)) and bar_feet > 0:
+                merge_pipeline_stats_scale["scale_bar_feet_per_paper_inch"] = float(bar_feet)
     else:
         merge_pipeline_stats_scale = {}
     if scale_status == "conflict" and scale_resolution.get("reason"):

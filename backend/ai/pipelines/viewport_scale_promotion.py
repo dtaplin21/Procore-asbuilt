@@ -15,6 +15,7 @@ from typing import Any
 
 MIN_PROMOTION_CONFIDENCE = 0.6
 SCALE_AGREEMENT_REL_TOL = 0.02
+SCALE_BAR_VETO_REL_TOL = 0.05
 PREFERRED_VIEWPORT_KIND = "plan"
 
 
@@ -132,6 +133,7 @@ def _pick_best(candidates: list[ScaleCandidate]) -> ScaleCandidate:
 def promote_scale(
     sheet_entity_graph_pages: dict[str, Any],
     existing_drawing_scale_json: dict[str, Any] | None,
+    scale_bar_feet_per_paper_inch: float | None = None,
 ) -> ScalePromotionResult:
     """Pure promotion logic — caller persists ``scale_json`` / ``index_stats_json``."""
     if existing_drawing_scale_json:
@@ -189,6 +191,29 @@ def promote_scale(
                 "better viewport-kind classifier."
             ),
         )
+
+    if scale_bar_feet_per_paper_inch is not None:
+        bar = float(scale_bar_feet_per_paper_inch)
+        if bar > 0 and best.real_feet_per_paper_inch > 0:
+            rel = abs(best.real_feet_per_paper_inch - bar) / max(
+                best.real_feet_per_paper_inch, bar
+            )
+            if rel > SCALE_BAR_VETO_REL_TOL:
+                return ScalePromotionResult(
+                    promoted=False,
+                    scale_json=None,
+                    scale_found=False,
+                    scale_source=None,
+                    source_viewport_id=None,
+                    source_page=None,
+                    ambiguous=True,
+                    candidates=all_candidates,
+                    reason=(
+                        f"Viewport '{best.viewport_id}' scale "
+                        f"{best.real_feet_per_paper_inch} ft/in disagrees with the "
+                        f"sheet's scale bar ({bar:.2f} ft/in). Not promoting."
+                    ),
+                )
 
     promoted_scale_json = dict(best.scale_json)
     promoted_scale_json["source"] = "viewport_promotion"

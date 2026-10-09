@@ -142,3 +142,47 @@ def test_ineligible_conflicting_scale_does_not_block_plan_promotion() -> None:
     assert result.ambiguous is False
     assert result.scale_json is not None
     assert result.scale_json["real_feet_per_paper_inch"] == 40.0
+
+
+def test_scale_bar_vetoes_wrong_viewport_scale() -> None:
+    wrong_plan = {
+        "1": {
+            "viewports": [
+                {
+                    "viewport_id": "plan",
+                    "kind": "plan",
+                    "bbox_fractional": [0.03, 0.03, 0.82, 0.45],
+                    "scale": {
+                        "raw_text": "1 INCH = 40'",
+                        "real_feet_per_paper_inch": 40.0,
+                        "confidence": 0.9,
+                    },
+                },
+            ]
+        }
+    }
+    vetoed = promote_scale(wrong_plan, None, scale_bar_feet_per_paper_inch=20.0)
+    assert vetoed.promoted is False
+    assert vetoed.ambiguous is True
+    assert vetoed.scale_found is False
+
+    right_plan = {
+        "1": {
+            "viewports": [
+                {
+                    "viewport_id": "plan",
+                    "kind": "plan",
+                    "bbox_fractional": [0.03, 0.03, 0.82, 0.45],
+                    "scale": {
+                        "raw_text": "1 INCH = 20 FT",
+                        "real_feet_per_paper_inch": 20.0,
+                        "confidence": 0.9,
+                    },
+                },
+            ]
+        }
+    }
+    ok = promote_scale(right_plan, None, scale_bar_feet_per_paper_inch=20.0)
+    assert ok.promoted is True
+    assert ok.scale_json is not None
+    assert ok.scale_json["real_feet_per_paper_inch"] == 20.0

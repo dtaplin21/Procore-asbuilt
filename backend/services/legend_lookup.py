@@ -6,10 +6,11 @@ token resolves to 'fire department connection' for candidate scoring.
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from sqlalchemy.orm import Session
 
+from ai.pipelines.legend_line_typing import LineTypeRow, match_line_type
 from models.legend_reference import (
     DrawingLegendAbbreviation,
     DrawingLegendLineType,
@@ -122,17 +123,7 @@ def find_codes_for_term(
     return sorted(codes)
 
 
-def match_line_type_by_name(
-    session: Session,
-    label_text: str,
-    *,
-    project_id: int | None = None,
-) -> DrawingLegendLineType | None:
-    """Match clustered legend row text to a seeded ``DrawingLegendLineType`` name."""
-    normalized = " ".join(label_text.strip().upper().split())
-    if not normalized:
-        return None
-
+def _line_type_query(session: Session, project_id: int | None):
     line_type_query = session.query(DrawingLegendLineType)
     if project_id is not None:
         line_type_query = line_type_query.filter(
@@ -141,22 +132,50 @@ def match_line_type_by_name(
         )
     else:
         line_type_query = line_type_query.filter(DrawingLegendLineType.project_id.is_(None))
+    return line_type_query
 
-    best: DrawingLegendLineType | None = None
-    best_score = -1
-    for row in line_type_query.all():
-        name = " ".join(str(row.line_type_name).strip().upper().split())
-        if not name:
-            continue
-        if normalized == name:
-            return row
-        score = 0
-        if normalized in name or name in normalized:
-            score = min(len(normalized), len(name))
-        elif all(part in name for part in normalized.split()):
-            score = len(normalized.split())
-        if score > best_score:
-            best_score = score
-            best = row
 
-    return best if best_score > 0 else None
+def line_type_rows_for_project(
+    session: Session,
+    *,
+    project_id: int | None = None,
+) -> list[LineTypeRow]:
+    rows: list[LineTypeRow] = []
+    for row in _line_type_query(session, project_id).all():
+        rows.append(
+            LineTypeRow(
+                cast(int, row.id),
+                str(row.line_type_name),
+                _abbreviation_code(row),
+            )
+        )
+    return rows
+
+
+def match_line_type_by_id(
+    session: Session,
+    line_type_id: int,
+    *,
+    project_id: int | None = None,
+) -> DrawingLegendLineType | None:
+    row = session.get(DrawingLegendLineType, int(line_type_id))
+    if row is None:
+        return None
+    row_project_id = cast(int | None, row.project_id)
+    if project_id is not None and row_project_id is not None and row_project_id != project_id:
+        return None
+    return row
+
+
+def match_line_type_by_name(
+    session: Session,
+    label_text: str,
+    *,
+    project_id: int | None = None,
+) -> DrawingLegendLineType | None:
+    """Match legend row text to a seeded line type; returns None on ambiguity."""
+    line_types = line_type_rows_for_project(session, project_id=project_id)
+    matched, _reason = match_line_type(line_types, label_text)
+    if matched is None:
+        return None
+    return match_line_type_by_id(session, matched.id, project_id=project_id)

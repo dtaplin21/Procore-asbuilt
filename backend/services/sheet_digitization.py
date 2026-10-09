@@ -17,6 +17,7 @@ from ai.pipelines.legend_line_swatch import LegendLineTemplate
 from ai.pipelines.sheet_association import associate_labels_to_symbols
 from ai.pipelines.sheet_entity_graph import (
     DrawingViewport,
+    LineTypingStatus,
     SheetEntityGraph,
     SheetLabel,
     SheetLine,
@@ -220,7 +221,7 @@ def _legend_templates_for_page(
     if pdf_path is None or not pdf_path.is_file():
         return ()
     from ai.pipelines.legend_line_swatch import (
-        build_legend_line_templates,
+        build_legend_line_templates_with_diagnostics,
         legend_line_templates_to_meta,
     )
     from services.legend_index_helpers import (
@@ -232,13 +233,14 @@ def _legend_templates_for_page(
     line_meta["legend_line_row_count"] = len(rows)
     if rows:
         line_meta["legend_line_rows"] = legend_rows_to_audit_meta(rows)
-    templates = build_legend_line_templates(
+    templates, template_diag = build_legend_line_templates_with_diagnostics(
         session,
         pdf_path,
         rows,
         project_id=project_id,
         page=page,
     )
+    line_meta["legend_template_diagnostics"] = template_diag
     if templates:
         line_meta["legend_line_templates"] = legend_line_templates_to_meta(templates)
     return tuple(templates)
@@ -274,9 +276,13 @@ def _extract_lines(
     project_id: int | None,
     line_meta: dict[str, Any],
 ) -> list[SheetLine]:
-    from ai.pipelines.legend_line_swatch import classify_chains_with_templates
+    from collections import Counter
+
+    from ai.pipelines.legend_line_typing import select_chains_for_storage
+    from ai.pipelines.legend_line_swatch import classify_chain_typings
     from ai.pipelines.pdf_line_source_gate import PdfLineSource, classify_pdf_line_source
     from ai.pipelines.pdf_vector_line_extractor import (
+        DEFAULT_MAX_CHAINS,
         chains_to_sheet_lines,
         extract_pdf_vector_chains,
     )
@@ -299,17 +305,78 @@ def _extract_lines(
             "stroked_path_count": line_stats.stroked_path_count,
         }
         if source is PdfLineSource.VECTOR:
-            chains = extract_pdf_vector_chains(pdf_path, page=page)
+            chains = extract_pdf_vector_chains(pdf_path, page=page, max_chains=10**9)
             if len(chains) >= MIN_VECTOR_CHAINS_BEFORE_RASTER_FALLBACK:
-                classified = classify_chains_with_templates(chains, list(dash_templates))
+                typings = classify_chain_typings(chains, list(dash_templates))
+                plan_bbox: tuple[float, float, float, float] | None = None
+                for vp in viewports:
+                    if vp.kind == "plan":
+                        plan_bbox = vp.bbox_fractional
+                        break
+                if dash_templates:
+                    from ai.pipelines.label_seeded_stitching import (
+                        enrich_ambiguous_chain_typings,
+                        labels_from_bboxes,
+                        segments_from_pdf_vector_segments,
+                        style_filter_for_swatch,
+                    )
+                    from ai.pipelines.pdf_vector_line_extractor import extract_pdf_vector_segments
+
+                    page_labels = _labels_from_text_elements(
+                        session, drawing_id, page, viewports
+                    )
+                    text_boxes = labels_from_bboxes(
+                        (lb.text, lb.bbox_fractional) for lb in page_labels
+                    )
+                    pdf_segments = extract_pdf_vector_segments(pdf_path, page=page)
+                    seg_list = segments_from_pdf_vector_segments(pdf_segments)
+                    code_to_template: dict[
+                        str, tuple[int, str, Any]
+                    ] = {}
+                    for tpl in dash_templates:
+                        code = (tpl.abbreviation_code or "").strip().upper()
+                        if not code or code in code_to_template:
+                            continue
+                        code_to_template[code] = (
+                            tpl.legend_line_type_id,
+                            tpl.line_type_name,
+                            style_filter_for_swatch(
+                                stroke_width_bucket=tpl.style.stroke_width_bucket,
+                                color=tpl.style.color,
+                            ),
+                        )
+                    typings, trace_stats = enrich_ambiguous_chain_typings(
+                        chains,
+                        typings,
+                        seg_list,
+                        text_boxes,
+                        code_to_template=code_to_template,
+                        plan_bbox=plan_bbox,
+                    )
+                    line_meta["label_seeded_trace"] = trace_stats
+                line_meta["chain_typing_counts"] = dict(Counter(t.status for t in typings))
+                keep_indices, tier_counts = select_chains_for_storage(
+                    chains,
+                    typings,
+                    plan_bbox=plan_bbox,
+                    wanted_type_ids=(),
+                    max_chains=DEFAULT_MAX_CHAINS,
+                )
+                line_meta["chain_storage_tiers"] = tier_counts
                 lines: list[SheetLine] = []
-                for chain, type_name, type_id in classified:
+                for idx in keep_indices:
+                    chain = chains[idx]
+                    ty = typings[idx]
+                    type_name = ty.line_type_name if ty.status == "typed" else None
+                    type_id = ty.legend_line_type_id if ty.status == "typed" else None
                     lines.extend(
                         chains_to_sheet_lines(
                             [chain],
                             viewports,
                             line_type=type_name,
                             legend_line_type_id=type_id,
+                            line_typing_status=cast(LineTypingStatus, ty.status),
+                            candidate_legend_line_type_ids=ty.candidate_type_ids,
                         )
                     )
                 return lines

@@ -60,14 +60,14 @@ def _sheet_pages_from_viewports(session: Session, drawing_id: int) -> dict[str, 
     )
     pages: dict[str, Any] = {}
     for row in rows:
-        page_key = str(int(row.page))
+        page_key = str(cast(int, row.page))
         pages.setdefault(page_key, {"viewports": []})
         bbox = row.bbox_json if isinstance(row.bbox_json, dict) else {}
         scale = row.scale_json if isinstance(row.scale_json, dict) else None
         pages[page_key]["viewports"].append(
             {
-                "viewport_id": row.viewport_id,
-                "kind": row.kind,
+                "viewport_id": cast(str, row.viewport_id),
+                "kind": cast(str, row.kind),
                 "bbox_json": bbox,
                 "scale": scale,
             }
@@ -79,7 +79,7 @@ def _resolve_sheet_entity_graph_pages(
     session: Session,
     drawing: Drawing,
 ) -> dict[str, Any]:
-    db_pages = _sheet_pages_from_viewports(session, int(drawing.id))
+    db_pages = _sheet_pages_from_viewports(session, cast(int, drawing.id))
     stats = cast(dict[str, Any] | None, drawing.index_stats_json)
     if not isinstance(stats, dict):
         return db_pages
@@ -100,6 +100,15 @@ def _resolve_sheet_entity_graph_pages(
     return graph_pages if graph_pages else db_pages
 
 
+def _scale_bar_feet_from_stats(stats: dict[str, Any] | None) -> float | None:
+    if not isinstance(stats, dict):
+        return None
+    raw = stats.get("scale_bar_feet_per_paper_inch")
+    if isinstance(raw, (int, float)) and raw > 0:
+        return float(raw)
+    return None
+
+
 def apply_viewport_scale_promotion(
     session: Session,
     drawing: Drawing,
@@ -115,14 +124,20 @@ def apply_viewport_scale_promotion(
             drawing.id,
             raw_existing.get("source_viewport_id"),
         )
-    result = promote_scale(pages, existing)
-
     stats: dict[str, Any] = {}
     prior = cast(dict[str, Any] | None, drawing.index_stats_json)
     if isinstance(prior, dict):
         stats = dict(prior)
 
+    scale_bar_feet = _scale_bar_feet_from_stats(stats)
+    result = promote_scale(pages, existing, scale_bar_feet_per_paper_inch=scale_bar_feet)
+
     stats.update(scale_promotion_audit_entries(result))
+    if result.ambiguous and result.reason:
+        gaps = list(stats.get("gaps_noticed") or [])
+        if result.reason not in gaps:
+            gaps.append(result.reason)
+        stats["gaps_noticed"] = gaps
     if not result.ambiguous:
         stats.pop("scale_ambiguous", None)
         stats.pop("scale_candidates", None)

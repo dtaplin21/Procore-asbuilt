@@ -99,10 +99,11 @@ def _filter_survey_rows_to_plan_viewports(
 
     kept: list[DrawingSurveyPoint] = []
     for row in rows:
-        if int(row.page) != 1:
+        page = cast(int, row.page)
+        if page != 1:
             # Multi-page: only keep if that page has a plan viewport containing the point.
             page_bboxes = _load_plan_viewport_bboxes(
-                session, drawing_id, page=int(row.page)
+                session, drawing_id, page=page
             )
             if not page_bboxes:
                 continue
@@ -258,9 +259,14 @@ def _linear_fit(
     return scale, translate
 
 
+def _survey_ne(row: DrawingSurveyPoint) -> tuple[float, float]:
+    return cast(float, row.northing), cast(float, row.easting)
+
+
 def _has_real_survey_coordinates(row: DrawingSurveyPoint) -> bool:
     """True when a row carries OCR N/E suitable for coordinate matching."""
-    if float(row.northing) == 0.0 and float(row.easting) == 0.0:
+    northing, easting = _survey_ne(row)
+    if northing == 0.0 and easting == 0.0:
         return False
     meta = row.meta_json if isinstance(row.meta_json, dict) else {}
     if meta.get("plain_text_fallback"):
@@ -381,14 +387,14 @@ def _match_control_points_by_ne(
     """Pair placed survey points that share the same N/E on aux and master sheets."""
     master_by_coord: dict[tuple[float, float], DrawingSurveyPoint] = {}
     for row in master_rows:
-        key = _survey_coord_key(float(row.northing), float(row.easting))
+        key = _survey_coord_key(*_survey_ne(row))
         master_by_coord.setdefault(key, row)
 
     pairs: list[ControlPointPair] = []
     seen_keys: set[tuple[float, float]] = set()
     matched_aux_ids: set[int] = set()
     for aux_row in aux_rows:
-        key = _survey_coord_key(float(aux_row.northing), float(aux_row.easting))
+        key = _survey_coord_key(*_survey_ne(aux_row))
         if key in seen_keys:
             continue
         master_row = master_by_coord.get(key)
@@ -402,12 +408,13 @@ def _match_control_points_by_ne(
 
         seen_keys.add(key)
         matched_aux_ids.add(cast(int, aux_row.id))
+        northing, easting = _survey_ne(aux_row)
         pairs.append(
             ControlPointPair(
                 aux_xy=aux_centroid,
                 master_xy=master_centroid,
-                northing=float(aux_row.northing),
-                easting=float(aux_row.easting),
+                northing=northing,
+                easting=easting,
                 station=cast(str | None, aux_row.station),
                 pairing_method="ne",
             )
@@ -449,12 +456,13 @@ def _match_control_points_by_station(
             continue
 
         seen_stations.add(station)
+        northing, easting = _survey_ne(aux_row)
         pairs.append(
             ControlPointPair(
                 aux_xy=aux_centroid,
                 master_xy=master_centroid,
-                northing=float(aux_row.northing),
-                easting=float(aux_row.easting),
+                northing=northing,
+                easting=easting,
                 station=cast(str | None, aux_row.station),
                 pairing_method="station",
             )

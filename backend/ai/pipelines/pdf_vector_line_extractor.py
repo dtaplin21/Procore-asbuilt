@@ -16,7 +16,12 @@ from ai.pipelines.line_extractor import (
     _merge_colinear_segments,
     _polyline_length_frac,
 )
-from ai.pipelines.sheet_entity_graph import DrawingViewport, SheetLine, assign_viewport_id
+from ai.pipelines.sheet_entity_graph import (
+    DrawingViewport,
+    LineTypingStatus,
+    SheetLine,
+    assign_viewport_id,
+)
 
 LineStyleKind = Literal["solid", "dashed", "dash_dot", "unknown"]
 
@@ -308,6 +313,8 @@ def chains_to_sheet_lines(
     *,
     line_type: str | None = None,
     legend_line_type_id: int | None = None,
+    line_typing_status: LineTypingStatus | None = None,
+    candidate_legend_line_type_ids: tuple[int, ...] = (),
 ) -> list[SheetLine]:
     lines: list[SheetLine] = []
     for chain in chains:
@@ -325,6 +332,8 @@ def chains_to_sheet_lines(
                 source="pdf_vector",
                 style_signature=style_signature_as_dict(chain.style),
                 legend_line_type_id=legend_line_type_id,
+                line_typing_status=line_typing_status,
+                candidate_legend_line_type_ids=candidate_legend_line_type_ids,
             )
         )
     return lines

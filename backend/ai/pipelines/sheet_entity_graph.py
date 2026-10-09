@@ -45,6 +45,14 @@ class SheetSymbol:
     detector: str  # yolo | manual | contour
 
 
+LineTypingStatus = Literal[
+    "typed",
+    "ambiguous_family",
+    "unmatched",
+    "no_templates",
+]
+
+
 @dataclass(frozen=True)
 class SheetLine:
     points: tuple[tuple[float, float], ...]
@@ -54,6 +62,8 @@ class SheetLine:
     source: str = "raster"  # raster | pdf_vector
     style_signature: dict[str, float | str] | None = None
     legend_line_type_id: int | None = None
+    line_typing_status: LineTypingStatus | None = None
+    candidate_legend_line_type_ids: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
