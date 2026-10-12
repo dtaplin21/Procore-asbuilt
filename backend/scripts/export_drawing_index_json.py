@@ -10,7 +10,7 @@ import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent
 if str(_BACKEND_ROOT) not in sys.path:
@@ -51,23 +51,28 @@ def _row_dict(row: Any, *, include: set[str] | None = None, exclude: set[str] | 
 
 def _gaps_for_drawing(drawing: Drawing, stats: dict[str, Any], *, survey_count: int) -> list[str]:
     gaps: list[str] = []
-    if not drawing.scale_json:
+    scale_json = cast(Any, drawing.scale_json)
+    if scale_json is None:
         gaps.append("drawings.scale_json is null; index_stats scale_found may still be false.")
     if stats.get("scale_found") is False:
         gaps.append("No drawing-level scale promoted (check drawing_viewports for per-viewport scale).")
     if survey_count == 0 or stats.get("survey_points", survey_count) == 0:
         gaps.append("No drawing_survey_points / station controls on master — aux→master registration from index alone.")
-    doc = stats.get("document_ai") if isinstance(stats.get("document_ai"), dict) else {}
+    doc_raw = stats.get("document_ai")
+    doc = doc_raw if isinstance(doc_raw, dict) else {}
     if doc.get("document_ai_cache_hit"):
         gaps.append("Document AI cache hit on this run — OCR tokens reused, not freshly billed.")
-    merge = stats.get("text_merge") if isinstance(stats.get("text_merge"), dict) else {}
+    merge_raw = stats.get("text_merge")
+    merge = merge_raw if isinstance(merge_raw, dict) else {}
     dropped = merge.get("dropped_count") or stats.get("text_merge_dropped_count")
     if dropped:
         gaps.append(f"Proximity merge dropped {dropped} token(s) (see index_stats text_merge).")
-    page_meta = drawing.page_meta_json if isinstance(drawing.page_meta_json, list) else []
+    page_meta_raw = cast(Any, drawing.page_meta_json)
+    page_meta = page_meta_raw if isinstance(page_meta_raw, list) else []
     if page_meta and isinstance(page_meta[0], dict) and page_meta[0].get("keyplan_bbox") is None:
         gaps.append("keyplan_bbox not detected on page meta.")
-    legend = stats.get("legend_index") if isinstance(stats.get("legend_index"), dict) else {}
+    legend_raw = stats.get("legend_index")
+    legend = legend_raw if isinstance(legend_raw, dict) else {}
     rows = legend.get("legend_line_rows") or []
     if len(rows) >= 4:
         b3 = (rows[2].get("label_bbox") if isinstance(rows[2], dict) else None) or {}
