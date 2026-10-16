@@ -1365,6 +1365,16 @@ class InspectionRunListResponse(BaseModel):
     offset: int
 
 
+class InspectionRunReprocessResponse(BaseModel):
+    """Queued re-investigation + match for an existing inspection run."""
+
+    inspection_run_id: int
+    job_id: int
+    status: str = "processing"
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
 class InspectionRunEvidenceUploadResponse(BaseModel):
     evidence_id: int
     overlays_created: int

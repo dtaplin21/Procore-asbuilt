@@ -133,8 +133,16 @@ class Settings(BaseSettings):
     pdf_link_follow_max_external: int = Field(default=5, description="PDF_LINK_FOLLOW_MAX_EXTERNAL")
     #: Max external link fetches during match-time PDF investigation. Env: ``PDF_LINK_FOLLOW_MAX_EXTERNAL_MATCH``.
     pdf_link_follow_max_external_match: int = Field(
-        default=10,
+        default=20,
         description="PDF_LINK_FOLLOW_MAX_EXTERNAL_MATCH",
+    )
+    pdf_link_merge_word_budget: int = Field(
+        default=6000,
+        description="PDF_LINK_MERGE_WORD_BUDGET",
+    )
+    pdf_link_merge_word_budget_match: int = Field(
+        default=30_000,
+        description="PDF_LINK_MERGE_WORD_BUDGET_MATCH",
     )
     #: Max nested hyperlink depth when following PDF links. Env: ``PDF_LINK_FOLLOW_MAX_DEPTH``.
     pdf_link_follow_max_depth: int = Field(default=2, description="PDF_LINK_FOLLOW_MAX_DEPTH")

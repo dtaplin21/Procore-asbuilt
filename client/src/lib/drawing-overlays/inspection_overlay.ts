@@ -50,9 +50,28 @@ export function overlayColorsForTone(tone: OverlayInspectionTone, selected: bool
   };
 }
 
-/** Thin stroke for utility-line polylines so overlays match drawing linework weight. */
+/** Default stroke for non-utility polylines (tone-colored). */
 export function utilityPolylineStrokeWidth(selected: boolean): number {
   return selected ? 2 : 1.5;
+}
+
+/** Marker-style yellow highlight: wide, semi-transparent, multiply blend so sheet linework shows through. */
+export function utilityPolylineHighlightStyle(selected: boolean): {
+  stroke: string;
+  strokeWidth: number;
+  mixBlendMode: "multiply";
+  labelFill: string;
+} {
+  return {
+    stroke: selected ? "rgba(250, 204, 21, 0.58)" : "rgba(250, 204, 21, 0.5)",
+    strokeWidth: selected ? 14 : 11,
+    mixBlendMode: "multiply",
+    labelFill: "#a16207",
+  };
+}
+
+export function isUtilityLineScope(scopeKind: string | null | undefined): boolean {
+  return scopeKind?.trim().toLowerCase() === "utility_line";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

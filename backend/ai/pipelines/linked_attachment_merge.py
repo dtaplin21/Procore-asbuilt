@@ -38,6 +38,13 @@ PRIORITY_FILENAME_PATTERNS = [
     r"\bsheet\b",
     r"\bmarkup\b",
     r"\bredline\b",
+    r"\bsewer\b",
+    r"\bsanitary\b",
+    r"\bstorm\b",
+    r"\bunderground\b",
+    r"\bumr\b",
+    r"\bc4\.?20\b",
+    r"\bepd\b",
 ]
 
 # Filenames matching these patterns get deprioritized: typically long,

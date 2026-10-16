@@ -4,8 +4,8 @@
 ``page.rotation_matrix`` maps them to the rendered orientation; ``page.rect`` is
 the normalizing size (post-rotation), matching ``page.get_pixmap`` / viewer PNGs.
 
-Vector geometry uses ``pdf_display_space`` (``transformation_matrix``); native
-text uses this module until both paths are unified.
+Vector geometry and native text both use ``rotation_matrix`` via
+``pdf_display_space`` / this module.
 """
 
 from __future__ import annotations

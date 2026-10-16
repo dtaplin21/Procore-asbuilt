@@ -14,6 +14,7 @@ from pathlib import Path
 import fitz
 
 from ai.pipelines.linked_attachment_merge import (
+    LINKED_CONTENT_WORD_BUDGET,
     LinkedAttachment,
     merge_linked_attachments_within_budget,
 )
@@ -66,6 +67,9 @@ class LinkFollowResult:
     skipped_count: int = 0
     errors: list[str] = field(default_factory=list)
     fetched_pdfs: list[FetchedLinkedPdf] = field(default_factory=list)
+    merge_included: list[str] = field(default_factory=list)
+    merge_truncated: list[str] = field(default_factory=list)
+    merge_dropped: list[str] = field(default_factory=list)
 
 
 def extract_pdf_hyperlinks(file_path: str | Path) -> list[PdfHyperlink]:
@@ -88,6 +92,7 @@ def follow_pdf_links(
     *,
     max_external: int | None = None,
     max_depth: int | None = None,
+    merge_word_budget: int | None = None,
     procore_context: ProcoreFetchContext | None = None,
 ) -> LinkFollowResult:
     """Enumerate and follow hyperlinks in a PDF. Non-PDF files return empty result."""
@@ -118,12 +123,18 @@ def follow_pdf_links(
         )
         return LinkFollowResult(errors=["hyperlink extraction failed"])
 
+    word_budget = (
+        int(merge_word_budget)
+        if merge_word_budget is not None
+        else int(settings.pdf_link_merge_word_budget)
+    )
     result = _follow_links(
         path,
         links,
         max_external=external_limit,
         max_depth=depth_limit,
         depth=0,
+        merge_word_budget=word_budget,
         procore_context=procore_context,
     )
     logger.info(
@@ -244,6 +255,7 @@ def _follow_links(
     depth: int = 0,
     fetch_budget: list[int] | None = None,
     visited_urls: set[str] | None = None,
+    merge_word_budget: int | None = None,
     procore_context: ProcoreFetchContext | None = None,
 ) -> LinkFollowResult:
     result = LinkFollowResult()
@@ -400,8 +412,15 @@ def _follow_links(
             result.skipped_count += 1
 
     if attachments:
-        merge_result = merge_linked_attachments_within_budget(attachments)
+        budget = merge_word_budget if merge_word_budget is not None else LINKED_CONTENT_WORD_BUDGET
+        merge_result = merge_linked_attachments_within_budget(
+            attachments,
+            word_budget=budget,
+        )
         result.supplemental_text = merge_result["merged_text"]
+        result.merge_included = list(merge_result.get("included") or [])
+        result.merge_truncated = list(merge_result.get("truncated") or [])
+        result.merge_dropped = list(merge_result.get("dropped") or [])
         logger.info(
             "pdf_link_merge_complete",
             extra={

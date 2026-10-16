@@ -8,7 +8,7 @@
  */
 
 import type { InspectionRun as SchemaInspectionRun } from "@shared/schema";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, RefreshCw, Trash2 } from "lucide-react";
 
 import {
   AlertDialog,
@@ -91,6 +91,9 @@ export type InspectionRunHistoryRowProps = {
   onSelect?: never;
   onDelete?: (runId: number) => void;
   deletePending?: boolean;
+  onReprocess?: (runId: number) => void;
+  reprocessPending?: boolean;
+  reprocessPendingRunId?: number | null;
 };
 
 export type InspectionRunPanelRowProps = {
@@ -100,9 +103,65 @@ export type InspectionRunPanelRowProps = {
   onSelect?: (runId: number) => void;
   onDelete?: (runId: number) => void;
   deletePending?: boolean;
+  onReprocess?: (runId: number) => void;
+  reprocessPending?: boolean;
+  reprocessPendingRunId?: number | null;
 };
 
 export type InspectionRunRowProps = InspectionRunPanelRowProps | InspectionRunHistoryRowProps;
+
+function ReprocessInspectionRunButton({
+  runId,
+  disabled,
+  pending,
+  onReprocess,
+  variant = "history",
+}: {
+  runId: number;
+  disabled?: boolean;
+  pending?: boolean;
+  onReprocess?: (runId: number) => void;
+  variant?: "history" | "panel";
+}) {
+  if (!onReprocess) {
+    return null;
+  }
+
+  const label = pending ? "Re-running…" : "Re-run inspection";
+
+  if (variant === "panel") {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="h-8 w-8 shrink-0"
+        disabled={disabled || pending}
+        title={label}
+        aria-label={label}
+        data-testid={`inspection-run-reprocess-${runId}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onReprocess(runId);
+        }}
+      >
+        <RefreshCw className={`h-3.5 w-3.5 ${pending ? "animate-spin" : ""}`} />
+      </Button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="text-sm text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+      disabled={disabled || pending}
+      data-testid={`inspection-run-reprocess-${runId}`}
+      onClick={() => onReprocess(runId)}
+    >
+      {label}
+    </button>
+  );
+}
 
 function DeleteInspectionRunButton({
   runId,
@@ -176,6 +235,9 @@ function InspectionRunHistoryRow({
   projectId,
   onDelete,
   deletePending = false,
+  onReprocess,
+  reprocessPending = false,
+  reprocessPendingRunId = null,
 }: InspectionRunHistoryRowProps) {
   const masterDrawingId = String(run.master_drawing_id);
   const runId = String(run.id);
@@ -259,6 +321,12 @@ function InspectionRunHistoryRow({
         <a href={viewOnDrawingUrl} data-testid="view-on-drawing-link">
           View on drawing
         </a>
+        <ReprocessInspectionRunButton
+          runId={run.id}
+          onReprocess={onReprocess}
+          disabled={run.evidence_id == null || run.status === "processing" || run.status === "queued"}
+          pending={reprocessPending && reprocessPendingRunId === run.id}
+        />
         <DeleteInspectionRunButton
           runId={run.id}
           runLabel={historyTitle(run)}
@@ -276,6 +344,9 @@ function InspectionRunPanelRow({
   onSelect,
   onDelete,
   deletePending = false,
+  onReprocess,
+  reprocessPending = false,
+  reprocessPendingRunId = null,
 }: InspectionRunPanelRowProps) {
   const label = run.inspection_type?.trim() || `Run #${run.id}`;
   const timestamp = formatRunTimestamp(run.completed_at ?? run.started_at ?? run.created_at);
@@ -314,7 +385,14 @@ function InspectionRunPanelRow({
           <p className="mt-1 line-clamp-2 text-xs text-destructive">{run.error_message}</p>
         ) : null}
       </button>
-      <div className="flex shrink-0 items-start py-2 pr-2">
+      <div className="flex shrink-0 items-start gap-1 py-2 pr-2">
+        <ReprocessInspectionRunButton
+          runId={run.id}
+          onReprocess={onReprocess}
+          disabled={run.evidence_id == null || run.status === "processing" || run.status === "queued"}
+          pending={reprocessPending && reprocessPendingRunId === run.id}
+          variant="panel"
+        />
         <DeleteInspectionRunButton
           runId={run.id}
           runLabel={label}
@@ -335,6 +413,9 @@ export function InspectionRunRow(props: InspectionRunRowProps) {
         projectId={props.projectId}
         onDelete={props.onDelete}
         deletePending={props.deletePending}
+        onReprocess={props.onReprocess}
+        reprocessPending={props.reprocessPending}
+        reprocessPendingRunId={props.reprocessPendingRunId}
       />
     );
   }
@@ -345,6 +426,9 @@ export function InspectionRunRow(props: InspectionRunRowProps) {
       onSelect={props.onSelect}
       onDelete={props.onDelete}
       deletePending={props.deletePending}
+      onReprocess={props.onReprocess}
+      reprocessPending={props.reprocessPending}
+      reprocessPendingRunId={props.reprocessPendingRunId}
     />
   );
 }

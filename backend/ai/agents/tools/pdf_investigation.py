@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_TEXT_PREVIEW_CHARS = 500
+_TEXT_PREVIEW_CHARS = 2000
 _IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}
 
 
@@ -79,6 +79,7 @@ def follow_and_capture_links(
     *,
     max_external: int | None = None,
     max_depth: int | None = None,
+    merge_word_budget: int | None = None,
     procore_context: ProcoreFetchContext | None = None,
 ) -> LinkFollowResult:
     """Follow hyperlinks and capture supplemental text + fetched PDF bodies."""
@@ -86,6 +87,7 @@ def follow_and_capture_links(
         file_path,
         max_external=max_external,
         max_depth=max_depth,
+        merge_word_budget=merge_word_budget,
         procore_context=procore_context,
     )
 
@@ -310,8 +312,9 @@ def run_pdf_investigation(
 
     link_result = follow_and_capture_links(
         file_path,
-        max_external=settings.pdf_link_follow_max_external_match,
+        max_external=max_links,
         max_depth=settings.pdf_link_follow_max_depth,
+        merge_word_budget=settings.pdf_link_merge_word_budget_match,
         procore_context=procore_context,
     )
     errors.extend(link_result.errors)

@@ -50,7 +50,7 @@ def test_build_aux_survey_polyline_orders_vertices_by_chainage() -> None:
     assert result.points[0][0] < result.points[1][0] < result.points[2][0]
 
 
-def test_build_aux_survey_polyline_requires_three_points_in_range() -> None:
+def test_build_aux_survey_polyline_requires_min_points_in_range() -> None:
     scoped_points = (
         _point(drawing_id=1084, station="10+00", x0=0.08, y0=0.18, x1=0.12, y1=0.22),
         _point(drawing_id=1084, station="10+90.95", x0=0.27, y0=0.26, x1=0.31, y1=0.28),
@@ -61,9 +61,18 @@ def test_build_aux_survey_polyline_requires_three_points_in_range() -> None:
             scoped_points,
             station_from="10+00",
             station_to="10+90.95",
+            min_points=3,
         )
         is None
     )
+    two_point = build_aux_survey_polyline(
+        scoped_points,
+        station_from="10+00",
+        station_to="10+90.95",
+        min_points=2,
+    )
+    assert two_point is not None
+    assert len(two_point.points) == 2
 
 
 def test_build_aux_survey_polyline_picks_drawing_with_most_in_range_points() -> None:

@@ -1,0 +1,88 @@
+{
+  "drawing_id": 1722,
+  "indexed_at": "2026-10-09T16:09:31.204146",
+  "index_status": "ready",
+  "question": "Why did re-index appear to stop at regions and not produce polylines?",
+  "short_answer": "The OCR/index phase finished through regions and legend rows. Sheet digitization did run and stored 2000 PDF vector polylines, but zero legend templates linked, so there are no utility-typed polylines (legend_line_type_id) and no label-seeded utility runs.",
+  "pipeline_stages": {
+    "1_index_master_drawing": {
+      "completed": true,
+      "text_elements": 1116,
+      "regions": 144,
+      "legend_line_rows": 9,
+      "scale_status": "corroborated",
+      "scale": "1 INCH = 20 FT",
+      "survey_points": 0,
+      "landmarks": 17,
+      "note": "Regions are built inside index_master_drawing after text + legend clustering; this is not the last step."
+    },
+    "2_viewport_seed": {
+      "completed": true,
+      "viewports": 1,
+      "viewport_kind": "profile",
+      "warning": "Only a profile viewport was seeded (not plan). plan_bbox was unused for chain storage tiers."
+    },
+    "3_sheet_digitization": {
+      "completed": true,
+      "requires": "SHEET_DIGITIZATION_ENABLED=true",
+      "pdf_line_source": "vector",
+      "lines_persisted_in_sheetEntityGraph": 2000,
+      "chains_classified_total": 8299,
+      "chain_typing_counts": { "no_templates": 8299 },
+      "chain_storage_tiers": {
+        "tier1": 0,
+        "tier2": 0,
+        "tier3": 0,
+        "tier4": 0,
+        "tier5": 8299,
+        "selected": 2000,
+        "dropped": 6299
+      }
+    },
+    "4_utility_typed_polylines": {
+      "completed": false,
+      "reason": "All 9 legend rows failed swatch extraction; no LegendLineTemplate objects; label_seeded_trace not populated."
+    }
+  },
+  "root_cause_legend_templates": {
+    "symptom": "legend_template_diagnostics: all 9 rows skipped with swatch_style_found=false",
+    "skip_reason": "no vector segments inside swatch bbox",
+    "meaning": "extract_swatch_style requires PDF vector segments fully inside each swatch_bbox. On Master.pdf, zero segments fall inside those boxes at legend Y (~0.05–0.11, X ~0.72–0.78).",
+    "live_pdf_check": {
+      "total_vector_segments_after_titleblock_filter": 40439,
+      "segments_fully_inside_sewer_row_swatch_bbox": 0,
+      "segments_center_in_sewer_swatch_bbox": 0,
+      "likely_causes": [
+        "Legend swatch graphics are not stroked PDF vectors at those coordinates (raster/xobject or different layer).",
+        "Remaining native_pdf vs pdf_vector_line_extractor display-frame mismatch for legend column geometry (text bboxes align; vectors at legend stubs do not).",
+        "Swatch bboxes still misaligned (e.g. x0 0.724 vs real stubs ~0.7406) — even partial overlap would not satisfy fully-inside rule."
+      ]
+    },
+    "downstream": [
+      "chain_typing_counts no_templates → every stored line has line_typing_status=no_templates, legend_line_type_id=null",
+      "enrich_ambiguous_chain_typings never runs meaningfully (no templates / no style_filter per code)",
+      "Scope/inspection utility polyline tracing has no typed SS/FW/E family to follow"
+    ]
+  },
+  "what_you_have_vs_missing": {
+    "have": [
+      "144 drawing_regions rows",
+      "1116 drawing_text_elements",
+      "2000 untyped pdf_vector SheetLine polylines in index_stats_json.sheetEntityGraph.page.1",
+      "Corroborated 1\"=20' scale on drawing.scale_json"
+    ],
+    "missing_for_utility_polyline": [
+      "legend_line_templates in digitization meta",
+      "legend_line_type_id on lines",
+      "label_seeded_trace stats",
+      "Merged TracedRun polylines (Step 4) — not invoked as separate persisted artifact today"
+    ]
+  },
+  "if_digitization_disabled": {
+    "note": "If SHEET_DIGITIZATION_ENABLED=false, index would stop after regions/scale with no sheetEntityGraph lines at all. Your run has sheetEntityGraph → digitization was enabled."
+  },
+  "export_files": {
+    "full_index": "Notes/drawing-1722-full-index-export.json",
+    "this_analysis": "Notes/drawing-1722-index-polyline-analysis.json"
+  }
+}

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import cast
 
 import fitz
+import pytest
 
 from ai.pipelines.legend_line_row_builder import LegendLineRow, cluster_legend_line_rows
 from ai.pipelines.legend_line_swatch import (
@@ -13,6 +14,7 @@ from ai.pipelines.legend_line_swatch import (
     SwatchStyleForMatch,
     build_legend_line_templates,
     classify_chains_with_templates,
+    extract_swatch_style_for_bbox,
     extract_swatch_template,
     legend_line_templates_to_meta,
 )
@@ -34,8 +36,8 @@ def _write_legend_swatch_pdf(path: Path) -> tuple[float, float, float, float]:
     page.draw_line((88, 48), (104, 48), width=0.72, color=(0, 0, 0))
     doc.save(str(path))
     doc.close()
-    # Display-space Y is flipped vs PDF user Y (see pdf_display_space).
-    return (0.03, 0.88, 0.15, 0.95)
+    # Display frame uses rotation_matrix (same orientation as PNG / native text).
+    return (0.03, 0.05, 0.15, 0.12)
 
 
 def test_extract_swatch_template_from_bbox(tmp_path: Path) -> None:
@@ -164,3 +166,20 @@ def test_legend_line_templates_to_meta() -> None:
     )
     assert meta[0]["abbreviation_code"] == "W"
     assert meta[0]["style"]["kind_guess"] == "dashed"
+
+
+_MASTER_1722_PDF = (
+    Path(__file__).resolve().parents[1]
+    / "uploads/projects/1348/drawings/213463639cc949cda3e2356abe5c560d_Master.pdf"
+)
+
+
+@pytest.mark.skipif(not _MASTER_1722_PDF.is_file(), reason="Master.pdf fixture not on disk")
+def test_master_1722_sewer_swatch_vectors_align_with_text_bbox() -> None:
+    """Legend swatch bboxes (from OCR) must overlap vector stubs after rotation_matrix fix."""
+    bbox = (0.72402364, 0.093491122, 0.78402364, 0.10118343)
+    style = extract_swatch_style_for_bbox(_MASTER_1722_PDF, bbox)
+    assert style is not None
+    assert style.color == (115, 115, 115)
+    assert abs(style.stroke_width_bucket - 0.72) < 0.05
+    assert style.signature.kind_guess == "dashed"

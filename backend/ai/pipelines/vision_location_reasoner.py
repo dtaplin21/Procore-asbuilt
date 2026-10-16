@@ -49,7 +49,7 @@ def build_dossier_summary(dossier: EvidenceDossier) -> str:
     ]
     parts = [
         f"evidence_kind={dossier.evidence_kind.value}",
-        f"evidence_text={dossier.evidence_text[:1200]}",
+        f"evidence_text={dossier.reasoning_text or dossier.evidence_text[:1200]}",
         "expanded_clues:",
         *(clue_lines or ["(none)"]),
     ]

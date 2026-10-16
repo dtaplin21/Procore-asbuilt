@@ -16,7 +16,11 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveProject } from "@/contexts/active_project_context";
-import { useDeleteInspectionRun, useInspectionRuns } from "@/hooks/use-inspection-runs";
+import {
+  useDeleteInspectionRun,
+  useInspectionRuns,
+  useReprocessInspectionRun,
+} from "@/hooks/use-inspection-runs";
 import { toast } from "@/hooks/use-toast";
 import { replaceDashboardProjectIdInUrl } from "@/lib/active_project";
 import {
@@ -57,6 +61,30 @@ export default function Inspections() {
 
   const { mutate: deleteInspectionRun, isPending: deletePending } =
     useDeleteInspectionRun(selectedProjectId);
+  const {
+    mutate: reprocessInspectionRun,
+    isPending: reprocessPending,
+    variables: reprocessRunId,
+  } = useReprocessInspectionRun(selectedProjectId);
+
+  const handleReprocessRun = (runId: number) => {
+    reprocessInspectionRun(runId, {
+      onSuccess: () => {
+        toast({
+          title: "Re-running inspection",
+          description:
+            "Following linked files and re-matching on the master drawing. Status will update when processing finishes.",
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Re-run failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      },
+    });
+  };
 
   const handleDeleteRun = (runId: number) => {
     deleteInspectionRun(runId, {
@@ -260,6 +288,9 @@ export default function Inspections() {
               projectId={String(selectedProjectId)}
               onDelete={handleDeleteRun}
               deletePending={deletePending}
+              onReprocess={handleReprocessRun}
+              reprocessPending={reprocessPending}
+              reprocessPendingRunId={reprocessRunId ?? null}
             />
           ))}
         </ul>

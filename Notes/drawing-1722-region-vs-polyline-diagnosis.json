@@ -1,0 +1,50 @@
+{
+  "symptom": "UI shows a small region/circle, not a utility polyline",
+  "drawing_id": 1722,
+  "inspection_run_id": 692,
+  "root_causes": [
+    {
+      "id": "stale_overlay",
+      "severity": "primary_for_current_ui",
+      "detail": "drawing_overlays id=486 was created 2026-10-01, before the 2026-10-11 re-index. Re-index does not re-run inspection matching.",
+      "evidence": {
+        "overlay_id": 486,
+        "created_at": "2026-10-01T06:59:10",
+        "master_indexed_at": "2026-10-11T20:31:14",
+        "geometry_type": "rect",
+        "geometry_size_frac": "width~0.009 height~0.017 (reads as a dot/circle)",
+        "region_id": null
+      }
+    },
+    {
+      "id": "missing_plan_viewport",
+      "severity": "blocked_sheet_line_scope",
+      "detail": "Only OCR viewport kind=profile was seeded. scope_line_tracer._best_plan_sheet_line required kind=plan, so typed SS sheet lines were never used for overlay scope.",
+      "evidence": {
+        "viewports": [{"viewport_id": "profile", "kind": "profile", "y0": 0.45, "y1": 0.94}],
+        "typed_ss_lines_in_graph": 15,
+        "typed_line_viewport_ids": "mostly profile (vertical profile cuts, not plan sewer run)"
+      }
+    },
+    {
+      "id": "region_layer_vs_overlay",
+      "severity": "ux_confusion",
+      "detail": "Auto-index drawing_regions (144 rects) render on the region layer. Inspection overlay is separate; stale rect overlay + region highlight can look like 'only a circle' with no polyline."
+    }
+  ],
+  "re_index_status_2026_10_11": {
+    "legend_templates": 3,
+    "label_seeded_trace_resolved_chains": 32,
+    "stored_lines": 2000,
+    "stored_typed_ss_lines": 15,
+    "note": "Digitization improved; inspection overlay was not refreshed."
+  },
+  "fixes_applied_in_code": [
+    "viewport_seeding: if OCR finds PROFILE but not PLAN on plan/profile sheets, use layout plan+profile fallback",
+    "scope_line_tracer: when no plan viewport in graph, accept typed lines in plan Y band (0.10–0.55)"
+  ],
+  "required_user_actions": [
+    "Re-index drawing 1722 once more (to seed plan+profile viewports and refresh sheetEntityGraph viewports)",
+    "Re-run inspection location match for run 692 (or delete overlay 486 and rematch)"
+  ]
+}

@@ -86,6 +86,7 @@ def _mock_dossier(
         clues=(),
         expanded_clues=expanded_clues,
         evidence_text="Underground Sanitary Sewer at COLO",
+        reasoning_text="Underground Sanitary Sewer at COLO",
         base_text="Underground Sanitary Sewer at COLO",
         evidence_kind=EvidenceKind.FORM,
         linked_attachments=(

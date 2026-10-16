@@ -55,6 +55,7 @@ class InspectionLocationAgent:
         master_drawing_id: int,
         page: int = 1,
         inspection_run_id: int | None = None,
+        force_investigate: bool = False,
     ) -> AgentMatchResult:
         """Investigate evidence and resolve a scoped overlay on the master drawing."""
         readiness = get_master_drawing_index_readiness(session, master_drawing_id)
@@ -87,6 +88,7 @@ class InspectionLocationAgent:
             master_drawing_id=master_drawing_id,
             page=page,
             investigate=True,
+            force_investigate=force_investigate,
         )
 
         if _auxiliary_drawings_need_index(session, dossier):
@@ -276,29 +278,40 @@ def _resolve_scope_source_drawing_id(
     master_drawing_id: int,
     registration_transform: RegistrationTransform | None,
 ) -> int | None:
-    """Prefer the aux sheet used for station range when registration can project to master."""
-    if registration_transform is None:
-        if (
-            winner_source_drawing_id is not None
-            and int(winner_source_drawing_id) == int(master_drawing_id)
-        ):
-            return int(master_drawing_id)
-        return None
-
+    """Prefer the aux sheet used for station range when building utility scope."""
     meta = cast(dict[str, Any] | None, getattr(dossier.evidence, "meta", None))
+    station_range_aux_id: int | None = None
     if isinstance(meta, dict):
         raw_station_source = meta.get("station_range_source_drawing_id")
         if raw_station_source is not None:
             try:
-                return int(raw_station_source)
+                station_range_aux_id = int(raw_station_source)
             except (TypeError, ValueError):
-                pass
+                station_range_aux_id = None
 
-        reg_aux_id = _registration_aux_drawing_id_from_meta(meta)
-        if reg_aux_id is not None:
-            return reg_aux_id
+    if registration_transform is not None:
+        if isinstance(meta, dict):
+            reg_aux_id = _registration_aux_drawing_id_from_meta(meta)
+            if reg_aux_id is not None:
+                return reg_aux_id
+        if station_range_aux_id is not None and station_range_aux_id != int(
+            master_drawing_id
+        ):
+            return station_range_aux_id
+        return winner_source_drawing_id
 
-    return winner_source_drawing_id
+    if (
+        station_range_aux_id is not None
+        and station_range_aux_id != int(master_drawing_id)
+    ):
+        return station_range_aux_id
+
+    if (
+        winner_source_drawing_id is not None
+        and int(winner_source_drawing_id) == int(master_drawing_id)
+    ):
+        return int(master_drawing_id)
+    return None
 
 
 def _fallback_fused_score_for_master_placement(

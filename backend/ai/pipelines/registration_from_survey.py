@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import math
 import re
 from dataclasses import dataclass
@@ -69,6 +70,99 @@ def _load_plan_viewport_bboxes(
             )
         )
     return bboxes
+
+
+def _load_profile_viewport_bboxes(
+    session: Session,
+    drawing_id: int,
+    *,
+    page: int = 1,
+) -> list[tuple[float, float, float, float]]:
+    rows = (
+        session.query(DrawingViewportRow)
+        .filter(
+            DrawingViewportRow.drawing_id == int(drawing_id),
+            DrawingViewportRow.page == int(page),
+            DrawingViewportRow.kind == "profile",
+        )
+        .all()
+    )
+    bboxes: list[tuple[float, float, float, float]] = []
+    for row in rows:
+        bbox = cast(dict[str, Any], row.bbox_json)
+        bboxes.append(
+            (
+                float(bbox["x0"]),
+                float(bbox["y0"]),
+                float(bbox["x1"]),
+                float(bbox["y1"]),
+            )
+        )
+    return bboxes
+
+
+def _bbox_for_centroid(x: float, y: float, *, half: float = 0.004) -> dict[str, float]:
+    return {
+        "x0": x - half,
+        "y0": y - half,
+        "x1": x + half,
+        "y1": y + half,
+    }
+
+
+def _profile_station_to_plan_xy(
+    profile_xy: tuple[float, float],
+    *,
+    plan_bboxes: Sequence[tuple[float, float, float, float]],
+) -> tuple[float, float]:
+    """Map profile-band station X onto the plan viewport (composite plan/profile sheets)."""
+    plan_x = profile_xy[0]
+    plan_y = sum((y0 + y1) / 2.0 for _x0, y0, _x1, y1 in plan_bboxes) / len(plan_bboxes)
+    return clamp_point_to_page((plan_x, plan_y))
+
+
+def _master_rows_for_plan_registration(
+    session: Session,
+    rows: Sequence[DrawingSurveyPoint],
+    *,
+    drawing_id: int,
+) -> list[DrawingSurveyPoint]:
+    """Plan-only registration rows; promote profile station labels to plan band when needed."""
+    in_plan = _filter_survey_rows_to_plan_viewports(
+        session, rows, drawing_id=int(drawing_id)
+    )
+    if len(in_plan) >= 2:
+        return in_plan
+
+    plan_bboxes = _load_plan_viewport_bboxes(session, int(drawing_id), page=1)
+    if not plan_bboxes:
+        return list(rows)
+
+    profile_bboxes = _load_profile_viewport_bboxes(session, int(drawing_id), page=1)
+    by_station: dict[str, DrawingSurveyPoint] = {}
+    for row in in_plan:
+        station = _normalize_station(cast(str | None, row.station))
+        if station is not None:
+            by_station[station] = row
+
+    for row in rows:
+        station = _normalize_station(cast(str | None, row.station))
+        if station is None or station in by_station:
+            continue
+        centroid = _bbox_centroid(cast(dict[str, float], row.label_bbox_json))
+        if centroid is None:
+            continue
+        if _point_in_any_bbox(centroid, plan_bboxes):
+            by_station[station] = row
+            continue
+        if profile_bboxes and not _point_in_any_bbox(centroid, profile_bboxes):
+            continue
+        plan_xy = _profile_station_to_plan_xy(centroid, plan_bboxes=plan_bboxes)
+        cloned = copy.copy(row)
+        setattr(cloned, "label_bbox_json", _bbox_for_centroid(plan_xy[0], plan_xy[1]))
+        by_station[station] = cloned
+
+    return list(by_station.values())
 
 
 def _point_in_any_bbox(
@@ -506,7 +600,7 @@ def match_control_points(
     aux_rows = _filter_survey_rows_to_plan_viewports(
         session, aux_rows, drawing_id=int(aux_drawing_id)
     )
-    master_rows = _filter_survey_rows_to_plan_viewports(
+    master_rows = _master_rows_for_plan_registration(
         session, master_rows, drawing_id=int(master_drawing_id)
     )
 

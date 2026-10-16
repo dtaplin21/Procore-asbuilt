@@ -44,6 +44,7 @@ def _minimal_dossier(*, evidence_text: str = "") -> EvidenceDossier:
             ),
         ),
         evidence_text=evidence_text,
+        reasoning_text=evidence_text,
         base_text=evidence_text,
         evidence_kind=EvidenceKind.FORM,
         linked_attachments=(),

@@ -198,6 +198,35 @@ export function evidenceFileDownloadUrl(
   );
 }
 
+export interface ReprocessInspectionRunResult {
+  inspection_run_id: number;
+  job_id: number;
+  status: string;
+}
+
+/** Re-follow linked PDFs and re-run match pipeline without re-uploading evidence. */
+export async function reprocessInspectionRun(
+  projectId: string,
+  runId: string,
+): Promise<ReprocessInspectionRunResult> {
+  const response = await fetch(
+    resolveFetchUrl(
+      `/api/projects/${encodeURIComponent(projectId)}/inspections/runs/${encodeURIComponent(runId)}/reprocess`,
+    ),
+    {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Idempotency-Key": crypto.randomUUID(),
+      },
+    },
+  );
+  return parseJsonOrThrow<ReprocessInspectionRunResult>(
+    response,
+    "Re-running inspection processing",
+  );
+}
+
 export async function deleteInspectionRun(
   projectId: string,
   runId: string,

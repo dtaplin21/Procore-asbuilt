@@ -5,7 +5,9 @@ import {
   polygonPointsToSvgString,
 } from "@/lib/drawing-overlays/geometry";
 import {
+  isUtilityLineScope,
   overlayColorsForTone,
+  utilityPolylineHighlightStyle,
   utilityPolylineStrokeWidth,
   type OverlayInspectionTone,
 } from "@/lib/drawing-overlays/inspection_overlay";
@@ -79,6 +81,9 @@ export default function OverlayShape({
   if (region.kind === "polyline") {
     const points = normalizedPointsToPixels(region.points, viewerSize);
     const pointsString = polygonPointsToSvgString(points);
+    const utilityHighlight = isUtilityLineScope(region.source.scopeKind)
+      ? utilityPolylineHighlightStyle(selected)
+      : null;
     const polylineStroke = utilityPolylineStrokeWidth(selected);
 
     return (
@@ -86,21 +91,27 @@ export default function OverlayShape({
         data-testid={`overlay-group-${index}`}
         data-overlay-id={regionId != null ? String(regionId) : undefined}
         data-focused={selected ? "true" : "false"}
+        data-overlay-highlight={utilityHighlight ? "utility-marker" : undefined}
       >
         <polyline
           points={pointsString}
           fill="none"
-          stroke={stroke}
-          strokeWidth={polylineStroke}
+          stroke={utilityHighlight?.stroke ?? stroke}
+          strokeWidth={utilityHighlight?.strokeWidth ?? polylineStroke}
           strokeLinecap="round"
           strokeLinejoin="round"
+          style={
+            utilityHighlight
+              ? { mixBlendMode: utilityHighlight.mixBlendMode }
+              : undefined
+          }
           data-testid={`overlay-polyline-${index}`}
         />
         {caption && points[0] ? (
           <text
             x={points[0].x + 4}
             y={Math.max(12, points[0].y - 6)}
-            fill={stroke}
+            fill={utilityHighlight?.labelFill ?? stroke}
             fontSize={11}
             fontWeight={600}
             data-testid={`overlay-label-${index}`}

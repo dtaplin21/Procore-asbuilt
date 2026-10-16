@@ -39,11 +39,12 @@ def test_native_pdf_extraction_uses_rotation_not_transformation_matrix() -> None
     page.insert_text((100, 400), "TICK", fontsize=12)
     raw = page.get_text("words")[0]
     x0, y0, x1, y1 = raw[0], raw[1], raw[2], raw[3]
-    wrong = pdf_rect_to_display_fractional(page, x0, y0, x1, y1)
+    display_rect = pdf_rect_to_display_fractional(page, x0, y0, x1, y1)
     fixed = native_words_display_fractional(page)
     assert fixed
     assert fixed[0].text == "TICK"
-    assert abs(fixed[0].cx - (wrong[0] + wrong[2]) / 2) > 0.05
+    assert abs(fixed[0].cx - (display_rect[0] + display_rect[2]) / 2) < 0.01
+    assert abs(fixed[0].cy - (display_rect[1] + display_rect[3]) / 2) < 0.01
     doc.close()
 
 

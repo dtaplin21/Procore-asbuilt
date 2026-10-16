@@ -71,6 +71,7 @@ def _dossier(
             ),
         ),
         evidence_text=evidence_text,
+        reasoning_text=evidence_text,
         base_text=evidence_text,
         evidence_kind=EvidenceKind.FORM,
         linked_attachments=(),

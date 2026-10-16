@@ -51,6 +51,24 @@ describe("InspectionRunRow history mode", () => {
     expect(screen.getByTestId("inspection-run-delete-42")).toBeInTheDocument();
   });
 
+  it("renders re-run control when onReprocess is provided and evidence exists", () => {
+    const onReprocess = vi.fn();
+    render(
+      <ul>
+        <InspectionRunRow
+          run={buildRun({ id: 42, evidence_id: 99 })}
+          projectId="p1"
+          onReprocess={onReprocess}
+        />
+      </ul>,
+    );
+    expect(screen.getByTestId("inspection-run-reprocess-42")).toHaveTextContent(
+      "Re-run inspection",
+    );
+    fireEvent.click(screen.getByTestId("inspection-run-reprocess-42"));
+    expect(onReprocess).toHaveBeenCalledWith(42);
+  });
+
   it("renders without a region label or link when the run has no region", () => {
     renderHistoryRow(buildRun({ region_id: null, region_label: null }), "p1");
     expect(screen.queryByTestId("inspection-run-region-label")).not.toBeInTheDocument();

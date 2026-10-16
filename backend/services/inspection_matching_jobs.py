@@ -141,6 +141,7 @@ def enqueue_inspection_match_job(
     page: int,
     user_id: Optional[int] = None,
     inspection_run_id: Optional[int] = None,
+    force_investigate: bool = False,
 ) -> JobQueue:
     if user_id is None:
         user_id = _resolve_user_id_for_project(db, project_id)
@@ -157,6 +158,8 @@ def enqueue_inspection_match_job(
     }
     if inspection_run_id is not None:
         input_data["inspection_run_id"] = int(inspection_run_id)
+    if force_investigate:
+        input_data["force_investigate"] = True
 
     job = JobQueue(
         user_id=user_id,
@@ -526,13 +529,18 @@ def _finalize_inspection_run_after_match(
         return
 
     if match_status == "index_pending":
-        storage.update_inspection_run_status(inspection_run_id, "processing")
+        storage.update_inspection_run_status(
+            inspection_run_id,
+            "processing",
+            clear_error_message=True,
+        )
         return
 
     storage.update_inspection_run_status(
         inspection_run_id,
         "complete",
         completed_at=now,
+        clear_error_message=True,
     )
 
 
@@ -557,6 +565,7 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
             job_id=job_id,
             evidence_id=evidence_id,
             master_drawing_id=master_drawing_id,
+            force_investigate=bool(payload.get("force_investigate")),
         )
     except Exception as exc:
         _finalize_inspection_run_after_match(
@@ -579,6 +588,7 @@ def _run_inspection_match_job_body(
     job_id: int | None,
     evidence_id: int | None,
     master_drawing_id: int | None,
+    force_investigate: bool = False,
 ) -> MatchStatus:
 
     def _persist(**kwargs: Any) -> int | None:
@@ -625,6 +635,7 @@ def _run_inspection_match_job_body(
         master_drawing_id=master_drawing_id,
         page=page,
         inspection_run_id=run_id_hint,
+        force_investigate=force_investigate,
     )
     status = result.status
 

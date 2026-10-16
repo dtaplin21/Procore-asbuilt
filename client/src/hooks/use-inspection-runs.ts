@@ -12,7 +12,7 @@ import {
   refreshInspectionWorkspaceQueries,
   uploadInspectionRunEvidence,
 } from "@/lib/api/inspection_runs";
-import { deleteInspectionRun } from "@/lib/api/inspections";
+import { deleteInspectionRun, reprocessInspectionRun } from "@/lib/api/inspections";
 import { invalidateProjectDrawingListQueries } from "@/lib/api/drawings";
 import {
   fetchDrawingOverlays,
@@ -227,6 +227,41 @@ export function useInvalidateOverlaysForRun() {
   return (drawingId: string, runId: string) => {
     invalidateOverlaysForRun(queryClient, drawingId, runId);
   };
+}
+
+export function useReprocessInspectionRun(projectId: number | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    Awaited<ReturnType<typeof reprocessInspectionRun>>,
+    Error,
+    number
+  >({
+    mutationFn: async (runId) => {
+      if (projectId == null) {
+        throw new Error("Project required");
+      }
+      return reprocessInspectionRun(String(projectId), String(runId));
+    },
+    onSuccess: () => {
+      if (projectId != null) {
+        void queryClient.invalidateQueries({
+          predicate: (query) => {
+            const key = query.queryKey[0];
+            return (
+              typeof key === "string" &&
+              (key.includes(`/api/projects/${projectId}/inspections/runs`) ||
+                key.includes("drawing-overlays") ||
+                key.includes("inspection-match-status"))
+            );
+          },
+        });
+        void queryClient.invalidateQueries({
+          queryKey: [`/api/projects/${projectId}/evidence`],
+        });
+      }
+    },
+  });
 }
 
 export function useDeleteInspectionRun(projectId: number | null) {

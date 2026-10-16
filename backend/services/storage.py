@@ -1129,6 +1129,7 @@ class StorageService:
         started_at: Optional[datetime] = None,
         completed_at: Optional[datetime] = None,
         error_message: Optional[str] = None,
+        clear_error_message: bool = False,
         inspection_type: Optional[str] = None,
     ) -> Optional[InspectionRun]:
         run = self.db.query(InspectionRun).filter(InspectionRun.id == run_id).first()
@@ -1140,7 +1141,9 @@ class StorageService:
             setattr(run, "started_at", started_at)
         if completed_at is not None:
             setattr(run, "completed_at", completed_at)
-        if error_message is not None:
+        if clear_error_message:
+            setattr(run, "error_message", None)
+        elif error_message is not None:
             setattr(run, "error_message", error_message)
         if inspection_type is not None:
             setattr(run, "inspection_type", inspection_type)

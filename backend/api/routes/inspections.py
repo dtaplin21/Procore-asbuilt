@@ -12,7 +12,12 @@ from sqlalchemy.orm import Session
 from api.dependencies import get_db, get_idempotency_key
 from services.idempotency import begin_idempotent_operation, finish_idempotent_operation
 from ai.pipelines.inspection_mapping import run_inspection_mapping
-from models.schemas import InspectionRunCreate, InspectionRunListResponse, InspectionRunResponse
+from models.schemas import (
+    InspectionRunCreate,
+    InspectionRunListResponse,
+    InspectionRunReprocessResponse,
+    InspectionRunResponse,
+)
 from api.schemas.inspection_match_response import BboxResponse, InspectionMatchStatusResponse
 from services.inspection_matching_jobs import load_inspection_match_status
 from services.inspection_run_deletion import delete_inspection_run_from_project
@@ -216,6 +221,39 @@ def list_inspection_runs(
         total=total,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.post(
+    "/{project_id}/inspections/runs/{run_id}/reprocess",
+    response_model=InspectionRunReprocessResponse,
+)
+def reprocess_inspection_run_route(
+    project_id: int,
+    run_id: int,
+    db: Session = Depends(get_db),
+) -> InspectionRunReprocessResponse:
+    """Re-follow linked files and re-run location matching without re-uploading evidence."""
+    from services.inspection_run_reprocess import reprocess_inspection_run
+
+    storage = StorageService(db)
+    _ensure_project_exists(storage, project_id)
+
+    try:
+        run_id_out, job_id = reprocess_inspection_run(
+            db,
+            project_id=project_id,
+            run_id=run_id,
+        )
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Inspection run not found") from None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return InspectionRunReprocessResponse(
+        inspection_run_id=run_id_out,
+        job_id=job_id,
+        status="processing",
     )
 
 

@@ -24,6 +24,7 @@ import {
   useDeleteInspectionRun,
   useDrawingOverlays,
   useInspectionRuns,
+  useReprocessInspectionRun,
   useRunInspection,
   useUploadInspectionRunEvidence,
 } from "@/hooks/use-inspection-runs";
@@ -87,6 +88,11 @@ export default function InspectionRunsPanel({
     useUploadInspectionRunEvidence(projectId);
   const { mutate: deleteInspectionRun, isPending: deletePending } =
     useDeleteInspectionRun(projectId);
+  const {
+    mutate: reprocessInspectionRun,
+    isPending: reprocessPending,
+    variables: reprocessRunId,
+  } = useReprocessInspectionRun(projectId);
 
   const uploadBusy = uploadPending || createRunPending;
   const runDisabled = runPending || hasActiveRun || uploadBusy;
@@ -219,6 +225,30 @@ export default function InspectionRunsPanel({
         });
       }
     })();
+  };
+
+  const handleReprocessRun = (runId: number) => {
+    reprocessInspectionRun(runId, {
+      onSuccess: () => {
+        void refreshInspectionWorkspaceQueries(
+          queryClient,
+          projectId,
+          masterDrawingId,
+        );
+        toast({
+          title: "Re-running inspection",
+          description:
+            "Re-processing linked files and re-matching on this master sheet.",
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Re-run failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      },
+    });
   };
 
   const handleDeleteRun = (runId: number) => {
@@ -355,6 +385,9 @@ export default function InspectionRunsPanel({
               }}
               onDelete={handleDeleteRun}
               deletePending={deletePending}
+              onReprocess={handleReprocessRun}
+              reprocessPending={reprocessPending}
+              reprocessPendingRunId={reprocessRunId ?? null}
             />
           ))}
         </ul>

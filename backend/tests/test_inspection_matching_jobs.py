@@ -202,6 +202,36 @@ def test_run_inspection_match_job_calls_agent(
         master_drawing_id=master_drawing_id,
         page=1,
         inspection_run_id=cast(int, run.id),
+        force_investigate=False,
+    )
+
+
+@patch("services.inspection_matching_jobs.InspectionLocationAgent")
+def test_run_inspection_match_job_force_investigate(mock_agent_cls, db: Session):
+    run, file_id = _seed_run(db)
+    master_drawing_id = cast(int, run.master_drawing_id)
+    mock_agent = mock_agent_cls.return_value
+    mock_agent.run.return_value = _matched_agent_result()
+
+    run_inspection_match_job(
+        {
+            "inspection_id": file_id,
+            "drawing_id": str(master_drawing_id),
+            "page": 1,
+            "project_id": cast(int, run.project_id),
+            "inspection_run_id": cast(int, run.id),
+            "force_investigate": True,
+        },
+        db,
+    )
+
+    mock_agent.run.assert_called_once_with(
+        db,
+        evidence_id=int(file_id),
+        master_drawing_id=master_drawing_id,
+        page=1,
+        inspection_run_id=cast(int, run.id),
+        force_investigate=True,
     )
 
 

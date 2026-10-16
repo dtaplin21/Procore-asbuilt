@@ -239,7 +239,7 @@ def persist_evidence_investigation(
     project_id: int,
     payload: EvidenceInvestigationPayload,
     persist_text_content: bool = True,
-    text_content_max_chars: int | None = _TEXT_CONTENT_PREVIEW_CHARS,
+    text_content_max_chars: int | None = None,
 ) -> EvidenceInvestigationPersistResult:
     """Apply DB side effects for a completed PDF investigation payload."""
     link_result = payload.link_result
@@ -259,12 +259,10 @@ def persist_evidence_investigation(
             drawing_ids_needing_index=[],
         )
 
+    merged_text_len = len(payload.merged_text) if payload.merged_text else 0
     if persist_text_content and payload.merged_text:
-        setattr(
-            evidence,
-            "text_content",
-            _text_content_for_evidence(payload, text_content_max_chars=text_content_max_chars),
-        )
+        merged = _text_content_for_evidence(payload, text_content_max_chars=text_content_max_chars)
+        setattr(evidence, "text_content", merged)
 
     cross_raw = cast(list[Any] | None, evidence.cross_refs_json)
     existing_refs = list(cross_raw or [])
@@ -385,10 +383,25 @@ def persist_evidence_investigation(
             )
 
     meta = dict(cast(dict[str, Any] | None, evidence.meta) or {})
+    if merged_text_len:
+        meta["merged_text_length"] = merged_text_len
+        meta["text_content_length"] = len(getattr(evidence, "text_content", "") or "")
+    merge_dropped = list(getattr(link_result, "merge_dropped", []) or [])
+    merge_truncated = list(getattr(link_result, "merge_truncated", []) or [])
+    investigation_complete = (
+        link_result.skipped_count == 0
+        and not merge_dropped
+        and not merge_truncated
+        and not any("truncat" in str(err).lower() for err in link_result.errors)
+    )
     meta["matchInvestigation"] = {
         "followed": link_result.followed_count,
         "skipped": link_result.skipped_count,
-        "errors": link_result.errors[:5],
+        "errors": list(link_result.errors),
+        "merge_included": list(getattr(link_result, "merge_included", []) or []),
+        "merge_truncated": merge_truncated,
+        "merge_dropped": merge_dropped,
+        "investigation_complete": investigation_complete,
         "linked_drawing_ids": linked_drawing_ids,
         "linked_drawing_ids_indexed_sync": linked_drawing_ids_indexed_sync,
         "drawing_ids_needing_index": drawing_ids_needing_index,

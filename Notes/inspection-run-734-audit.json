@@ -1,0 +1,93 @@
+{
+  "audited_at": "2026-10-16T05:31:00Z",
+  "inspection_run_id": 734,
+  "evidence_id": 749,
+  "master_drawing_id": 1722,
+  "project_id": 1348,
+  "run_status": "complete",
+  "run_error": null,
+  "overlay": {
+    "id": 528,
+    "match_status": "needs_review",
+    "geometry_type": "polyline",
+    "scope_kind": "utility_line",
+    "scope_source": "survey_endpoints",
+    "points_fractional": [
+      [0.16215277777777776, 0.7795833333333333],
+      [0.2538888888888889, 0.7795833333333333]
+    ],
+    "note": "Short horizontal segment in profile band (~Y 0.78), not plan sewer run. Yellow UI highlight applies if scope_kind is utility_line."
+  },
+  "match_outcome": {
+    "fused_score_approx": 0.424,
+    "winner": "station_lookup station 10+90.95",
+    "blocking_issues": [
+      "master 1722 registration_json is null — aux polyline not projected",
+      "scope fell back to survey_endpoints (aux label bboxes clamped into master anchor)"
+    ],
+    "agent_rationale_tail": "aux_coords_unprojected | scope=survey_endpoints"
+  },
+  "text_extraction": {
+    "evidence_pdf_pages": 2,
+    "source_format": "native_pdf",
+    "native_word_count": 285,
+    "base_text_length": 1875,
+    "merged_text_length_live_reprobe": 38422,
+    "stored_text_content_length": 2000,
+    "text_content_truncation": {
+      "cap_chars": 2000,
+      "field": "evidence_records.text_content via persist_evidence_investigation",
+      "impact": "build_full_evidence_text / vision dossier summary see at most 2000 chars; DocumentClue extraction used full merged_text at investigation time"
+    },
+    "stored_text_starts_with": "linked Procore URL header (not inspection body)",
+    "link_follow": {
+      "followed": 3,
+      "skipped": 14,
+      "linked_drawing_ids": [1870, 1871, 1872],
+      "linked_indexed_sync": [1870, 1871, 1872],
+      "errors": [
+        "Procore submittal XML unsupported content type",
+        "EPD PDF timeout (may succeed on retry)",
+        "UMR 78-page PDF truncated in merge"
+      ]
+    },
+    "merged_attachment_word_counts_sample": {
+      "UMR_sanitary_sewer_pd": 22008,
+      "EPD_polaris": 3099,
+      "EPD_concrete_tool": 566,
+      "U1_C4_20_install_2pg": 888
+    },
+    "ocr_vs_vision": "Evidence base PDF used native text layer only (no page OCR). Linked PDFs OCR via attachment clue path when fetched."
+  },
+  "document_extraction": {
+    "extraction_id": 218,
+    "document_type": "inspection_report",
+    "classification_confidence": 0.95,
+    "clues_total": 19,
+    "location_relevant_clues": 18,
+    "sample_clues": [
+      "location_text: 52ND STREET, OAKLAND, CA 94609",
+      "document_title: SEWER PLAN & PROFILE",
+      "items: HARDSCAPE AREA, GENERAL DRAINAGE, UNDERGROUND FIRE MAIN, ELECTRIC DUCT BANK"
+    ],
+    "station_clues_in_db": "none typed as station — stations live in evidence.meta survey_points and station_from/to"
+  },
+  "survey_and_stations": {
+    "survey_points_in_meta": 6,
+    "station_from": "10+00",
+    "station_to": "10+90.95",
+    "station_range_source_drawing_id": 1872,
+    "source_drawing_name": "7.20-7.24 U1.C4.20 6.00 Sanitary Sewer Install.pdf",
+    "source_drawing_index_status": "ready"
+  },
+  "master_drawing_1722": {
+    "registration_json": null,
+    "recommendation": "Seed aux→master registration then re-run inspection_match for run 734"
+  },
+  "recommended_next_steps": [
+    "Persist full merged_text to text_content (or dossier reads merged_text from meta) so agent/vision see same corpus as clue extraction",
+    "Re-run persist_evidence_investigation with force after fixing UMR truncation if sewer PD text is required in clues",
+    "Establish registration on 1722 and re-run match job for run 734",
+    "Pan to Y~0.78 on Master.pdf to verify yellow utility polyline overlay 528 until placement is fixed"
+  ]
+}

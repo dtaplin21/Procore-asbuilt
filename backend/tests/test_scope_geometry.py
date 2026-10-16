@@ -91,6 +91,7 @@ def _minimal_dossier(
         clues=clues,
         expanded_clues=expanded_clues,
         evidence_text=evidence_text,
+        reasoning_text=evidence_text,
         base_text=evidence_text,
         evidence_kind=EvidenceKind.FORM,
         linked_attachments=(),

@@ -281,6 +281,13 @@ def seed_viewports_for_page(
             )
     else:
         seed_rows = tuple(proposal_to_seed_dict(p) for p in proposals)
+        kinds = {str(r["kind"]) for r in seed_rows}
+        # OCR often finds PROFILE only on combined plan/profile sheets (e.g. Master 1722).
+        if "plan" not in kinds and _sheet_has_plan_profile_signals(session, drawing_id, page=page):
+            drawing = session.get(Drawing, drawing_id)
+            if drawing is not None:
+                seed_rows = _layout_fallback_rows(drawing, page=page)
+                seed_source = _LAYOUT_SOURCE
 
     written = upsert_drawing_viewports(
         session,

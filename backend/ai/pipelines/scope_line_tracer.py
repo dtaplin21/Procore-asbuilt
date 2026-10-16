@@ -137,6 +137,7 @@ def trace_scope_geometry(
             station_from=station_from,
             station_to=station_to,
             max_centroid_y=_PLAN_VIEW_MAX_Y if trace_on_aux else None,
+            min_points=2,
         )
         if aux_polyline is not None:
             return ScopeGeometry(
@@ -430,8 +431,29 @@ def _best_plan_sheet_line(
         for vp in (page_graph.get("viewports") or [])
         if isinstance(vp, dict) and vp.get("kind") == "plan" and vp.get("viewport_id")
     }
-    if not plan_ids:
-        return None
+    plan_bbox: tuple[float, float, float, float] | None = None
+    for vp in page_graph.get("viewports") or []:
+        if not isinstance(vp, dict) or vp.get("kind") != "plan":
+            continue
+        bb = vp.get("bbox_fractional")
+        if isinstance(bb, (list, tuple)) and len(bb) == 4:
+            plan_bbox = tuple(float(v) for v in bb)
+            break
+
+    def _line_in_plan_area(raw_line: dict[str, Any]) -> bool:
+        points_raw = raw_line.get("points")
+        if not isinstance(points_raw, (list, tuple)) or len(points_raw) < 2:
+            return False
+        ys: list[float] = []
+        for pt in points_raw:
+            if isinstance(pt, (list, tuple)) and len(pt) >= 2:
+                ys.append(float(pt[1]))
+        if not ys:
+            return False
+        mid_y = sum(ys) / len(ys)
+        if plan_bbox is not None:
+            return plan_bbox[1] <= mid_y <= plan_bbox[3]
+        return _PLAN_VIEW_MIN_Y <= mid_y <= _PLAN_VIEW_MAX_Y
 
     codes = legend_codes or set()
     ax0, ay0, ax1, ay1 = expanded_anchor
@@ -451,7 +473,10 @@ def _best_plan_sheet_line(
         if not _line_matches_utility_legend(raw, legend_codes=codes, session=session):
             continue
         viewport_id = raw.get("viewport_id")
-        if viewport_id is None or str(viewport_id) not in plan_ids:
+        if plan_ids:
+            if viewport_id is None or str(viewport_id) not in plan_ids:
+                continue
+        elif not _line_in_plan_area(raw):
             continue
         points_raw = raw.get("points")
         if not isinstance(points_raw, (list, tuple)) or len(points_raw) < 2:

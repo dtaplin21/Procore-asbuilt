@@ -6,11 +6,16 @@ import fitz
 
 
 def pdf_point_to_display_fractional(page: fitz.Page, x: float, y: float) -> tuple[float, float]:
-    """Map one PDF point to fractional page coords using ``transformation_matrix``."""
+    """Map one PDF point to fractional coords in the rendered page frame.
+
+    Uses ``rotation_matrix`` (same as ``native_pdf_display_frame`` and PNG
+    renditions). ``transformation_matrix`` misplaces geometry on rotated sheets.
+    """
     pw, ph = page.rect.width, page.rect.height
     if pw <= 0 or ph <= 0:
         raise ValueError("page has invalid dimensions")
-    rect = fitz.Rect(x, y, x, y) * page.transformation_matrix
+    rect = fitz.Rect(x, y, x, y) * page.rotation_matrix
+    rect.normalize()
     return float(rect.x0) / pw, float(rect.y0) / ph
 
 
@@ -25,7 +30,8 @@ def pdf_rect_to_display_fractional(
     pw, ph = page.rect.width, page.rect.height
     if pw <= 0 or ph <= 0:
         raise ValueError("page has invalid dimensions")
-    display = fitz.Rect(x0, y0, x1, y1) * page.transformation_matrix
+    display = fitz.Rect(x0, y0, x1, y1) * page.rotation_matrix
+    display.normalize()
     return (
         float(display.x0) / pw,
         float(display.y0) / ph,

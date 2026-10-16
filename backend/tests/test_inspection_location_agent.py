@@ -65,6 +65,7 @@ def _utility_line_dossier(
             ),
         ),
         evidence_text="Sanitary sewer lateral run in corridor",
+        reasoning_text="Sanitary sewer lateral run in corridor",
         base_text="Sanitary sewer lateral run in corridor",
         evidence_kind=EvidenceKind.FORM,
         linked_attachments=(),

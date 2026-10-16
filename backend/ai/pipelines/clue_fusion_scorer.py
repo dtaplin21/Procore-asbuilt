@@ -238,7 +238,7 @@ def _build_fusion_prompt(
         for clue in dossier.expanded_clues
     ]
     attachment_lines = [
-        f"- {attachment.filename}: {attachment.text_preview[:240]}"
+        f"- {attachment.filename}: {attachment.text_preview[:1200]}"
         for attachment in dossier.linked_attachments
     ]
     candidate_lines: list[str] = []
@@ -269,7 +269,7 @@ def _build_fusion_prompt(
         FUSION_TIEBREAK_PROMPT.strip(),
         "Inspection dossier summary:",
         f"- evidence_kind={dossier.evidence_kind.value}",
-        f"- evidence_text={dossier.evidence_text[:1200]}",
+        f"- evidence_text={dossier.reasoning_text or dossier.evidence_text[:1200]}",
         "- expanded_clues:",
         *(clue_lines or ["  (none)"]),
         "- legend_codes_near_candidates:",

@@ -23,7 +23,10 @@ from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
 from models.models import Drawing, EvidenceDrawingLink, EvidenceRecord
 from services.evidence_linking import load_linked_drawings
-from services.evidence_text import build_full_evidence_text
+from services.evidence_text import (
+    build_full_evidence_text,
+    build_location_reasoning_excerpt,
+)
 from services.file_storage import resolve_stored_file_path
 from services.legend_lookup import find_codes_for_term
 from services.match_candidate_scope import build_match_scope
@@ -79,6 +82,7 @@ class EvidenceDossier:
     clues: tuple[DocumentClue, ...]
     expanded_clues: tuple[ExpandedClue, ...]
     evidence_text: str
+    reasoning_text: str
     base_text: str
     evidence_kind: EvidenceKind
     linked_attachments: tuple[LinkedAttachmentSummary, ...]
@@ -104,6 +108,14 @@ def build_evidence_dossier(
         raise ValueError(f"Evidence {evidence_id} not found")
 
     project_id = cast(int, evidence.project_id)
+    meta = dict(cast(dict[str, Any] | None, evidence.meta) or {})
+
+    if investigate and not force_investigate and _investigation_needs_refresh(meta):
+        logger.info(
+            "evidence_investigation_auto_refresh",
+            extra={"evidence_id": evidence_id},
+        )
+        force_investigate = True
 
     investigated_summaries, pdf_investigation_meta = _maybe_investigate_and_persist(
         session,
@@ -180,6 +192,12 @@ def build_evidence_dossier(
         investigated_summaries,
     )
 
+    reasoning_text = build_location_reasoning_excerpt(
+        evidence_text,
+        clues=clues,
+        linked_attachments=linked_attachments,
+    )
+
     region_index = build_region_index(session, master_drawing_id)
     drawing_ids = (master_drawing_id, *scope.auxiliary_drawing_ids)
     scoped_rows = _load_scoped_survey_points(session, drawing_ids)
@@ -248,6 +266,7 @@ def build_evidence_dossier(
         clues=tuple(clues),
         expanded_clues=expanded_clues,
         evidence_text=evidence_text,
+        reasoning_text=reasoning_text,
         base_text=base_text,
         evidence_kind=evidence_kind,
         linked_attachments=linked_attachments,
@@ -434,6 +453,29 @@ def _merge_linked_attachment_summaries(
         )
 
     return tuple(merged.values())
+
+
+def _investigation_needs_refresh(meta: dict[str, Any]) -> bool:
+    """Re-run link follow when prior investigation did not ingest all attachments."""
+    mi = meta.get("matchInvestigation")
+    if isinstance(mi, dict):
+        if mi.get("investigation_complete"):
+            return False
+        if mi.get("merge_dropped") or mi.get("merge_truncated"):
+            return True
+        if int(mi.get("skipped") or 0) > 0:
+            return True
+        errors = mi.get("errors") or []
+        if isinstance(errors, list):
+            for err in errors:
+                text = str(err).lower()
+                if "truncat" in text or "timeout" in text or "unsupported" in text:
+                    return True
+    for err in meta.get("pdf_investigation_errors") or []:
+        text = str(err).lower()
+        if "truncat" in text or "dropped" in text:
+            return True
+    return False
 
 
 def _match_investigation_is_fresh(meta: dict[str, Any]) -> bool:

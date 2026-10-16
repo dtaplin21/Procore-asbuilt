@@ -97,12 +97,17 @@ describe("DrawingOverlayLayer", () => {
       />,
     );
 
+    const group = screen.getByTestId("overlay-group-0");
+    expect(group).toHaveAttribute("data-overlay-highlight", "utility-marker");
+
     const polyline = screen.getByTestId("overlay-polyline-0");
     expect(polyline).toBeInTheDocument();
     expect(polyline).toHaveAttribute("fill", "none");
     expect(polyline).toHaveAttribute("stroke-linecap", "round");
     expect(polyline).toHaveAttribute("stroke-linejoin", "round");
-    expect(polyline).toHaveAttribute("stroke-width", "1.5");
+    expect(polyline).toHaveAttribute("stroke-width", "11");
+    expect(polyline).toHaveAttribute("stroke", "rgba(250, 204, 21, 0.5)");
+    expect(polyline).toHaveStyle({ mixBlendMode: "multiply" });
     expect(polyline).toHaveAttribute(
       "points",
       "410,304 430,312 450,320",
