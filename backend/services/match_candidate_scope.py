@@ -55,6 +55,12 @@ def build_match_scope(
                             auxiliary.append(int(drawing_id))
                         except (TypeError, ValueError):
                             continue
+            source_id = meta.get("inspection_source_drawing_id")
+            if source_id is not None:
+                try:
+                    auxiliary.append(int(source_id))
+                except (TypeError, ValueError):
+                    pass
 
     auxiliary_ids = tuple(
         drawing_id

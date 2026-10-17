@@ -15,12 +15,15 @@ from ai.pipelines.inspection_mapping import run_inspection_mapping
 from models.schemas import (
     InspectionRunCreate,
     InspectionRunListResponse,
+    InspectionRunProgressResponse,
     InspectionRunReprocessResponse,
     InspectionRunResponse,
 )
 from api.schemas.inspection_match_response import BboxResponse, InspectionMatchStatusResponse
 from services.inspection_matching_jobs import load_inspection_match_status
 from services.inspection_run_deletion import delete_inspection_run_from_project
+from services.inspection_run_activity import inspection_run_to_response
+from services.inspection_run_progress import get_run_progress
 from services.storage import StorageService
 
 logger = logging.getLogger(__name__)
@@ -217,30 +220,25 @@ def list_inspection_runs(
         offset=offset,
     )
     return InspectionRunListResponse(
-        items=[InspectionRunResponse.model_validate(r) for r in items],
+        items=[inspection_run_to_response(db, r) for r in items],
         total=total,
         limit=limit,
         offset=offset,
     )
 
 
-@router.post(
-    "/{project_id}/inspections/runs/{run_id}/reprocess",
-    response_model=InspectionRunReprocessResponse,
-)
-def reprocess_inspection_run_route(
+def _queue_inspection_run_job(
+    db: Session,
+    *,
     project_id: int,
     run_id: int,
-    db: Session = Depends(get_db),
+    queue_fn,
+    queued_status: str = "processing",
 ) -> InspectionRunReprocessResponse:
-    """Re-follow linked files and re-run location matching without re-uploading evidence."""
-    from services.inspection_run_reprocess import reprocess_inspection_run
-
     storage = StorageService(db)
     _ensure_project_exists(storage, project_id)
-
     try:
-        run_id_out, job_id = reprocess_inspection_run(
+        run_id_out, job_id = queue_fn(
             db,
             project_id=project_id,
             run_id=run_id,
@@ -253,7 +251,132 @@ def reprocess_inspection_run_route(
     return InspectionRunReprocessResponse(
         inspection_run_id=run_id_out,
         job_id=job_id,
-        status="processing",
+        status=queued_status,
+    )
+
+
+@router.get(
+    "/{project_id}/inspections/runs/{run_id}/progress",
+    response_model=InspectionRunProgressResponse,
+)
+def get_inspection_run_progress(
+    project_id: int,
+    run_id: int,
+    db: Session = Depends(get_db),
+) -> InspectionRunProgressResponse:
+    """Coarse AI pipeline progress for polling while a run is active."""
+    storage = StorageService(db)
+    _ensure_project_exists(storage, project_id)
+    run = storage.get_inspection_run(project_id, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Inspection run not found")
+    payload = get_run_progress(db, project_id=project_id, run_id=run_id)
+    if payload is None:
+        return InspectionRunProgressResponse(run_id=run_id)
+    return InspectionRunProgressResponse.model_validate({"run_id": run_id, **payload})
+
+
+@router.get("/{project_id}/inspections/runs/{run_id}/placement-forensics")
+def inspection_run_placement_forensics_route(
+    project_id: int,
+    run_id: int,
+    db: Session = Depends(get_db),
+) -> dict:
+    """OCR corpus, dossier/vision inputs, scope trace path, and placement blockers."""
+    from scripts.export_inspection_placement_forensics import export_forensics
+
+    storage = StorageService(db)
+    _ensure_project_exists(storage, project_id)
+    try:
+        return export_forensics(db, run_id=run_id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Inspection run not found") from None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/{project_id}/inspections/runs/{run_id}/index-inventory")
+def inspection_run_index_inventory_route(
+    project_id: int,
+    run_id: int,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Structured report of indexed pages, clues, and linked drawings for a run."""
+    from services.inspection_index_export import build_inspection_index_inventory
+
+    storage = StorageService(db)
+    _ensure_project_exists(storage, project_id)
+    try:
+        return build_inspection_index_inventory(
+            db,
+            project_id=project_id,
+            run_id=run_id,
+        )
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Inspection run not found") from None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post(
+    "/{project_id}/inspections/runs/{run_id}/reindex",
+    response_model=InspectionRunReprocessResponse,
+)
+def reindex_inspection_run_route(
+    project_id: int,
+    run_id: int,
+    db: Session = Depends(get_db),
+) -> InspectionRunReprocessResponse:
+    """Re-follow linked PDFs and refresh clues (no master placement)."""
+    from services.inspection_run_reprocess import reindex_inspection_run
+
+    return _queue_inspection_run_job(
+        db,
+        project_id=project_id,
+        run_id=run_id,
+        queue_fn=reindex_inspection_run,
+        queued_status="indexing",
+    )
+
+
+@router.post(
+    "/{project_id}/inspections/runs/{run_id}/rematch",
+    response_model=InspectionRunReprocessResponse,
+)
+def rematch_inspection_run_route(
+    project_id: int,
+    run_id: int,
+    db: Session = Depends(get_db),
+) -> InspectionRunReprocessResponse:
+    """Re-run location matching using existing indexed clues (no link re-follow)."""
+    from services.inspection_run_reprocess import rematch_inspection_run
+
+    return _queue_inspection_run_job(
+        db,
+        project_id=project_id,
+        run_id=run_id,
+        queue_fn=rematch_inspection_run,
+        queued_status="matching",
+    )
+
+
+@router.post(
+    "/{project_id}/inspections/runs/{run_id}/reprocess",
+    response_model=InspectionRunReprocessResponse,
+)
+def reprocess_inspection_run_route(
+    project_id: int,
+    run_id: int,
+    db: Session = Depends(get_db),
+) -> InspectionRunReprocessResponse:
+    """Index linked files then re-run placement in one worker job."""
+    from services.inspection_run_reprocess import reprocess_inspection_run
+
+    return _queue_inspection_run_job(
+        db,
+        project_id=project_id,
+        run_id=run_id,
+        queue_fn=reprocess_inspection_run,
     )
 
 

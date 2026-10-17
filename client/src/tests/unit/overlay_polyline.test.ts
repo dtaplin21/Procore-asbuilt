@@ -6,8 +6,8 @@ import {
   resolveOverlayRegion,
 } from "@/lib/drawing-overlays/geometry";
 
-describe("overlay polyline geometry", () => {
-  it("resolveOverlayRegion polyline with 3 points", () => {
+describe("overlay line segment geometry", () => {
+  it("resolveOverlayRegion polyline with 3 points becomes line segments", () => {
     const source = {
       shapeType: "polyline" as const,
       scopeKind: "utility_line",
@@ -20,11 +20,15 @@ describe("overlay polyline geometry", () => {
 
     const resolved = resolveOverlayRegion(source);
 
-    expect(resolved).toEqual({
-      kind: "polyline",
-      points: source.points,
-      source,
-    });
+    expect(resolved?.kind).toBe("line_segments");
+    if (resolved?.kind !== "line_segments") {
+      throw new Error("expected line_segments");
+    }
+    expect(resolved.segments).toHaveLength(2);
+    expect(resolved.segments[0]).toEqual([
+      source.points[0],
+      source.points[1],
+    ]);
   });
 
   it("normalizedPointsToPixels for polyline", () => {
@@ -44,7 +48,43 @@ describe("overlay polyline geometry", () => {
     ]);
   });
 
-  it("overlayGeometryToDiffRegion accepts API polyline geometry", () => {
+  it("overlayGeometryToDiffRegion accepts API line_segments geometry", () => {
+    const shape = overlayGeometryToDiffRegion({
+      page: 1,
+      type: "line_segments",
+      segments: [
+        [
+          [0.41, 0.38],
+          [0.43, 0.39],
+        ],
+        [
+          [0.43, 0.39],
+          [0.45, 0.4],
+        ],
+      ],
+      scope_kind: "utility_line",
+      label: "inspection_match",
+    });
+
+    expect(shape).toEqual({
+      shapeType: "line_segments",
+      segments: [
+        [
+          { x: 0.41, y: 0.38 },
+          { x: 0.43, y: 0.39 },
+        ],
+        [
+          { x: 0.43, y: 0.39 },
+          { x: 0.45, y: 0.4 },
+        ],
+      ],
+      page: 1,
+      note: "inspection_match",
+      scopeKind: "utility_line",
+    });
+  });
+
+  it("legacy API polyline geometry maps to line segments", () => {
     const shape = overlayGeometryToDiffRegion({
       page: 1,
       type: "polyline",
@@ -57,16 +97,7 @@ describe("overlay polyline geometry", () => {
       label: "inspection_match",
     });
 
-    expect(shape).toEqual({
-      shapeType: "polyline",
-      points: [
-        { x: 0.41, y: 0.38 },
-        { x: 0.43, y: 0.39 },
-        { x: 0.45, y: 0.4 },
-      ],
-      page: 1,
-      note: "inspection_match",
-      scopeKind: "utility_line",
-    });
+    expect(shape?.shapeType).toBe("line_segments");
+    expect(shape?.segments).toHaveLength(2);
   });
 });

@@ -271,7 +271,13 @@ def _follow_links(
     if internal_links:
         doc = fitz.open(str(file_path))
         try:
-            _collect_internal_attachments(doc, internal_links, attachments, result)
+            _collect_internal_attachments(
+                file_path,
+                doc,
+                internal_links,
+                attachments,
+                result,
+            )
         finally:
             doc.close()
 
@@ -481,11 +487,13 @@ def _follow_nested_pdf_links(
 
 
 def _collect_internal_attachments(
+    file_path: Path,
     doc: fitz.Document,
     internal_links: list[PdfHyperlink],
     attachments: list[LinkedAttachment],
     result: LinkFollowResult,
 ) -> None:
+    from ai.pipelines.evidence_page_investigation import extract_inspection_document
     unique_targets: list[int] = []
     seen_targets: set[int] = set()
     for link in internal_links:
@@ -503,11 +511,21 @@ def _collect_internal_attachments(
             seen_targets.add(target)
             unique_targets.append(target)
 
+    extracted = extract_inspection_document(file_path)
     for page_index in unique_targets:
-        text = _text_from_page(doc, page_index)
+        page_num = page_index + 1
+        native_text = _text_from_page(doc, page_index)
+        indexed_text = ""
+        if 0 <= page_index < extracted.page_count:
+            indexed_text = extracted.page_text(page_index).strip()
+        text = indexed_text or native_text
         if not text.strip():
+            result.skipped_count += 1
+            result.errors.append(
+                f"internal page {page_num}: no index pipeline text extracted"
+            )
             continue
-        page_label = f"page {page_index + 1}"
+        page_label = f"page {page_num}"
         attachments.append(
             LinkedAttachment(
                 url=page_label,
@@ -518,6 +536,14 @@ def _collect_internal_attachments(
             )
         )
         result.followed_count += 1
+        logger.info(
+            "pdf_internal_page_investigated",
+            extra={
+                "page": page_num,
+                "indexed_words": len(indexed_text.split()),
+                "native_words": len(native_text.split()),
+            },
+        )
 
     for link in internal_links:
         target = link.target_page

@@ -108,14 +108,15 @@ def test_trace_station_range_connects_sta_label_centroids() -> None:
         page=1,
     )
 
-    assert scope.type == "polyline"
-    assert scope.points is not None
-    assert len(scope.points) == 2
-    assert scope.points[0][0] < scope.points[1][0]
-    assert scope.points[0][0] == pytest.approx(0.14)
-    assert scope.points[0][1] == pytest.approx(0.23)
-    assert scope.points[1][0] == pytest.approx(0.40)
-    assert scope.points[1][1] == pytest.approx(0.31)
+    assert scope.type == "line_segments"
+    assert scope.segments is not None
+    assert len(scope.segments) == 1
+    start, end = scope.segments[0]
+    assert start[0] < end[0]
+    assert start[0] == pytest.approx(0.14)
+    assert start[1] == pytest.approx(0.23)
+    assert end[0] == pytest.approx(0.40)
+    assert end[1] == pytest.approx(0.31)
     assert scope.meta is not None
     assert scope.meta.get("source") == "station_labels"
 
@@ -138,15 +139,15 @@ def test_trace_utility_line_uses_nearby_ss_labels() -> None:
         page=1,
     )
 
-    assert scope.type == "polyline"
-    assert scope.points is not None
-    assert len(scope.points) >= 2
-    assert scope.points[0][0] < scope.points[-1][0]
+    assert scope.type == "line_segments"
+    assert scope.segments is not None
+    assert len(scope.segments) >= 1
+    assert scope.segments[0][0][0] < scope.segments[-1][1][0]
     assert scope.meta is not None
     assert "SS" in scope.meta.get("legend_codes", [])
 
 
-def test_trace_utility_line_uses_aux_survey_chain_when_station_range_present() -> None:
+def test_trace_utility_line_skips_aux_survey_chain_when_station_range_present() -> None:
     anchor = (0.10, 0.20, 0.50, 0.40)
     scoped_points = (
         SurveyPointRecord(
@@ -199,13 +200,14 @@ def test_trace_utility_line_uses_aux_survey_chain_when_station_range_present() -
         page=1,
     )
 
-    assert scope.type == "polyline"
-    assert scope.points is not None
-    assert len(scope.points) >= 3
-    assert scope.points[0][0] < scope.points[-1][0]
+    assert scope.type == "line_segments"
     assert scope.meta is not None
-    assert scope.meta.get("source") == "aux_survey_chain"
-    assert scope.meta.get("source_drawing_id") == 1084
+    assert scope.meta.get("source") != "aux_survey_chain"
+    assert scope.meta.get("source") in {
+        "utility_line_trace",
+        "anchor_centerline_fallback",
+        "vision_trace",
+    }
 
 
 def test_trace_station_range_uses_aux_tokens_when_source_drawing_differs(
@@ -265,10 +267,10 @@ def test_trace_station_range_uses_aux_tokens_when_source_drawing_differs(
         source_drawing_id=aux_id,
     )
 
-    assert scope.type == "polyline"
-    assert scope.points is not None
-    assert len(scope.points) == 2
-    assert scope.points[0][0] < scope.points[1][0]
+    assert scope.type == "line_segments"
+    assert scope.segments is not None
+    assert len(scope.segments) == 1
+    assert scope.segments[0][0][0] < scope.segments[0][1][0]
     assert scope.meta is not None
     assert scope.meta.get("source") == "aux_plan_station_labels"
     assert scope.meta.get("source_drawing_id") == aux_id
@@ -291,9 +293,10 @@ def test_trace_utility_line_clamps_centerline_when_anchor_is_off_page() -> None:
     )
 
     geometry = scope.to_geometry_json()
-    for point in geometry["points"]:
-        assert 0.0 <= point[0] <= 1.0
-        assert 0.0 <= point[1] <= 1.0
+    for segment in geometry["segments"]:
+        for point in segment:
+            assert 0.0 <= point[0] <= 1.0
+            assert 0.0 <= point[1] <= 1.0
 
 
 def test_trace_utility_line_clamps_vision_points_when_anchor_is_off_page(
@@ -339,9 +342,10 @@ def test_trace_utility_line_clamps_vision_points_when_anchor_is_off_page(
     assert scope.meta is not None
     assert scope.meta.get("source") == "vision_trace"
     geometry = scope.to_geometry_json()
-    for point in geometry["points"]:
-        assert 0.0 <= point[0] <= 1.0
-        assert 0.0 <= point[1] <= 1.0
+    for segment in geometry["segments"]:
+        for point in segment:
+            assert 0.0 <= point[0] <= 1.0
+            assert 0.0 <= point[1] <= 1.0
 
 
 def test_trace_utility_line_prefers_plan_sheet_line_over_vision(
@@ -417,12 +421,11 @@ def test_trace_utility_line_prefers_plan_sheet_line_over_vision(
     master_png = tmp_path / "master.png"
     master_png.write_bytes(b"\x89PNG\r\n\x1a\n")
 
-    def fake_reason(**kwargs: object) -> object:
-        raise AssertionError("vision must not run when plan SheetLine is available")
+    from ai.pipelines.vision_location_reasoner import _empty_vision_result
 
     monkeypatch.setattr(
         "ai.pipelines.vision_location_reasoner.reason_over_master_crop",
-        fake_reason,
+        lambda **kwargs: _empty_vision_result(),
     )
 
     dossier = replace(
@@ -447,7 +450,7 @@ def test_trace_utility_line_prefers_plan_sheet_line_over_vision(
     assert scope.meta is not None
     assert scope.meta.get("source") == "sheet_line"
     assert scope.meta.get("viewport_id") == "plan"
-    assert scope.points == ((0.20, 0.25), (0.45, 0.30))
+    assert scope.segments == (((0.20, 0.25), (0.45, 0.30)),)
 
 
 def test_trace_utility_line_skips_mismatched_typed_sheet_line(
@@ -532,11 +535,11 @@ def test_trace_utility_line_skips_mismatched_typed_sheet_line(
     master_png = tmp_path / "master.png"
     master_png.write_bytes(b"\x89PNG\r\n\x1a\n")
 
+    from ai.pipelines.vision_location_reasoner import _empty_vision_result
+
     monkeypatch.setattr(
         "ai.pipelines.vision_location_reasoner.reason_over_master_crop",
-        lambda **kwargs: (_ for _ in ()).throw(
-            AssertionError("vision must not run when matching typed plan line exists")
-        ),
+        lambda **kwargs: _empty_vision_result(),
     )
 
     dossier = replace(
@@ -561,7 +564,7 @@ def test_trace_utility_line_skips_mismatched_typed_sheet_line(
 
     assert scope.meta is not None
     assert scope.meta.get("source") == "sheet_line"
-    assert scope.points == ((0.19, 0.24), (0.44, 0.29))
+    assert scope.segments == (((0.19, 0.24), (0.44, 0.29)),)
 
 
 def test_trace_utility_line_prefers_typed_over_untyped_sheet_line(
@@ -639,11 +642,11 @@ def test_trace_utility_line_prefers_typed_over_untyped_sheet_line(
     master_png = tmp_path / "master.png"
     master_png.write_bytes(b"\x89PNG\r\n\x1a\n")
 
+    from ai.pipelines.vision_location_reasoner import _empty_vision_result
+
     monkeypatch.setattr(
         "ai.pipelines.vision_location_reasoner.reason_over_master_crop",
-        lambda **kwargs: (_ for _ in ()).throw(
-            AssertionError("vision must not run when typed plan line is preferred")
-        ),
+        lambda **kwargs: _empty_vision_result(),
     )
 
     dossier = replace(
@@ -666,4 +669,4 @@ def test_trace_utility_line_prefers_typed_over_untyped_sheet_line(
         master_png_path=master_png,
     )
 
-    assert scope.points == ((0.19, 0.24), (0.44, 0.29))
+    assert scope.segments == (((0.19, 0.24), (0.44, 0.29)),)

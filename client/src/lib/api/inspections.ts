@@ -204,14 +204,15 @@ export interface ReprocessInspectionRunResult {
   status: string;
 }
 
-/** Re-follow linked PDFs and re-run match pipeline without re-uploading evidence. */
-export async function reprocessInspectionRun(
+async function postInspectionRunPipelineJob(
   projectId: string,
   runId: string,
+  action: "reindex" | "rematch" | "reprocess",
+  errorLabel: string,
 ): Promise<ReprocessInspectionRunResult> {
   const response = await fetch(
     resolveFetchUrl(
-      `/api/projects/${encodeURIComponent(projectId)}/inspections/runs/${encodeURIComponent(runId)}/reprocess`,
+      `/api/projects/${encodeURIComponent(projectId)}/inspections/runs/${encodeURIComponent(runId)}/${action}`,
     ),
     {
       method: "POST",
@@ -221,9 +222,51 @@ export async function reprocessInspectionRun(
       },
     },
   );
-  return parseJsonOrThrow<ReprocessInspectionRunResult>(
-    response,
+  return parseJsonOrThrow<ReprocessInspectionRunResult>(response, errorLabel);
+}
+
+/** Re-follow linked PDFs and refresh clues (no master placement). */
+export function reindexInspectionRun(
+  projectId: string,
+  runId: string,
+): Promise<ReprocessInspectionRunResult> {
+  return postInspectionRunPipelineJob(
+    projectId,
+    runId,
+    "reindex",
+    "Re-indexing inspection files",
+  );
+}
+
+/** Re-run master placement using indexed clues (no link re-follow). */
+export function rematchInspectionRun(
+  projectId: string,
+  runId: string,
+): Promise<ReprocessInspectionRunResult> {
+  return postInspectionRunPipelineJob(
+    projectId,
+    runId,
+    "rematch",
+    "Re-running placement on master",
+  );
+}
+
+/** Index linked files then re-run placement in one worker job. */
+export async function reprocessInspectionRun(
+  projectId: string,
+  runId: string,
+): Promise<ReprocessInspectionRunResult> {
+  return postInspectionRunPipelineJob(
+    projectId,
+    runId,
+    "reprocess",
     "Re-running inspection processing",
+  );
+}
+
+export function inspectionRunIndexInventoryUrl(projectId: string, runId: string): string {
+  return resolveFetchUrl(
+    `/api/projects/${encodeURIComponent(projectId)}/inspections/runs/${encodeURIComponent(runId)}/index-inventory`,
   );
 }
 

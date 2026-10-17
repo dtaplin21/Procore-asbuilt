@@ -701,6 +701,19 @@ def project_polyline_to_master(
     )
 
 
+def project_line_segments_to_master(
+    segments: Sequence[tuple[tuple[float, float], tuple[float, float]]],
+    registration_transform: RegistrationTransform,
+) -> tuple[tuple[tuple[float, float], tuple[float, float]], ...]:
+    return tuple(
+        (
+            project_point_to_master(a[0], a[1], registration_transform),
+            project_point_to_master(b[0], b[1], registration_transform),
+        )
+        for a, b in segments
+    )
+
+
 def project_bbox_to_master(
     bbox: tuple[float, float, float, float],
     registration_transform: RegistrationTransform,

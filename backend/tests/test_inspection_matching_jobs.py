@@ -203,6 +203,7 @@ def test_run_inspection_match_job_calls_agent(
         page=1,
         inspection_run_id=cast(int, run.id),
         force_investigate=False,
+        investigate=True,
     )
 
 
@@ -232,6 +233,7 @@ def test_run_inspection_match_job_force_investigate(mock_agent_cls, db: Session)
         page=1,
         inspection_run_id=cast(int, run.id),
         force_investigate=True,
+        investigate=True,
     )
 
 

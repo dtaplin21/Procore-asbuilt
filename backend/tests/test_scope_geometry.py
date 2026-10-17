@@ -214,6 +214,23 @@ def test_scope_geometry_polyline_roundtrip() -> None:
     validate_scope_geometry(geometry)
 
 
+def test_scope_geometry_line_segments_roundtrip() -> None:
+    from ai.pipelines.scope_geometry import scope_line_segments
+
+    scope = scope_line_segments(
+        page=1,
+        points=((0.2, 0.25), (0.45, 0.30)),
+        scope_kind=ScopeKind.UTILITY_LINE,
+        meta={"source": "sheet_line"},
+    )
+
+    geometry = scope.to_geometry_json()
+
+    assert geometry["type"] == "line_segments"
+    assert geometry["segments"] == [[[0.2, 0.25], [0.45, 0.30]]]
+    validate_scope_geometry(geometry)
+
+
 def test_validate_region_geometry_accepts_polyline() -> None:
     validate_region_geometry(
         {

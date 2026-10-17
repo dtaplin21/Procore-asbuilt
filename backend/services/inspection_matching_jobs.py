@@ -142,6 +142,9 @@ def enqueue_inspection_match_job(
     user_id: Optional[int] = None,
     inspection_run_id: Optional[int] = None,
     force_investigate: bool = False,
+    index_only: bool = False,
+    match_only: bool = False,
+    chain_match: bool = False,
 ) -> JobQueue:
     if user_id is None:
         user_id = _resolve_user_id_for_project(db, project_id)
@@ -160,6 +163,12 @@ def enqueue_inspection_match_job(
         input_data["inspection_run_id"] = int(inspection_run_id)
     if force_investigate:
         input_data["force_investigate"] = True
+    if index_only:
+        input_data["index_only"] = True
+    if match_only:
+        input_data["match_only"] = True
+    if chain_match:
+        input_data["chain_match"] = True
 
     job = JobQueue(
         user_id=user_id,
@@ -461,9 +470,12 @@ def _bbox_from_agent_result(
                 scope.x + scope.width,
                 scope.y + scope.height,
             )
-        if scope.type == "polyline" and scope.points:
-            xs = [point[0] for point in scope.points]
-            ys = [point[1] for point in scope.points]
+        from ai.pipelines.scope_geometry import scope_path_points
+
+        path = scope_path_points(scope)
+        if path:
+            xs = [point[0] for point in path]
+            ys = [point[1] for point in path]
             return (min(xs), min(ys), max(xs), max(ys))
 
     return None
@@ -505,6 +517,53 @@ def _latest_overlay_id(
     return cast(int, overlay.id)
 
 
+def finalize_inspection_run_for_job_failure(
+    payload: dict[str, Any],
+    error_message: str,
+) -> None:
+    """Mark the run failed using a fresh DB session (safe after ORM rollback)."""
+    run_id = _parse_optional_int(payload.get("inspection_run_id"))
+    if run_id is None:
+        return
+
+    from database import SessionLocal
+    from services.inspection_run_progress import fail_run_progress
+
+    fail_run_progress(run_id, error_message)
+
+    db = SessionLocal()
+    try:
+        _finalize_inspection_run_after_match(
+            db,
+            inspection_run_id=run_id,
+            match_status="no_match",
+            error_message=error_message,
+        )
+    finally:
+        db.close()
+
+
+def _finalize_inspection_run_after_index(
+    session: Session,
+    *,
+    inspection_run_id: int | None,
+    finish_progress: bool = True,
+) -> None:
+    if inspection_run_id is None:
+        return
+    storage = StorageService(session)
+    storage.update_inspection_run_status(
+        inspection_run_id,
+        "complete",
+        completed_at=datetime.now(timezone.utc),
+        clear_error_message=True,
+    )
+    if finish_progress:
+        from services.inspection_run_progress import finish_run_progress
+
+        finish_run_progress(inspection_run_id)
+
+
 def _finalize_inspection_run_after_match(
     session: Session,
     *,
@@ -528,6 +587,8 @@ def _finalize_inspection_run_after_match(
         )
         return
 
+    from services.inspection_run_progress import finish_run_progress
+
     if match_status == "index_pending":
         storage.update_inspection_run_status(
             inspection_run_id,
@@ -542,6 +603,8 @@ def _finalize_inspection_run_after_match(
         completed_at=now,
         clear_error_message=True,
     )
+    if match_status != "index_pending":
+        finish_run_progress(inspection_run_id)
 
 
 def run_inspection_match_job(payload: dict[str, Any], session: Session) -> MatchStatus:
@@ -554,26 +617,36 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
     evidence_id = _parse_optional_int(inspection_id)
     master_drawing_id = _parse_optional_int(drawing_id)
 
+    from services.inspection_run_progress import inspection_progress_scope
+
+    index_only = bool(payload.get("index_only"))
+    match_only = bool(payload.get("match_only"))
     try:
-        return _run_inspection_match_job_body(
+        with inspection_progress_scope(
             session,
-            inspection_id=inspection_id,
-            drawing_id=drawing_id,
-            page=page,
-            run_id_hint=run_id_hint,
-            project_id=project_id,
+            run_id=run_id_hint,
             job_id=job_id,
-            evidence_id=evidence_id,
-            master_drawing_id=master_drawing_id,
-            force_investigate=bool(payload.get("force_investigate")),
-        )
+            index_only=index_only,
+            match_only=match_only,
+        ):
+            return _run_inspection_match_job_body(
+                session,
+                inspection_id=inspection_id,
+                drawing_id=drawing_id,
+                page=page,
+                run_id_hint=run_id_hint,
+                project_id=project_id,
+                job_id=job_id,
+                evidence_id=evidence_id,
+                master_drawing_id=master_drawing_id,
+                force_investigate=bool(payload.get("force_investigate")),
+                index_only=index_only,
+                match_only=match_only,
+                chain_match=bool(payload.get("chain_match")),
+            )
     except Exception as exc:
-        _finalize_inspection_run_after_match(
-            session,
-            inspection_run_id=run_id_hint,
-            match_status="no_match",
-            error_message=str(exc),
-        )
+        session.rollback()
+        finalize_inspection_run_for_job_failure(payload, str(exc))
         raise
 
 
@@ -589,7 +662,13 @@ def _run_inspection_match_job_body(
     evidence_id: int | None,
     master_drawing_id: int | None,
     force_investigate: bool = False,
+    index_only: bool = False,
+    match_only: bool = False,
+    chain_match: bool = False,
 ) -> MatchStatus:
+
+    if index_only and match_only:
+        raise ValueError("index_only and match_only are mutually exclusive")
 
     def _persist(**kwargs: Any) -> int | None:
         return persist_inspection_match_overlay(
@@ -619,6 +698,47 @@ def _run_inspection_match_job_body(
         )
         return status
 
+    if index_only:
+        from ai.agents.evidence_dossier import index_evidence_attachments
+
+        investigation_meta = index_evidence_attachments(
+            session,
+            evidence_id=evidence_id,
+            force=force_investigate or True,
+        )
+        log_inspection_investigation_complete(
+            evidence_id=evidence_id,
+            master_drawing_id=master_drawing_id,
+            investigation_meta=investigation_meta,
+            inspection_run_id=run_id_hint,
+        )
+        session.flush()
+        if chain_match:
+            from services.inspection_run_progress import get_inspection_progress
+
+            progress = get_inspection_progress()
+            if progress is not None:
+                progress.mode = "match"  # type: ignore[misc]
+                progress.set_phase("matching")
+            return _run_inspection_match_job_body(
+                session,
+                inspection_id=inspection_id,
+                drawing_id=drawing_id,
+                page=page,
+                run_id_hint=run_id_hint,
+                project_id=project_id,
+                job_id=job_id,
+                evidence_id=evidence_id,
+                master_drawing_id=master_drawing_id,
+                match_only=True,
+            )
+        _finalize_inspection_run_after_index(
+            session,
+            inspection_run_id=run_id_hint,
+            finish_progress=True,
+        )
+        return "no_match"
+
     log_inspection_match_started(
         evidence_id=evidence_id,
         master_drawing_id=master_drawing_id,
@@ -635,7 +755,8 @@ def _run_inspection_match_job_body(
         master_drawing_id=master_drawing_id,
         page=page,
         inspection_run_id=run_id_hint,
-        force_investigate=force_investigate,
+        force_investigate=force_investigate and not match_only,
+        investigate=not match_only,
     )
     status = result.status
 

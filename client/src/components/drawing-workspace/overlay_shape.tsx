@@ -78,6 +78,58 @@ export default function OverlayShape({
     );
   }
 
+  if (region.kind === "line_segments") {
+    const utilityHighlight = isUtilityLineScope(region.source.scopeKind)
+      ? utilityPolylineHighlightStyle(selected)
+      : null;
+    const segmentStroke = utilityPolylineStrokeWidth(selected);
+    const pixelSegments = region.segments.map(([start, end]) => ({
+      start: normalizedPointsToPixels([start], viewerSize)[0],
+      end: normalizedPointsToPixels([end], viewerSize)[0],
+    }));
+    const labelAnchor = pixelSegments[0]?.start;
+
+    return (
+      <g
+        data-testid={`overlay-group-${index}`}
+        data-overlay-id={regionId != null ? String(regionId) : undefined}
+        data-focused={selected ? "true" : "false"}
+        data-overlay-highlight={utilityHighlight ? "utility-marker" : undefined}
+      >
+        {pixelSegments.map((segment, segmentIndex) => (
+          <line
+            key={`segment-${segmentIndex}`}
+            x1={segment.start.x}
+            y1={segment.start.y}
+            x2={segment.end.x}
+            y2={segment.end.y}
+            stroke={utilityHighlight?.stroke ?? stroke}
+            strokeWidth={utilityHighlight?.strokeWidth ?? segmentStroke}
+            strokeLinecap="round"
+            style={
+              utilityHighlight
+                ? { mixBlendMode: utilityHighlight.mixBlendMode }
+                : undefined
+            }
+            data-testid={`overlay-line-segment-${index}-${segmentIndex}`}
+          />
+        ))}
+        {caption && labelAnchor ? (
+          <text
+            x={labelAnchor.x + 4}
+            y={Math.max(12, labelAnchor.y - 6)}
+            fill={utilityHighlight?.labelFill ?? stroke}
+            fontSize={11}
+            fontWeight={600}
+            data-testid={`overlay-label-${index}`}
+          >
+            {caption}
+          </text>
+        ) : null}
+      </g>
+    );
+  }
+
   if (region.kind === "polyline") {
     const points = normalizedPointsToPixels(region.points, viewerSize);
     const pointsString = polygonPointsToSvgString(points);

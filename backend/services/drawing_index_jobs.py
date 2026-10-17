@@ -40,6 +40,10 @@ logger = logging.getLogger(__name__)
 
 JOB_TYPE = "drawing_index"
 _LINKED_DRAWING_SOURCE = "linked_evidence"
+_INSPECTION_EVIDENCE_SOURCE = "inspection_evidence"
+INSPECTION_INDEXABLE_SOURCES = frozenset(
+    {_LINKED_DRAWING_SOURCE, _INSPECTION_EVIDENCE_SOURCE}
+)
 INDEX_STATUS_PENDING_DOCUMENT_AI = "pending_document_ai"
 
 
@@ -222,20 +226,22 @@ def ensure_linked_attachment_ready_for_index(session: Session, drawing: Drawing)
     return True
 
 
-def index_linked_attachment_drawing_sync(
+def index_inspection_attachment_drawing_sync(
     session: Session,
     drawing_id: int,
+    *,
+    force: bool = False,
 ) -> IndexResult | None:
-    """Run full positioned OCR index synchronously for one linked attachment."""
+    """Run ``index_master_drawing`` synchronously for inspection / linked attachment PDFs."""
     if not settings.drawing_index_enabled:
         return None
 
     drawing = session.get(Drawing, drawing_id)
     if drawing is None:
         return None
-    if cast(str | None, drawing.source) != _LINKED_DRAWING_SOURCE:
+    if cast(str | None, drawing.source) not in INSPECTION_INDEXABLE_SOURCES:
         return None
-    if cast(str, drawing.index_status) == "ready":
+    if not force and cast(str, drawing.index_status) == "ready":
         return None
 
     if not ensure_linked_attachment_ready_for_index(session, drawing):
@@ -271,6 +277,14 @@ def index_linked_attachment_drawing_sync(
         return None
 
 
+def index_linked_attachment_drawing_sync(
+    session: Session,
+    drawing_id: int,
+) -> IndexResult | None:
+    """Backward-compatible alias for linked attachment sync index."""
+    return index_inspection_attachment_drawing_sync(session, drawing_id)
+
+
 def index_linked_attachment_drawings_sync(
     session: Session,
     drawing_ids: list[int],
@@ -278,7 +292,7 @@ def index_linked_attachment_drawings_sync(
     """OCR-index every linked attachment; return ids that reached index_status=ready."""
     indexed: list[int] = []
     for drawing_id in drawing_ids:
-        result = index_linked_attachment_drawing_sync(session, drawing_id)
+        result = index_inspection_attachment_drawing_sync(session, drawing_id)
         if result is not None:
             indexed.append(drawing_id)
     return indexed

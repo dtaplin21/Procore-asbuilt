@@ -151,6 +151,38 @@ def test_native_text_looks_garbled_accepts_readable_native_layer() -> None:
     assert _native_text_looks_garbled(document) is False
 
 
+def test_extract_drawing_document_for_inspection_uses_master_path_when_aligned(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from config import settings
+
+    monkeypatch.setattr(settings, "inspection_index_align_with_master", True)
+    pdf_path = tmp_path / "inspection.pdf"
+    pdf_path.write_bytes(b"%PDF")
+    native = ExtractedDocument(
+        source_format=SourceFormat.NATIVE_PDF,
+        page_count=1,
+        words=[_word("STA 10+00")],
+    )
+
+    with patch(
+        "ai.pipelines.master_drawing_indexer.extract_document",
+        return_value=native,
+    ) as native_mock:
+        with patch(
+            "ai.pipelines.master_drawing_indexer.extract_document_via_ocr",
+        ) as ocr_mock:
+            from ai.pipelines.master_drawing_indexer import (
+                extract_drawing_document_for_inspection,
+            )
+
+            extract_drawing_document_for_inspection(pdf_path)
+
+    native_mock.assert_called_once()
+    ocr_mock.assert_called_once()
+
+
 def test_extract_drawing_document_force_ocr_for_linked_evidence(tmp_path: Path) -> None:
     pdf_path = tmp_path / "install.pdf"
     pdf_path.write_bytes(b"%PDF")

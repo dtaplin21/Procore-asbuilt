@@ -10,6 +10,7 @@ from typing import Any, cast
 
 from sqlalchemy.orm import Session, object_session
 
+from config import settings
 from ai.agents.tools.pdf_investigation import EvidenceInvestigationPayload
 from ai.pipelines.document_extraction_orchestrator import run_document_extraction
 from ai.pipelines.evidence_kind_classifier import classify_and_persist_evidence_kind
@@ -27,6 +28,7 @@ from models.inspection_run import InspectionRun
 from models.models import Drawing, EvidenceRecord, JobQueue, Project
 from services.drawing_index_jobs import JOB_TYPE as DRAWING_INDEX_JOB_TYPE, maybe_enqueue_drawing_index_job
 from services.drawing_index_jobs import index_linked_attachment_drawings_sync
+from services.inspection_evidence_index import ensure_inspection_evidence_drawing_indexed
 from services.drawing_render_jobs import DRAWING_RENDER_JOB_TYPE, enqueue_drawing_render_job
 from services.evidence_linking import replace_evidence_drawing_links
 from services.evidence_survey_extraction import (
@@ -240,8 +242,15 @@ def persist_evidence_investigation(
     payload: EvidenceInvestigationPayload,
     persist_text_content: bool = True,
     text_content_max_chars: int | None = None,
+    force_reindex: bool = False,
 ) -> EvidenceInvestigationPersistResult:
     """Apply DB side effects for a completed PDF investigation payload."""
+    from services.inspection_run_progress import get_inspection_progress
+
+    progress = get_inspection_progress()
+    if progress is not None:
+        progress.set_phase("extracting_clues")
+
     link_result = payload.link_result
     linked_drawing_ids: list[int] = []
     survey_point_count = 0
@@ -269,6 +278,20 @@ def persist_evidence_investigation(
     existing_refs.extend(link_result.cross_refs)
     evidence.cross_refs_json = existing_refs  # type: ignore[assignment]
 
+    inspection_source_drawing_id: int | None = None
+    try:
+        inspection_source_drawing_id = ensure_inspection_evidence_drawing_indexed(
+            session,
+            evidence=evidence,
+            project_id=project_id,
+            force=force_reindex,
+        )
+    except Exception:
+        logger.exception(
+            "inspection_evidence_pdf_index_failed",
+            extra={"evidence_id": evidence_id},
+        )
+
     try:
         linked_drawing_ids = register_linked_pdfs_as_auxiliary_drawings(
             session,
@@ -285,6 +308,8 @@ def persist_evidence_investigation(
     drawing_ids_needing_index: list[int] = []
     linked_drawing_ids_indexed_sync: list[int] = []
     if linked_drawing_ids:
+        if progress is not None:
+            progress.set_phase("indexing_linked")
         try:
             linked_drawing_ids_indexed_sync = index_linked_attachment_drawings_sync(
                 session,
@@ -405,6 +430,11 @@ def persist_evidence_investigation(
         "linked_drawing_ids": linked_drawing_ids,
         "linked_drawing_ids_indexed_sync": linked_drawing_ids_indexed_sync,
         "drawing_ids_needing_index": drawing_ids_needing_index,
+        "page_investigations": list(getattr(payload, "page_investigations", ()) or ()),
+        "inspection_source_drawing_id": inspection_source_drawing_id,
+        "index_pipeline": "master_index"
+        if settings.inspection_index_align_with_master
+        else "ocr_only",
         "at": datetime.now(timezone.utc).isoformat(),
     }
     evidence.meta = meta  # type: ignore[assignment]

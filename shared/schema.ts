@@ -530,6 +530,8 @@ export interface InspectionRun {
   error_message: string | null;
   created_at: string;
   updated_at: string;
+  /** While queued/processing: indexing | matching | investigating | stuck */
+  activity?: string | null;
 }
 
 export interface InspectionRunListResponse {
@@ -706,6 +708,7 @@ export interface InspectionRun {
   error_message: string | null;
   created_at: string;
   updated_at: string;
+  activity?: string | null;
 }
 
 /** Paginated list of inspection runs. */

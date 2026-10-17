@@ -14,6 +14,8 @@ import type { InspectionRunRowRun } from "@/components/drawing-workspace/inspect
 vi.mock("@/lib/api/inspections", () => ({
   evidenceFileDownloadUrl: (projectId: string, evidenceFileId: string) =>
     `/api/projects/${projectId}/evidence/${evidenceFileId}/file`,
+  inspectionRunIndexInventoryUrl: (projectId: string, runId: string) =>
+    `/api/projects/${projectId}/inspections/runs/${runId}/index-inventory`,
 }));
 
 function buildRun(overrides: Partial<InspectionRunRowRun> = {}): InspectionRunRowRun {
@@ -51,22 +53,29 @@ describe("InspectionRunRow history mode", () => {
     expect(screen.getByTestId("inspection-run-delete-42")).toBeInTheDocument();
   });
 
-  it("renders re-run control when onReprocess is provided and evidence exists", () => {
-    const onReprocess = vi.fn();
+  it("renders index and placement controls when handlers are provided", () => {
+    const onReindex = vi.fn();
+    const onRematch = vi.fn();
     render(
       <ul>
         <InspectionRunRow
           run={buildRun({ id: 42, evidence_id: 99 })}
           projectId="p1"
-          onReprocess={onReprocess}
+          onReindex={onReindex}
+          onRematch={onRematch}
         />
       </ul>,
     );
-    expect(screen.getByTestId("inspection-run-reprocess-42")).toHaveTextContent(
-      "Re-run inspection",
+    expect(screen.getByTestId("inspection-run-reindex-42")).toHaveTextContent(
+      "Re-index files",
     );
-    fireEvent.click(screen.getByTestId("inspection-run-reprocess-42"));
-    expect(onReprocess).toHaveBeenCalledWith(42);
+    expect(screen.getByTestId("inspection-run-rematch-42")).toHaveTextContent(
+      "Re-run placement",
+    );
+    fireEvent.click(screen.getByTestId("inspection-run-reindex-42"));
+    fireEvent.click(screen.getByTestId("inspection-run-rematch-42"));
+    expect(onReindex).toHaveBeenCalledWith(42);
+    expect(onRematch).toHaveBeenCalledWith(42);
   });
 
   it("renders without a region label or link when the run has no region", () => {
@@ -121,14 +130,17 @@ describe("InspectionRunRow history mode", () => {
 });
 
 describe("InspectionRunRow panel mode", () => {
-  it("shows investigating label for processing runs in panel mode", () => {
+  it("shows activity-specific label for processing runs in panel mode", () => {
     render(
       <ul>
-        <InspectionRunRow run={buildRun({ id: 15, status: "processing" })} onSelect={vi.fn()} />
+        <InspectionRunRow
+          run={buildRun({ id: 15, status: "processing", activity: "indexing" })}
+          onSelect={vi.fn()}
+        />
       </ul>,
     );
 
-    expect(screen.getByText("Investigating linked files…")).toBeInTheDocument();
+    expect(screen.getByText("Indexing linked files…")).toBeInTheDocument();
   });
 
   it("calls onSelect when clicked", () => {

@@ -1029,6 +1029,17 @@ def project_polyline_to_master(
     return _project_polyline(points, registration_transform)
 
 
+def project_line_segments_to_master(
+    segments: Sequence[tuple[tuple[float, float], tuple[float, float]]],
+    registration_transform: RegistrationTransform,
+) -> tuple[tuple[tuple[float, float], tuple[float, float]], ...]:
+    from ai.pipelines.registration_from_survey import (
+        project_line_segments_to_master as _project_segments,
+    )
+
+    return _project_segments(segments, registration_transform)
+
+
 def _load_document_extraction(
     session: Session,
     evidence_id: int,

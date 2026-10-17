@@ -295,6 +295,26 @@ def test_run_drawing_index_job_is_idempotent(
     assert all(row.text != "OLD" for row in rows)
 
 
+def test_index_inspection_attachment_drawing_sync_indexes_inspection_evidence(
+    db_session: Session,
+    seeded_ready_pdf_drawing: Drawing,
+) -> None:
+    from services.drawing_index_jobs import index_inspection_attachment_drawing_sync
+
+    linked = seeded_ready_pdf_drawing
+    linked.source = "inspection_evidence"  # type: ignore[assignment]
+    linked.index_status = "pending"  # type: ignore[assignment]
+    db_session.commit()
+
+    drawing_id = cast(int, linked.id)
+    result = index_inspection_attachment_drawing_sync(db_session, drawing_id)
+
+    assert result is not None
+    assert result.text_elements >= 1
+    db_session.refresh(linked)
+    assert cast(str, linked.index_status) == "ready"
+
+
 def test_index_linked_attachment_drawing_sync_indexes_linked_evidence(
     db_session: Session,
     seeded_ready_pdf_drawing: Drawing,

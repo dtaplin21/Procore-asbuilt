@@ -31,13 +31,34 @@ export function normalizePoints(points: NormalizedPoint[]): NormalizedPoint[] {
   }));
 }
 
+function normalizeSegments(
+  segments: [NormalizedPoint, NormalizedPoint][]
+): [NormalizedPoint, NormalizedPoint][] {
+  return segments.map(([start, end]) => [normalizePoints([start])[0], normalizePoints([end])[0]]);
+}
+
 export function resolveOverlayRegion(region: DrawingDiffRegion): ResolvedOverlayRegion | null {
-  if (region.shapeType === "polyline" && region.points && region.points.length >= 2) {
+  if (region.shapeType === "line_segments" && region.segments && region.segments.length >= 1) {
     return {
-      kind: "polyline",
-      points: normalizePoints(region.points),
+      kind: "line_segments",
+      segments: normalizeSegments(region.segments),
       source: region,
     };
+  }
+
+  if (region.shapeType === "polyline" && region.points && region.points.length >= 2) {
+    const segments: [NormalizedPoint, NormalizedPoint][] = [];
+    const points = normalizePoints(region.points);
+    for (let index = 0; index < points.length - 1; index += 1) {
+      segments.push([points[index], points[index + 1]]);
+    }
+    if (segments.length >= 1) {
+      return {
+        kind: "line_segments",
+        segments,
+        source: region,
+      };
+    }
   }
 
   if (region.shapeType === "polygon" && region.points && region.points.length >= 3) {

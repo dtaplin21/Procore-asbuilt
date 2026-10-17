@@ -28,6 +28,16 @@ vi.mock("@/hooks/use-inspection-runs", () => ({
     mutate: vi.fn(),
     isPending: false,
   }),
+  useReindexInspectionRun: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    variables: undefined,
+  }),
+  useRematchInspectionRun: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    variables: undefined,
+  }),
   useDrawingOverlays: () => ({
     data: [
       {
@@ -57,6 +67,12 @@ vi.mock("@/hooks/use_inspection_match_status", () => ({
   ) => useInspectionMatchStatusMock(evidenceId, options),
 }));
 
+const useInspectionRunProgressMock = vi.fn();
+
+vi.mock("@/hooks/use-inspection-run-progress", () => ({
+  useInspectionRunProgress: (...args: unknown[]) => useInspectionRunProgressMock(...args),
+}));
+
 function renderPanel(ui: ReactElement) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -83,6 +99,10 @@ describe("InspectionRunsPanel", () => {
     createRunAsync.mockReset();
     uploadRunEvidenceAsync.mockReset();
     useInspectionMatchStatusMock.mockReturnValue(null);
+    useInspectionRunProgressMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    });
     createRunAsync.mockResolvedValue({ id: 7, status: "queued" });
     uploadRunEvidenceAsync.mockResolvedValue({
       evidence_id: 99,
@@ -183,7 +203,7 @@ describe("InspectionRunsPanel", () => {
     });
   });
 
-  it("shows investigating label for processing runs", () => {
+  it("shows activity-specific label for processing runs", () => {
     mockRuns([
       {
         id: 2,
@@ -192,6 +212,7 @@ describe("InspectionRunsPanel", () => {
         evidence_id: 8,
         inspection_type: "visual",
         status: "processing",
+        activity: "matching",
         started_at: "2026-01-01T12:00:00Z",
         completed_at: null,
         error_message: null,
@@ -204,7 +225,41 @@ describe("InspectionRunsPanel", () => {
       <InspectionRunsPanel projectId={2} masterDrawingId={10} selectedRunId={2} />
     );
 
-    expect(screen.getByText("Investigating linked files…")).toBeInTheDocument();
+    expect(screen.getByText("Matching location on master…")).toBeInTheDocument();
+  });
+
+  it("shows coarse progress panel for an active selected run", () => {
+    mockRuns([
+      {
+        id: 2,
+        project_id: 2,
+        master_drawing_id: 10,
+        evidence_id: 8,
+        inspection_type: "visual",
+        status: "processing",
+        activity: "indexing",
+        started_at: "2026-01-01T12:00:00Z",
+        completed_at: null,
+        error_message: null,
+        created_at: "2026-01-01T12:00:00Z",
+        updated_at: "2026-01-01T12:00:00Z",
+      },
+    ]);
+    useInspectionRunProgressMock.mockReturnValue({
+      data: {
+        run_id: 2,
+        current: { label: "Reading page 4 of 20" },
+        steps: [{ id: "reading_pdf", label: "Reading evidence PDF", status: "running" }],
+      },
+      isLoading: false,
+    });
+
+    renderPanel(
+      <InspectionRunsPanel projectId={2} masterDrawingId={10} selectedRunId={2} />
+    );
+
+    expect(screen.getByTestId("inspection-run-progress-panel")).toBeInTheDocument();
+    expect(screen.getByText("Reading page 4 of 20")).toBeInTheDocument();
   });
 
   it("keeps upload enabled when a deferred queued run has no evidence yet", () => {

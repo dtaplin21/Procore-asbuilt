@@ -19,7 +19,8 @@ import { useActiveProject } from "@/contexts/active_project_context";
 import {
   useDeleteInspectionRun,
   useInspectionRuns,
-  useReprocessInspectionRun,
+  useReindexInspectionRun,
+  useRematchInspectionRun,
 } from "@/hooks/use-inspection-runs";
 import { toast } from "@/hooks/use-toast";
 import { replaceDashboardProjectIdInUrl } from "@/lib/active_project";
@@ -62,23 +63,55 @@ export default function Inspections() {
   const { mutate: deleteInspectionRun, isPending: deletePending } =
     useDeleteInspectionRun(selectedProjectId);
   const {
-    mutate: reprocessInspectionRun,
-    isPending: reprocessPending,
-    variables: reprocessRunId,
-  } = useReprocessInspectionRun(selectedProjectId);
+    mutate: reindexInspectionRun,
+    isPending: reindexPending,
+    variables: reindexRunId,
+  } = useReindexInspectionRun(selectedProjectId);
+  const {
+    mutate: rematchInspectionRun,
+    isPending: rematchPending,
+    variables: rematchRunId,
+  } = useRematchInspectionRun(selectedProjectId);
 
-  const handleReprocessRun = (runId: number) => {
-    reprocessInspectionRun(runId, {
+  const pipelinePending = reindexPending || rematchPending;
+  const pipelinePendingRunId = reindexRunId ?? rematchRunId ?? null;
+  const pipelinePendingAction = reindexPending
+    ? "reindex"
+    : rematchPending
+      ? "rematch"
+      : null;
+
+  const handleReindexRun = (runId: number) => {
+    reindexInspectionRun(runId, {
       onSuccess: () => {
         toast({
-          title: "Re-running inspection",
+          title: "Re-indexing inspection files",
           description:
-            "Following linked files and re-matching on the master drawing. Status will update when processing finishes.",
+            "Following linked PDFs and refreshing clues. Re-run placement when indexing finishes.",
         });
       },
       onError: (error) => {
         toast({
-          title: "Re-run failed",
+          title: "Re-index failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      },
+    });
+  };
+
+  const handleRematchRun = (runId: number) => {
+    rematchInspectionRun(runId, {
+      onSuccess: () => {
+        toast({
+          title: "Re-running placement",
+          description:
+            "Matching indexed clues on the master drawing without re-fetching linked files.",
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Re-match failed",
           description: error.message,
           variant: "destructive",
         });
@@ -288,9 +321,11 @@ export default function Inspections() {
               projectId={String(selectedProjectId)}
               onDelete={handleDeleteRun}
               deletePending={deletePending}
-              onReprocess={handleReprocessRun}
-              reprocessPending={reprocessPending}
-              reprocessPendingRunId={reprocessRunId ?? null}
+              onReindex={handleReindexRun}
+              onRematch={handleRematchRun}
+              pipelinePending={pipelinePending}
+              pipelinePendingRunId={pipelinePendingRunId}
+              pipelinePendingAction={pipelinePendingAction}
             />
           ))}
         </ul>

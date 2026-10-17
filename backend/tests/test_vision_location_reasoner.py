@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from ai.agents.evidence_dossier import (
     EvidenceDossier,
@@ -158,8 +158,18 @@ def test_apply_vision_to_fused_scores_boosts_selected_candidate(mock_reason) -> 
     assert "vision=COLO corridor match" in updated[0].rationale
 
 
-def test_apply_vision_skips_strong_coordinate_winner() -> None:
-    dossier = _minimal_dossier(evidence_text="Sanitary sewer run")
+@patch("ai.pipelines.vision_location_reasoner.reason_over_master_crop")
+def test_apply_vision_runs_for_strong_coordinate_winner(
+    mock_reason: MagicMock,
+) -> None:
+    mock_reason.return_value = SimpleNamespace(
+        best_candidate_index=0,
+        confidence=0.8,
+        rationale="utility corridor",
+    )
+    dossier = _minimal_dossier(
+        evidence_text="Sanitary sewer lateral run along corridor",
+    )
     coordinate_winner = _fused_candidate(
         region_id=10,
         fused_score=0.95,
@@ -173,20 +183,16 @@ def test_apply_vision_skips_strong_coordinate_winner() -> None:
             ),
         ),
     )
-    scores = [
-        coordinate_winner,
-        _fused_candidate(region_id=20, fused_score=0.5),
-    ]
+    scores = [coordinate_winner, _fused_candidate(region_id=20, fused_score=0.5)]
 
-    with patch("ai.pipelines.vision_location_reasoner.reason_over_master_crop") as mock_reason:
-        updated = apply_vision_to_fused_scores(
-            dossier,
-            scores,
-            master_png_path=Path("/tmp/master.png"),
-        )
+    updated = apply_vision_to_fused_scores(
+        dossier,
+        scores,
+        master_png_path=Path("/tmp/master.png"),
+    )
 
-    assert updated == scores
-    mock_reason.assert_not_called()
+    mock_reason.assert_called_once()
+    assert updated[0].fused_score >= scores[0].fused_score
 
 
 @patch("ai.pipelines.vision_location_reasoner.reason_over_master_crop")
@@ -215,9 +221,9 @@ def test_trace_scope_geometry_uses_vision_when_deterministic_trace_fails(
         master_png_path=png_path,
     )
 
-    assert scope.type == "polyline"
-    assert scope.points is not None
-    assert len(scope.points) == 3
+    assert scope.type == "line_segments"
+    assert scope.segments is not None
+    assert len(scope.segments) == 2
     assert scope.meta is not None
     assert scope.meta.get("source") == "vision_trace"
     mock_reason.assert_called_once()

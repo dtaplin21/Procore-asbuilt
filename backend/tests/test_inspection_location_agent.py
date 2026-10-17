@@ -188,7 +188,10 @@ def test_agent_defers_when_master_index_not_ready(db_session: Session) -> None:
     assert overlay_meta["match_status"] == "index_pending"
 
 
-@patch("ai.agents.inspection_location_agent.should_invoke_vision", return_value=False)
+@patch(
+    "ai.agents.inspection_location_agent.apply_vision_to_fused_scores",
+    side_effect=lambda _dossier, scores, **kwargs: scores,
+)
 @patch("ai.agents.inspection_location_agent.fuse_candidate_scores")
 @patch("ai.agents.inspection_location_agent.generate_all_location_candidates")
 @patch("ai.agents.inspection_location_agent.build_evidence_dossier")
@@ -234,10 +237,10 @@ def test_agent_end_to_end_polyline_for_utility_line(
 
     assert result.status == "matched"
     assert result.scope is not None
-    assert result.scope.type == "polyline"
+    assert result.scope.type == "line_segments"
     assert result.scope.scope_kind == ScopeKind.UTILITY_LINE
-    assert result.scope.points is not None
-    assert len(result.scope.points) >= 2
+    assert result.scope.segments is not None
+    assert len(result.scope.segments) >= 1
 
     overlay = (
         db_session.query(DrawingOverlay)
@@ -245,9 +248,9 @@ def test_agent_end_to_end_polyline_for_utility_line(
         .one()
     )
     geometry = cast(dict, overlay.geometry)
-    assert geometry["type"] == "polyline"
+    assert geometry["type"] == "line_segments"
     assert geometry.get("scope_kind") == ScopeKind.UTILITY_LINE.value
-    assert len(cast(list, geometry.get("points"))) >= 2
+    assert len(cast(list, geometry.get("segments"))) >= 1
 
     overlay_meta = cast(dict, overlay.meta)
     assert overlay_meta["match_status"] == "matched"
@@ -268,7 +271,10 @@ def test_agent_end_to_end_polyline_for_utility_line(
     assert candidate_meta["clue_hits"] == []
 
 
-@patch("ai.agents.inspection_location_agent.should_invoke_vision", return_value=False)
+@patch(
+    "ai.agents.inspection_location_agent.apply_vision_to_fused_scores",
+    side_effect=lambda _dossier, scores, **kwargs: scores,
+)
 @patch("ai.agents.inspection_location_agent.trace_scope_geometry")
 @patch("ai.agents.inspection_location_agent.fuse_candidate_scores")
 @patch("ai.agents.inspection_location_agent.generate_all_location_candidates")
@@ -312,8 +318,8 @@ def test_agent_traces_on_master_when_registration_missing(
     ]
     mock_trace_scope.return_value = ScopeGeometry(
         page=1,
-        type="polyline",
-        points=((0.10, 0.20), (0.29, 0.27)),
+        type="line_segments",
+        segments=(((0.10, 0.20), (0.29, 0.27)),),
         scope_kind=ScopeKind.UTILITY_LINE,
         meta={"source": "aux_station_labels", "source_drawing_id": 1084},
     )
@@ -329,7 +335,10 @@ def test_agent_traces_on_master_when_registration_missing(
     assert mock_trace_scope.call_args_list[-1].kwargs["source_drawing_id"] is None
 
 
-@patch("ai.agents.inspection_location_agent.should_invoke_vision", return_value=False)
+@patch(
+    "ai.agents.inspection_location_agent.apply_vision_to_fused_scores",
+    side_effect=lambda _dossier, scores, **kwargs: scores,
+)
 @patch("ai.agents.inspection_location_agent.trace_scope_geometry")
 @patch("ai.agents.inspection_location_agent.fuse_candidate_scores")
 @patch("ai.agents.inspection_location_agent.generate_all_location_candidates")
@@ -387,8 +396,8 @@ def test_agent_prefers_registration_aux_for_scope_tracing(
     ]
     mock_trace_scope.return_value = ScopeGeometry(
         page=1,
-        type="polyline",
-        points=((0.10, 0.20), (0.29, 0.27)),
+        type="line_segments",
+        segments=(((0.10, 0.20), (0.29, 0.27)),),
         scope_kind=ScopeKind.UTILITY_LINE,
         meta={
             "source": "aux_plan_station_labels",
@@ -406,20 +415,25 @@ def test_agent_prefers_registration_aux_for_scope_tracing(
     mock_trace_scope.assert_called_once()
     assert mock_trace_scope.call_args.kwargs["source_drawing_id"] == registered_aux_id
     assert result.scope is not None
-    assert result.scope.points is not None
-    assert result.scope.points[0][0] == pytest.approx(0.50, abs=0.02)
+    assert result.scope.segments is not None
+    assert result.scope.segments[0][0][0] == pytest.approx(0.50, abs=0.02)
 
 
-def _polyline_path_length(points: tuple[tuple[float, float], ...]) -> float:
+def _segment_path_length(
+    segments: tuple[tuple[tuple[float, float], tuple[float, float]], ...],
+) -> float:
     total = 0.0
-    for index in range(1, len(points)):
-        dx = points[index][0] - points[index - 1][0]
-        dy = points[index][1] - points[index - 1][1]
+    for start, end in segments:
+        dx = end[0] - start[0]
+        dy = end[1] - start[1]
         total += (dx * dx + dy * dy) ** 0.5
     return total
 
 
-@patch("ai.agents.inspection_location_agent.should_invoke_vision", return_value=False)
+@patch(
+    "ai.agents.inspection_location_agent.apply_vision_to_fused_scores",
+    side_effect=lambda _dossier, scores, **kwargs: scores,
+)
 @patch("ai.agents.inspection_location_agent.trace_scope_geometry")
 @patch("ai.agents.inspection_location_agent.fuse_candidate_scores")
 @patch("ai.agents.inspection_location_agent.generate_all_location_candidates")
@@ -477,18 +491,17 @@ def test_agent_projects_aux_polyline_to_master_with_registration_transform(
             rationale="coordinate_lookup@0.98",
         )
     ]
-    aux_polyline = (
-        (0.10, 0.20),
-        (0.20, 0.22),
-        (0.29, 0.27),
-        (0.30, 0.27),
+    aux_segments = (
+        ((0.10, 0.20), (0.20, 0.22)),
+        ((0.20, 0.22), (0.29, 0.27)),
+        ((0.29, 0.27), (0.30, 0.27)),
     )
     mock_trace_scope.return_value = ScopeGeometry(
         page=1,
-        type="polyline",
-        points=aux_polyline,
+        type="line_segments",
+        segments=aux_segments,
         scope_kind=ScopeKind.UTILITY_LINE,
-        meta={"source": "aux_survey_chain", "source_drawing_id": aux_drawing_id},
+        meta={"source": "aux_plan_station_labels", "source_drawing_id": aux_drawing_id},
     )
 
     agent = InspectionLocationAgent()
@@ -500,11 +513,11 @@ def test_agent_projects_aux_polyline_to_master_with_registration_transform(
 
     assert result.status == "matched"
     assert result.scope is not None
-    assert result.scope.type == "polyline"
-    assert result.scope.points is not None
-    assert result.scope.points[0][0] == pytest.approx(0.50, abs=0.02)
-    assert result.scope.points[0][1] == pytest.approx(0.47, abs=0.02)
-    assert _polyline_path_length(result.scope.points) > 0.05
+    assert result.scope.type == "line_segments"
+    assert result.scope.segments is not None
+    assert result.scope.segments[0][0][0] == pytest.approx(0.50, abs=0.02)
+    assert result.scope.segments[0][0][1] == pytest.approx(0.47, abs=0.02)
+    assert _segment_path_length(result.scope.segments) > 0.05
     assert result.scope.meta is not None
     assert result.scope.meta.get("projected_from_drawing_id") == aux_drawing_id
 
@@ -514,15 +527,24 @@ def test_agent_projects_aux_polyline_to_master_with_registration_transform(
         .one()
     )
     geometry = cast(dict, overlay.geometry)
-    assert geometry["type"] == "polyline"
-    points = cast(list[list[float]], geometry["points"])
-    assert points[0][0] == pytest.approx(0.50, abs=0.02)
-    assert points[0][1] == pytest.approx(0.47, abs=0.02)
-    polyline = tuple((float(p[0]), float(p[1])) for p in points)
-    assert _polyline_path_length(polyline) > 0.05
+    assert geometry["type"] == "line_segments"
+    segments = cast(list[list[list[float]]], geometry["segments"])
+    assert segments[0][0][0] == pytest.approx(0.50, abs=0.02)
+    assert segments[0][0][1] == pytest.approx(0.47, abs=0.02)
+    projected_segments = tuple(
+        (
+            (float(segment[0][0]), float(segment[0][1])),
+            (float(segment[1][0]), float(segment[1][1])),
+        )
+        for segment in segments
+    )
+    assert _segment_path_length(projected_segments) > 0.05
 
 
-@patch("ai.agents.inspection_location_agent.should_invoke_vision", return_value=False)
+@patch(
+    "ai.agents.inspection_location_agent.apply_vision_to_fused_scores",
+    side_effect=lambda _dossier, scores, **kwargs: scores,
+)
 @patch("ai.agents.inspection_location_agent.trace_scope_geometry")
 @patch("ai.agents.inspection_location_agent.fuse_candidate_scores")
 @patch("ai.agents.inspection_location_agent.generate_all_location_candidates")
@@ -567,16 +589,16 @@ def test_agent_defers_aux_polyline_when_registration_transform_missing(
     ]
     master_scope = ScopeGeometry(
         page=1,
-        type="polyline",
-        points=((0.45, 0.46), (0.65, 0.53)),
+        type="line_segments",
+        segments=(((0.45, 0.46), (0.65, 0.53)),),
         scope_kind=ScopeKind.UTILITY_LINE,
-        meta={"source": "utility_line_trace"},
+        meta={"source": "sheet_line"},
     )
     mock_trace_scope.side_effect = [
         ScopeGeometry(
             page=1,
-            type="polyline",
-            points=((0.10, 0.20), (0.29, 0.27)),
+            type="line_segments",
+            segments=(((0.10, 0.20), (0.29, 0.27)),),
             scope_kind=ScopeKind.UTILITY_LINE,
             meta={"source": "aux_station_labels", "source_drawing_id": aux_drawing_id},
         ),
@@ -592,7 +614,7 @@ def test_agent_defers_aux_polyline_when_registration_transform_missing(
 
     assert result.status == "needs_review"
     assert result.scope is not None
-    assert result.scope.type == "polyline"
+    assert result.scope.type == "line_segments"
     assert "aux_coords_unprojected" in result.rationale
     assert mock_trace_scope.call_count == 2
     assert mock_trace_scope.call_args_list[-1].kwargs["source_drawing_id"] is None
@@ -603,4 +625,4 @@ def test_agent_defers_aux_polyline_when_registration_transform_missing(
         .one()
     )
     geometry = cast(dict, overlay.geometry)
-    assert geometry["type"] == "polyline"
+    assert geometry["type"] == "line_segments"

@@ -31,6 +31,7 @@ from services.drawing_index_jobs import (
 )
 from services.inspection_matching_jobs import (
     JOB_TYPE_INSPECTION_MATCH,
+    finalize_inspection_run_for_job_failure,
     process_inspection_match_job,
 )
 
@@ -143,6 +144,10 @@ async def process_one_job() -> bool:
             logger.info("Job %s completed", job_id)
         except Exception as exc:
             previous_status = cast(str | None, job.status)
+            if job_type == JOB_TYPE_INSPECTION_MATCH:
+                input_data = cast(dict[str, Any] | None, job.input_data)
+                if input_data:
+                    finalize_inspection_run_for_job_failure(input_data, str(exc))
             _mark_job_failed(db, job_id, str(exc))
             log_job_status_transition(
                 project_id=cast(int, job.project_id),

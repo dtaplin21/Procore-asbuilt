@@ -161,6 +161,16 @@ class Settings(BaseSettings):
         default=0,
         description="PDF_LINK_FOLLOW_OCR_MAX_PAGES",
     )
+    #: Run OpenAI vision OCR on each page when following PDF links. Env: ``PDF_LINK_FOLLOW_PAGE_VISION_ENABLED``.
+    pdf_link_follow_page_vision_enabled: bool = Field(
+        default=True,
+        description="PDF_LINK_FOLLOW_PAGE_VISION_ENABLED",
+    )
+    #: Use the same ``extract_drawing_document`` / index stack as masters for inspection PDFs and linked attachments. Env: ``INSPECTION_INDEX_ALIGN_WITH_MASTER``.
+    inspection_index_align_with_master: bool = Field(
+        default=True,
+        description="INSPECTION_INDEX_ALIGN_WITH_MASTER",
+    )
 
     #: Enable master drawing auto-index jobs. Env: ``DRAWING_INDEX_ENABLED``.
     drawing_index_enabled: bool = Field(default=True, description="DRAWING_INDEX_ENABLED")

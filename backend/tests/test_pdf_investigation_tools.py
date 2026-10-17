@@ -67,8 +67,11 @@ def test_render_pdf_page_writes_png(tmp_path: Path) -> None:
     rendered.png_path.unlink(missing_ok=True)
 
 
-@patch("ai.agents.tools.pdf_investigation.extract_document")
-def test_extract_page_clues_returns_counts(mock_extract: MagicMock, tmp_path: Path) -> None:
+@patch("ai.pipelines.evidence_page_investigation.investigate_pdf_page")
+def test_extract_page_clues_returns_counts(
+    mock_investigate_page: MagicMock,
+    tmp_path: Path,
+) -> None:
     from ai.pipelines.document_text_extraction import (
         BoundingBox,
         ExtractedDocument,
@@ -76,20 +79,19 @@ def test_extract_page_clues_returns_counts(mock_extract: MagicMock, tmp_path: Pa
         SourceFormat,
     )
 
-    bbox = BoundingBox(x=0, y=0, width=100, height=100, page_width=100, page_height=100)
-    words = [
-        PositionedWord(text="Location:", bbox=bbox, page_index=0),
-        PositionedWord(text="COLO", bbox=bbox, page_index=0),
-        PositionedWord(text="STA", bbox=bbox, page_index=0),
-        PositionedWord(text="10+50", bbox=bbox, page_index=0),
-    ]
-    mock_extract.return_value = ExtractedDocument(
-        source_format=SourceFormat.NATIVE_PDF,
-        page_count=1,
-        words=words,
+    pdf_path = _pdf_with_internal_link(tmp_path)
+    from ai.pipelines.evidence_page_investigation import PageInvestigationResult
+
+    mock_investigate_page.return_value = PageInvestigationResult(
+        page=1,
+        ocr_text="Location: COLO STA 10+50",
+        vision_text="",
+        combined_text="Location: COLO STA 10+50",
+        ocr_word_count=4,
+        vision_word_count=0,
     )
 
-    clues = extract_page_clues(tmp_path / "dummy.pdf", page=1)
+    clues = extract_page_clues(pdf_path, page=2)
 
     assert clues["word_count"] == 4
     assert clues["positioned_term_count"] >= 0
@@ -97,40 +99,51 @@ def test_extract_page_clues_returns_counts(mock_extract: MagicMock, tmp_path: Pa
     assert "10+50" in clues["survey_hints"]["stations"]
 
 
-@patch("ai.pipelines.master_drawing_indexer.extract_drawing_document")
+@patch("ai.pipelines.evidence_page_investigation.investigate_pdf_all_pages")
 def test_extract_attachment_clues_aggregates_all_pages(
-    mock_extract_document: MagicMock,
+    mock_investigate_all: MagicMock,
     tmp_path: Path,
 ) -> None:
     from ai.agents.tools.pdf_investigation import extract_attachment_clues
-    from ai.pipelines.document_text_extraction import (
-        BoundingBox,
-        ExtractedDocument,
-        PositionedWord,
-        SourceFormat,
-    )
+    from ai.pipelines.document_text_extraction import ExtractedDocument, SourceFormat
+    from ai.pipelines.evidence_page_investigation import PageInvestigationResult
 
-    bbox = BoundingBox(x=0, y=0, width=100, height=100, page_width=100, page_height=100)
-    words = [
-        PositionedWord(text="10+00", bbox=bbox, page_index=0),
-        PositionedWord(text="10+90.95", bbox=bbox, page_index=1),
-    ]
-    mock_extract_document.return_value = ExtractedDocument(
+    document = ExtractedDocument(
         source_format=SourceFormat.SCANNED_PDF,
         page_count=2,
-        words=words,
+        words=[],
+    )
+    mock_investigate_all.return_value = (
+        (
+            PageInvestigationResult(
+                page=1,
+                ocr_text="10+00",
+                vision_text="",
+                combined_text="10+00",
+                ocr_word_count=1,
+                vision_word_count=0,
+            ),
+            PageInvestigationResult(
+                page=2,
+                ocr_text="10+90.95",
+                vision_text="",
+                combined_text="10+90.95",
+                ocr_word_count=1,
+                vision_word_count=0,
+            ),
+        ),
+        document,
     )
 
     clues = extract_attachment_clues(tmp_path / "install.pdf")
 
-    mock_extract_document.assert_called_once()
-    assert mock_extract_document.call_args.kwargs.get("force_ocr") is True
+    mock_investigate_all.assert_called_once()
     assert clues["page_count"] == 2
-    assert clues["word_count"] == 2
     assert "10+00" in clues["text"]
     assert "10+90.95" in clues["text"]
     assert "10+00" in clues["survey_hints"]["stations"]
     assert "10+90.95" in clues["survey_hints"]["stations"]
+    assert len(clues["page_investigations"]) == 2
 
 
 @patch("ai.agents.tools.pdf_investigation.follow_and_capture_links")

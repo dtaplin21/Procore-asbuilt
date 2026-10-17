@@ -90,5 +90,68 @@ def test_reprocess_inspection_run_enqueues_job(
     input_data = cast(dict, job.input_data)
     assert input_data["inspection_id"] == str(evidence_id)
     assert input_data["drawing_id"] == str(master_id)
+    assert input_data["index_only"] is True
+    assert input_data["chain_match"] is True
     assert input_data["force_investigate"] is True
     assert input_data["inspection_run_id"] == run_id
+
+
+def test_reindex_inspection_run_enqueues_index_only_job(
+    client: TestClient, db_session: Session, project: Project
+) -> None:
+    project_id, run_id, evidence_id, master_id = _seed_run_with_evidence(
+        db_session, project
+    )
+
+    response = client.post(
+        f"/api/projects/{project_id}/inspections/runs/{run_id}/reindex",
+    )
+    assert response.status_code == 200
+
+    job = (
+        db_session.query(JobQueue)
+        .filter(
+            JobQueue.job_type == JOB_TYPE_INSPECTION_MATCH,
+            JobQueue.project_id == project_id,
+        )
+        .order_by(JobQueue.id.desc())
+        .first()
+    )
+    assert job is not None
+    input_data = cast(dict, job.input_data)
+    assert input_data["index_only"] is True
+    assert input_data.get("chain_match") is not True
+    assert input_data.get("match_only") is not True
+    assert input_data["force_investigate"] is True
+    assert input_data["inspection_id"] == str(evidence_id)
+    assert input_data["drawing_id"] == str(master_id)
+
+
+def test_rematch_inspection_run_enqueues_match_only_job(
+    client: TestClient, db_session: Session, project: Project
+) -> None:
+    project_id, run_id, evidence_id, master_id = _seed_run_with_evidence(
+        db_session, project
+    )
+
+    response = client.post(
+        f"/api/projects/{project_id}/inspections/runs/{run_id}/rematch",
+    )
+    assert response.status_code == 200
+
+    job = (
+        db_session.query(JobQueue)
+        .filter(
+            JobQueue.job_type == JOB_TYPE_INSPECTION_MATCH,
+            JobQueue.project_id == project_id,
+        )
+        .order_by(JobQueue.id.desc())
+        .first()
+    )
+    assert job is not None
+    input_data = cast(dict, job.input_data)
+    assert input_data["match_only"] is True
+    assert input_data.get("index_only") is not True
+    assert input_data.get("force_investigate") is not True
+    assert input_data["inspection_id"] == str(evidence_id)
+    assert input_data["drawing_id"] == str(master_id)

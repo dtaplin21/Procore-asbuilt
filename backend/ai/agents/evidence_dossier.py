@@ -21,8 +21,9 @@ from ai.pipelines.location_match_orchestrator import _load_scoped_survey_points
 from ai.pipelines.survey_point_extractor import SurveyPointRecord
 from models.document_clue import DocumentClue
 from models.document_extraction import DocumentExtraction
+from models.drawing_text_element import DrawingTextElement
 from models.models import Drawing, EvidenceDrawingLink, EvidenceRecord
-from services.evidence_linking import load_linked_drawings
+from services.evidence_linking import load_inspection_auxiliary_drawings
 from services.evidence_text import (
     build_full_evidence_text,
     build_location_reasoning_excerpt,
@@ -153,7 +154,7 @@ def build_evidence_dossier(
         evidence_id=evidence_id,
         master_drawing_id=master_drawing_id,
     )
-    auxiliary_drawings = tuple(load_linked_drawings(session, evidence_id))
+    auxiliary_drawings = tuple(load_inspection_auxiliary_drawings(session, evidence_id))
     linked_drawing_ids = [
         int(cast(int, drawing.id))
         for drawing in auxiliary_drawings
@@ -349,6 +350,20 @@ def _scoped_to_survey_record(point: Any) -> SurveyPointRecord:
     )
 
 
+def _indexed_drawing_text_preview(session: Session, drawing_id: int) -> str:
+    rows = (
+        session.query(DrawingTextElement.text)
+        .filter(DrawingTextElement.master_drawing_id == drawing_id)
+        .order_by(DrawingTextElement.page.asc(), DrawingTextElement.id.asc())
+        .limit(800)
+        .all()
+    )
+    if not rows:
+        return ""
+    combined = " ".join(str(row[0]) for row in rows if row and row[0])
+    return combined[:_TEXT_PREVIEW_CHARS]
+
+
 def _linked_attachments(
     session: Session,
     *,
@@ -364,11 +379,12 @@ def _linked_attachments(
 
     for drawing in auxiliary_drawings:
         drawing_id = cast(int, drawing.id)
+        indexed_preview = _indexed_drawing_text_preview(session, drawing_id)
         by_drawing[drawing_id] = LinkedAttachmentSummary(
             url="",
             filename=str(drawing.name or drawing.original_filename or f"drawing-{drawing_id}"),
             page_count=0,
-            text_preview="",
+            text_preview=indexed_preview,
             drawing_id=drawing_id,
         )
 
@@ -386,7 +402,8 @@ def _linked_attachments(
             if drawing is not None
             else str(link.matched_text or f"drawing-{drawing_id}")
         )
-        preview = str(link.matched_text or "")[:_TEXT_PREVIEW_CHARS]
+        indexed_preview = _indexed_drawing_text_preview(session, drawing_id)
+        preview = indexed_preview or str(link.matched_text or "")[:_TEXT_PREVIEW_CHARS]
         existing = by_drawing.get(drawing_id)
         if existing is None:
             by_drawing[drawing_id] = LinkedAttachmentSummary(
@@ -396,7 +413,7 @@ def _linked_attachments(
                 text_preview=preview,
                 drawing_id=drawing_id,
             )
-        elif preview and not existing.text_preview:
+        elif preview and (not existing.text_preview or len(preview) > len(existing.text_preview)):
             by_drawing[drawing_id] = LinkedAttachmentSummary(
                 url=existing.url,
                 filename=existing.filename or filename,
@@ -496,12 +513,40 @@ def _match_investigation_is_fresh(meta: dict[str, Any]) -> bool:
 
 
 def _pdf_investigation_meta_from_payload(result: Any) -> dict[str, Any]:
+    page_rows = getattr(result, "page_investigations", ()) or ()
     return {
         "links_followed": result.links_followed,
         "pages_rendered": result.pages_rendered,
         "ocr_word_counts": dict(result.ocr_word_counts),
         "pdf_investigation_errors": list(result.errors),
+        "page_investigations": list(page_rows),
     }
+
+
+def index_evidence_attachments(
+    session: Session,
+    *,
+    evidence_id: int,
+    force: bool = True,
+) -> dict[str, Any]:
+    """PDF link follow, merge, clue extraction, and linked-drawing persistence only."""
+    evidence = session.get(EvidenceRecord, evidence_id)
+    if evidence is None:
+        raise ValueError(f"Evidence {evidence_id} not found")
+    project_id = cast(int, evidence.project_id)
+    _, meta = _maybe_investigate_and_persist(
+        session,
+        evidence=evidence,
+        project_id=project_id,
+        investigate=True,
+        force_investigate=force,
+    )
+    session.refresh(evidence)
+    out = dict(meta)
+    evidence_meta = cast(dict[str, Any] | None, evidence.meta) or {}
+    if evidence_meta.get("matchInvestigation"):
+        out["matchInvestigation"] = evidence_meta["matchInvestigation"]
+    return out
 
 
 def _maybe_investigate_and_persist(
@@ -550,6 +595,7 @@ def _maybe_investigate_and_persist(
             file_path=file_path,
             project_id=project_id,
             payload=result,
+            force_reindex=force_investigate,
         )
         session.flush()
         session.refresh(evidence)

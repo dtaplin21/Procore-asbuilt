@@ -5,7 +5,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, cast
+from typing import Any, Sequence, cast
+
+LineSegment = tuple[tuple[float, float], tuple[float, float]]
 
 from ai.agents.evidence_dossier import EvidenceDossier
 from ai.pipelines.fractional_coords import (
@@ -42,8 +44,9 @@ class ScopeKind(str, Enum):
 @dataclass(frozen=True)
 class ScopeGeometry:
     page: int
-    type: str  # rect | polygon | polyline
+    type: str  # rect | polygon | polyline | line_segments
     points: tuple[tuple[float, float], ...] | None = None
+    segments: tuple[LineSegment, ...] | None = None
     x: float | None = None
     y: float | None = None
     width: float | None = None
@@ -84,8 +87,20 @@ class ScopeGeometry:
                 list(clamp_point_to_page((float(x), float(y))))
                 for x, y in self.points
             ]
+        elif self.type == "line_segments":
+            if not self.segments:
+                raise ValueError("line_segments scope requires segments")
+            payload["segments"] = [
+                [
+                    list(clamp_point_to_page((float(a[0]), float(a[1])))),
+                    list(clamp_point_to_page((float(b[0]), float(b[1])))),
+                ]
+                for a, b in self.segments
+            ]
         else:
-            raise ValueError("scope type must be 'rect', 'polygon', or 'polyline'")
+            raise ValueError(
+                "scope type must be 'rect', 'polygon', 'polyline', or 'line_segments'"
+            )
 
         if self.scope_kind != ScopeKind.AREA:
             payload["scope_kind"] = self.scope_kind.value
@@ -118,8 +133,69 @@ def validate_scope_geometry(geometry: dict[str, Any]) -> None:
         _validate_point_list(geometry.get("points"), min_points=3, label="polygon")
     elif gtype == "polyline":
         _validate_point_list(geometry.get("points"), min_points=2, label="polyline")
+    elif gtype == "line_segments":
+        _validate_segment_list(geometry.get("segments"))
     else:
-        raise ValueError("geometry.type must be 'rect', 'polygon', or 'polyline'")
+        raise ValueError(
+            "geometry.type must be 'rect', 'polygon', 'polyline', or 'line_segments'"
+        )
+
+
+def line_segments_from_points(
+    points: Sequence[tuple[float, float]],
+) -> tuple[LineSegment, ...]:
+    """Turn consecutive vertices into independent segment pairs (not a connected polyline stroke)."""
+    if len(points) < 2:
+        return ()
+    return tuple((points[index], points[index + 1]) for index in range(len(points) - 1))
+
+
+def scope_line_segments(
+    *,
+    page: int,
+    points: Sequence[tuple[float, float]],
+    scope_kind: ScopeKind,
+    meta: dict[str, Any] | None = None,
+) -> ScopeGeometry:
+    segments = line_segments_from_points(points)
+    if not segments:
+        raise ValueError("line segment scope requires at least two points")
+    return ScopeGeometry(
+        page=page,
+        type="line_segments",
+        segments=segments,
+        scope_kind=scope_kind,
+        meta=meta,
+    )
+
+
+def scope_path_points(scope: ScopeGeometry) -> tuple[tuple[float, float], ...] | None:
+    """Flatten scope geometry into a vertex path for bbox envelopes and eval metrics."""
+    if scope.type == "polyline" and scope.points:
+        return scope.points
+    if scope.type == "line_segments" and scope.segments:
+        path: list[tuple[float, float]] = []
+        for index, (start, end) in enumerate(scope.segments):
+            if index == 0:
+                path.append(start)
+            path.append(end)
+        return tuple(path)
+    return None
+
+
+def _validate_segment_list(segments: Any) -> None:
+    if not isinstance(segments, list):
+        raise ValueError("line_segments must have segments array")
+    if len(segments) < 1:
+        raise ValueError("line_segments needs at least 1 segment.")
+    for index, segment in enumerate(segments):
+        if not isinstance(segment, (list, tuple)) or len(segment) != 2:
+            raise ValueError(f"segment {index} must be [[x0, y0], [x1, y1]]")
+        for point_index, point in enumerate(segment):
+            if not isinstance(point, (list, tuple)) or len(point) < 2:
+                raise ValueError(f"segment {index} point {point_index} must be [x, y]")
+            _check_normalized(float(point[0]), f"segments[{index}][{point_index}][0]")
+            _check_normalized(float(point[1]), f"segments[{index}][{point_index}][1]")
 
 
 def _validate_point_list(

@@ -349,15 +349,33 @@ def endpoint_error_norm(predicted: PolylinePoints, expected: PolylinePoints) -> 
 
 
 def _scope_polyline_points(scope: dict[str, Any]) -> tuple[tuple[float, float], ...] | None:
-    if scope.get("type") != "polyline":
-        return None
-    raw_points = scope.get("points")
-    if not isinstance(raw_points, list) or len(raw_points) < 2:
-        return None
-    try:
-        return _polyline_points(raw_points)
-    except (IndexError, TypeError, ValueError):
-        return None
+    gtype = scope.get("type")
+    if gtype == "polyline":
+        raw_points = scope.get("points")
+        if not isinstance(raw_points, list) or len(raw_points) < 2:
+            return None
+        try:
+            return _polyline_points(raw_points)
+        except (IndexError, TypeError, ValueError):
+            return None
+    if gtype == "line_segments":
+        raw_segments = scope.get("segments")
+        if not isinstance(raw_segments, list) or not raw_segments:
+            return None
+        path: list[tuple[float, float]] = []
+        for index, segment in enumerate(raw_segments):
+            if not isinstance(segment, (list, tuple)) or len(segment) != 2:
+                return None
+            try:
+                start = (float(segment[0][0]), float(segment[0][1]))
+                end = (float(segment[1][0]), float(segment[1][1]))
+            except (IndexError, TypeError, ValueError):
+                return None
+            if index == 0:
+                path.append(start)
+            path.append(end)
+        return tuple(path) if len(path) >= 2 else None
+    return None
 
 
 def _predicted_scope_from_overlay(session: Session, label: EvalLabel) -> dict[str, Any] | None:
@@ -400,9 +418,12 @@ def _bbox_xyxy_from_agent_result(
                 scope.x + scope.width,
                 scope.y + scope.height,
             )
-        if scope.type == "polyline" and scope.points:
-            xs = [point[0] for point in scope.points]
-            ys = [point[1] for point in scope.points]
+        from ai.pipelines.scope_geometry import scope_path_points
+
+        path = scope_path_points(scope)
+        if path:
+            xs = [point[0] for point in path]
+            ys = [point[1] for point in path]
             return (min(xs), min(ys), max(xs), max(ys))
 
     return None
@@ -597,10 +618,14 @@ def evaluate_label(
     min_iou: float,
 ) -> LabelEvalResult:
     if label.evidence_id is None:
+        truth_type = (
+            label.master_scope_geometry_json.get("type")
+            if isinstance(label.master_scope_geometry_json, dict)
+            else None
+        )
         geometry_mode = (
             "polyline"
-            if isinstance(label.master_scope_geometry_json, dict)
-            and label.master_scope_geometry_json.get("type") == "polyline"
+            if truth_type in {"polyline", "line_segments"}
             else "rect"
         )
         return LabelEvalResult(

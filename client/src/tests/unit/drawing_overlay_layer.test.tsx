@@ -67,7 +67,7 @@ describe("DrawingOverlayLayer", () => {
     expect(screen.getByTestId("overlay-polygon-0")).toBeInTheDocument();
   });
 
-  it("renders polyline overlays through resolveOverlayRegion", () => {
+  it("renders utility line segments through resolveOverlayRegion", () => {
     const regions: OverlayRegion[] = [
       {
         id: 42,
@@ -100,18 +100,17 @@ describe("DrawingOverlayLayer", () => {
     const group = screen.getByTestId("overlay-group-0");
     expect(group).toHaveAttribute("data-overlay-highlight", "utility-marker");
 
-    const polyline = screen.getByTestId("overlay-polyline-0");
-    expect(polyline).toBeInTheDocument();
-    expect(polyline).toHaveAttribute("fill", "none");
-    expect(polyline).toHaveAttribute("stroke-linecap", "round");
-    expect(polyline).toHaveAttribute("stroke-linejoin", "round");
-    expect(polyline).toHaveAttribute("stroke-width", "11");
-    expect(polyline).toHaveAttribute("stroke", "rgba(250, 204, 21, 0.5)");
-    expect(polyline).toHaveStyle({ mixBlendMode: "multiply" });
-    expect(polyline).toHaveAttribute(
-      "points",
-      "410,304 430,312 450,320",
-    );
+    const firstSegment = screen.getByTestId("overlay-line-segment-0-0");
+    expect(firstSegment).toBeInTheDocument();
+    expect(firstSegment).toHaveAttribute("stroke-linecap", "round");
+    expect(firstSegment).toHaveAttribute("stroke-width", "11");
+    expect(firstSegment).toHaveAttribute("stroke", "rgba(250, 204, 21, 0.5)");
+    expect(firstSegment).toHaveStyle({ mixBlendMode: "multiply" });
+    expect(firstSegment).toHaveAttribute("x1", "410");
+    expect(firstSegment).toHaveAttribute("y1", "304");
+    expect(firstSegment).toHaveAttribute("x2", "430");
+    expect(firstSegment).toHaveAttribute("y2", "312");
+    expect(screen.getByTestId("overlay-line-segment-0-1")).toHaveAttribute("x2", "450");
     expect(screen.getByTestId("overlay-label-0")).toHaveTextContent(
       "Sanitary sewer run",
     );

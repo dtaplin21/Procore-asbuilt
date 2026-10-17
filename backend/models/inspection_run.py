@@ -26,6 +26,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     Text,
 )
@@ -80,6 +81,7 @@ class InspectionRun(Base):
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     error_message = Column(Text, nullable=True)
+    progress_json = Column(JSON, nullable=True)
 
     created_at = Column(
         DateTime(timezone=True),

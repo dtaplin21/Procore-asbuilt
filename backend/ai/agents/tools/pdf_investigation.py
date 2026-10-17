@@ -6,7 +6,7 @@ import logging
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import fitz
 
@@ -55,6 +55,7 @@ class EvidenceInvestigationPayload:
     pages_rendered: int
     ocr_word_counts: dict[str, int]
     errors: tuple[str, ...]
+    page_investigations: tuple[dict[str, Any], ...] = ()
 
 
 # Backward-compatible alias for callers that only need investigation summaries.
@@ -124,78 +125,84 @@ def render_pdf_page(pdf_path: Path, *, page: int = 1, dpi: int = 200) -> Rendere
 
 
 def extract_page_clues(pdf_path: Path, *, page: int = 1) -> dict[str, Any]:
-    """Extract text and location hints from one page of a PDF or image."""
-    document = extract_document(pdf_path)
-    page_index = max(page - 1, 0)
-    if page_index >= document.page_count:
-        page_index = 0
-
-    page_words = [word for word in document.words if word.page_index == page_index]
-    page_text = document.page_text(page_index)
-    positioned_terms = extract_positioned_terms(document)
-    page_terms = [term for term in positioned_terms if term.page_index == page_index]
-
-    survey_points = extract_survey_points_from_plain_text(
-        page_text,
-        page=page_index + 1,
-        scale_source="pdf_investigation",
+    """Extract OCR + vision text and location hints from one page of a PDF or image."""
+    from ai.pipelines.evidence_page_investigation import (
+        investigate_pdf_page,
+        survey_hints_from_text,
     )
-    coordinate_pairs = [
-        {
-            "northing": point.northing,
-            "easting": point.easting,
-            "station": point.station,
-        }
-        for point in survey_points
-    ]
+
+    suffix = pdf_path.suffix.lower()
+    page_index = max(page - 1, 0)
+    if suffix in _IMAGE_SUFFIXES:
+        document = extract_document(pdf_path)
+        page_index = min(page_index, max(document.page_count - 1, 0))
+        page_text = document.page_text(page_index)
+        page_count = document.page_count
+        word_count = len([word for word in document.words if word.page_index == page_index])
+        positioned_terms = extract_positioned_terms(document)
+        page_terms = [term for term in positioned_terms if term.page_index == page_index]
+    else:
+        investigated = investigate_pdf_page(pdf_path, page=page)
+        page_text = investigated.combined_text
+        word_count = len(page_text.split())
+        doc = fitz.open(str(pdf_path))
+        try:
+            page_count = doc.page_count
+        finally:
+            doc.close()
+        page_terms = []
+
+    hints = survey_hints_from_text(page_text, page=max(page, 1))
 
     return {
         "text": page_text,
-        "word_count": len(page_words),
-        "page_count": document.page_count,
+        "word_count": word_count,
+        "page_count": page_count,
         "positioned_term_count": len(page_terms),
-        "survey_hints": {
-            "stations": extract_stations_from_text(page_text),
-            "coordinate_pairs": coordinate_pairs,
-        },
+        "survey_hints": hints,
     }
 
 
 def extract_attachment_clues(pdf_path: Path) -> dict[str, Any]:
-    """Full multi-page OCR and clue extraction for a linked attachment PDF."""
-    from ai.pipelines.master_drawing_indexer import extract_drawing_document
+    """Full multi-page OCR, vision, and clue extraction for a linked attachment PDF."""
+    from ai.pipelines.document_text_extraction import extract_document_via_ocr
+    from ai.pipelines.evidence_page_investigation import (
+        investigate_pdf_all_pages,
+        link_follow_ocr_max_pages,
+        page_investigation_to_meta,
+        survey_hints_from_text,
+    )
 
-    document = extract_drawing_document(pdf_path, force_ocr=True)
+    page_results, document = investigate_pdf_all_pages(pdf_path)
+    page_blocks = [result.combined_text for result in page_results if result.combined_text.strip()]
+    combined_text = "\n\n".join(page_blocks)
+
     positioned_terms = extract_positioned_terms(document)
+    if not combined_text.strip():
+        combined_text = document.full_text()
 
     all_stations: list[str] = []
     coordinate_pairs: list[dict[str, Any]] = []
-    for page_index in range(document.page_count):
-        page_text = document.page_text(page_index)
-        all_stations.extend(extract_stations_from_text(page_text))
-        survey_points = extract_survey_points_from_plain_text(
-            page_text,
-            page=page_index + 1,
-            scale_source="attachment_ocr",
-        )
-        coordinate_pairs.extend(
-            {
-                "northing": point.northing,
-                "easting": point.easting,
-                "station": point.station,
-            }
-            for point in survey_points
-        )
+    for result in page_results:
+        if not result.combined_text.strip():
+            continue
+        hints = survey_hints_from_text(result.combined_text, page=result.page)
+        all_stations.extend(cast(list[str], hints["stations"]))
+        coordinate_pairs.extend(cast(list[dict[str, Any]], hints["coordinate_pairs"]))
 
     return {
-        "text": document.full_text(),
-        "word_count": len(document.words),
+        "text": combined_text,
+        "word_count": len(combined_text.split()),
         "page_count": document.page_count,
         "positioned_term_count": len(positioned_terms),
         "survey_hints": {
             "stations": sorted(set(all_stations)),
             "coordinate_pairs": coordinate_pairs,
         },
+        "page_investigations": [
+            page_investigation_to_meta(result, source="linked_attachment")
+            for result in page_results
+        ],
     }
 
 
@@ -208,18 +215,30 @@ def _text_preview(text: str) -> str:
 
 def _summary_from_fetched(
     fetched: FetchedLinkedPdf,
-) -> tuple[LinkedAttachmentSummary, int]:
+) -> tuple[LinkedAttachmentSummary, int, tuple[dict[str, Any], ...], str]:
     preview = _text_preview(fetched.text)
     word_count = len(fetched.text.split())
     page_count = fetched.pages or 1
+    page_meta: tuple[dict[str, Any], ...] = ()
+    enriched_text = ""
     if fetched.body:
         temp_path = _write_pdf_bytes(fetched.body, filename_hint=fetched.filename)
         try:
+            from services.inspection_run_progress import get_inspection_progress
+
+            progress = get_inspection_progress()
+            if progress is not None:
+                progress.set_file_name(fetched.filename)
+                progress.set_phase("reading_pdf")
             clues = extract_attachment_clues(temp_path)
             page_text = str(clues.get("text", "") or "")
             word_count = int(clues.get("word_count", word_count))
             page_count = int(clues.get("page_count", page_count))
+            raw_meta = clues.get("page_investigations")
+            if isinstance(raw_meta, list):
+                page_meta = tuple(dict(item) for item in raw_meta if isinstance(item, dict))
             if page_text.strip():
+                enriched_text = page_text.strip()
                 preview = _text_preview(page_text)
         except Exception:
             logger.exception(
@@ -236,25 +255,34 @@ def _summary_from_fetched(
         text_preview=preview,
         drawing_id=None,
     )
-    return summary, word_count
+    return summary, word_count, page_meta, enriched_text
 
 
 def _summary_from_internal_page(
     file_path: Path,
     *,
     target_page: int,
-) -> tuple[LinkedAttachmentSummary, int]:
+) -> tuple[LinkedAttachmentSummary, int, tuple[dict[str, Any], ...], str]:
+    from ai.pipelines.evidence_page_investigation import (
+        investigate_pdf_page,
+        page_investigation_to_meta,
+    )
+
     page_num = target_page + 1
-    clues = extract_page_clues(file_path, page=page_num)
-    word_count = int(clues.get("word_count", 0))
+    investigated = investigate_pdf_page(file_path, page=page_num)
+    page_text = investigated.combined_text
+    word_count = len(page_text.split())
+    page_meta = (
+        page_investigation_to_meta(investigated, source=f"internal:{page_num}"),
+    )
     summary = LinkedAttachmentSummary(
         url=f"internal:page-{page_num}",
         filename=f"{file_path.stem}-page-{page_num}.pdf",
         page_count=1,
-        text_preview=_text_preview(str(clues.get("text", ""))),
+        text_preview=_text_preview(page_text),
         drawing_id=None,
     )
-    return summary, word_count
+    return summary, word_count, page_meta, page_text
 
 
 def _write_pdf_bytes(body: bytes, *, filename_hint: str) -> Path:
@@ -273,6 +301,12 @@ def run_pdf_investigation(
     project_id: int | None = None,
 ) -> EvidenceInvestigationPayload:
     """Follow PDF links, render pages, extract clues, and return investigation payload."""
+    from services.inspection_run_progress import get_inspection_progress
+
+    progress = get_inspection_progress()
+    if progress is not None:
+        progress.set_phase("following_links")
+
     if file_path.suffix.lower() != ".pdf":
         base_text = extract_document(file_path).full_text().strip()
         return EvidenceInvestigationPayload(
@@ -284,6 +318,7 @@ def run_pdf_investigation(
             pages_rendered=0,
             ocr_word_counts={},
             errors=(),
+            page_investigations=(),
         )
 
     summaries: list[LinkedAttachmentSummary] = []
@@ -291,6 +326,7 @@ def run_pdf_investigation(
     errors: list[str] = []
     pages_rendered = 0
     seen_keys: set[str] = set()
+    page_investigations: list[dict[str, Any]] = []
 
     def _append(summary: LinkedAttachmentSummary, word_count: int) -> None:
         nonlocal pages_rendered
@@ -318,13 +354,37 @@ def run_pdf_investigation(
         procore_context=procore_context,
     )
     errors.extend(link_result.errors)
-    base_text = extract_document(file_path).full_text().strip()
+    try:
+        from ai.pipelines.evidence_page_investigation import (
+            extract_inspection_document,
+            investigate_pdf_all_pages,
+        )
+
+        if progress is not None:
+            progress.set_file_name(file_path.name)
+            progress.set_phase("reading_pdf")
+            _page_results, document = investigate_pdf_all_pages(file_path)
+            base_text = document.full_text().strip()
+        else:
+            base_text = extract_inspection_document(file_path).full_text().strip()
+    except Exception:
+        logger.exception(
+            "pdf_investigation_base_extract_failed",
+            extra={"file_path": str(file_path)},
+        )
+        base_text = extract_document(file_path).full_text().strip()
     merged_text = _merge_evidence_text(base_text, link_result)
+    enriched_sections: list[str] = []
 
     for fetched in link_result.fetched_pdfs:
         if len(summaries) >= max_links:
             break
-        summary, word_count = _summary_from_fetched(fetched)
+        summary, word_count, page_meta, enriched = _summary_from_fetched(fetched)
+        page_investigations.extend(page_meta)
+        if enriched.strip():
+            enriched_sections.append(
+                f"--- Linked attachment {summary.filename} (OCR+vision) ---\n{enriched.strip()}"
+            )
         _append(summary, word_count)
 
     hyperlinks = list_pdf_hyperlinks(file_path)
@@ -343,10 +403,15 @@ def run_pdf_investigation(
         if len(summaries) >= max_links:
             break
         try:
-            summary, word_count = _summary_from_internal_page(
+            summary, word_count, page_meta, enriched = _summary_from_internal_page(
                 file_path,
                 target_page=target_page,
             )
+            page_investigations.extend(page_meta)
+            if enriched.strip():
+                enriched_sections.append(
+                    f"--- Internal page {target_page + 1} (OCR+vision) ---\n{enriched.strip()}"
+                )
             _append(summary, word_count)
         except Exception:
             logger.exception(
@@ -354,6 +419,9 @@ def run_pdf_investigation(
                 extra={"file_path": str(file_path), "target_page": target_page + 1},
             )
             errors.append(f"internal page {target_page + 1} investigation failed")
+
+    if enriched_sections:
+        merged_text = "\n\n".join(enriched_sections + [merged_text]).strip()
 
     return EvidenceInvestigationPayload(
         link_result=link_result,
@@ -364,6 +432,7 @@ def run_pdf_investigation(
         pages_rendered=pages_rendered,
         ocr_word_counts=ocr_word_counts,
         errors=tuple(errors),
+        page_investigations=tuple(page_investigations),
     )
 
 

@@ -14,6 +14,34 @@ SHEET_REF_PATTERNS = (
 _AUTO_LINK_SOURCES = ("regex", "pdf_link")
 
 
+def load_inspection_auxiliary_drawings(session: Session, evidence_id: int) -> list[Drawing]:
+    """Linked install sheets plus the indexed inspection evidence PDF drawing."""
+    drawings = load_linked_drawings(session, evidence_id)
+    evidence = session.get(EvidenceRecord, evidence_id)
+    if evidence is None:
+        return drawings
+
+    meta = cast(dict[str, Any] | None, evidence.meta)
+    if not isinstance(meta, dict):
+        return drawings
+
+    raw_id = meta.get("inspection_source_drawing_id")
+    if raw_id is None:
+        return drawings
+    try:
+        drawing_id = int(raw_id)
+    except (TypeError, ValueError):
+        return drawings
+
+    seen = {cast(int, drawing.id) for drawing in drawings}
+    if drawing_id in seen:
+        return drawings
+    drawing = session.get(Drawing, drawing_id)
+    if drawing is not None:
+        drawings.append(drawing)
+    return drawings
+
+
 def load_linked_drawings(session: Session, evidence_id: int) -> list[Drawing]:
     links = (
         session.query(EvidenceDrawingLink)

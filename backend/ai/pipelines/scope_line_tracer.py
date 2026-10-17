@@ -1,4 +1,4 @@
-"""Derive polyline scope geometry on master drawing."""
+"""Derive line-segment scope geometry on master drawing."""
 
 from __future__ import annotations
 
@@ -9,17 +9,16 @@ from typing import Any, cast
 
 from sqlalchemy.orm import Session
 
-from ai.pipelines.aux_scope_polyline import build_aux_survey_polyline
 from ai.agents.evidence_dossier import EvidenceDossier
 from ai.pipelines.station_range_extractor import station_chainage
 from ai.pipelines.scope_geometry import (
     ScopeGeometry,
     ScopeKind,
-    _evidence_survey_points,
     _station_range,
     bbox_to_scope_rect,
     clamp_fractional_bbox,
     clamp_point_to_page,
+    scope_line_segments,
 )
 from ai.pipelines.survey_point_extractor import extract_stations_from_text
 from models.drawing_text_element import DrawingTextElement
@@ -77,27 +76,35 @@ def trace_scope_geometry(
 
     if scope_kind == ScopeKind.UTILITY_LINE:
         station_from, station_to = _station_range(dossier)
+        legend_codes = _utility_legend_codes(dossier, session=session)
+        trace_meta: dict[str, Any] = {"source": "utility_line_trace"}
+        if source_drawing_id is not None:
+            trace_meta["source_drawing_id"] = source_drawing_id
 
-        if trace_on_aux and station_from and station_to:
-            aux_polyline = build_aux_survey_polyline(
-                dossier.master_context.scoped_survey_points,
-                station_from=station_from,
-                station_to=station_to,
-                max_centroid_y=_PLAN_VIEW_MAX_Y,
-                min_points=2,
+        sheet_on_master = _prefer_plan_sheet_line(
+            session=session,
+            drawing_id=int(dossier.master_drawing_id),
+            page=page,
+            expanded_anchor=expanded_anchor,
+            base_meta=trace_meta,
+            source_drawing_id=None,
+            legend_codes=legend_codes,
+        )
+        if sheet_on_master is not None:
+            return sheet_on_master
+
+        if trace_on_aux and source_drawing_id is not None:
+            sheet_on_aux = _prefer_plan_sheet_line(
+                session=session,
+                drawing_id=int(source_drawing_id),
+                page=page,
+                expanded_anchor=expanded_anchor,
+                base_meta=trace_meta,
+                source_drawing_id=source_drawing_id,
+                legend_codes=legend_codes,
             )
-            if aux_polyline is not None:
-                return ScopeGeometry(
-                    page=page,
-                    type="polyline",
-                    points=aux_polyline.points,
-                    scope_kind=ScopeKind.UTILITY_LINE,
-                    meta={
-                        "source": "aux_survey_chain",
-                        "source_drawing_id": aux_polyline.source_drawing_id,
-                        "stations": list(aux_polyline.stations),
-                    },
-                )
+            if sheet_on_aux is not None:
+                return sheet_on_aux
 
         if station_from and station_to:
             station_scope = _trace_station_range(
@@ -110,8 +117,7 @@ def trace_scope_geometry(
                 source_drawing_id=source_drawing_id if trace_on_aux else None,
             )
             if (
-                station_scope.points
-                and len(station_scope.points) >= 2
+                station_scope.segments
                 and station_scope.meta is not None
                 and station_scope.meta.get("source")
                 in {"station_labels", "aux_plan_station_labels"}
@@ -126,44 +132,12 @@ def trace_scope_geometry(
                     meta["source_drawing_id"] = source_drawing_id
                 return ScopeGeometry(
                     page=page,
-                    type="polyline",
-                    points=station_scope.points,
+                    type="line_segments",
+                    segments=station_scope.segments,
                     scope_kind=ScopeKind.UTILITY_LINE,
                     meta=meta,
                 )
 
-        aux_polyline = build_aux_survey_polyline(
-            dossier.master_context.scoped_survey_points,
-            station_from=station_from,
-            station_to=station_to,
-            max_centroid_y=_PLAN_VIEW_MAX_Y if trace_on_aux else None,
-            min_points=2,
-        )
-        if aux_polyline is not None:
-            return ScopeGeometry(
-                page=page,
-                type="polyline",
-                points=aux_polyline.points,
-                scope_kind=ScopeKind.UTILITY_LINE,
-                meta={
-                    "source": "aux_survey_chain",
-                    "source_drawing_id": aux_polyline.source_drawing_id,
-                    "stations": list(aux_polyline.stations),
-                },
-            )
-
-        endpoint_positions = _survey_endpoint_positions(
-            dossier,
-            expanded_anchor=expanded_anchor,
-        )
-        if endpoint_positions is not None:
-            return ScopeGeometry(
-                page=page,
-                type="polyline",
-                points=endpoint_positions,
-                scope_kind=ScopeKind.UTILITY_LINE,
-                meta={"source": "survey_endpoints"},
-            )
         return _trace_utility_line(
             dossier,
             anchor_bbox=anchor_bbox,
@@ -223,9 +197,8 @@ def _trace_station_range(
             }
             if source_drawing_id is not None:
                 meta["source_drawing_id"] = source_drawing_id
-            return ScopeGeometry(
+            return scope_line_segments(
                 page=page,
-                type="polyline",
                 points=tuple(plan_points),
                 scope_kind=ScopeKind.STATION_RANGE,
                 meta=meta,
@@ -246,9 +219,8 @@ def _trace_station_range(
         meta = {"source": "station_labels", "stations": target_stations}
         if source_drawing_id is not None:
             meta["source_drawing_id"] = source_drawing_id
-        return ScopeGeometry(
+        return scope_line_segments(
             page=page,
-            type="polyline",
             points=tuple(matched_points),
             scope_kind=ScopeKind.STATION_RANGE,
             meta=meta,
@@ -261,9 +233,8 @@ def _trace_station_range(
     }
     if source_drawing_id is not None:
         fallback_meta["source_drawing_id"] = source_drawing_id
-    return ScopeGeometry(
+    return scope_line_segments(
         page=page,
-        type="polyline",
         points=fallback,
         scope_kind=ScopeKind.STATION_RANGE,
         meta=fallback_meta,
@@ -298,9 +269,8 @@ def _trace_utility_line(
 
     if len(label_points) >= 2:
         ordered = _order_points_along_dominant_axis(label_points, anchor_bbox)
-        return ScopeGeometry(
+        return scope_line_segments(
             page=page,
-            type="polyline",
             points=tuple(ordered),
             scope_kind=ScopeKind.UTILITY_LINE,
             meta={**meta, "legend_codes": sorted(legend_codes)},
@@ -322,7 +292,6 @@ def _trace_utility_line(
     if sheet_line_geometry is not None:
         return sheet_line_geometry
 
-    centerline = _centerline_through_anchor(anchor_bbox, expanded_anchor)
     vision_geometry = _vision_trace_fallback(
         dossier,
         anchor_bbox=anchor_bbox,
@@ -334,12 +303,12 @@ def _trace_utility_line(
     if vision_geometry is not None:
         return vision_geometry
 
-    return ScopeGeometry(
+    centerline = _centerline_through_anchor(anchor_bbox, expanded_anchor)
+    return scope_line_segments(
         page=page,
-        type="polyline",
         points=centerline,
         scope_kind=ScopeKind.UTILITY_LINE,
-        meta={**meta, "legend_codes": sorted(legend_codes), "vision_deferred": True},
+        meta={**meta, "legend_codes": sorted(legend_codes), "vision_trace_empty": True},
     )
 
 
@@ -374,9 +343,8 @@ def _prefer_plan_sheet_line(
     }
     if source_drawing_id is not None:
         meta["source_drawing_id"] = source_drawing_id
-    return ScopeGeometry(
+    return scope_line_segments(
         page=page,
-        type="polyline",
         points=points,
         scope_kind=ScopeKind.UTILITY_LINE,
         meta=meta,
@@ -543,9 +511,8 @@ def _vision_trace_fallback(
     if vision.highlight_detected:
         meta["highlight_detected"] = True
 
-    return ScopeGeometry(
+    return scope_line_segments(
         page=page,
-        type="polyline",
         points=clamped,
         scope_kind=ScopeKind.UTILITY_LINE,
         meta=meta,
@@ -763,27 +730,6 @@ def _find_station_centroid(
                     return clamp_point_to_page(centroid)
                 return _clamp_point(centroid, expanded_anchor)
     return None
-
-
-def _survey_endpoint_positions(
-    dossier: EvidenceDossier,
-    *,
-    expanded_anchor: tuple[float, float, float, float],
-) -> tuple[tuple[float, float], tuple[float, float]] | None:
-    points = _evidence_survey_points(dossier)
-    if len(points) < 2:
-        return None
-
-    positions: list[tuple[float, float]] = []
-    for item in points[:2]:
-        label_bbox = item.get("label_bbox_json")
-        if isinstance(label_bbox, dict):
-            centroid = _centroid(_bbox_from_json(cast(dict[str, float], label_bbox)))
-        else:
-            return None
-        positions.append(_clamp_point(centroid, expanded_anchor))
-
-    return (positions[0], positions[1])
 
 
 def _utility_legend_codes(

@@ -54,4 +54,9 @@ export type ResolvedOverlayRegion =
       kind: "polyline";
       points: NormalizedPoint[];
       source: DrawingDiffRegion;
+    }
+  | {
+      kind: "line_segments";
+      segments: [NormalizedPoint, NormalizedPoint][];
+      source: DrawingDiffRegion;
     };

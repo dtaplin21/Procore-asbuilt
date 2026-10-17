@@ -8,7 +8,7 @@
  */
 
 import type { InspectionRun as SchemaInspectionRun } from "@shared/schema";
-import { Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { FileSearch, Link2, Loader2, MapPin, Trash2 } from "lucide-react";
 
 import {
   AlertDialog,
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { evidenceFileDownloadUrl } from "@/lib/api/inspections";
+import { evidenceFileDownloadUrl, inspectionRunIndexInventoryUrl } from "@/lib/api/inspections";
 import {
   objectsPagePathForRun,
   objectsPagePathWithParams,
@@ -43,9 +43,16 @@ export type InspectionRunRowRun = SchemaInspectionRun & RunHistoryFields;
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pending",
   queued: "Queued",
-  processing: "Investigating linked files…",
+  processing: "Processing…",
   complete: "Complete",
   failed: "Failed",
+};
+
+const ACTIVITY_LABEL: Record<string, string> = {
+  indexing: "Indexing linked files…",
+  matching: "Matching location on master…",
+  investigating: "Investigating linked files…",
+  stuck: "Job interrupted…",
 };
 
 function formatRunTimestamp(value: string | null): string {
@@ -72,7 +79,11 @@ function statusVariant(
   return "outline";
 }
 
-function statusLabel(status: string): string {
+function statusLabel(status: string, activity?: string | null): string {
+  const normalizedActivity = activity?.trim().toLowerCase();
+  if (normalizedActivity && ACTIVITY_LABEL[normalizedActivity]) {
+    return ACTIVITY_LABEL[normalizedActivity];
+  }
   return STATUS_LABEL[status.toLowerCase()] ?? status;
 }
 
@@ -91,9 +102,11 @@ export type InspectionRunHistoryRowProps = {
   onSelect?: never;
   onDelete?: (runId: number) => void;
   deletePending?: boolean;
-  onReprocess?: (runId: number) => void;
-  reprocessPending?: boolean;
-  reprocessPendingRunId?: number | null;
+  onReindex?: (runId: number) => void;
+  onRematch?: (runId: number) => void;
+  pipelinePending?: boolean;
+  pipelinePendingRunId?: number | null;
+  pipelinePendingAction?: "reindex" | "rematch" | null;
 };
 
 export type InspectionRunPanelRowProps = {
@@ -103,63 +116,144 @@ export type InspectionRunPanelRowProps = {
   onSelect?: (runId: number) => void;
   onDelete?: (runId: number) => void;
   deletePending?: boolean;
-  onReprocess?: (runId: number) => void;
-  reprocessPending?: boolean;
-  reprocessPendingRunId?: number | null;
+  onReindex?: (runId: number) => void;
+  onRematch?: (runId: number) => void;
+  pipelinePending?: boolean;
+  pipelinePendingRunId?: number | null;
+  pipelinePendingAction?: "reindex" | "rematch" | null;
 };
 
 export type InspectionRunRowProps = InspectionRunPanelRowProps | InspectionRunHistoryRowProps;
 
-function ReprocessInspectionRunButton({
+function InspectionPipelineButtons({
   runId,
+  projectId,
   disabled,
   pending,
-  onReprocess,
+  pendingAction,
+  onReindex,
+  onRematch,
   variant = "history",
 }: {
   runId: number;
+  projectId?: string;
   disabled?: boolean;
   pending?: boolean;
-  onReprocess?: (runId: number) => void;
+  pendingAction?: "reindex" | "rematch" | null;
+  onReindex?: (runId: number) => void;
+  onRematch?: (runId: number) => void;
   variant?: "history" | "panel";
 }) {
-  if (!onReprocess) {
+  if (!onReindex && !onRematch) {
     return null;
   }
 
-  const label = pending ? "Re-running…" : "Re-run inspection";
+  const reindexLabel =
+    pending && pendingAction === "reindex" ? "Indexing…" : "Re-index files";
+  const rematchLabel =
+    pending && pendingAction === "rematch" ? "Placing…" : "Re-run placement";
+
+  const indexInventoryHref =
+    projectId != null ? inspectionRunIndexInventoryUrl(projectId, String(runId)) : null;
 
   if (variant === "panel") {
     return (
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        className="h-8 w-8 shrink-0"
-        disabled={disabled || pending}
-        title={label}
-        aria-label={label}
-        data-testid={`inspection-run-reprocess-${runId}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          onReprocess(runId);
-        }}
-      >
-        <RefreshCw className={`h-3.5 w-3.5 ${pending ? "animate-spin" : ""}`} />
-      </Button>
+      <>
+        {indexInventoryHref ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            title="View index inventory (JSON)"
+            aria-label="View index inventory"
+            data-testid={`inspection-run-index-inventory-${runId}`}
+            asChild
+          >
+            <a href={indexInventoryHref} target="_blank" rel="noreferrer">
+              <FileSearch className="h-3.5 w-3.5" />
+            </a>
+          </Button>
+        ) : null}
+        {onReindex ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            disabled={disabled || pending}
+            title={reindexLabel}
+            aria-label={reindexLabel}
+            data-testid={`inspection-run-reindex-${runId}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onReindex(runId);
+            }}
+          >
+            <Link2
+              className={`h-3.5 w-3.5 ${pending && pendingAction === "reindex" ? "animate-pulse" : ""}`}
+            />
+          </Button>
+        ) : null}
+        {onRematch ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            disabled={disabled || pending}
+            title={rematchLabel}
+            aria-label={rematchLabel}
+            data-testid={`inspection-run-rematch-${runId}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRematch(runId);
+            }}
+          >
+            <MapPin
+              className={`h-3.5 w-3.5 ${pending && pendingAction === "rematch" ? "animate-pulse" : ""}`}
+            />
+          </Button>
+        ) : null}
+      </>
     );
   }
 
   return (
-    <button
-      type="button"
-      className="text-sm text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-      disabled={disabled || pending}
-      data-testid={`inspection-run-reprocess-${runId}`}
-      onClick={() => onReprocess(runId)}
-    >
-      {label}
-    </button>
+    <span style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      {indexInventoryHref ? (
+        <a
+          href={indexInventoryHref}
+          target="_blank"
+          rel="noreferrer"
+          data-testid={`inspection-run-index-inventory-${runId}`}
+        >
+          Index report
+        </a>
+      ) : null}
+      {onReindex ? (
+        <button
+          type="button"
+          className="text-sm text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={disabled || pending}
+          data-testid={`inspection-run-reindex-${runId}`}
+          onClick={() => onReindex(runId)}
+        >
+          {reindexLabel}
+        </button>
+      ) : null}
+      {onRematch ? (
+        <button
+          type="button"
+          className="text-sm text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={disabled || pending}
+          data-testid={`inspection-run-rematch-${runId}`}
+          onClick={() => onRematch(runId)}
+        >
+          {rematchLabel}
+        </button>
+      ) : null}
+    </span>
   );
 }
 
@@ -235,9 +329,11 @@ function InspectionRunHistoryRow({
   projectId,
   onDelete,
   deletePending = false,
-  onReprocess,
-  reprocessPending = false,
-  reprocessPendingRunId = null,
+  onReindex,
+  onRematch,
+  pipelinePending = false,
+  pipelinePendingRunId = null,
+  pipelinePendingAction = null,
 }: InspectionRunHistoryRowProps) {
   const masterDrawingId = String(run.master_drawing_id);
   const runId = String(run.id);
@@ -281,7 +377,7 @@ function InspectionRunHistoryRow({
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <span style={{ fontWeight: 500 }}>{historyTitle(run)}</span>
         <span style={{ fontSize: 13, color: "#6B7280" }}>
-          {statusLabel(run.status)} · {formatRunTimestamp(run.created_at)}
+          {statusLabel(run.status, run.activity)} · {formatRunTimestamp(run.created_at)}
           {typeof run.overlays_created === "number" && (
             <>
               {" "}
@@ -321,11 +417,14 @@ function InspectionRunHistoryRow({
         <a href={viewOnDrawingUrl} data-testid="view-on-drawing-link">
           View on drawing
         </a>
-        <ReprocessInspectionRunButton
+        <InspectionPipelineButtons
           runId={run.id}
-          onReprocess={onReprocess}
+          projectId={projectId}
+          onReindex={onReindex}
+          onRematch={onRematch}
           disabled={run.evidence_id == null || run.status === "processing" || run.status === "queued"}
-          pending={reprocessPending && reprocessPendingRunId === run.id}
+          pending={pipelinePending && pipelinePendingRunId === run.id}
+          pendingAction={pipelinePendingAction}
         />
         <DeleteInspectionRunButton
           runId={run.id}
@@ -344,9 +443,11 @@ function InspectionRunPanelRow({
   onSelect,
   onDelete,
   deletePending = false,
-  onReprocess,
-  reprocessPending = false,
-  reprocessPendingRunId = null,
+  onReindex,
+  onRematch,
+  pipelinePending = false,
+  pipelinePendingRunId = null,
+  pipelinePendingAction = null,
 }: InspectionRunPanelRowProps) {
   const label = run.inspection_type?.trim() || `Run #${run.id}`;
   const timestamp = formatRunTimestamp(run.completed_at ?? run.started_at ?? run.created_at);
@@ -375,7 +476,7 @@ function InspectionRunPanelRow({
             <p className="text-xs text-muted-foreground">{timestamp}</p>
           </div>
           <Badge variant={statusVariant(run.status)} className="shrink-0 capitalize">
-            {statusLabel(run.status)}
+            {statusLabel(run.status, run.activity)}
           </Badge>
         </div>
         {run.evidence_id != null ? (
@@ -386,11 +487,13 @@ function InspectionRunPanelRow({
         ) : null}
       </button>
       <div className="flex shrink-0 items-start gap-1 py-2 pr-2">
-        <ReprocessInspectionRunButton
+        <InspectionPipelineButtons
           runId={run.id}
-          onReprocess={onReprocess}
+          onReindex={onReindex}
+          onRematch={onRematch}
           disabled={run.evidence_id == null || run.status === "processing" || run.status === "queued"}
-          pending={reprocessPending && reprocessPendingRunId === run.id}
+          pending={pipelinePending && pipelinePendingRunId === run.id}
+          pendingAction={pipelinePendingAction}
           variant="panel"
         />
         <DeleteInspectionRunButton
@@ -413,9 +516,11 @@ export function InspectionRunRow(props: InspectionRunRowProps) {
         projectId={props.projectId}
         onDelete={props.onDelete}
         deletePending={props.deletePending}
-        onReprocess={props.onReprocess}
-        reprocessPending={props.reprocessPending}
-        reprocessPendingRunId={props.reprocessPendingRunId}
+        onReindex={props.onReindex}
+        onRematch={props.onRematch}
+        pipelinePending={props.pipelinePending}
+        pipelinePendingRunId={props.pipelinePendingRunId}
+        pipelinePendingAction={props.pipelinePendingAction}
       />
     );
   }
@@ -426,9 +531,11 @@ export function InspectionRunRow(props: InspectionRunRowProps) {
       onSelect={props.onSelect}
       onDelete={props.onDelete}
       deletePending={props.deletePending}
-      onReprocess={props.onReprocess}
-      reprocessPending={props.reprocessPending}
-      reprocessPendingRunId={props.reprocessPendingRunId}
+      onReindex={props.onReindex}
+      onRematch={props.onRematch}
+      pipelinePending={props.pipelinePending}
+      pipelinePendingRunId={props.pipelinePendingRunId}
+      pipelinePendingAction={props.pipelinePendingAction}
     />
   );
 }

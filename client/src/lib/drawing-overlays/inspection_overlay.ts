@@ -172,6 +172,31 @@ function parseNormalizedPoints(value: unknown): NormalizedPoint[] {
     .filter((point): point is NormalizedPoint => point != null);
 }
 
+function polylinePointsToSegments(
+  points: NormalizedPoint[]
+): [NormalizedPoint, NormalizedPoint][] {
+  if (points.length < 2) return [];
+  const segments: [NormalizedPoint, NormalizedPoint][] = [];
+  for (let index = 0; index < points.length - 1; index += 1) {
+    segments.push([points[index], points[index + 1]]);
+  }
+  return segments;
+}
+
+function parseNormalizedSegments(value: unknown): [NormalizedPoint, NormalizedPoint][] {
+  if (!Array.isArray(value)) return [];
+  const segments: [NormalizedPoint, NormalizedPoint][] = [];
+  for (const raw of value) {
+    if (!Array.isArray(raw) || raw.length !== 2) continue;
+    const start = parseNormalizedPoint(raw[0]);
+    const end = parseNormalizedPoint(raw[1]);
+    if (start && end) {
+      segments.push([start, end]);
+    }
+  }
+  return segments;
+}
+
 function bboxFromRect(rect: NormalizedRect): NormalizedRect {
   return { ...rect };
 }
@@ -220,6 +245,12 @@ function bboxFromGeometry(geometry: Record<string, unknown>): NormalizedRect | n
     }
   }
 
+  const segments = parseNormalizedSegments(geometry.segments);
+  if (segments.length > 0) {
+    const segmentPoints = segments.flatMap(([start, end]) => [start, end]);
+    return bboxFromPoints(segmentPoints);
+  }
+
   const points = parseNormalizedPoints(geometry.points);
   return bboxFromPoints(points);
 }
@@ -240,12 +271,26 @@ export function overlayGeometryToDiffRegion(
   const geometryType =
     typeof geometry.type === "string" ? geometry.type.trim().toLowerCase() : null;
 
+  if (geometryType === "line_segments") {
+    const segments = parseNormalizedSegments(geometry.segments);
+    if (segments.length >= 1) {
+      return {
+        shapeType: "line_segments",
+        segments,
+        page,
+        note: label,
+        scopeKind,
+      };
+    }
+  }
+
   if (geometryType === "polyline") {
     const points = parseNormalizedPoints(geometry.points);
-    if (points.length >= 2) {
+    const segments = polylinePointsToSegments(points);
+    if (segments.length >= 1) {
       return {
-        shapeType: "polyline",
-        points,
+        shapeType: "line_segments",
+        segments,
         page,
         note: label,
         scopeKind,

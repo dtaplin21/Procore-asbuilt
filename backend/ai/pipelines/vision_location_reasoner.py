@@ -10,11 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from ai.agents.evidence_dossier import EvidenceDossier
-from ai.pipelines.clue_fusion_scorer import (
-    FusedCandidateScore,
-    LLM_TIEBREAK_LOW_SCORE,
-    LLM_TIEBREAK_SCORE_GAP,
-)
+from ai.pipelines.clue_fusion_scorer import FusedCandidateScore
 from ai.pipelines.drawing_location_resolver import ResolutionMethod
 from ai.pipelines.openai_vision import (
     _load_image,
@@ -22,7 +18,6 @@ from ai.pipelines.openai_vision import (
     _vision_chat_completion,
     encode_image_as_data_url,
 )
-from ai.pipelines.scope_geometry import ScopeKind, infer_scope_kind
 from services.inspection_match_persistence import MATCH_SCORE_THRESHOLD
 
 logger = logging.getLogger(__name__)
@@ -60,17 +55,9 @@ def should_invoke_vision(
     fused_scores: list[FusedCandidateScore],
     dossier: EvidenceDossier,
 ) -> bool:
-    """True if top score < 0.65 OR top two within 0.05 OR scope_kind is UTILITY_LINE."""
-    ordered = sorted(fused_scores, key=lambda score: -score.fused_score)
-    if ordered and ordered[0].fused_score < LLM_TIEBREAK_LOW_SCORE:
-        return True
-
-    if len(ordered) >= 2:
-        gap = ordered[0].fused_score - ordered[1].fused_score
-        if gap <= LLM_TIEBREAK_SCORE_GAP:
-            return True
-
-    return infer_scope_kind(dossier) == ScopeKind.UTILITY_LINE
+    """Always run vision localize when a master rendition is available."""
+    del fused_scores, dossier
+    return True
 
 
 def reason_over_master_crop(
@@ -115,16 +102,11 @@ def apply_vision_to_fused_scores(
     *,
     master_png_path: Path,
 ) -> list[FusedCandidateScore]:
-    """Merge vision confidence into fused scores; never override strong coordinate match alone."""
+    """Merge vision confidence into fused scores after a vision localize pass."""
     if not scores:
         return scores
 
     ordered = sorted(scores, key=lambda score: -score.fused_score)
-    if _is_strong_coordinate_winner(ordered[0]):
-        return scores
-
-    if not should_invoke_vision(scores, dossier):
-        return scores
 
     candidate_bboxes = [
         bbox
@@ -136,7 +118,12 @@ def apply_vision_to_fused_scores(
         if bbox is not None
     ]
     if not candidate_bboxes:
-        return scores
+        for score in ordered:
+            if score.candidate.bbox_fractional is not None:
+                candidate_bboxes = [score.candidate.bbox_fractional]
+                break
+    if not candidate_bboxes:
+        candidate_bboxes = [(0.0, 0.0, 1.0, 1.0)]
 
     vision = reason_over_master_crop(
         master_png_path=master_png_path,

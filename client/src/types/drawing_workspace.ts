@@ -53,14 +53,16 @@ export type NormalizedRect = {
 /** Overlay / inspection UI chrome (amber=changed, green=passed, red=failed). */
 export type ReviewBadgeTone = "changed" | "passed" | "failed";
 
-/** Normalized geometry for inspection overlays (rect, polygon, or polyline). */
+/** Normalized geometry for inspection overlays (rect, polygon, polyline, or line segments). */
 export type DrawingDiffRegion = {
   id?: string | number;
   page?: number | null;
-  shapeType?: "rect" | "polygon" | "polyline" | null;
+  shapeType?: "rect" | "polygon" | "polyline" | "line_segments" | null;
   scopeKind?: string | null;
   rect?: NormalizedRect | null;
   points?: NormalizedPoint[] | null;
+  /** Independent normalized segments for utility highlights (each pair is one sheet line). */
+  segments?: [NormalizedPoint, NormalizedPoint][] | null;
   bbox?: {
     x: number;
     y: number;

@@ -54,6 +54,7 @@ from services.survey_point_storage import persist_station_control_points, persis
 _WHITESPACE_RE = re.compile(r"\s+")
 _READABLE_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9+\-'.]{1,}$")
 _LINKED_DRAWING_SOURCE = "linked_evidence"
+_INSPECTION_EVIDENCE_SOURCE = "inspection_evidence"
 _GARBLED_NATIVE_MIN_TOKENS = 20
 _GARBLED_NATIVE_MAX_READABLE_RATIO = 0.35
 
@@ -127,9 +128,38 @@ def _ocr_token_source() -> str:
     return "tesseract"
 
 
-def _index_max_pages() -> int | None:
+def drawing_index_max_pages() -> int | None:
+    """Max pages for master and inspection index OCR (``0`` = all pages)."""
     cap = int(settings.drawing_index_ocr_max_pages)
     return cap if cap > 0 else None
+
+
+def _index_max_pages() -> int | None:
+    return drawing_index_max_pages()
+
+
+def _force_ocr_only_for_drawing_source(source: str | None) -> bool:
+    """Linked attachments historically used OCR-only; masters use hybrid Document AI when enabled."""
+    if settings.inspection_index_align_with_master:
+        return False
+    return (source or "").strip() == _LINKED_DRAWING_SOURCE
+
+
+def extract_drawing_document_for_inspection(
+    file_path: Path,
+    *,
+    drawing_id: int | None = None,
+    document_ai_stats: dict[str, Any] | None = None,
+    on_document_ai_batch_started: Any | None = None,
+) -> ExtractedDocument:
+    """Same extraction entry point as ``index_master_drawing`` (all pages, index page cap)."""
+    return extract_drawing_document(
+        file_path,
+        force_ocr=not settings.inspection_index_align_with_master,
+        document_ai_stats=document_ai_stats,
+        drawing_id=drawing_id,
+        on_document_ai_batch_started=on_document_ai_batch_started,
+    )
 
 
 def _limit_extracted_document(
@@ -461,7 +491,11 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
     if not source_path.exists():
         raise FileNotFoundError(f"Drawing source file not found: {source_path}")
 
-    is_linked_evidence = cast(str | None, drawing.source) == _LINKED_DRAWING_SOURCE
+    source = cast(str | None, drawing.source)
+    is_linked_evidence = source == _LINKED_DRAWING_SOURCE
+    is_inspection_evidence = source == _INSPECTION_EVIDENCE_SOURCE
+    is_inspection_attachment = is_linked_evidence or is_inspection_evidence
+    force_ocr = _force_ocr_only_for_drawing_source(source)
     document_ai_stats: dict[str, Any] = {}
     drawing_id = cast(int, drawing.id)
 
@@ -474,9 +508,9 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
 
     extracted = extract_drawing_document(
         source_path,
-        force_ocr=is_linked_evidence,
+        force_ocr=force_ocr,
         document_ai_stats=document_ai_stats,
-        drawing_id=drawing_id if not is_linked_evidence else None,
+        drawing_id=drawing_id if not force_ocr else None,
         on_document_ai_batch_started=_on_document_ai_batch_started,
     )
     page_meta_json = build_page_meta_json(
@@ -486,7 +520,7 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
         page_count=extracted.page_count,
     )
     gutter_words: list[Any] = []
-    if not is_linked_evidence and settings.drawing_index_gutter_ocr_enabled:
+    if not is_inspection_attachment and settings.drawing_index_gutter_ocr_enabled:
         from ai.pipelines.gutter_rotated_ocr import supplement_gutter_rotated_ocr
 
         first_meta = page_meta_json[0] if page_meta_json else {}
@@ -539,7 +573,7 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
     )
 
     legend_index_meta: dict[str, Any] | None = None
-    if not is_linked_evidence:
+    if not is_inspection_attachment:
         from services.legend_index_helpers import (
             cluster_legend_rows_for_drawing,
             legend_index_ai_payload,

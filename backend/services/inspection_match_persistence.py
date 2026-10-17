@@ -404,7 +404,7 @@ def _fallback_bbox_for_persist(
                 scope.x + scope.width,
                 scope.y + scope.height,
             )
-        envelope = _bbox_from_polyline_scope(scope)
+        envelope = _bbox_from_line_scope(scope)
         if envelope is not None:
             return envelope
 
@@ -413,11 +413,14 @@ def _fallback_bbox_for_persist(
     return None
 
 
-def _bbox_from_polyline_scope(
+def _bbox_from_line_scope(
     scope: ScopeGeometry,
 ) -> tuple[float, float, float, float] | None:
-    if scope.type != "polyline" or not scope.points:
+    from ai.pipelines.scope_geometry import scope_path_points
+
+    path = scope_path_points(scope)
+    if not path:
         return None
-    xs = [point[0] for point in scope.points]
-    ys = [point[1] for point in scope.points]
+    xs = [point[0] for point in path]
+    ys = [point[1] for point in path]
     return (min(xs), min(ys), max(xs), max(ys))

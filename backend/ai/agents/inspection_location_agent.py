@@ -22,14 +22,18 @@ from ai.pipelines.location_match_orchestrator import (
     LocationMatchCandidate,
     _load_registration_transform,
     generate_all_location_candidates,
-    project_polyline_to_master,
+    project_line_segments_to_master,
 )
-from ai.pipelines.scope_geometry import ScopeGeometry, ScopeKind, bbox_to_scope_rect, clamp_fractional_bbox, infer_scope_kind
+from ai.pipelines.scope_geometry import (
+    ScopeGeometry,
+    ScopeKind,
+    bbox_to_scope_rect,
+    clamp_fractional_bbox,
+    infer_scope_kind,
+    line_segments_from_points,
+)
 from ai.pipelines.scope_line_tracer import trace_scope_geometry
-from ai.pipelines.vision_location_reasoner import (
-    apply_vision_to_fused_scores,
-    should_invoke_vision,
-)
+from ai.pipelines.vision_location_reasoner import apply_vision_to_fused_scores
 from models.models import DrawingRendition
 from services.file_storage import resolve_stored_file_path
 from services.inspection_match_persistence import (
@@ -56,6 +60,7 @@ class InspectionLocationAgent:
         page: int = 1,
         inspection_run_id: int | None = None,
         force_investigate: bool = False,
+        investigate: bool = True,
     ) -> AgentMatchResult:
         """Investigate evidence and resolve a scoped overlay on the master drawing."""
         readiness = get_master_drawing_index_readiness(session, master_drawing_id)
@@ -87,9 +92,13 @@ class InspectionLocationAgent:
             evidence_id=evidence_id,
             master_drawing_id=master_drawing_id,
             page=page,
-            investigate=True,
+            investigate=investigate,
             force_investigate=force_investigate,
         )
+
+        from services.inspection_run_progress import get_inspection_progress
+
+        progress = get_inspection_progress()
 
         if _auxiliary_drawings_need_index(session, dossier):
             result = AgentMatchResult(
@@ -110,6 +119,9 @@ class InspectionLocationAgent:
                 inspection_run_id=inspection_run_id,
             )
             return result
+
+        if progress is not None:
+            progress.set_phase("matching")
 
         candidates = generate_all_location_candidates(
             session,
@@ -139,7 +151,7 @@ class InspectionLocationAgent:
 
         ranked_scores = fuse_candidate_scores(dossier, candidates)
         master_png_path = _master_rendition_path(session, master_drawing_id, page)
-        if should_invoke_vision(ranked_scores, dossier) and master_png_path is not None:
+        if master_png_path is not None and ranked_scores:
             ranked_scores = apply_vision_to_fused_scores(
                 dossier,
                 ranked_scores,
@@ -192,6 +204,8 @@ class InspectionLocationAgent:
         scope: ScopeGeometry | None = None
         if anchor_bbox is not None:
             safe_anchor = clamp_fractional_bbox(anchor_bbox)
+            if progress is not None:
+                progress.set_phase("tracing")
             try:
                 scope = trace_scope_geometry(
                     dossier,
@@ -259,6 +273,8 @@ class InspectionLocationAgent:
             rationale=rationale,
             fused_score=winner.fused_score,
         )
+        if progress is not None:
+            progress.set_phase("saving_overlay")
         persist_agent_match_result(
             session,
             evidence_id=evidence_id,
@@ -434,8 +450,14 @@ def _maybe_project_aux_scope_to_master(
     source_drawing_id: int | None,
     registration_aux_drawing_id: int | None = None,
 ) -> tuple[ScopeGeometry | None, bool]:
-    """Project aux-space polylines onto master; drop scope when transform is missing."""
-    if scope is None or scope.type != "polyline" or not scope.points:
+    """Project aux-space line segments onto master; drop scope when transform is missing."""
+    if scope is None:
+        return scope, False
+
+    segments = scope.segments
+    if scope.type == "polyline" and scope.points:
+        segments = line_segments_from_points(scope.points)
+    if scope.type != "line_segments" or not segments:
         return scope, False
 
     meta = dict(scope.meta or {})
@@ -459,15 +481,18 @@ def _maybe_project_aux_scope_to_master(
     ):
         return None, True
 
-    projected_points = project_polyline_to_master(scope.points, registration_transform)
+    projected_segments = project_line_segments_to_master(
+        segments,
+        registration_transform,
+    )
     meta["projected_from_drawing_id"] = aux_drawing_id
     source = meta.get("source")
     if source:
         meta["source"] = f"{source}_projected"
     return ScopeGeometry(
         page=scope.page,
-        type=scope.type,
-        points=projected_points,
+        type="line_segments",
+        segments=projected_segments,
         scope_kind=scope.scope_kind,
         meta=meta,
     ), False

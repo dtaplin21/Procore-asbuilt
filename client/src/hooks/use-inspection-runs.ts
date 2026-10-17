@@ -12,7 +12,12 @@ import {
   refreshInspectionWorkspaceQueries,
   uploadInspectionRunEvidence,
 } from "@/lib/api/inspection_runs";
-import { deleteInspectionRun, reprocessInspectionRun } from "@/lib/api/inspections";
+import {
+  deleteInspectionRun,
+  reindexInspectionRun,
+  rematchInspectionRun,
+  reprocessInspectionRun,
+} from "@/lib/api/inspections";
 import { invalidateProjectDrawingListQueries } from "@/lib/api/drawings";
 import {
   fetchDrawingOverlays,
@@ -229,39 +234,57 @@ export function useInvalidateOverlaysForRun() {
   };
 }
 
-export function useReprocessInspectionRun(projectId: number | null) {
+function invalidateAfterInspectionPipelineJob(
+  queryClient: ReturnType<typeof useQueryClient>,
+  projectId: number,
+) {
+  void queryClient.invalidateQueries({
+    predicate: (query) => {
+      const key = query.queryKey[0];
+      return (
+        typeof key === "string" &&
+        (key.includes(`/api/projects/${projectId}/inspections/runs`) ||
+          key.includes("drawing-overlays") ||
+          key.includes("inspection-match-status"))
+      );
+    },
+  });
+  void queryClient.invalidateQueries({
+    queryKey: [`/api/projects/${projectId}/evidence`],
+  });
+}
+
+function useInspectionRunPipelineJob(
+  projectId: number | null,
+  mutateFn: (projectId: string, runId: string) => Promise<unknown>,
+) {
   const queryClient = useQueryClient();
 
-  return useMutation<
-    Awaited<ReturnType<typeof reprocessInspectionRun>>,
-    Error,
-    number
-  >({
+  return useMutation<unknown, Error, number>({
     mutationFn: async (runId) => {
       if (projectId == null) {
         throw new Error("Project required");
       }
-      return reprocessInspectionRun(String(projectId), String(runId));
+      return mutateFn(String(projectId), String(runId));
     },
     onSuccess: () => {
       if (projectId != null) {
-        void queryClient.invalidateQueries({
-          predicate: (query) => {
-            const key = query.queryKey[0];
-            return (
-              typeof key === "string" &&
-              (key.includes(`/api/projects/${projectId}/inspections/runs`) ||
-                key.includes("drawing-overlays") ||
-                key.includes("inspection-match-status"))
-            );
-          },
-        });
-        void queryClient.invalidateQueries({
-          queryKey: [`/api/projects/${projectId}/evidence`],
-        });
+        invalidateAfterInspectionPipelineJob(queryClient, projectId);
       }
     },
   });
+}
+
+export function useReindexInspectionRun(projectId: number | null) {
+  return useInspectionRunPipelineJob(projectId, reindexInspectionRun);
+}
+
+export function useRematchInspectionRun(projectId: number | null) {
+  return useInspectionRunPipelineJob(projectId, rematchInspectionRun);
+}
+
+export function useReprocessInspectionRun(projectId: number | null) {
+  return useInspectionRunPipelineJob(projectId, reprocessInspectionRun);
 }
 
 export function useDeleteInspectionRun(projectId: number | null) {

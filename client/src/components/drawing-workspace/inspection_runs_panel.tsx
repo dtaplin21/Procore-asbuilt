@@ -8,6 +8,7 @@ import type {
 } from "@shared/schema";
 
 import InspectionRunRow from "@/components/drawing-workspace/inspection_run_row";
+import InspectionRunProgressPanel from "@/components/drawing-workspace/inspection_run_progress_panel";
 import { MatchAlertBanner } from "@/components/drawing-workspace/match_alert_banner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,10 +25,12 @@ import {
   useDeleteInspectionRun,
   useDrawingOverlays,
   useInspectionRuns,
-  useReprocessInspectionRun,
+  useReindexInspectionRun,
+  useRematchInspectionRun,
   useRunInspection,
   useUploadInspectionRunEvidence,
 } from "@/hooks/use-inspection-runs";
+import { useInspectionRunProgress } from "@/hooks/use-inspection-run-progress";
 import { toast } from "@/hooks/use-toast";
 import { fetchProjectEvidence, projectEvidenceQueryKey } from "@/lib/api/evidence";
 import { refreshInspectionWorkspaceQueries } from "@/lib/api/inspection_runs";
@@ -89,10 +92,23 @@ export default function InspectionRunsPanel({
   const { mutate: deleteInspectionRun, isPending: deletePending } =
     useDeleteInspectionRun(projectId);
   const {
-    mutate: reprocessInspectionRun,
-    isPending: reprocessPending,
-    variables: reprocessRunId,
-  } = useReprocessInspectionRun(projectId);
+    mutate: reindexInspectionRun,
+    isPending: reindexPending,
+    variables: reindexRunId,
+  } = useReindexInspectionRun(projectId);
+  const {
+    mutate: rematchInspectionRun,
+    isPending: rematchPending,
+    variables: rematchRunId,
+  } = useRematchInspectionRun(projectId);
+
+  const pipelinePending = reindexPending || rematchPending;
+  const pipelinePendingRunId = reindexRunId ?? rematchRunId ?? null;
+  const pipelinePendingAction = reindexPending
+    ? "reindex"
+    : rematchPending
+      ? "rematch"
+      : null;
 
   const uploadBusy = uploadPending || createRunPending;
   const runDisabled = runPending || hasActiveRun || uploadBusy;
@@ -120,6 +136,11 @@ export default function InspectionRunsPanel({
   const selectedRun = useMemo(
     () => (selectedRunId != null ? runs.find((r) => r.id === selectedRunId) ?? null : null),
     [runs, selectedRunId],
+  );
+
+  const { data: runProgress, isLoading: runProgressLoading } = useInspectionRunProgress(
+    projectId,
+    selectedRun,
   );
 
   const matchEvidenceId = useMemo(() => {
@@ -227,8 +248,8 @@ export default function InspectionRunsPanel({
     })();
   };
 
-  const handleReprocessRun = (runId: number) => {
-    reprocessInspectionRun(runId, {
+  const handleReindexRun = (runId: number) => {
+    reindexInspectionRun(runId, {
       onSuccess: () => {
         void refreshInspectionWorkspaceQueries(
           queryClient,
@@ -236,9 +257,31 @@ export default function InspectionRunsPanel({
           masterDrawingId,
         );
         toast({
-          title: "Re-running inspection",
-          description:
-            "Re-processing linked files and re-matching on this master sheet.",
+          title: "Re-indexing inspection files",
+          description: "Following linked PDFs and refreshing clues for this run.",
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Re-index failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      },
+    });
+  };
+
+  const handleRematchRun = (runId: number) => {
+    rematchInspectionRun(runId, {
+      onSuccess: () => {
+        void refreshInspectionWorkspaceQueries(
+          queryClient,
+          projectId,
+          masterDrawingId,
+        );
+        toast({
+          title: "Re-running placement",
+          description: "Re-matching on the master using indexed clues only.",
         });
       },
       onError: (error) => {
@@ -385,9 +428,11 @@ export default function InspectionRunsPanel({
               }}
               onDelete={handleDeleteRun}
               deletePending={deletePending}
-              onReprocess={handleReprocessRun}
-              reprocessPending={reprocessPending}
-              reprocessPendingRunId={reprocessRunId ?? null}
+              onReindex={handleReindexRun}
+              onRematch={handleRematchRun}
+              pipelinePending={pipelinePending}
+              pipelinePendingRunId={pipelinePendingRunId}
+              pipelinePendingAction={pipelinePendingAction}
             />
           ))}
         </ul>
@@ -395,6 +440,12 @@ export default function InspectionRunsPanel({
 
       {selectedRunId != null ? (
         <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
+          {selectedRun && hasActiveInspectionRun([selectedRun]) ? (
+            <InspectionRunProgressPanel
+              progress={runProgress}
+              isLoading={runProgressLoading}
+            />
+          ) : null}
           {matchEvidenceId ? (
             <MatchAlertBanner
               evidenceId={matchEvidenceId}

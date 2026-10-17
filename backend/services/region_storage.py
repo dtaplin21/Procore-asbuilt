@@ -65,8 +65,24 @@ def validate_region_geometry(
                 raise ValueError(f"point {i} must be [x, y]")
             _check_normalized(float(p[0]), f"points[{i}][0]")
             _check_normalized(float(p[1]), f"points[{i}][1]")
+    elif gtype == "line_segments":
+        segments = geometry.get("segments")
+        if not isinstance(segments, list):
+            raise ValueError("line_segments must have segments array")
+        if len(segments) < 1:
+            raise ValueError("line_segments needs at least 1 segment.")
+        for seg_index, segment in enumerate(segments):
+            if not isinstance(segment, (list, tuple)) or len(segment) != 2:
+                raise ValueError(f"segment {seg_index} must be [[x0, y0], [x1, y1]]")
+            for point_index, point in enumerate(segment):
+                if not isinstance(point, (list, tuple)) or len(point) < 2:
+                    raise ValueError(f"segment {seg_index} point {point_index} must be [x, y]")
+                _check_normalized(float(point[0]), f"segments[{seg_index}][{point_index}][0]")
+                _check_normalized(float(point[1]), f"segments[{seg_index}][{point_index}][1]")
     else:
-        raise ValueError("geometry.type must be 'rect', 'polygon', or 'polyline'")
+        raise ValueError(
+            "geometry.type must be 'rect', 'polygon', 'polyline', or 'line_segments'"
+        )
 
     if polygon_points is not None:
         if len(polygon_points) < 3:

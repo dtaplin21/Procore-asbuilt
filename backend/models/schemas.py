@@ -1319,6 +1319,8 @@ class InspectionRunResponse(BaseModel):
     error_message: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    # indexing | matching | investigating while queued/processing; stuck before auto-heal
+    activity: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1365,8 +1367,24 @@ class InspectionRunListResponse(BaseModel):
     offset: int
 
 
+class InspectionRunProgressResponse(BaseModel):
+    """Coarse pipeline progress for an active inspection run."""
+
+    run_id: int
+    job_id: Optional[int] = None
+    mode: Optional[str] = None
+    phase: Optional[str] = None
+    updated_at: Optional[str] = None
+    models: Optional[dict[str, Any]] = None
+    current: Optional[dict[str, Any]] = None
+    steps: Optional[list[dict[str, Any]]] = None
+    error: Optional[str] = None
+
+    model_config = ConfigDict(extra="allow")
+
+
 class InspectionRunReprocessResponse(BaseModel):
-    """Queued re-investigation + match for an existing inspection run."""
+    """Queued inspection pipeline job (index, match, or both)."""
 
     inspection_run_id: int
     job_id: int
