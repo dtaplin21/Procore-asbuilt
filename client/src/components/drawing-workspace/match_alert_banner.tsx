@@ -4,12 +4,36 @@ interface Props {
   evidenceId: string;
   drawingId?: string;
   runId?: string | null;
+  /** When the inspection run failed (worker/placement), show immediately in dev. */
+  runErrorMessage?: string | null;
 }
 
-export function MatchAlertBanner({ evidenceId, drawingId, runId }: Props) {
+export function MatchAlertBanner({
+  evidenceId,
+  drawingId,
+  runId,
+  runErrorMessage,
+}: Props) {
   const status = useInspectionMatchStatus(evidenceId, { drawingId, runId });
+  const trimmedRunError = runErrorMessage?.trim();
 
-  if (!status || status.match_status === "matched") {
+  if (trimmedRunError) {
+    return (
+      <div
+        role="alert"
+        data-testid="match-alert-banner"
+        className="mb-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+      >
+        {trimmedRunError}
+      </div>
+    );
+  }
+
+  if (
+    !status ||
+    status.match_status === "matched" ||
+    status.match_status === "needs_review"
+  ) {
     return null;
   }
 
@@ -21,8 +45,6 @@ export function MatchAlertBanner({ evidenceId, drawingId, runId }: Props) {
     >
       {status.match_status === "index_pending"
         ? "Master drawing is still being indexed. Location matching will run automatically when indexing finishes."
-        : status.match_status === "needs_review"
-        ? "This inspection could not be automatically placed. Please review and confirm the location on the drawing."
         : "No likely location was found on the master drawing for this inspection."}
     </div>
   );

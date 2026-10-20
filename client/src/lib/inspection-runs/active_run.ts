@@ -24,6 +24,40 @@ export function hasActiveInspectionRun(runs: RunActivityFields[]): boolean {
   return runs.some(isActiveInspectionRun);
 }
 
+/** True while the worker may be updating coarse progress for this run. */
+export function shouldPollInspectionRunProgress(
+  run: RunActivityFields & { id?: number },
+  pipelinePendingRunId?: number | null,
+): boolean {
+  if (pipelinePendingRunId != null && run.id === pipelinePendingRunId) {
+    return true;
+  }
+  return isActiveInspectionRun(run);
+}
+
+/** Prefer selected active run, otherwise any run that is inspecting or reprocessing. */
+export function pickInspectionProgressRun<
+  T extends RunActivityFields & { id: number },
+>(
+  runs: T[],
+  options?: {
+    selectedRunId?: number | null;
+    pipelinePendingRunId?: number | null;
+  },
+): T | null {
+  const { selectedRunId, pipelinePendingRunId } = options ?? {};
+  const isCandidate = (run: T) =>
+    shouldPollInspectionRunProgress(run, pipelinePendingRunId);
+
+  if (selectedRunId != null) {
+    const selected = runs.find((r) => r.id === selectedRunId);
+    if (selected && isCandidate(selected)) {
+      return selected;
+    }
+  }
+  return runs.find(isCandidate) ?? null;
+}
+
 export function pollWhileInspectionRunsActive(
   query: Query<InspectionRunListResponse, Error>,
 ): number | false {

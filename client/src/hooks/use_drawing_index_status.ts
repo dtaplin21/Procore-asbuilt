@@ -1,9 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 
 import {
   drawingIndexStatusQueryKey,
   fetchDrawingIndexStatus,
 } from "@/lib/api/drawing_index";
+import { invalidateOverlaysForDrawing } from "@/lib/api/overlays";
 import { isDrawingIndexInProgress } from "@/lib/drawing-index/format_index_summary";
 
 export function useDrawingIndexStatus(
@@ -15,8 +17,10 @@ export function useDrawingIndexStatus(
     drawingId != null &&
     projectId > 0 &&
     drawingId > 0;
+  const queryClient = useQueryClient();
+  const seenIndexedAt = useRef<{ drawingId: number; indexedAt: string | null } | null>(null);
 
-  return useQuery({
+  const query = useQuery({
     queryKey:
       enabled && projectId != null && drawingId != null
         ? drawingIndexStatusQueryKey(projectId, drawingId)
@@ -28,4 +32,19 @@ export function useDrawingIndexStatus(
       return isDrawingIndexInProgress(status) ? 3000 : false;
     },
   });
+
+  const indexedAt = query.data?.indexed_at ?? null;
+  const status = query.data?.status;
+  useEffect(() => {
+    if (!enabled || drawingId == null) return;
+    const previous = seenIndexedAt.current;
+    const sameDrawing = previous?.drawingId === drawingId;
+    seenIndexedAt.current = { drawingId, indexedAt };
+    if (!sameDrawing || previous.indexedAt === indexedAt) return;
+    if (status === "ready") {
+      invalidateOverlaysForDrawing(queryClient, String(drawingId));
+    }
+  }, [drawingId, enabled, indexedAt, queryClient, status]);
+
+  return query;
 }

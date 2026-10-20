@@ -96,6 +96,17 @@ describe("toOverlayRegions", () => {
     expect(regions[0].bbox.height).toBeCloseTo(0.25);
   });
 
+  it("skips overlays whose placement index is stale", () => {
+    const regions = toOverlayRegions([
+      makeOverlay({
+        id: 7,
+        meta: { index_stale: true, match_status: "needs_review" },
+      }),
+    ]);
+
+    expect(regions).toHaveLength(0);
+  });
+
   it("skips overlays with unparseable geometry", () => {
     const regions = toOverlayRegions([
       makeOverlay({ id: 1, geometry: {} as OverlayWireRecord["geometry"] }),

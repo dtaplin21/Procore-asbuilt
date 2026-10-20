@@ -364,13 +364,15 @@ export function toOverlayRegions(overlays: DrawingOverlay[]): OverlayRegion[] {
   for (const overlay of overlays) {
     if (!isRecord(overlay.geometry)) continue;
 
+    const meta = isRecord(overlay.meta) ? overlay.meta : null;
+    if (meta?.index_stale === true) continue;
+
     const shape = overlayGeometryToDiffRegion(overlay.geometry);
     if (!shape) continue;
 
     const bbox = bboxFromGeometry(overlay.geometry);
     if (!bbox) continue;
 
-    const meta = isRecord(overlay.meta) ? overlay.meta : null;
     const inspectionRunId = readInspectionRunId(overlay);
     const diffId = readDiffId(overlay);
     const kind: OverlayRegionKind = inspectionRunId != null ? "inspection" : "diff";

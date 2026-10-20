@@ -22,6 +22,9 @@ from database import SessionLocal  # noqa: E402
 from models.drawing_symbol import DrawingSymbol  # noqa: E402
 from models.drawing_viewport import DrawingViewport  # noqa: E402
 from models.models import Drawing  # noqa: E402
+from services.master_sheet_line_inventory import (  # noqa: E402
+    get_master_sheet_line_inventory,
+)
 from services.sheet_digitization import SHEET_ENTITY_GRAPH_KEY  # noqa: E402
 
 
@@ -101,6 +104,18 @@ def main() -> int:
                 f"symbols={counts['symbols']} lines={counts['lines']} "
                 f"associations={counts['associations']}"
             )
+
+        page_filter = int(args.page) if args.page is not None else 1
+        inv = get_master_sheet_line_inventory(session, int(args.drawing_id), page=page_filter)
+        print(
+            "placement_inventory: "
+            f"placable={inv.is_placable} "
+            f"high_conf_plan_lines={inv.high_conf_plan_line_count} "
+            f"plan_viewports={inv.plan_viewport_count} "
+            f"blocker={inv.blocker_code!r}"
+        )
+        if inv.blocker_message:
+            print(f"  detail: {inv.blocker_message}")
         return 0
     finally:
         session.close()

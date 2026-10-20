@@ -31,6 +31,15 @@ from services.inspection_match_persistence import MATCH_SCORE_THRESHOLD
 from services.storage import StorageService
 
 
+@pytest.fixture(autouse=True)
+def _non_strict_inspection_placement(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Legacy agent tests expect relaxed placement fallbacks."""
+    monkeypatch.setattr(
+        "ai.agents.inspection_location_agent.placement_strict_enabled",
+        lambda: False,
+    )
+
+
 def _unique() -> str:
     return uuid.uuid4().hex[:12]
 
@@ -110,6 +119,46 @@ def _utility_line_dossier(
     )
 
 
+def _plan_sheet_line_index_stats(*, drawing_id: int = 0) -> dict:
+    return {
+        "sheetEntityGraph": {
+            "1": {
+                "drawing_id": drawing_id,
+                "page": 1,
+                "viewports": [
+                    {
+                        "viewport_id": "plan",
+                        "kind": "plan",
+                        "page": 1,
+                        "bbox_fractional": [0.05, 0.05, 0.95, 0.55],
+                        "scale": None,
+                        "source": "manual",
+                        "notes": "",
+                    }
+                ],
+                "labels": [],
+                "symbols": [],
+                "lines": [
+                    {
+                        "points": [[0.14, 0.24], [0.38, 0.30]],
+                        "viewport_id": "plan",
+                        "confidence": 0.92,
+                        "line_type": "SS",
+                    },
+                    {
+                        "points": [[0.40, 0.28], [0.62, 0.32]],
+                        "viewport_id": "plan",
+                        "confidence": 0.88,
+                        "line_type": "SS",
+                    },
+                ],
+                "associations": [],
+                "meta": {},
+            }
+        }
+    }
+
+
 def _seed_ready_master_run(db: Session) -> tuple[InspectionRun, int, int, int]:
     company = Company(name=f"Co {_unique()}", procore_company_id=f"pc-{_unique()}")
     db.add(company)
@@ -129,9 +178,16 @@ def _seed_ready_master_run(db: Session) -> tuple[InspectionRun, int, int, int]:
         name="Master",
         storage_key=f"drawings/{_unique()}.pdf",
         index_status="ready",
+        index_stats_json=_plan_sheet_line_index_stats(),
     )
     db.add(drawing)
     db.flush()
+    stats = dict(drawing.index_stats_json or {})
+    graph = stats.get("sheetEntityGraph", {})
+    if isinstance(graph, dict) and "1" in graph and isinstance(graph["1"], dict):
+        graph["1"]["drawing_id"] = int(drawing.id)
+        stats["sheetEntityGraph"] = graph
+        setattr(drawing, "index_stats_json", stats)
 
     storage = StorageService(db)
     region = storage.create_drawing_region(
@@ -275,7 +331,7 @@ def test_agent_end_to_end_polyline_for_utility_line(
     "ai.agents.inspection_location_agent.apply_vision_to_fused_scores",
     side_effect=lambda _dossier, scores, **kwargs: scores,
 )
-@patch("ai.agents.inspection_location_agent.trace_scope_geometry")
+@patch("ai.agents.inspection_location_agent.resolve_master_sheet_line_scope")
 @patch("ai.agents.inspection_location_agent.fuse_candidate_scores")
 @patch("ai.agents.inspection_location_agent.generate_all_location_candidates")
 @patch("ai.agents.inspection_location_agent.build_evidence_dossier")
@@ -283,7 +339,7 @@ def test_agent_traces_on_master_when_registration_missing(
     mock_build_dossier,
     mock_generate_candidates,
     mock_fuse_scores,
-    mock_trace_scope,
+    mock_resolve_scope,
     _mock_should_vision,
     db_session: Session,
 ) -> None:
@@ -316,12 +372,12 @@ def test_agent_traces_on_master_when_registration_missing(
             rationale="coordinate_lookup@0.98",
         )
     ]
-    mock_trace_scope.return_value = ScopeGeometry(
+    mock_resolve_scope.return_value = ScopeGeometry(
         page=1,
         type="line_segments",
-        segments=(((0.10, 0.20), (0.29, 0.27)),),
+        segments=(((0.45, 0.46), (0.65, 0.53)),),
         scope_kind=ScopeKind.UTILITY_LINE,
-        meta={"source": "aux_station_labels", "source_drawing_id": 1084},
+        meta={"source": "sheet_line"},
     )
 
     agent = InspectionLocationAgent()
@@ -331,15 +387,15 @@ def test_agent_traces_on_master_when_registration_missing(
         master_drawing_id=master_drawing_id,
     )
 
-    assert mock_trace_scope.call_count == 2
-    assert mock_trace_scope.call_args_list[-1].kwargs["source_drawing_id"] is None
+    mock_resolve_scope.assert_called_once()
+    assert mock_resolve_scope.call_args.kwargs["master_drawing_id"] == master_drawing_id
 
 
 @patch(
     "ai.agents.inspection_location_agent.apply_vision_to_fused_scores",
     side_effect=lambda _dossier, scores, **kwargs: scores,
 )
-@patch("ai.agents.inspection_location_agent.trace_scope_geometry")
+@patch("ai.agents.inspection_location_agent.resolve_master_sheet_line_scope")
 @patch("ai.agents.inspection_location_agent.fuse_candidate_scores")
 @patch("ai.agents.inspection_location_agent.generate_all_location_candidates")
 @patch("ai.agents.inspection_location_agent.build_evidence_dossier")
@@ -347,7 +403,7 @@ def test_agent_prefers_registration_aux_for_scope_tracing(
     mock_build_dossier,
     mock_generate_candidates,
     mock_fuse_scores,
-    mock_trace_scope,
+    mock_resolve_scope,
     _mock_should_vision,
     db_session: Session,
 ) -> None:
@@ -394,15 +450,12 @@ def test_agent_prefers_registration_aux_for_scope_tracing(
             rationale="reference_lookup@0.94",
         )
     ]
-    mock_trace_scope.return_value = ScopeGeometry(
+    mock_resolve_scope.return_value = ScopeGeometry(
         page=1,
         type="line_segments",
-        segments=(((0.10, 0.20), (0.29, 0.27)),),
+        segments=(((0.14, 0.24), (0.38, 0.30)),),
         scope_kind=ScopeKind.UTILITY_LINE,
-        meta={
-            "source": "aux_plan_station_labels",
-            "source_drawing_id": registered_aux_id,
-        },
+        meta={"source": "sheet_line"},
     )
 
     agent = InspectionLocationAgent()
@@ -412,11 +465,11 @@ def test_agent_prefers_registration_aux_for_scope_tracing(
         master_drawing_id=master_drawing_id,
     )
 
-    mock_trace_scope.assert_called_once()
-    assert mock_trace_scope.call_args.kwargs["source_drawing_id"] == registered_aux_id
+    mock_resolve_scope.assert_called_once()
+    assert mock_resolve_scope.call_args.kwargs["master_drawing_id"] == master_drawing_id
     assert result.scope is not None
-    assert result.scope.segments is not None
-    assert result.scope.segments[0][0][0] == pytest.approx(0.50, abs=0.02)
+    assert result.scope.meta is not None
+    assert result.scope.meta.get("source") == "sheet_line"
 
 
 def _segment_path_length(
@@ -434,20 +487,17 @@ def _segment_path_length(
     "ai.agents.inspection_location_agent.apply_vision_to_fused_scores",
     side_effect=lambda _dossier, scores, **kwargs: scores,
 )
-@patch("ai.agents.inspection_location_agent.trace_scope_geometry")
 @patch("ai.agents.inspection_location_agent.fuse_candidate_scores")
 @patch("ai.agents.inspection_location_agent.generate_all_location_candidates")
 @patch("ai.agents.inspection_location_agent.build_evidence_dossier")
-def test_agent_projects_aux_polyline_to_master_with_registration_transform(
+def test_agent_places_on_master_sheet_line_with_registration_context(
     mock_build_dossier,
     mock_generate_candidates,
     mock_fuse_scores,
-    mock_trace_scope,
     _mock_should_vision,
     db_session: Session,
 ) -> None:
     from ai.pipelines.drawing_location_resolver import RegistrationTransform
-    from ai.pipelines.scope_geometry import ScopeGeometry
 
     run, evidence_id, master_drawing_id, region_id = _seed_ready_master_run(db_session)
     dossier = _utility_line_dossier(
@@ -491,19 +541,6 @@ def test_agent_projects_aux_polyline_to_master_with_registration_transform(
             rationale="coordinate_lookup@0.98",
         )
     ]
-    aux_segments = (
-        ((0.10, 0.20), (0.20, 0.22)),
-        ((0.20, 0.22), (0.29, 0.27)),
-        ((0.29, 0.27), (0.30, 0.27)),
-    )
-    mock_trace_scope.return_value = ScopeGeometry(
-        page=1,
-        type="line_segments",
-        segments=aux_segments,
-        scope_kind=ScopeKind.UTILITY_LINE,
-        meta={"source": "aux_plan_station_labels", "source_drawing_id": aux_drawing_id},
-    )
-
     agent = InspectionLocationAgent()
     result = agent.run(
         db_session,
@@ -515,11 +552,9 @@ def test_agent_projects_aux_polyline_to_master_with_registration_transform(
     assert result.scope is not None
     assert result.scope.type == "line_segments"
     assert result.scope.segments is not None
-    assert result.scope.segments[0][0][0] == pytest.approx(0.50, abs=0.02)
-    assert result.scope.segments[0][0][1] == pytest.approx(0.47, abs=0.02)
     assert _segment_path_length(result.scope.segments) > 0.05
     assert result.scope.meta is not None
-    assert result.scope.meta.get("projected_from_drawing_id") == aux_drawing_id
+    assert result.scope.meta.get("source") == "sheet_line"
 
     overlay = (
         db_session.query(DrawingOverlay)
@@ -529,36 +564,23 @@ def test_agent_projects_aux_polyline_to_master_with_registration_transform(
     geometry = cast(dict, overlay.geometry)
     assert geometry["type"] == "line_segments"
     segments = cast(list[list[list[float]]], geometry["segments"])
-    assert segments[0][0][0] == pytest.approx(0.50, abs=0.02)
-    assert segments[0][0][1] == pytest.approx(0.47, abs=0.02)
-    projected_segments = tuple(
-        (
-            (float(segment[0][0]), float(segment[0][1])),
-            (float(segment[1][0]), float(segment[1][1])),
-        )
-        for segment in segments
-    )
-    assert _segment_path_length(projected_segments) > 0.05
+    assert len(segments) >= 1
 
 
 @patch(
     "ai.agents.inspection_location_agent.apply_vision_to_fused_scores",
     side_effect=lambda _dossier, scores, **kwargs: scores,
 )
-@patch("ai.agents.inspection_location_agent.trace_scope_geometry")
 @patch("ai.agents.inspection_location_agent.fuse_candidate_scores")
 @patch("ai.agents.inspection_location_agent.generate_all_location_candidates")
 @patch("ai.agents.inspection_location_agent.build_evidence_dossier")
-def test_agent_defers_aux_polyline_when_registration_transform_missing(
+def test_agent_uses_master_sheet_line_when_aux_coordinate_unprojected(
     mock_build_dossier,
     mock_generate_candidates,
     mock_fuse_scores,
-    mock_trace_scope,
     _mock_should_vision,
     db_session: Session,
 ) -> None:
-    from ai.pipelines.scope_geometry import ScopeGeometry
-
     run, evidence_id, master_drawing_id, region_id = _seed_ready_master_run(db_session)
     dossier = _utility_line_dossier(
         evidence_id=evidence_id,
@@ -587,24 +609,6 @@ def test_agent_defers_aux_polyline_when_registration_transform_missing(
             rationale="coordinate_lookup@0.98",
         )
     ]
-    master_scope = ScopeGeometry(
-        page=1,
-        type="line_segments",
-        segments=(((0.45, 0.46), (0.65, 0.53)),),
-        scope_kind=ScopeKind.UTILITY_LINE,
-        meta={"source": "sheet_line"},
-    )
-    mock_trace_scope.side_effect = [
-        ScopeGeometry(
-            page=1,
-            type="line_segments",
-            segments=(((0.10, 0.20), (0.29, 0.27)),),
-            scope_kind=ScopeKind.UTILITY_LINE,
-            meta={"source": "aux_station_labels", "source_drawing_id": aux_drawing_id},
-        ),
-        master_scope,
-    ]
-
     agent = InspectionLocationAgent()
     result = agent.run(
         db_session,
@@ -612,12 +616,11 @@ def test_agent_defers_aux_polyline_when_registration_transform_missing(
         master_drawing_id=master_drawing_id,
     )
 
-    assert result.status == "needs_review"
+    assert result.status == "matched"
     assert result.scope is not None
     assert result.scope.type == "line_segments"
-    assert "aux_coords_unprojected" in result.rationale
-    assert mock_trace_scope.call_count == 2
-    assert mock_trace_scope.call_args_list[-1].kwargs["source_drawing_id"] is None
+    assert result.scope.meta is not None
+    assert result.scope.meta.get("source") == "sheet_line"
 
     overlay = (
         db_session.query(DrawingOverlay)

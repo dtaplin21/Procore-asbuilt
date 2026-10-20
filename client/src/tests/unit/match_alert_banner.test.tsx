@@ -53,22 +53,35 @@ describe("MatchAlertBanner", () => {
     );
   });
 
-  it("shows needs_review message without confidence numbers", () => {
+  it("shows run failure message when provided", () => {
     useInspectionMatchStatusMock.mockReturnValue({
       inspection_id: "357",
-      match_status: "needs_review",
+      match_status: "matched",
       bbox: null,
     });
 
-    render(<MatchAlertBanner evidenceId="357" />);
+    render(
+      <MatchAlertBanner
+        evidenceId="357"
+        runErrorMessage="[INSPECTION_NO_MASTER_SHEET_LINE] no lines"
+      />,
+    );
 
     const banner = screen.getByRole("alert");
-    expect(banner).toHaveTextContent(
-      "This inspection could not be automatically placed. Please review and confirm the location on the drawing.",
-    );
-    expect(banner.textContent).not.toMatch(/%/);
-    expect(banner.textContent?.toLowerCase()).not.toContain("confidence");
-    expect(banner.textContent?.toLowerCase()).not.toContain("score");
+    expect(banner).toHaveTextContent("INSPECTION_NO_MASTER_SHEET_LINE");
+    expect(banner.className).toMatch(/destructive/);
+  });
+
+  it("renders nothing for legacy needs_review (placement is always automatic)", () => {
+    useInspectionMatchStatusMock.mockReturnValue({
+      inspection_id: "357",
+      match_status: "needs_review",
+      bbox: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
+    });
+
+    const { container } = render(<MatchAlertBanner evidenceId="357" />);
+
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("shows no_match message", () => {
@@ -85,17 +98,4 @@ describe("MatchAlertBanner", () => {
     );
   });
 
-  it("ucsf needs_review shows alert without numeric scores", () => {
-    useInspectionMatchStatusMock.mockReturnValue({
-      inspection_id: "357",
-      match_status: "needs_review",
-      bbox: null,
-    });
-
-    render(<MatchAlertBanner evidenceId="357" />);
-
-    const banner = screen.getByRole("alert");
-    expect(banner).toHaveTextContent("could not be automatically placed");
-    expect(banner.textContent).not.toMatch(/\d+%/);
-  });
 });

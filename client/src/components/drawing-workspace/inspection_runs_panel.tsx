@@ -37,6 +37,7 @@ import { refreshInspectionWorkspaceQueries } from "@/lib/api/inspection_runs";
 import { formatOverlayListItem } from "@/lib/drawing-overlays/overlay_display";
 import {
   hasActiveInspectionRun,
+  pickInspectionProgressRun,
   pollWhileInspectionRunsActive,
 } from "@/lib/inspection-runs/active_run";
 import { formatEvidenceUploadToastDescription } from "@/lib/inspection-runs/upload_toast";
@@ -138,9 +139,19 @@ export default function InspectionRunsPanel({
     [runs, selectedRunId],
   );
 
+  const progressRun = useMemo(
+    () =>
+      pickInspectionProgressRun(runs, {
+        selectedRunId,
+        pipelinePendingRunId,
+      }),
+    [runs, selectedRunId, pipelinePendingRunId],
+  );
+
   const { data: runProgress, isLoading: runProgressLoading } = useInspectionRunProgress(
     projectId,
-    selectedRun,
+    progressRun,
+    { pipelinePendingRunId },
   );
 
   const matchEvidenceId = useMemo(() => {
@@ -417,7 +428,15 @@ export default function InspectionRunsPanel({
           No inspection runs for this sheet yet. Upload evidence to create one.
         </p>
       ) : (
-        <ul className="flex max-h-[min(24rem,50vh)] flex-col gap-2 overflow-y-auto pr-1">
+        <>
+          {progressRun ? (
+            <InspectionRunProgressPanel
+              progress={runProgress}
+              isLoading={runProgressLoading}
+              isActive
+            />
+          ) : null}
+          <ul className="flex max-h-[min(24rem,50vh)] flex-col gap-2 overflow-y-auto pr-1">
           {runs.map((run) => (
             <InspectionRunRow
               key={run.id}
@@ -435,22 +454,22 @@ export default function InspectionRunsPanel({
               pipelinePendingAction={pipelinePendingAction}
             />
           ))}
-        </ul>
+          </ul>
+        </>
       )}
 
       {selectedRunId != null ? (
         <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
-          {selectedRun && hasActiveInspectionRun([selectedRun]) ? (
-            <InspectionRunProgressPanel
-              progress={runProgress}
-              isLoading={runProgressLoading}
-            />
-          ) : null}
           {matchEvidenceId ? (
             <MatchAlertBanner
               evidenceId={matchEvidenceId}
               drawingId={String(masterDrawingId)}
               runId={selectedRunId != null ? String(selectedRunId) : null}
+              runErrorMessage={
+                selectedRun?.status?.toLowerCase() === "failed"
+                  ? selectedRun.error_message
+                  : null
+              }
             />
           ) : null}
           <div className="flex items-center justify-between gap-2">

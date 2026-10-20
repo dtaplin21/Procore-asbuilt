@@ -20,35 +20,34 @@ from ai.pipelines.drawing_location_resolver import ResolutionMethod
 from ai.pipelines.drawing_location_resolver import RegistrationTransform
 from ai.pipelines.location_match_orchestrator import (
     LocationMatchCandidate,
-    _load_registration_transform,
     generate_all_location_candidates,
-    project_line_segments_to_master,
 )
 from ai.pipelines.scope_geometry import (
     ScopeGeometry,
     ScopeKind,
-    bbox_to_scope_rect,
     clamp_fractional_bbox,
-    infer_scope_kind,
-    line_segments_from_points,
 )
-from ai.pipelines.scope_line_tracer import trace_scope_geometry
+from ai.pipelines.scope_line_tracer import resolve_master_sheet_line_scope
 from ai.pipelines.vision_location_reasoner import apply_vision_to_fused_scores
 from models.models import DrawingRendition
 from services.file_storage import resolve_stored_file_path
 from services.inspection_match_persistence import (
-    MATCH_SCORE_THRESHOLD,
     AgentMatchResult,
-    MatchStatus,
     persist_agent_match_result,
+)
+from services.inspection_placement_errors import (
+    INSPECTION_INVALID_SCOPE,
+    INSPECTION_NO_ANCHOR_BBOX,
+    INSPECTION_NO_CANDIDATES,
+    INSPECTION_NO_FUSED_WINNER,
+    InspectionPlacementError,
+    placement_strict_enabled,
 )
 from services.master_drawing_index_readiness import get_master_drawing_index_readiness
 
 logger = logging.getLogger(__name__)
 
 MAX_INVESTIGATION_STEPS = 8
-_MAJOR_CONFLICT_THRESHOLD = 2
-
 
 class InspectionLocationAgent:
     def run(
@@ -70,10 +69,7 @@ class InspectionLocationAgent:
                 scope=None,
                 region_id=None,
                 page=page,
-                rationale=(
-                    f"Master drawing index not ready "
-                    f"(status={readiness.index_status}, regions={readiness.region_count})."
-                ),
+                rationale=readiness.not_ready_message(),
                 fused_score=None,
             )
             persist_agent_match_result(
@@ -129,27 +125,14 @@ class InspectionLocationAgent:
             master_drawing_id=master_drawing_id,
             page=page,
         )
-        if not candidates:
-            result = AgentMatchResult(
-                status="no_match",
-                scope=None,
-                region_id=None,
-                page=page,
-                rationale="No location candidates generated.",
-                fused_score=None,
+        strict = placement_strict_enabled()
+        if strict and not candidates:
+            raise InspectionPlacementError(
+                INSPECTION_NO_CANDIDATES,
+                "No location candidates were generated for this evidence on the master drawing.",
             )
-            persist_agent_match_result(
-                session,
-                evidence_id=evidence_id,
-                master_drawing_id=master_drawing_id,
-                result=result,
-                ranked_scores=[],
-                page=page,
-                inspection_run_id=inspection_run_id,
-            )
-            return result
 
-        ranked_scores = fuse_candidate_scores(dossier, candidates)
+        ranked_scores = fuse_candidate_scores(dossier, candidates) if candidates else []
         master_png_path = _master_rendition_path(session, master_drawing_id, page)
         if master_png_path is not None and ranked_scores:
             ranked_scores = apply_vision_to_fused_scores(
@@ -158,21 +141,65 @@ class InspectionLocationAgent:
                 master_png_path=master_png_path,
             )
 
-        winner = select_fused_winner(ranked_scores)
-        if winner is None:
-            winner = _fallback_fused_score_for_master_placement(
-                ranked_scores,
-                master_drawing_id=master_drawing_id,
-            )
+        winner, placement_note = _pick_placement_winner(
+            ranked_scores,
+            master_drawing_id=master_drawing_id,
+            session=session,
+            page=page,
+            strict=strict,
+        )
 
-        if winner is None:
-            result = AgentMatchResult(
-                status="no_match",
-                scope=None,
-                region_id=None,
+        anchor_bbox = _master_scope_anchor_bbox(
+            winner,
+            ranked_scores,
+            master_drawing_id=master_drawing_id,
+            session=session,
+            page=page,
+            strict=strict,
+        )
+        if anchor_bbox is None:
+            if strict:
+                raise InspectionPlacementError(
+                    INSPECTION_NO_ANCHOR_BBOX,
+                    "Could not derive a master-sheet anchor bbox from fused location candidates.",
+                )
+            anchor_bbox = (0.35, 0.25, 0.65, 0.55)
+        safe_anchor = clamp_fractional_bbox(anchor_bbox)
+
+        if progress is not None:
+            progress.set_phase("tracing")
+
+        try:
+            scope = _resolve_master_line_placement_scope(
+                session,
+                dossier=dossier,
+                master_drawing_id=master_drawing_id,
                 page=page,
-                rationale="No actionable fused candidate.",
-                fused_score=None,
+                anchor_bbox=safe_anchor,
+                strict=strict,
+            )
+        except ValueError as exc:
+            if strict:
+                from services.inspection_placement_errors import (
+                    inspection_placement_error_from_value_error,
+                )
+
+                raise inspection_placement_error_from_value_error(exc) from exc
+            logger.warning(
+                "inspection_master_sheet_line_missing",
+                extra={
+                    "evidence_id": evidence_id,
+                    "master_drawing_id": master_drawing_id,
+                    "error": str(exc),
+                },
+            )
+            result = AgentMatchResult(
+                status="index_pending",
+                scope=None,
+                region_id=winner.candidate.region_id,
+                page=page,
+                rationale=str(exc),
+                fused_score=winner.fused_score,
             )
             persist_agent_match_result(
                 session,
@@ -185,88 +212,22 @@ class InspectionLocationAgent:
             )
             return result
 
-        scope_kind = infer_scope_kind(dossier)
-        registration_transform = _load_registration_transform(dossier.evidence)
-        registration_aux_drawing_id = _registration_aux_drawing_id(dossier.evidence)
-        anchor_bbox = _master_scope_anchor_bbox(
-            winner,
-            ranked_scores,
-            master_drawing_id=master_drawing_id,
-            session=session,
-            page=page,
-        )
-        scope_source_drawing_id = _resolve_scope_source_drawing_id(
-            dossier,
-            winner.candidate.source_drawing_id,
-            master_drawing_id=master_drawing_id,
-            registration_transform=registration_transform,
-        )
-        scope: ScopeGeometry | None = None
-        if anchor_bbox is not None:
-            safe_anchor = clamp_fractional_bbox(anchor_bbox)
-            if progress is not None:
-                progress.set_phase("tracing")
-            try:
-                scope = trace_scope_geometry(
-                    dossier,
-                    anchor_bbox=safe_anchor,
-                    scope_kind=scope_kind,
-                    page=page,
-                    session=session,
-                    master_png_path=master_png_path,
-                    source_drawing_id=scope_source_drawing_id,
-                )
-            except ValueError:
-                scope = None
-            if scope is None:
-                scope = bbox_to_scope_rect(
-                    safe_anchor,
-                    page=page,
-                    scope_kind=scope_kind,
-                )
-
-        scope, aux_scope_unprojected = _maybe_project_aux_scope_to_master(
-            scope,
-            master_drawing_id=master_drawing_id,
-            registration_transform=registration_transform,
-            source_drawing_id=scope_source_drawing_id
-            or winner.candidate.source_drawing_id,
-            registration_aux_drawing_id=registration_aux_drawing_id,
-        )
-        if aux_scope_unprojected and scope is None and anchor_bbox is not None:
-            safe_anchor = clamp_fractional_bbox(anchor_bbox)
-            try:
-                scope = trace_scope_geometry(
-                    dossier,
-                    anchor_bbox=safe_anchor,
-                    scope_kind=scope_kind,
-                    page=page,
-                    session=session,
-                    master_png_path=master_png_path,
-                    source_drawing_id=None,
-                )
-            except ValueError:
-                scope = None
-
-        status = _decide_match_status(
-            winner,
-            scope=scope,
-            scope_kind=scope_kind,
-        )
-        rationale = winner.rationale
-        if aux_scope_unprojected:
-            status = "needs_review"
-            rationale = (
-                f"{rationale} | aux_coords_unprojected: aux scope polyline "
-                "could not be projected onto the master sheet."
+        if strict and (scope.meta or {}).get("source") != "sheet_line":
+            raise InspectionPlacementError(
+                INSPECTION_INVALID_SCOPE,
+                f"Placement scope must be master sheet_line, got {scope.meta!r}.",
             )
-        if scope is not None and scope.meta:
+
+        rationale = winner.rationale
+        if placement_note:
+            rationale = f"{rationale} | {placement_note}"
+        if scope.meta:
             source = scope.meta.get("source")
             if source:
                 rationale = f"{rationale} | scope={source}"
 
         result = AgentMatchResult(
-            status=status,
+            status="matched",
             scope=scope,
             region_id=winner.candidate.region_id,
             page=winner.candidate.page,
@@ -285,6 +246,95 @@ class InspectionLocationAgent:
             inspection_run_id=inspection_run_id,
         )
         return result
+
+
+def _resolve_master_line_placement_scope(
+    session: Session,
+    *,
+    dossier: EvidenceDossier,
+    master_drawing_id: int,
+    page: int,
+    anchor_bbox: tuple[float, float, float, float],
+    strict: bool,
+) -> ScopeGeometry:
+    """Always place on a master plan SheetLine (never aux polylines or anchor rects)."""
+    return resolve_master_sheet_line_scope(
+        session,
+        dossier=dossier,
+        master_drawing_id=master_drawing_id,
+        page=page,
+        anchor_bbox=anchor_bbox,
+        strict=strict,
+    )
+
+
+def _pick_placement_winner(
+    ranked_scores: Sequence[FusedCandidateScore],
+    *,
+    master_drawing_id: int,
+    session: Session,
+    page: int,
+    strict: bool,
+) -> tuple[FusedCandidateScore, str | None]:
+    """Choose a location anchor; inspection always receives a master SheetLine overlay."""
+    winner = select_fused_winner(list(ranked_scores))
+    if strict:
+        if winner is None:
+            raise InspectionPlacementError(
+                INSPECTION_NO_FUSED_WINNER,
+                "No fused location candidate met strict placement requirements "
+                "(positive fused score and valid master bbox).",
+            )
+        return winner, None
+
+    if winner is None:
+        winner = _fallback_fused_score_for_master_placement(
+            ranked_scores,
+            master_drawing_id=master_drawing_id,
+        )
+    if winner is None and ranked_scores:
+        with_bbox = [
+            fused
+            for fused in ranked_scores
+            if fused.candidate.bbox_fractional is not None
+        ]
+        if with_bbox:
+            winner = max(
+                with_bbox,
+                key=lambda item: (item.fused_score, item.candidate.confidence),
+            )
+            return winner, "placement_fallback=best_bbox_candidate"
+
+    if winner is not None:
+        return winner, None
+
+    corridor = clamp_fractional_bbox((0.12, 0.22, 0.92, 0.78))
+    from ai.pipelines.master_utility_anchor import utility_corridor_anchor_for_drawing
+
+    legend_corridor = utility_corridor_anchor_for_drawing(
+        session,
+        master_drawing_id,
+        page=page,
+    )
+    anchor = legend_corridor or corridor
+    synthetic = LocationMatchCandidate(
+        method=ResolutionMethod.REFERENCE_LOOKUP,
+        confidence=0.05,
+        bbox_fractional=anchor,
+        page=page,
+        source_drawing_id=master_drawing_id,
+        notes="synthetic_plan_corridor_anchor",
+    )
+    return (
+        FusedCandidateScore(
+            candidate=synthetic,
+            fused_score=0.01,
+            clue_hits=(),
+            conflicts=(),
+            rationale="placement_fallback=plan_corridor",
+        ),
+        "placement_fallback=plan_corridor",
+    )
 
 
 def _resolve_scope_source_drawing_id(
@@ -355,6 +405,7 @@ def _master_scope_anchor_bbox(
     master_drawing_id: int,
     session: Session | None = None,
     page: int = 1,
+    strict: bool = False,
 ) -> tuple[float, float, float, float] | None:
     """Avoid anchoring master scope traces on unprojected auxiliary coordinate boxes."""
     candidate = winner.candidate
@@ -390,7 +441,10 @@ def _master_scope_anchor_bbox(
         if legend_corridor is not None:
             return legend_corridor
 
-    # Last resort: search the plan-view band on the master sheet (not the aux pin).
+    if strict:
+        return None
+
+    # Last resort (non-strict): search the plan-view band on the master sheet (not the aux pin).
     return clamp_fractional_bbox((0.12, 0.22, 0.92, 0.78))
 
 
@@ -440,93 +494,6 @@ def _registration_aux_drawing_id_from_meta(meta: dict[str, Any]) -> int | None:
         return int(reg_aux)
     except (TypeError, ValueError):
         return None
-
-
-def _maybe_project_aux_scope_to_master(
-    scope: ScopeGeometry | None,
-    *,
-    master_drawing_id: int,
-    registration_transform: RegistrationTransform | None,
-    source_drawing_id: int | None,
-    registration_aux_drawing_id: int | None = None,
-) -> tuple[ScopeGeometry | None, bool]:
-    """Project aux-space line segments onto master; drop scope when transform is missing."""
-    if scope is None:
-        return scope, False
-
-    segments = scope.segments
-    if scope.type == "polyline" and scope.points:
-        segments = line_segments_from_points(scope.points)
-    if scope.type != "line_segments" or not segments:
-        return scope, False
-
-    meta = dict(scope.meta or {})
-    raw_aux_id = meta.get("source_drawing_id")
-    if raw_aux_id is None and source_drawing_id is not None:
-        raw_aux_id = source_drawing_id
-    try:
-        aux_drawing_id = int(raw_aux_id) if raw_aux_id is not None else None
-    except (TypeError, ValueError):
-        aux_drawing_id = None
-
-    if aux_drawing_id is None or aux_drawing_id == master_drawing_id:
-        return scope, False
-
-    if registration_transform is None:
-        return None, True
-
-    if (
-        registration_aux_drawing_id is not None
-        and aux_drawing_id != registration_aux_drawing_id
-    ):
-        return None, True
-
-    projected_segments = project_line_segments_to_master(
-        segments,
-        registration_transform,
-    )
-    meta["projected_from_drawing_id"] = aux_drawing_id
-    source = meta.get("source")
-    if source:
-        meta["source"] = f"{source}_projected"
-    return ScopeGeometry(
-        page=scope.page,
-        type="line_segments",
-        segments=projected_segments,
-        scope_kind=scope.scope_kind,
-        meta=meta,
-    ), False
-
-
-def _decide_match_status(
-    winner: FusedCandidateScore,
-    *,
-    scope: ScopeGeometry | None,
-    scope_kind: ScopeKind,
-) -> MatchStatus:
-    del scope_kind  # reserved for future scope-specific rules
-
-    if winner.fused_score <= 0:
-        return "no_match"
-
-    major_conflicts = len(winner.conflicts) >= _MAJOR_CONFLICT_THRESHOLD
-    ambiguous_line = bool(scope and scope.meta and scope.meta.get("ambiguous"))
-    borderline = winner.fused_score < MATCH_SCORE_THRESHOLD
-
-    if major_conflicts and winner.fused_score < MATCH_SCORE_THRESHOLD:
-        return "no_match"
-
-    if (
-        winner.fused_score >= MATCH_SCORE_THRESHOLD
-        and not major_conflicts
-        and not ambiguous_line
-    ):
-        return "matched"
-
-    if borderline or ambiguous_line or major_conflicts:
-        return "needs_review"
-
-    return "needs_review"
 
 
 def _has_unprojected_aux_coordinate_match(

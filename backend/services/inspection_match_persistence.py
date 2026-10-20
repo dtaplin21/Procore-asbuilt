@@ -12,7 +12,8 @@ from services.overlay_geometry import UNMAPPED_GEOMETRY
 from models.drawing_match_candidate import DrawingMatchCandidate
 from models.drawing_overlay import DrawingOverlay
 from models.inspection_run import InspectionRun
-from models.models import EvidenceRecord
+from models.models import Drawing, EvidenceRecord
+from services.overlay_index_binding import with_index_stamp
 from services.storage import StorageService
 
 if TYPE_CHECKING:
@@ -21,9 +22,15 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Used for eval, vision heuristics, and logging — not for gating overlay placement.
 MATCH_SCORE_THRESHOLD = 0.75
 
 MatchStatus = Literal["matched", "needs_review", "no_match", "index_pending"]
+
+
+def status_includes_placement_geometry(status: MatchStatus) -> bool:
+    """Whether this match status should persist scope/bbox on the master drawing."""
+    return status not in ("no_match", "index_pending")
 
 
 @dataclass(frozen=True)
@@ -48,7 +55,7 @@ class AgentMatchResult:
 
 
 def match_status_from_internal_score(internal_score: float) -> MatchStatus:
-    return "matched" if internal_score >= MATCH_SCORE_THRESHOLD else "needs_review"
+    return "matched" if internal_score > 0 else "no_match"
 
 
 def record_internal_match_candidate(
@@ -108,8 +115,10 @@ def persist_inspection_match_overlay(
         return None
 
     master_drawing_id = int(drawing_id)
+    drawing = session.get(Drawing, master_drawing_id)
+    indexed_at = getattr(drawing, "indexed_at", None) if drawing is not None else None
     meta_patch = {"match_status": status}
-    has_resolved_geometry = status in ("matched", "needs_review") and (
+    has_resolved_geometry = status_includes_placement_geometry(status) and (
         scope is not None or bbox is not None
     )
 
@@ -125,7 +134,7 @@ def persist_inspection_match_overlay(
 
     if overlay is not None:
         current_meta = overlay.meta if isinstance(overlay.meta, dict) else {}
-        setattr(overlay, "meta", {**current_meta, **meta_patch})
+        setattr(overlay, "meta", with_index_stamp({**current_meta, **meta_patch}, indexed_at))
         if has_resolved_geometry:
             setattr(
                 overlay,
@@ -142,8 +151,8 @@ def persist_inspection_match_overlay(
         return cast(int, overlay.id)
 
     geometry = scope_to_geometry(
-        scope if status in ("matched", "needs_review") else None,
-        fallback_bbox=bbox if status in ("matched", "needs_review") else None,
+        scope if status_includes_placement_geometry(status) else None,
+        fallback_bbox=bbox if status_includes_placement_geometry(status) else None,
         page=page,
     )
     storage = StorageService(session)
@@ -151,7 +160,7 @@ def persist_inspection_match_overlay(
         master_drawing_id,
         geometry,
         "unknown",
-        meta=meta_patch,
+        meta=with_index_stamp(meta_patch, indexed_at),
         inspection_run_id=run_id,
         label="Inspection match",
     )
@@ -340,11 +349,11 @@ def persist_agent_match_result(
         inspection_id=inspection_id,
         drawing_id=master_drawing_id,
         status=result.status,
-        bbox=bbox if result.status in ("matched", "needs_review") else None,
+        bbox=bbox if status_includes_placement_geometry(result.status) else None,
         page=page,
         region_id=result.region_id,
         inspection_run_id=inspection_run_id,
-        scope=result.scope if result.status in ("matched", "needs_review") else None,
+        scope=result.scope if status_includes_placement_geometry(result.status) else None,
     )
     if overlay_id is None:
         return None
@@ -354,16 +363,21 @@ def persist_agent_match_result(
         return overlay_id
 
     current_meta = overlay.meta if isinstance(overlay.meta, dict) else {}
-    agent_meta = {
-        **current_meta,
-        "match_status": result.status,
-        "agent_rationale": result.rationale,
-        "agent_fused_score": result.fused_score,
-        "agent_candidates": [
-            {"rank": rank, **_fused_score_to_candidate_meta(fused)}
-            for rank, fused in enumerate(ranked_scores, start=1)
-        ],
-    }
+    drawing = session.get(Drawing, master_drawing_id)
+    indexed_at = getattr(drawing, "indexed_at", None) if drawing is not None else None
+    agent_meta = with_index_stamp(
+        {
+            **current_meta,
+            "match_status": result.status,
+            "agent_rationale": result.rationale,
+            "agent_fused_score": result.fused_score,
+            "agent_candidates": [
+                {"rank": rank, **_fused_score_to_candidate_meta(fused)}
+                for rank, fused in enumerate(ranked_scores, start=1)
+            ],
+        },
+        indexed_at,
+    )
     setattr(overlay, "meta", agent_meta)
     session.commit()
     return overlay_id

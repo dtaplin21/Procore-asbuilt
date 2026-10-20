@@ -1,0 +1,2958 @@
+{
+  "run_id": 734,
+  "evidence_id": 749,
+  "master_drawing_id": 1722,
+  "run_status": "complete",
+  "run_error": null,
+  "index_inventory_summary": {
+    "match_investigation": {
+      "followed": 4,
+      "skipped": 13,
+      "errors": [
+        "https://app.procore.com/2727475/project/submittal_log_approvers/document_downloader?attachment_id=6001321764&item_id=177539970&item_type=SubmittalLogApprover&project_id=2727475&source=coversheet&submittal_log_id=69397739: unsupported content type: application/xml"
+      ],
+      "merge_included": [
+        "7.20-7.24 U1.C4.20 6.00 Sanitary Sewer Install.pdf",
+        "UMR 331000-5.0 - M&H - Sanitary Sewer PD_Approved (5).pdf",
+        "nested-UMR 331000-5.0 - M&H - Sanitary Sewer PD_Approved (5).pdf"
+      ],
+      "merge_truncated": [],
+      "merge_dropped": [],
+      "investigation_complete": false,
+      "linked_drawing_ids": [
+        1973,
+        1974,
+        1872
+      ],
+      "linked_drawing_ids_indexed_sync": [
+        1973,
+        1974
+      ],
+      "drawing_ids_needing_index": [],
+      "page_investigations": [
+        {
+          "source": "linked_attachment",
+          "page": 1,
+          "ocr_word_count": 2834,
+          "vision_word_count": 297,
+          "combined_word_count": 3131,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 2,
+          "ocr_word_count": 3583,
+          "vision_word_count": 111,
+          "combined_word_count": 3694,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 3,
+          "ocr_word_count": 1986,
+          "vision_word_count": 226,
+          "combined_word_count": 2212,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 4,
+          "ocr_word_count": 3233,
+          "vision_word_count": 144,
+          "combined_word_count": 3377,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 5,
+          "ocr_word_count": 2347,
+          "vision_word_count": 132,
+          "combined_word_count": 2479,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 6,
+          "ocr_word_count": 2502,
+          "vision_word_count": 13,
+          "combined_word_count": 2515,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 7,
+          "ocr_word_count": 2592,
+          "vision_word_count": 45,
+          "combined_word_count": 2637,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 8,
+          "ocr_word_count": 2415,
+          "vision_word_count": 55,
+          "combined_word_count": 2470,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 9,
+          "ocr_word_count": 3278,
+          "vision_word_count": 595,
+          "combined_word_count": 3873,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 10,
+          "ocr_word_count": 2432,
+          "vision_word_count": 252,
+          "combined_word_count": 2684,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 11,
+          "ocr_word_count": 11,
+          "vision_word_count": 13,
+          "combined_word_count": 24,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 12,
+          "ocr_word_count": 222,
+          "vision_word_count": 235,
+          "combined_word_count": 457,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 13,
+          "ocr_word_count": 226,
+          "vision_word_count": 223,
+          "combined_word_count": 449,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 14,
+          "ocr_word_count": 409,
+          "vision_word_count": 272,
+          "combined_word_count": 681,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 15,
+          "ocr_word_count": 395,
+          "vision_word_count": 334,
+          "combined_word_count": 729,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 16,
+          "ocr_word_count": 325,
+          "vision_word_count": 339,
+          "combined_word_count": 664,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 17,
+          "ocr_word_count": 239,
+          "vision_word_count": 363,
+          "combined_word_count": 602,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 18,
+          "ocr_word_count": 99,
+          "vision_word_count": 99,
+          "combined_word_count": 198,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 19,
+          "ocr_word_count": 373,
+          "vision_word_count": 380,
+          "combined_word_count": 753,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 20,
+          "ocr_word_count": 330,
+          "vision_word_count": 331,
+          "combined_word_count": 661,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 21,
+          "ocr_word_count": 1402,
+          "vision_word_count": 280,
+          "combined_word_count": 1682,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 22,
+          "ocr_word_count": 378,
+          "vision_word_count": 390,
+          "combined_word_count": 768,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 23,
+          "ocr_word_count": 255,
+          "vision_word_count": 255,
+          "combined_word_count": 510,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 24,
+          "ocr_word_count": 178,
+          "vision_word_count": 192,
+          "combined_word_count": 370,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 25,
+          "ocr_word_count": 231,
+          "vision_word_count": 263,
+          "combined_word_count": 494,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 26,
+          "ocr_word_count": 280,
+          "vision_word_count": 174,
+          "combined_word_count": 454,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 27,
+          "ocr_word_count": 275,
+          "vision_word_count": 261,
+          "combined_word_count": 536,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 28,
+          "ocr_word_count": 355,
+          "vision_word_count": 354,
+          "combined_word_count": 709,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 29,
+          "ocr_word_count": 379,
+          "vision_word_count": 416,
+          "combined_word_count": 795,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 30,
+          "ocr_word_count": 430,
+          "vision_word_count": 400,
+          "combined_word_count": 830,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 31,
+          "ocr_word_count": 325,
+          "vision_word_count": 339,
+          "combined_word_count": 664,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 32,
+          "ocr_word_count": 239,
+          "vision_word_count": 345,
+          "combined_word_count": 584,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 33,
+          "ocr_word_count": 99,
+          "vision_word_count": 99,
+          "combined_word_count": 198,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 34,
+          "ocr_word_count": 382,
+          "vision_word_count": 398,
+          "combined_word_count": 780,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 35,
+          "ocr_word_count": 330,
+          "vision_word_count": 331,
+          "combined_word_count": 661,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 36,
+          "ocr_word_count": 1402,
+          "vision_word_count": 281,
+          "combined_word_count": 1683,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 37,
+          "ocr_word_count": 378,
+          "vision_word_count": 371,
+          "combined_word_count": 749,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 38,
+          "ocr_word_count": 628,
+          "vision_word_count": 628,
+          "combined_word_count": 1256,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 39,
+          "ocr_word_count": 273,
+          "vision_word_count": 278,
+          "combined_word_count": 551,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 40,
+          "ocr_word_count": 300,
+          "vision_word_count": 302,
+          "combined_word_count": 602,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 41,
+          "ocr_word_count": 484,
+          "vision_word_count": 488,
+          "combined_word_count": 972,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 42,
+          "ocr_word_count": 628,
+          "vision_word_count": 628,
+          "combined_word_count": 1256,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 43,
+          "ocr_word_count": 143,
+          "vision_word_count": 142,
+          "combined_word_count": 285,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 44,
+          "ocr_word_count": 526,
+          "vision_word_count": 504,
+          "combined_word_count": 1030,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 45,
+          "ocr_word_count": 319,
+          "vision_word_count": 324,
+          "combined_word_count": 643,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 46,
+          "ocr_word_count": 213,
+          "vision_word_count": 216,
+          "combined_word_count": 429,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 47,
+          "ocr_word_count": 198,
+          "vision_word_count": 182,
+          "combined_word_count": 380,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 48,
+          "ocr_word_count": 95,
+          "vision_word_count": 92,
+          "combined_word_count": 187,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 49,
+          "ocr_word_count": 252,
+          "vision_word_count": 224,
+          "combined_word_count": 476,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 50,
+          "ocr_word_count": 245,
+          "vision_word_count": 225,
+          "combined_word_count": 470,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 51,
+          "ocr_word_count": 266,
+          "vision_word_count": 277,
+          "combined_word_count": 543,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 52,
+          "ocr_word_count": 306,
+          "vision_word_count": 301,
+          "combined_word_count": 607,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 53,
+          "ocr_word_count": 215,
+          "vision_word_count": 221,
+          "combined_word_count": 436,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 54,
+          "ocr_word_count": 176,
+          "vision_word_count": 171,
+          "combined_word_count": 347,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 55,
+          "ocr_word_count": 284,
+          "vision_word_count": 317,
+          "combined_word_count": 601,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 56,
+          "ocr_word_count": 277,
+          "vision_word_count": 281,
+          "combined_word_count": 558,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 57,
+          "ocr_word_count": 154,
+          "vision_word_count": 153,
+          "combined_word_count": 307,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 58,
+          "ocr_word_count": 206,
+          "vision_word_count": 220,
+          "combined_word_count": 426,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 59,
+          "ocr_word_count": 43,
+          "vision_word_count": 269,
+          "combined_word_count": 312,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 60,
+          "ocr_word_count": 287,
+          "vision_word_count": 231,
+          "combined_word_count": 518,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 61,
+          "ocr_word_count": 294,
+          "vision_word_count": 264,
+          "combined_word_count": 558,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 62,
+          "ocr_word_count": 610,
+          "vision_word_count": 620,
+          "combined_word_count": 1230,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 63,
+          "ocr_word_count": 325,
+          "vision_word_count": 324,
+          "combined_word_count": 649,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 64,
+          "ocr_word_count": 577,
+          "vision_word_count": 607,
+          "combined_word_count": 1184,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 65,
+          "ocr_word_count": 78,
+          "vision_word_count": 62,
+          "combined_word_count": 140,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 66,
+          "ocr_word_count": 64,
+          "vision_word_count": 65,
+          "combined_word_count": 129,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 67,
+          "ocr_word_count": 216,
+          "vision_word_count": 226,
+          "combined_word_count": 442,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 68,
+          "ocr_word_count": 11,
+          "vision_word_count": 11,
+          "combined_word_count": 22,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 69,
+          "ocr_word_count": 0,
+          "vision_word_count": 207,
+          "combined_word_count": 207,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 70,
+          "ocr_word_count": 90,
+          "vision_word_count": 84,
+          "combined_word_count": 174,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 71,
+          "ocr_word_count": 1,
+          "vision_word_count": 174,
+          "combined_word_count": 175,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 72,
+          "ocr_word_count": 1,
+          "vision_word_count": 201,
+          "combined_word_count": 202,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 73,
+          "ocr_word_count": 0,
+          "vision_word_count": 87,
+          "combined_word_count": 87,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 74,
+          "ocr_word_count": 0,
+          "vision_word_count": 274,
+          "combined_word_count": 274,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 75,
+          "ocr_word_count": 127,
+          "vision_word_count": 150,
+          "combined_word_count": 277,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 76,
+          "ocr_word_count": 516,
+          "vision_word_count": 523,
+          "combined_word_count": 1039,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 77,
+          "ocr_word_count": 475,
+          "vision_word_count": 380,
+          "combined_word_count": 855,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 78,
+          "ocr_word_count": 393,
+          "vision_word_count": 398,
+          "combined_word_count": 791,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 1,
+          "ocr_word_count": 466,
+          "vision_word_count": 46,
+          "combined_word_count": 512,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 2,
+          "ocr_word_count": 707,
+          "vision_word_count": 265,
+          "combined_word_count": 972,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 3,
+          "ocr_word_count": 244,
+          "vision_word_count": 170,
+          "combined_word_count": 414,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 4,
+          "ocr_word_count": 235,
+          "vision_word_count": 175,
+          "combined_word_count": 410,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 5,
+          "ocr_word_count": 374,
+          "vision_word_count": 226,
+          "combined_word_count": 600,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 6,
+          "ocr_word_count": 98,
+          "vision_word_count": 73,
+          "combined_word_count": 171,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 7,
+          "ocr_word_count": 516,
+          "vision_word_count": 286,
+          "combined_word_count": 802,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 8,
+          "ocr_word_count": 508,
+          "vision_word_count": 388,
+          "combined_word_count": 896,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 9,
+          "ocr_word_count": 496,
+          "vision_word_count": 384,
+          "combined_word_count": 880,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 10,
+          "ocr_word_count": 459,
+          "vision_word_count": 366,
+          "combined_word_count": 825,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 11,
+          "ocr_word_count": 327,
+          "vision_word_count": 367,
+          "combined_word_count": 694,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 12,
+          "ocr_word_count": 233,
+          "vision_word_count": 227,
+          "combined_word_count": 460,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 1,
+          "ocr_word_count": 453,
+          "vision_word_count": 296,
+          "combined_word_count": 749,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 2,
+          "ocr_word_count": 350,
+          "vision_word_count": 258,
+          "combined_word_count": 608,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 1,
+          "ocr_word_count": 575,
+          "vision_word_count": 27,
+          "combined_word_count": 602,
+          "pipeline": "master_index"
+        },
+        {
+          "source": "linked_attachment",
+          "page": 2,
+          "ocr_word_count": 1862,
+          "vision_word_count": 30,
+          "combined_word_count": 1892,
+          "pipeline": "master_index"
+        }
+      ],
+      "inspection_source_drawing_id": 1926,
+      "index_pipeline": "master_index",
+      "at": "2026-10-17T18:17:26.219385+00:00"
+    }
+  },
+  "dossier_for_match": {
+    "evidence_kind": "drawing_scan",
+    "evidence_text_chars": 673717,
+    "reasoning_text_chars": 12000,
+    "reasoning_text_preview": "Extracted clues:\n- location_text: 120 Constitution Drive 747 52nd Street SRMG Menlo Park, California 94025 Oakland, California 94609\n- trade: Sanitary Sewer\n- contractor: Rudolph and Sletten, Inc.\n- document_title: NPC-5 - OSHPD 33 10 00-5.0 - M&H - Sanitary Sewer Product Data\n- inspection_name: Sanitary Sewer Product Data Inspection\n- inspection_note: This inspection pertains to the sanitary sewer product data.\n- inspection_note: Final due date for the submission is Mar 4, 2026.\n- inspection_note: Review of manufacturing defects to ensure compliance with specifications.\n- inspection_note: For satisfactory performance, manufacturer suggests considerations beyond product quality.\n- item_inspected: MasterPozzolith 322\n- item_inspected: VCP to HDPE Coupling Adapter\n- item_inspected: HYMAX GRIP\u00ae COUPLING RESTRAINT\n- item_inspected: Flexible Expansion Joint\n- item_inspected: Satisfactory results with quality products\n- trade_abbreviation: SS\n- trade_abbreviation: SSCO\n- trade_abbreviation: SSMH\n- inspection_note_abbreviation: W/\n- location_code: Utility\n- location_code: s\n- location_code: AND\n- location_code: ECCENTRIC\n- location_code: Address\n- station_from: 10+00\n- station_to: 10+90.95\n\nLinked inspection files:\n- 7.20-7.24 U1.C4.20 6.00 Sanitary Sewer Install.pdf: Site-A-SG.rvt \u00a7/20/2025 9:52:12 AM Plot Date: a Wein SMITHGROUP ARCHTIECT, LANDSCAPE ARCHITECT 4TH FLOOR, SAN FRANCISCO, CA 94111 Lines LEGEND sez 0 oe d | | 3 | Ay uf Tans 3} jana \"ane \u2018and Tana \u2018Tan \u201cana \u2018Tans \u201cang ans \u201cang van \"ana and \u201cana \u2018Tan m3 mot} pe Nd \u2014\u2014 eo \" = Md A ts m3 m3 iE i L\\ 01 01 ry 01 01 701 0 101 rey rt ryan \u2014\u2014\u2014\u2014 \u2014\u2014~\u2014lss \u2018 = s $s ss \u2014\u2014\u2014\u2014 ss \u2014\u2014\u2014\u2014 ss VIEW ORIENTATION UC. <a NOTE THAT SHEET IS ORIENTED WTH NORTH POINTING Benioff Children Ss es afl =m am 5 s set = DOWN, WHICH I\n- inspection 1(correct).pdf: Rudolph and Sletten, Inc. 120 Constitution Drive Menlo Park, California 94025 P: (650) 216-3600 Project: 02001.161310 UCSF Benioff Oakland 747 52nd Street Oakland, California 94609 Inspection: Underground Sanitary Sewer #7 0/2 0 0 0 0 Items Inspected Conforming Deficient N/A Neutral Type Underground Rough-in Status Open Trade 33-Sanitary Sewerage Location Utility MR (NPC-5) Spec Section 33 30 00 - SANITARY SEWER Created By Andrew Clemons Linked Drawings Description 7/20/2026-7/24/2026 - UMR/NPC-\n\nLocation-relevant excerpts:\n--- Linked content (https://storage.procore.com/api/v5/files/us-east-1/pro-core.com/1789-c/5747272-p/01KXRWH87V5MSTG49T0TSEDJHB?companyId=9871&projectId=2727475&sig=c45935546ca79e13924d450e36d6e488be0afb4d997a54976b3770ee16dd3bb1) ---\n| onPORATED Rudolph and Sletten, Inc. Project: 02001.161310 UCSF Benioff Oakland o' * 0 120 Constitution Drive 747 52nd Street RUDOLPH SLETTEN wenlo Park, California 94025 Oakland, California 94609 saxo P: (650) 216-3600 GENERAL CONTRACTORS Submittal #NPC-5 OSHPD 33 10 00-5.0 M&H Sanitary Sewer Product Data - - - NPC-5 OSHPD 33 10 00 WATER SYSTEMS - - Revision 0 Submittal Manager Ada Wu (Rudolph and Sletten, Inc) Status Open Date Created Feb 9, 2026 Issue Date Feb 9, 2026 Spec Section NPC-5 OSHPD 33 10 00 WATER SYSTEMS - - Responsible McGuire & Hester Received From Hayden Lindsay (McGuire & Hester) Contractor Received Date Feb 17, 2026 Submit By Final Due Date Mar 4, 2026 Lead Time Cost Code Location Utility MR Type Product Data Submittal Package #5: NPC-5 Approvers Ada Wu (Rudolph and Sletten, Inc), Nathan Allen (Sandis Civil Engineers), Susan Amil (Smith Group Inc.), Nicholas Hughes (Sandis Civil Engineers), Dylan Nixon-Helms (Sandis Civil Engineers), Susan Amil (Smith Group Inc.), Ada Wu (Rudolph and Sletten, Inc) Ball in Court Ada Wu (Rudolph and Sletten, Inc) Distribution Ada Wu (Rudolph and Sletten, Inc), Angel Pacheco (McGuire & Hester), Dylan Nixon-Helms (Sandis Civil Engineers), Hayden Lindsay (McGuire & Hester), Joel Pathman (Smith Group Inc.), John Sabia (McGuire & Hester), Matt Finley (McGuire & Hester), Michael Laganowsky (McGuire & Hester), Nathan Allen (Sandis Civil Engineers), Nichola",
+    "evidence_text_preview": "--- Linked attachment UMR 331000-5.0 - M&H - Sanitary Sewer PD_Approved (5).pdf (OCR+vision) ---\nRudolph and Sletten, Inc. Project: 02001.161310 UCSF Benioff Oakland EBAR Force Balanced 120 Constitution Drive 747 52nd Street SRMG Menlo Park, California 94025 Oakland, California 94609 PART NAME NO QTY P: (650) 216-3600 BODY INCORPORATED A1 1 Sletten , Project : MasterPozzolith 322 Submittal #NPC-5 - OSHPD 33 10 00-5.0 - M&H - Sanitary Sewer Product Data 1960 Technical Data Sheet BEARING ( 2 VALVES ) 6 A2 2 NPC-5 - OSHPD 33 10 00 - WATER SYSTEMS SLETTEN 8 16 IRONNE RUDOLPH HYMAX Revision 0 Submittal Manager Ada Wu (Rudolph and Sletten, Inc) R A3 PLUG 1 Oakland , AND FLEX - TEND\u00ae Status Open Date Created Feb 9, 2026 A4 BUILDING ? 2.1.B_VCP to HDPE Coupling Adapter Vulcan : ( 650 ) Issue Date Feb 9, 2026 Spec Section NPC-5 - OSHPD 33 10 00 - WATER SYSTEMS P GASKET ( BODY ) A5 GREEN Responsible McGuire & Hester Received From Hayden Lindsay (McGuire & Hester) BONNET Contractor A6 1 Additional Information GENERAL CONTRACTORS Limited Warranty Notice COUNCIL Salt River Materials Group Received Date Feb 17, 2026 Submit By A7 BEARING Central Concrete Supply Co. , Inc. SDS : Clarkdale Cement Plant Final Due Date Mar 4, 2026 Lead Time 4 VALVES ) ( SEE NOTE 4 ) SCREW ( 2 A8 4 For additional information on MasterPozzolith 322 admixture , BASF warrants this product to be free from manufacturing Cost Code 601 N. Rd 16 6 6 http://centralconcrete.com/wp-content/themes/centralconcrete/images/PDFs/Central-Ready-Mixed-Co Force Balanced Flexible Expansion Joint # NPC - 5 M & H a 2.5 MUELLER SETTLEMENT brand JOINTS 100 % AMERICAN \u2122 Location Utility MR Type Product Data Clarkdale , AZ 86324 A9 PACKING contact your local sales representative . defects and to meet the technical properties on the current Salt River Materials Group Submittal Package #5: NPC-5 ncrete - SDS.pdf A10 NPC - 5 Technical Data Guide , if used as directed within shelf life . Materials Approvers Ada Wu (Rudolph and Slett",
+    "expanded_clues": [
+      {
+        "type": "location_text",
+        "values": [
+          "120 Constitution Drive 747 52nd Street SRMG Menlo Park, California 94025 Oakland, California 94609"
+        ],
+        "confidence": 0.9
+      },
+      {
+        "type": "trade",
+        "values": [
+          "Sanitary Sewer",
+          "SS",
+          "SAN",
+          "sewer lateral",
+          "cleanout",
+          "manhole",
+          "SSCO",
+          "SSMH"
+        ],
+        "confidence": 0.85
+      },
+      {
+        "type": "contractor",
+        "values": [
+          "Rudolph and Sletten, Inc."
+        ],
+        "confidence": 0.6
+      },
+      {
+        "type": "document_title",
+        "values": [
+          "NPC-5 - OSHPD 33 10 00-5.0 - M&H - Sanitary Sewer Product Data",
+          "SS",
+          "SAN",
+          "sewer lateral",
+          "cleanout",
+          "manhole"
+        ],
+        "confidence": 0.65
+      },
+      {
+        "type": "inspection_name",
+        "values": [
+          "Sanitary Sewer Product Data Inspection",
+          "SS",
+          "SAN",
+          "sewer lateral",
+          "cleanout",
+          "manhole"
+        ],
+        "confidence": 0.8
+      },
+      {
+        "type": "inspection_note",
+        "values": [
+          "This inspection pertains to the sanitary sewer product data.",
+          "SS",
+          "SAN",
+          "sewer lateral",
+          "cleanout",
+          "manhole"
+        ],
+        "confidence": 0.75
+      },
+      {
+        "type": "inspection_note",
+        "values": [
+          "Final due date for the submission is Mar 4, 2026."
+        ],
+        "confidence": 0.75
+      },
+      {
+        "type": "inspection_note",
+        "values": [
+          "Review of manufacturing defects to ensure compliance with specifications.",
+          "W/"
+        ],
+        "confidence": 0.75
+      },
+      {
+        "type": "inspection_note",
+        "values": [
+          "For satisfactory performance, manufacturer suggests considerations beyond product quality."
+        ],
+        "confidence": 0.75
+      },
+      {
+        "type": "item_inspected",
+        "values": [
+          "MasterPozzolith 322"
+        ],
+        "confidence": 0.75
+      },
+      {
+        "type": "item_inspected",
+        "values": [
+          "VCP to HDPE Coupling Adapter"
+        ],
+        "confidence": 0.75
+      },
+      {
+        "type": "item_inspected",
+        "values": [
+          "HYMAX GRIP\u00ae COUPLING RESTRAINT"
+        ],
+        "confidence": 0.75
+      },
+      {
+        "type": "item_inspected",
+        "values": [
+          "Flexible Expansion Joint"
+        ],
+        "confidence": 0.75
+      },
+      {
+        "type": "item_inspected",
+        "values": [
+          "Satisfactory results with quality products",
+          "W/"
+        ],
+        "confidence": 0.75
+      },
+      {
+        "type": "trade_abbreviation",
+        "values": [
+          "SS",
+          "SANITARY SEWER"
+        ],
+        "confidence": 0.765
+      },
+      {
+        "type": "trade_abbreviation",
+        "values": [
+          "SSCO"
+        ],
+        "confidence": 0.765
+      },
+      {
+        "type": "trade_abbreviation",
+        "values": [
+          "SSMH"
+        ],
+        "confidence": 0.765
+      },
+      {
+        "type": "inspection_note_abbreviation",
+        "values": [
+          "W/",
+          "WITH"
+        ],
+        "confidence": 0.675
+      },
+      {
+        "type": "location_code",
+        "values": [
+          "Utility"
+        ],
+        "confidence": 0.92
+      },
+      {
+        "type": "location_code",
+        "values": [
+          "s",
+          "SLOPE OR SOUTH"
+        ],
+        "confidence": 0.92
+      },
+      {
+        "type": "location_code",
+        "values": [
+          "AND"
+        ],
+        "confidence": 0.92
+      },
+      {
+        "type": "location_code",
+        "values": [
+          "ECCENTRIC"
+        ],
+        "confidence": 0.92
+      },
+      {
+        "type": "location_code",
+        "values": [
+          "Address"
+        ],
+        "confidence": 0.92
+      },
+      {
+        "type": "station_from",
+        "values": [
+          "10+00"
+        ],
+        "confidence": 0.85
+      },
+      {
+        "type": "station_to",
+        "values": [
+          "10+90.95"
+        ],
+        "confidence": 0.85
+      }
+    ],
+    "linked_attachments": [
+      {
+        "filename": "7.20-7.24 U1.C4.20 6.00 Sanitary Sewer Install.pdf",
+        "url": "",
+        "page_count": 0,
+        "text_preview_chars": 500,
+        "text_preview": "Site-A-SG.rvt \u00a7/20/2025 9:52:12 AM Plot Date: a Wein SMITHGROUP ARCHTIECT, LANDSCAPE ARCHITECT 4TH FLOOR, SAN FRANCISCO, CA 94111 Lines LEGEND sez 0 oe d | | 3 | Ay uf Tans 3} jana \"ane \u2018and Tana \u2018Tan \u201cana \u2018Tans \u201cang ans \u201cang van \"ana and \u201cana \u2018Tan m3 mot} pe Nd \u2014\u2014 eo \" = Md A ts m3 m3 iE i L\\ 01 01 ry 01 01 701 0 101 rey rt ryan \u2014\u2014\u2014\u2014 \u2014\u2014~\u2014lss \u2018 = s $s ss \u2014\u2014\u2014\u2014 ss \u2014\u2014\u2014\u2014 ss VIEW ORIENTATION UC. <a NOTE THAT SHEET IS ORIENTED WTH NORTH POINTING Benioff Children Ss es afl =m am 5 s set = DOWN, WHICH I"
+      },
+      {
+        "filename": "inspection 1(correct).pdf",
+        "url": "",
+        "page_count": 0,
+        "text_preview_chars": 500,
+        "text_preview": "Rudolph and Sletten, Inc. 120 Constitution Drive Menlo Park, California 94025 P: (650) 216-3600 Project: 02001.161310 UCSF Benioff Oakland 747 52nd Street Oakland, California 94609 Inspection: Underground Sanitary Sewer #7 0/2 0 0 0 0 Items Inspected Conforming Deficient N/A Neutral Type Underground Rough-in Status Open Trade 33-Sanitary Sewerage Location Utility MR (NPC-5) Spec Section 33 30 00 - SANITARY SEWER Created By Andrew Clemons Linked Drawings Description 7/20/2026-7/24/2026 - UMR/NPC-"
+      }
+    ],
+    "investigation_meta": {
+      "sheet_refs": [
+        "A10",
+        "A11",
+        "A12",
+        "A13",
+        "A14",
+        "C618",
+        "M295",
+        "C311",
+        "C114",
+        "T105",
+        "D4326",
+        "A536",
+        "D2000",
+        "C219",
+        "C136",
+        "C88",
+        "C430",
+        "C1293",
+        "A240",
+        "C188",
+        "C110",
+        "A21",
+        "A351",
+        "C109",
+        "C111",
+        "C153",
+        "A216",
+        "C151",
+        "C116",
+        "F593",
+        "F594",
+        "C600",
+        "C605",
+        "D2774",
+        "R18",
+        "B62",
+        "B17",
+        "B63",
+        "B11",
+        "B12",
+        "B51",
+        "B52",
+        "B13",
+        "B14",
+        "B15",
+        "B16",
+        "B18",
+        "B46",
+        "B42",
+        "B43",
+        "B82",
+        "B73",
+        "B69",
+        "B44",
+        "B45",
+        "B41",
+        "B40",
+        "B47",
+        "B74",
+        "B19",
+        "B20",
+        "B21",
+        "B22",
+        "B25",
+        "B29",
+        "B30",
+        "B31",
+        "B37",
+        "B38",
+        "C157",
+        "B53",
+        "C33",
+        "B54",
+        "B56",
+        "C150",
+        "B55",
+        "B57",
+        "B58",
+        "B59",
+        "B61",
+        "C1602",
+        "B64",
+        "B65",
+        "B66",
+        "B67",
+        "B68",
+        "B70",
+        "B71",
+        "B72",
+        "B75",
+        "B76",
+        "B77",
+        "C128",
+        "C213",
+        "C29",
+        "C105",
+        "D2419",
+        "D3744",
+        "C117",
+        "C123",
+        "C142",
+        "C40",
+        "C1260",
+        "G05",
+        "H20",
+        "M309",
+        "M14",
+        "F25",
+        "C39",
+        "SEH92",
+        "F477",
+        "D3034",
+        "D3212",
+        "F679",
+        "D1784",
+        "D2152",
+        "D2321",
+        "D2444",
+        "SEH90",
+        "D2412",
+        "C131",
+        "SEH91",
+        "PS0003",
+        "A-1029",
+        "A-1018",
+        "M85",
+        "C550",
+        "C210",
+        "A-48",
+        "PVC1120",
+        "D1785",
+        "C185",
+        "C204",
+        "C191",
+        "HD12",
+        "SP10",
+        "C-478",
+        "C94",
+        "A23",
+        "D2103",
+        "C494",
+        "D882",
+        "D1938",
+        "C990",
+        "HD16",
+        "HD20",
+        "D71",
+        "D113",
+        "D217",
+        "D92",
+        "D297",
+        "T111",
+        "G05T",
+        "G08",
+        "CS-102",
+        "S-210A",
+        "M-198",
+        "A00",
+        "A126",
+        "A01",
+        "A743",
+        "A02",
+        "A03",
+        "A05",
+        "A06",
+        "A07",
+        "A08",
+        "A09",
+        "C330",
+        "C09",
+        "C989",
+        "SRA35",
+        "CFC-11",
+        "C300",
+        "DAT-0958",
+        "DAT-0052",
+        "PS-004",
+        "EN-0522",
+        "FN-0405",
+        "SCH-40",
+        "SCH-80",
+        "C-923",
+        "NSF-61",
+        "GSL-12",
+        "H021",
+        "H041",
+        "H061",
+        "A04",
+        "B26",
+        "B36",
+        "B85",
+        "B86",
+        "B90",
+        "B91",
+        "SEN92",
+        "SEN90",
+        "SP-10",
+        "CS-17",
+        "T24",
+        "ACD0003",
+        "C478",
+        "X10",
+        "C900",
+        "D2487",
+        "EOS0284",
+        "S388",
+        "ACD-03",
+        "ACD-02",
+        "DA-01",
+        "A1018",
+        "S-210",
+        "M-198B",
+        "T1141",
+        "APR-2022",
+        "O42",
+        "P3744",
+        "A1203",
+        "FE203",
+        "NA20",
+        "K20",
+        "E025",
+        "E600",
+        "SSL-12",
+        "H029",
+        "D412",
+        "D1171",
+        "D746",
+        "O03",
+        "A21.10",
+        "A21.53",
+        "A21.16",
+        "A21.11",
+        "V1.04",
+        "U1.C4.20",
+        "C6.01",
+        "U1.C6.00",
+        "U1.06",
+        "C4.20",
+        "C4.21",
+        "C6.00"
+      ],
+      "auxiliary_drawing_ids": [
+        1872,
+        1973,
+        1974,
+        1926
+      ],
+      "preferred_pages": [
+        1
+      ],
+      "pdfLinkFollow": null,
+      "matchInvestigation": {
+        "followed": 4,
+        "skipped": 13,
+        "errors": [
+          "https://app.procore.com/2727475/project/submittal_log_approvers/document_downloader?attachment_id=6001321764&item_id=177539970&item_type=SubmittalLogApprover&project_id=2727475&source=coversheet&submittal_log_id=69397739: unsupported content type: application/xml"
+        ],
+        "merge_included": [
+          "7.20-7.24 U1.C4.20 6.00 Sanitary Sewer Install.pdf",
+          "UMR 331000-5.0 - M&H - Sanitary Sewer PD_Approved (5).pdf",
+          "nested-UMR 331000-5.0 - M&H - Sanitary Sewer PD_Approved (5).pdf"
+        ],
+        "merge_truncated": [],
+        "merge_dropped": [],
+        "investigation_complete": false,
+        "linked_drawing_ids": [
+          1973,
+          1974,
+          1872
+        ],
+        "linked_drawing_ids_indexed_sync": [
+          1973,
+          1974
+        ],
+        "drawing_ids_needing_index": [],
+        "page_investigations": [
+          {
+            "source": "linked_attachment",
+            "page": 1,
+            "ocr_word_count": 2834,
+            "vision_word_count": 297,
+            "combined_word_count": 3131,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 2,
+            "ocr_word_count": 3583,
+            "vision_word_count": 111,
+            "combined_word_count": 3694,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 3,
+            "ocr_word_count": 1986,
+            "vision_word_count": 226,
+            "combined_word_count": 2212,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 4,
+            "ocr_word_count": 3233,
+            "vision_word_count": 144,
+            "combined_word_count": 3377,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 5,
+            "ocr_word_count": 2347,
+            "vision_word_count": 132,
+            "combined_word_count": 2479,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 6,
+            "ocr_word_count": 2502,
+            "vision_word_count": 13,
+            "combined_word_count": 2515,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 7,
+            "ocr_word_count": 2592,
+            "vision_word_count": 45,
+            "combined_word_count": 2637,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 8,
+            "ocr_word_count": 2415,
+            "vision_word_count": 55,
+            "combined_word_count": 2470,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 9,
+            "ocr_word_count": 3278,
+            "vision_word_count": 595,
+            "combined_word_count": 3873,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 10,
+            "ocr_word_count": 2432,
+            "vision_word_count": 252,
+            "combined_word_count": 2684,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 11,
+            "ocr_word_count": 11,
+            "vision_word_count": 13,
+            "combined_word_count": 24,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 12,
+            "ocr_word_count": 222,
+            "vision_word_count": 235,
+            "combined_word_count": 457,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 13,
+            "ocr_word_count": 226,
+            "vision_word_count": 223,
+            "combined_word_count": 449,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 14,
+            "ocr_word_count": 409,
+            "vision_word_count": 272,
+            "combined_word_count": 681,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 15,
+            "ocr_word_count": 395,
+            "vision_word_count": 334,
+            "combined_word_count": 729,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 16,
+            "ocr_word_count": 325,
+            "vision_word_count": 339,
+            "combined_word_count": 664,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 17,
+            "ocr_word_count": 239,
+            "vision_word_count": 363,
+            "combined_word_count": 602,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 18,
+            "ocr_word_count": 99,
+            "vision_word_count": 99,
+            "combined_word_count": 198,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 19,
+            "ocr_word_count": 373,
+            "vision_word_count": 380,
+            "combined_word_count": 753,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 20,
+            "ocr_word_count": 330,
+            "vision_word_count": 331,
+            "combined_word_count": 661,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 21,
+            "ocr_word_count": 1402,
+            "vision_word_count": 280,
+            "combined_word_count": 1682,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 22,
+            "ocr_word_count": 378,
+            "vision_word_count": 390,
+            "combined_word_count": 768,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 23,
+            "ocr_word_count": 255,
+            "vision_word_count": 255,
+            "combined_word_count": 510,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 24,
+            "ocr_word_count": 178,
+            "vision_word_count": 192,
+            "combined_word_count": 370,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 25,
+            "ocr_word_count": 231,
+            "vision_word_count": 263,
+            "combined_word_count": 494,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 26,
+            "ocr_word_count": 280,
+            "vision_word_count": 174,
+            "combined_word_count": 454,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 27,
+            "ocr_word_count": 275,
+            "vision_word_count": 261,
+            "combined_word_count": 536,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 28,
+            "ocr_word_count": 355,
+            "vision_word_count": 354,
+            "combined_word_count": 709,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 29,
+            "ocr_word_count": 379,
+            "vision_word_count": 416,
+            "combined_word_count": 795,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 30,
+            "ocr_word_count": 430,
+            "vision_word_count": 400,
+            "combined_word_count": 830,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 31,
+            "ocr_word_count": 325,
+            "vision_word_count": 339,
+            "combined_word_count": 664,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 32,
+            "ocr_word_count": 239,
+            "vision_word_count": 345,
+            "combined_word_count": 584,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 33,
+            "ocr_word_count": 99,
+            "vision_word_count": 99,
+            "combined_word_count": 198,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 34,
+            "ocr_word_count": 382,
+            "vision_word_count": 398,
+            "combined_word_count": 780,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 35,
+            "ocr_word_count": 330,
+            "vision_word_count": 331,
+            "combined_word_count": 661,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 36,
+            "ocr_word_count": 1402,
+            "vision_word_count": 281,
+            "combined_word_count": 1683,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 37,
+            "ocr_word_count": 378,
+            "vision_word_count": 371,
+            "combined_word_count": 749,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 38,
+            "ocr_word_count": 628,
+            "vision_word_count": 628,
+            "combined_word_count": 1256,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 39,
+            "ocr_word_count": 273,
+            "vision_word_count": 278,
+            "combined_word_count": 551,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 40,
+            "ocr_word_count": 300,
+            "vision_word_count": 302,
+            "combined_word_count": 602,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 41,
+            "ocr_word_count": 484,
+            "vision_word_count": 488,
+            "combined_word_count": 972,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 42,
+            "ocr_word_count": 628,
+            "vision_word_count": 628,
+            "combined_word_count": 1256,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 43,
+            "ocr_word_count": 143,
+            "vision_word_count": 142,
+            "combined_word_count": 285,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 44,
+            "ocr_word_count": 526,
+            "vision_word_count": 504,
+            "combined_word_count": 1030,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 45,
+            "ocr_word_count": 319,
+            "vision_word_count": 324,
+            "combined_word_count": 643,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 46,
+            "ocr_word_count": 213,
+            "vision_word_count": 216,
+            "combined_word_count": 429,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 47,
+            "ocr_word_count": 198,
+            "vision_word_count": 182,
+            "combined_word_count": 380,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 48,
+            "ocr_word_count": 95,
+            "vision_word_count": 92,
+            "combined_word_count": 187,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 49,
+            "ocr_word_count": 252,
+            "vision_word_count": 224,
+            "combined_word_count": 476,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 50,
+            "ocr_word_count": 245,
+            "vision_word_count": 225,
+            "combined_word_count": 470,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 51,
+            "ocr_word_count": 266,
+            "vision_word_count": 277,
+            "combined_word_count": 543,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 52,
+            "ocr_word_count": 306,
+            "vision_word_count": 301,
+            "combined_word_count": 607,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 53,
+            "ocr_word_count": 215,
+            "vision_word_count": 221,
+            "combined_word_count": 436,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 54,
+            "ocr_word_count": 176,
+            "vision_word_count": 171,
+            "combined_word_count": 347,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 55,
+            "ocr_word_count": 284,
+            "vision_word_count": 317,
+            "combined_word_count": 601,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 56,
+            "ocr_word_count": 277,
+            "vision_word_count": 281,
+            "combined_word_count": 558,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 57,
+            "ocr_word_count": 154,
+            "vision_word_count": 153,
+            "combined_word_count": 307,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 58,
+            "ocr_word_count": 206,
+            "vision_word_count": 220,
+            "combined_word_count": 426,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 59,
+            "ocr_word_count": 43,
+            "vision_word_count": 269,
+            "combined_word_count": 312,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 60,
+            "ocr_word_count": 287,
+            "vision_word_count": 231,
+            "combined_word_count": 518,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 61,
+            "ocr_word_count": 294,
+            "vision_word_count": 264,
+            "combined_word_count": 558,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 62,
+            "ocr_word_count": 610,
+            "vision_word_count": 620,
+            "combined_word_count": 1230,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 63,
+            "ocr_word_count": 325,
+            "vision_word_count": 324,
+            "combined_word_count": 649,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 64,
+            "ocr_word_count": 577,
+            "vision_word_count": 607,
+            "combined_word_count": 1184,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 65,
+            "ocr_word_count": 78,
+            "vision_word_count": 62,
+            "combined_word_count": 140,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 66,
+            "ocr_word_count": 64,
+            "vision_word_count": 65,
+            "combined_word_count": 129,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 67,
+            "ocr_word_count": 216,
+            "vision_word_count": 226,
+            "combined_word_count": 442,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 68,
+            "ocr_word_count": 11,
+            "vision_word_count": 11,
+            "combined_word_count": 22,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 69,
+            "ocr_word_count": 0,
+            "vision_word_count": 207,
+            "combined_word_count": 207,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 70,
+            "ocr_word_count": 90,
+            "vision_word_count": 84,
+            "combined_word_count": 174,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 71,
+            "ocr_word_count": 1,
+            "vision_word_count": 174,
+            "combined_word_count": 175,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 72,
+            "ocr_word_count": 1,
+            "vision_word_count": 201,
+            "combined_word_count": 202,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 73,
+            "ocr_word_count": 0,
+            "vision_word_count": 87,
+            "combined_word_count": 87,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 74,
+            "ocr_word_count": 0,
+            "vision_word_count": 274,
+            "combined_word_count": 274,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 75,
+            "ocr_word_count": 127,
+            "vision_word_count": 150,
+            "combined_word_count": 277,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 76,
+            "ocr_word_count": 516,
+            "vision_word_count": 523,
+            "combined_word_count": 1039,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 77,
+            "ocr_word_count": 475,
+            "vision_word_count": 380,
+            "combined_word_count": 855,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 78,
+            "ocr_word_count": 393,
+            "vision_word_count": 398,
+            "combined_word_count": 791,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 1,
+            "ocr_word_count": 466,
+            "vision_word_count": 46,
+            "combined_word_count": 512,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 2,
+            "ocr_word_count": 707,
+            "vision_word_count": 265,
+            "combined_word_count": 972,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 3,
+            "ocr_word_count": 244,
+            "vision_word_count": 170,
+            "combined_word_count": 414,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 4,
+            "ocr_word_count": 235,
+            "vision_word_count": 175,
+            "combined_word_count": 410,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 5,
+            "ocr_word_count": 374,
+            "vision_word_count": 226,
+            "combined_word_count": 600,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 6,
+            "ocr_word_count": 98,
+            "vision_word_count": 73,
+            "combined_word_count": 171,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 7,
+            "ocr_word_count": 516,
+            "vision_word_count": 286,
+            "combined_word_count": 802,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 8,
+            "ocr_word_count": 508,
+            "vision_word_count": 388,
+            "combined_word_count": 896,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 9,
+            "ocr_word_count": 496,
+            "vision_word_count": 384,
+            "combined_word_count": 880,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 10,
+            "ocr_word_count": 459,
+            "vision_word_count": 366,
+            "combined_word_count": 825,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 11,
+            "ocr_word_count": 327,
+            "vision_word_count": 367,
+            "combined_word_count": 694,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 12,
+            "ocr_word_count": 233,
+            "vision_word_count": 227,
+            "combined_word_count": 460,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 1,
+            "ocr_word_count": 453,
+            "vision_word_count": 296,
+            "combined_word_count": 749,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 2,
+            "ocr_word_count": 350,
+            "vision_word_count": 258,
+            "combined_word_count": 608,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 1,
+            "ocr_word_count": 575,
+            "vision_word_count": 27,
+            "combined_word_count": 602,
+            "pipeline": "master_index"
+          },
+          {
+            "source": "linked_attachment",
+            "page": 2,
+            "ocr_word_count": 1862,
+            "vision_word_count": 30,
+            "combined_word_count": 1892,
+            "pipeline": "master_index"
+          }
+        ],
+        "inspection_source_drawing_id": 1926,
+        "index_pipeline": "master_index",
+        "at": "2026-10-17T18:17:26.219385+00:00"
+      },
+      "scoped_point_counts": {
+        "1722": 2,
+        "1872": 11,
+        "1973": 0,
+        "1974": 1,
+        "1926": 0
+      },
+      "auxiliary_index_pending": false,
+      "links_followed": 0,
+      "pages_rendered": 0,
+      "ocr_word_counts": {},
+      "pdf_investigation_errors": []
+    },
+    "scoped_survey_point_count": 14,
+    "scoped_survey_points_sample": [
+      {
+        "drawing_id": 1722,
+        "page": 1,
+        "station": "10+90.95",
+        "northing": 0.0,
+        "easting": 0.0,
+        "label_bbox": {
+          "x0": 0.2004375,
+          "y0": 0.8298472,
+          "x1": 0.2164375,
+          "y1": 0.8458472
+        }
+      },
+      {
+        "drawing_id": 1722,
+        "page": 1,
+        "station": "11+14.23",
+        "northing": 0.0,
+        "easting": 0.0,
+        "label_bbox": {
+          "x0": 0.27179169999999997,
+          "y0": 0.6819999999999999,
+          "x1": 0.2877917,
+          "y1": 0.698
+        }
+      },
+      {
+        "drawing_id": 1872,
+        "page": 1,
+        "station": "10+90.95",
+        "northing": 0.0,
+        "easting": 0.0,
+        "label_bbox": {
+          "x0": 0.27194444444444443,
+          "y0": 0.26958333333333334,
+          "x1": 0.30416666666666664,
+          "y1": 0.28458333333333335
+        }
+      },
+      {
+        "drawing_id": 1872,
+        "page": 1,
+        "station": "10+90",
+        "northing": 0.0,
+        "easting": 0.0,
+        "label_bbox": {
+          "x0": 0.27194444444444443,
+          "y0": 0.26958333333333334,
+          "x1": 0.3322222222222222,
+          "y1": 0.28458333333333335
+        }
+      },
+      {
+        "drawing_id": 1872,
+        "page": 1,
+        "station": "11+14.23",
+        "northing": 0.0,
+        "easting": 0.0,
+        "label_bbox": {
+          "x0": 0.32430555555555557,
+          "y0": 0.2675,
+          "x1": 0.3575,
+          "y1": 0.28458333333333335
+        }
+      },
+      {
+        "drawing_id": 1872,
+        "page": 1,
+        "station": "10+90.95",
+        "northing": 2131764.84,
+        "easting": 6051541.82,
+        "label_bbox": {
+          "x0": 0.15388888888888888,
+          "y0": 0.20375,
+          "x1": 0.17041666666666666,
+          "y1": 0.213125
+        }
+      },
+      {
+        "drawing_id": 1872,
+        "page": 1,
+        "station": "10+90.95",
+        "northing": 2131755.56,
+        "easting": 6051476.07,
+        "label_bbox": {
+          "x0": 0.24541666666666667,
+          "y0": 0.20354166666666668,
+          "x1": 0.2623611111111111,
+          "y1": 0.213125
+        }
+      },
+      {
+        "drawing_id": 1872,
+        "page": 1,
+        "station": "10+90.95",
+        "northing": 2131767.83,
+        "easting": 6051460.86,
+        "label_bbox": {
+          "x0": 0.27555555555555555,
+          "y0": 0.27520833333333333,
+          "x1": 0.2923611111111111,
+          "y1": 0.28458333333333335
+        }
+      },
+      {
+        "drawing_id": 1872,
+        "page": 1,
+        "station": "11+14.23",
+        "northing": 2131764.56,
+        "easting": 6051460.86,
+        "label_bbox": {
+          "x0": 0.27555555555555555,
+          "y0": 0.275,
+          "x1": 0.34444444444444444,
+          "y1": 0.28458333333333335
+        }
+      },
+      {
+        "drawing_id": 1872,
+        "page": 1,
+        "station": "11+14.23",
+        "northing": 2131758.15,
+        "easting": 6051388.02,
+        "label_bbox": {
+          "x0": 0.44166666666666665,
+          "y0": 0.27708333333333335,
+          "x1": 0.4583333333333333,
+          "y1": 0.2864583333333333
+        }
+      },
+      {
+        "drawing_id": 1872,
+        "page": 1,
+        "station": "11+14.23",
+        "northing": 2131751.55,
+        "easting": 6051337.14,
+        "label_bbox": {
+          "x0": 0.52875,
+          "y0": 0.27770833333333333,
+          "x1": 0.545,
+          "y1": 0.28708333333333336
+        }
+      },
+      {
+        "drawing_id": 1872,
+        "page": 1,
+        "station": "10+90.95",
+        "northing": 0.0,
+        "easting": 0.0,
+        "label_bbox": {
+          "x0": 0.1541528,
+          "y0": 0.2004375,
+          "x1": 0.17015280000000002,
+          "y1": 0.2164375
+        }
+      },
+      {
+        "drawing_id": 1872,
+        "page": 1,
+        "station": "11+14.23",
+        "northing": 0.0,
+        "easting": 0.0,
+        "label_bbox": {
+          "x0": 0.3329028,
+          "y0": 0.2680417,
+          "x1": 0.3489028,
+          "y1": 0.2840417
+        }
+      },
+      {
+        "drawing_id": 1974,
+        "page": 10,
+        "station": "00+00",
+        "northing": 0.0,
+        "easting": 0.0,
+        "label_bbox": {
+          "x0": 0.3838071885451772,
+          "y0": 0.25140405905367147,
+          "x1": 0.5842809739455678,
+          "y1": 0.26294951005415484
+        }
+      }
+    ]
+  },
+  "vision_model_inputs": {
+    "dossier_summary_would_send": "evidence_kind=drawing_scan\nevidence_text=Extracted clues:\n- location_text: 120 Constitution Drive 747 52nd Street SRMG Menlo Park, California 94025 Oakland, California 94609\n- trade: Sanitary Sewer\n- contractor: Rudolph and Sletten, Inc.\n- document_title: NPC-5 - OSHPD 33 10 00-5.0 - M&H - Sanitary Sewer Product Data\n- inspection_name: Sanitary Sewer Product Data Inspection\n- inspection_note: This inspection pertains to the sanitary sewer product data.\n- inspection_note: Final due date for the submission is Mar 4, 2026.\n- inspection_note: Review of manufacturing defects to ensure compliance with specifications.\n- inspection_note: For satisfactory performance, manufacturer suggests considerations beyond product quality.\n- item_inspected: MasterPozzolith 322\n- item_inspected: VCP to HDPE Coupling Adapter\n- item_inspected: HYMAX GRIP\u00ae COUPLING RESTRAINT\n- item_inspected: Flexible Expansion Joint\n- item_inspected: Satisfactory results with quality products\n- trade_abbreviation: SS\n- trade_abbreviation: SSCO\n- trade_abbreviation: SSMH\n- inspection_note_abbreviation: W/\n- location_code: Utility\n- location_code: s\n- location_code: AND\n- location_code: ECCENTRIC\n- location_code: Address\n- station_from: 10+00\n- station_to: 10+90.95\n\nLinked inspection files:\n- 7.20-7.24 U1.C4.20 6.00 Sanitary Sewer Install.pdf: Site-A-SG.rvt \u00a7/20/2025 9:52:12 AM Plot Date: a Wein SMITHGROUP ARCHTIECT, LANDSCAPE ARCHITECT 4TH FLOOR, SAN FRANCISCO, CA 94111 Lines LEGEND sez 0 oe d | | 3 | Ay uf Tans 3} jana \"ane \u2018and Tana \u2018Tan \u201cana \u2018Tans \u201cang ans \u201cang van \"ana and \u201cana \u2018Tan m3 mot} pe Nd \u2014\u2014 eo \" = Md A ts m3 m3 iE i L\\ 01 01 ry 01 01 701 0 101 rey rt ryan \u2014\u2014\u2014\u2014 \u2014\u2014~\u2014lss \u2018 = s $s ss \u2014\u2014\u2014\u2014 ss \u2014\u2014\u2014\u2014 ss VIEW ORIENTATION UC. <a NOTE THAT SHEET IS ORIENTED WTH NORTH POINTING Benioff Children Ss es afl =m am 5 s set = DOWN, WHICH I\n- inspection 1(correct).pdf: Rudolph and Sletten, Inc. 120 Constitution Drive Menlo Park, California 94025 P: (650) 216-3600 Project: 02001.161310 UCSF Benioff Oakland 747 52nd Street Oakland, California 94609 Inspection: Underground Sanitary Sewer #7 0/2 0 0 0 0 Items Inspected Conforming Deficient N/A Neutral Type Underground Rough-in Status Open Trade 33-Sanitary Sewerage Location Utility MR (NPC-5) Spec Section 33 30 00 - SANITARY SEWER Created By Andrew Clemons Linked Drawings Description 7/20/2026-7/24/2026 - UMR/NPC-\n\nLocation-relevant excerpts:\n--- Linked content (https://storage.procore.com/api/v5/files/us-east-1/pro-core.com/1789-c/5747272-p/01KXRWH87V5MSTG49T0TSEDJHB?companyId=9871&projectId=2727475&sig=c45935546ca79e13924d450e36d6e488be0afb4d997a54976b3770ee16dd3bb1) ---\n| onPORATED Rudolph and Sletten, Inc. Project: 02001.161310 UCSF Benioff Oakland o' * 0 120 Constitution Drive 747 52nd Street RUDOLPH SLETTEN wenlo Park, California 94025 Oakland, California 94609 saxo P: (650) 216-3600 GENERAL CONTRACTORS Submittal #NPC-5 OSHPD 33 10 00-5.0 M&H Sanitary Sewer Product Data - - - NPC-5 OSHPD 33 10 00 WATER SYSTEMS - - Revision 0 Submittal Manager Ada Wu (Rudolph and Sletten, Inc) Status Open Date Created Feb 9, 2026 Issue Date Feb 9, 2026 Spec Section NPC-5 OSHPD 33 10 00 WATER SYSTEMS - - Responsible McGuire & Hester Received From Hayden Lindsay (McGuire & Hester) Contractor Received Date Feb 17, 2026 Submit By Final Due Date Mar 4, 2026 Lead Time Cost Code Location Utility MR Type Product Data Submittal Package #5: NPC-5 Approvers Ada Wu (Rudolph and Sletten, Inc), Nathan Allen (Sandis Civil Engineers), Susan Amil (Smith Group Inc.), Nicholas Hughes (Sandis Civil Engineers), Dylan Nixon-Helms (Sandis Civil Engineers), Susan Amil (Smith Group Inc.), Ada Wu (Rudolph and Sletten, Inc) Ball in Court Ada Wu (Rudolph and Sletten, Inc) Distribution Ada Wu (Rudolph and Sletten, Inc), Angel Pacheco (McGuire & Hester), Dylan Nixon-Helms (Sandis Civil Engineers), Hayden Lindsay (McGuire & Hester), Joel Pathman (Smith Group Inc.), John Sabia (McGuire & Hester), Matt Finley (McGuire & Hester), Michael Laganowsky (McGuire & Hester), Nathan Allen (Sandis Civil Engineers), Nicholas Hughes (Sandis Civil Engineers), Ryan Kane (Rudolph and Sletten, Inc), Ryan M. Lippi (Rudolph and Sletten, Inc), Susan Amil (Smith Group Inc.) Description See sanitary product data below for the Utility Make Ready project. sewer Permit Code OSHPD Subcontractor Submittal # Owner Submittal # SUBMITTAL PRIORITY INFORMATION Response Needed By Submittal Priority Submittal Priority Explanation Submittal Workflow Name Sent Date Returned Date Response Attachments General Information Attachments 2 Rudolph and Sletten, Inc. Page 1 of Printed On: Feb 17, 2026 05:50 PM PST\nSubmittal #NPC-5 OSHPD 33 10 00-5.0 M&H Sanitary Sewer - - - Project: 02001.161310 UCSF Benioff Oakland Product Data Name Sent Date Due Date Returned Date Response Attachments Submitted Hayden Lindsay Feb 13, 2026 Feb 17, 2026 NPC-5_333000- M&H Sanitary Sewer - Product Data.pdf (Current) Comment NPC-5 OSHPD 33 10 00-5 Revision 0: M&H Sanitary Sewer Product Data - - Ada Wu Feb 17, 2026 Feb 17, 2026 Pending Nathan Allen Feb 27, 2026 Pending Susan Amil Feb 27, 2026 Pending Nicholas Hughes Feb 27, 2026 Pending Dylan Nixon-Helms Feb 27, 2026 Pending Susan Amil Mar 3, 2026 Pending Ada Wu Mar 4, 2026 Pending 2 Rudolph and Sletten, Inc. Page 2 of Printed On: Feb 17, 2026 05:50 PM PST\nrehee Povesren SMITHGROUP USEF Bardot? Chicren's PAGE SUBMITTAL STAMP Stamp Review Area: [X] NO EXCEPTIONS TAKEN & Rudolph Sletten, Inc (1 MAKE CORRECTIONS NOTED (NO REQUIRED) RESUBMISSIONS \u00a2ume Submittal (nec-5) 331000-5.0 O REVISE AS NOTED AND RESUBMIT (1 REJECTED-RESUBMIT Reviewed by R&S for CHECKING IS ONLY FOR GENERAL CONFORMANCE WITH THE DESIGN CONCEPT OF THE PROJECT AND GENERAL general conformity with . . COMPLIANCE WITH THE INFORMATION GIVEN ON THE CONTRACT DOCUMENTS. ANY ACTION SHOWN IS SUBJECT documents. the contract TO THE REQUIREMENTS OF THE PLANS AND SPECIFICATIONS. CONTRACTOR IS RESPONSIBLE FOR Subcontractor i \u2018ble for all ubcontractor 1s responsible for al DIMENSIONS WHICH SHALL BE CONFIRMED AND dimensions, complete quantities, joinery, & CORRELATED AT THE JOB SITE: FABRICATION PROCESSES AND TECHNIQUES OF CONSTRUCTION: COORDINATIONS OF compliance with documents. . . P construction HIS WORK WILL ALL OTHER TRADES: AND THE SATISFACTORY PERFORMANCE OF HIS WORK. S 2/17/2026 By: ADA WU Date: SANDIS 16131000 R&S Job: Nicholas Hughes 02/20/2026 gy: par\u00a2. SMITHGROUP SUBMITTAL REVIEW STAMP smithgroup.com Review is only for the limited of checking for purpose general conformance with the information given and the design expressed in the Contract Documents. The concept final Review Code the Submittal Review Sheet shall on prevail. REVIEW CODE 12018 Approved (AP) 7] Project No. Approved Noted (AN) as UMR(NPC-5)331000-5 Approved Noted as - \u2014\u2014\u2014 Submittal No. Resubmit (AN-R) Rejected (REJ) jpathman Not Requested by Reviewed By Contract Documents (X) 3/5/2026 Information Only \u2014 Review = Date Received (INF)\nSubmittal Cover Sheet 2810 Harbor Bay Parkway Alameda, CA 94502 510-632-7676 Fax 510-562-5210 | Project Title UCSF Benioff Children's Hospital Contract No. M&H Job# 5195 Submitted To: Location Address: 1st 2nd 3rd other Sub/Vender McGuire and Hester Attention: Contact Hayden Lindsay Phone: Telephone 831-706-7420 Sub/Ven Subm'l # | Date Rec'd | sepia| print | it | test [samp'l| other | |M&H SUBMITTAL # Date Sent ACTION TAKEN 2/17/2026 |A- Approved Subcontractor Contractor to |AAN- Approved Noted Contractor Owner to as RR- Revise & Resubmit Owner Consultant to R- Rejected Consultant Owner to |AR- Acknowledge Receipt Owner Contractor to RWR- Return W/o Review Contractor Subcontractor to | No. | ee Specification Water Systems Product Data We verify that the material transmitted herein is in compliance with the Contract Specifications: With Exceptions Except for the following deviations no Comments: Hayden Lindsay; Project Engineer McGuire and Hester Review Comments:\nA-1029 / A-1018 i (1) AURORA (y ee ve \\ NY EDGE \\ ZZ (1) CLOSE PICK =| a SECTION A-A VIEW IS ROTATED | DRAWN BY: CDILLEY_ DATE: 6/19/2017 PRODUCT NUMBER: MATERIAL TYPE: COVER A1018-16 ee H20 WHEEL LOADING = INDICATES MACHINED SURFACE G:\\__DLS DRAWINGS\\A\\A-1029\\A-1029-R1_A-1018-16.DWG\nVLA Section View 3\" Depth 5.00|_ _| NOTE: 1. ALL DIMENSIONS IN INCHES. 5.00 VA Section View 6\" Depth GRADE RING\nALL DIMENSIONS IN INCHES. ALL MANHOLE SECTIONS ARE MANUFACTURED SECTION E-E IN STRICT ACCORDANCE WITH THE LATEST REVISIONS OF A.S.1.M DESIGNATION C-478. MANHOLES MAY BE SUPPLIED WITH AND WITHOUT STEPS. ALL 48\" ID MANHOLE SECTIONS HAVE 5\u201d WALL THICKNESS. 48\" CONCENTRIC CONES\n48.00 PF 48.00 ff | 5.00 yo A \u2014p_ 1600 LBS 800 LBS 2 48.00 48.00 PT i 3200 LBS 2400 LBS \u2014\u2014 4000 LBS 5.00 ALL DIMENSIONS IN INCHES. ALL MANHOLE SECTIONS ARE MANUFACTURED IN STRICT ACCORDANCE WITH THE LATEST REVISIONS OF A.S.T.M DESIGNATION C-478. MANHOLES MAY BE SUPPLIED WITH AND WITHOUT STEPS. ALL 48\" ID MANHOLE SECTIONS HAVE 5\" WALL THICKNESS. 48\" SECTIONS BARREL\n\u2018SEAL OF SECURITY fy CONSEAL ConSeal\u201d CS-102 Concrete SEALANTS INC. BOND OF TRUST BUTYL RUBBER SEALANT Seal ConSeal Don\u2019t Just lt, It! BOX CULVERT JOINT 1 7 Sealant Butyl Rubber for All Precast Concrete Structures ASTM C990 Meets - PRODUCT APPLICATIONS For joints in: Manholes, Concrete Pipe, Vaults, Box Culverts, Septic Tanks, concrete and Vertical Structures. Not intended for in expansion joints joints Panel that use or move. SEALING PROPERTIES PHYSICAL PROPERTIES & CHEMICAL COMPOSITION Description Required Provides permanently flexible watertight joints. Spec CS-102 e (-1\u00b0C +49\u00b0C) Color Low high workability: 30\u00b0F 120\u00b0F Black to temperature to to e Rugged service -30\u00b0F +200\u00b0F (-34\u00b0C +93\u00b0C) Specific Gravity, 77\u00b0F ASTM D71 temperature: to to 1.15-1.50 1.25 e (25\u00b0C) Excellent chemical and mechanical adhesion clean dry surfaces. to e Greater cohesive and adhesive strengths. Ductility, 77\u00b0F (25\u00b0C) ASTM D113 min. 5.0 6 e Sealed ASTMD217 joints will shrink, harden oxidize aging. Penetration, 77\u00b0F 55-100dmm 55-60 dmm not or upon cone e Controlled flow resistance for application (25\u00b0C), 150 5 ease. gm, sec. e ASTM ConSeal CS-102 the hydrostatic performance requirement Flash Point, C.O.C., \u00b0F D92 350\u00b0F min. 375\u00b0F meets as e forth ASTM C990 (Performance C.0.C., ASTM D92 in section 10.1. requirement: Fire Point, \u00b0F 375\u00b0F min. 475\u00b0F set 10psi for minutes in straight alignment in plant, quality control Hydrocarbon blend ASTM D297 50% min. 10 51% \u2014 for materials.) joint % by weight test content, ConSeal CS-102 exceeds all of the requirements of Federal Inert material filler, by AASHTO min. meets % 30% 35% or e weight Specification SS-S-210 AASHTO (210-A), and M-198B. T1141 No priming normally When confronted with difficult Volatile Mater, by weight ASTM D6 % 3% 1.2% necessary. max. e installation conditions, such below wet concrete temperatures as or 40\u00b0F (4\u00b0C), priming the will improve the bonding action. concrete Consult Concrete Sealants for the primer application. to meet proper your IMMERSION TESTING 30-Day Immersion Testing: No visible deterioration when tested in Caustic Potash, Hydrochloric Acid, Sulfuric Acid, 5% 5% 5% and saturated Hydrogen Sulfide. 5% One Year Immersion Testing: No visible deterioration when tested in Formaldehyde, Formic Acid, 5% 5% Sulfuric Sodium Sulfide, 5% Acid, 5% Hydrochloric Acid, 5% Hydroxide, 5% Hydrogen and 5% Potassium Hydroxide. INSTALLATION GUIDELINES The following procedures should be followed for optimum sealant performance. Clean the and lower joint surface with stiff bristle brush. upper a e Remove dirt, debris, flashing, high points, which could keep the joint from coming together. concrete any or ConSeal of surface before recommends the primers, primers adhesion. When using primer, allow the primer dry placing sealant. to use as improve a ConSeal primers specifically designed for with ConSeal products. Contact ConSeal for the best primer for the projects specific application. are use DO NOT PLACE JOINTS OF CORNER. ANY WITHIN 12\u201d A Join the sealant into continuous strand by kneading the ends together where t\u2026\nexpanded_clues:\n- location_text: 120 Constitution Drive 747 52nd Street SRMG Menlo Park, California 94025 Oakland, California 94609\n- trade: Sanitary Sewer, SS, SAN, sewer lateral, cleanout, manhole, SSCO, SSMH\n- contractor: Rudolph and Sletten, Inc.\n- document_title: NPC-5 - OSHPD 33 10 00-5.0 - M&H - Sanitary Sewer Product Data, SS, SAN, sewer lateral, cleanout, manhole\n- inspection_name: Sanitary Sewer Product Data Inspection, SS, SAN, sewer lateral, cleanout, manhole\n- inspection_note: This inspection pertains to the sanitary sewer product data., SS, SAN, sewer lateral, cleanout, manhole\n- inspection_note: Final due date for the submission is Mar 4, 2026.\n- inspection_note: Review of manufacturing defects to ensure compliance with specifications., W/\n- inspection_note: For satisfactory performance, manufacturer suggests considerations beyond product quality.\n- item_inspected: MasterPozzolith 322\n- item_inspected: VCP to HDPE Coupling Adapter\n- item_inspected: HYMAX GRIP\u00ae COUPLING RESTRAINT\n- item_inspected: Flexible Expansion Joint\n- item_inspected: Satisfactory results with quality products, W/\n- trade_abbreviation: SS, SANITARY SEWER\n- trade_abbreviation: SSCO\n- trade_abbreviation: SSMH\n- inspection_note_abbreviation: W/, WITH\n- location_code: Utility\n- location_code: s, SLOPE OR SOUTH\n- location_code: AND\n- location_code: ECCENTRIC\n- location_code: Address\n- station_from: 10+00\n- station_to: 10+90.95",
+    "dossier_summary_chars": 13472,
+    "master_page_1_png": "/Users/dtaplin21/Desktop/Procore-Integrator/backend/uploads/drawings/rendered/project-1348/drawing-1722/page-1.png",
+    "master_png_bytes": 6236008
+  },
+  "location_candidates_count": 12,
+  "location_candidates_sample": [
+    {
+      "method": "coordinate_lookup",
+      "source_drawing_id": 1872,
+      "confidence": 0.98,
+      "bbox": [
+        0.8490980043943057,
+        0.02885556928827021,
+        0.8621411106643971,
+        0.051384477022008046
+      ],
+      "page": 1
+    },
+    {
+      "method": "station_lookup",
+      "source_drawing_id": 1722,
+      "confidence": 0.88,
+      "bbox": [
+        0.15415280000000003,
+        0.20043749999999994,
+        0.17015280000000005,
+        0.21643749999999995
+      ],
+      "page": 1
+    },
+    {
+      "method": "station_lookup",
+      "source_drawing_id": 1722,
+      "confidence": 0.88,
+      "bbox": [
+        0.30200000000000005,
+        0.27179169999999997,
+        0.3180000000000001,
+        0.2877917
+      ],
+      "page": 1
+    },
+    {
+      "method": "reference_lookup",
+      "source_drawing_id": 1722,
+      "confidence": 0.94,
+      "bbox": [
+        0.3715131,
+        0.81005919,
+        0.37658495,
+        0.81301773
+      ],
+      "page": 1
+    },
+    {
+      "method": "reference_lookup",
+      "source_drawing_id": 1872,
+      "confidence": 0.94,
+      "bbox": [
+        0.4047222222222222,
+        0.05583333333333333,
+        0.4088888888888889,
+        0.06
+      ],
+      "page": 1
+    },
+    {
+      "method": "reference_lookup",
+      "source_drawing_id": 1973,
+      "confidence": 0.94,
+      "bbox": [
+        0.6009929382723141,
+        0.12852282421646516,
+        0.6911889867844925,
+        0.14619895338594788
+      ],
+      "page": 1
+    },
+    {
+      "method": "reference_lookup",
+      "source_drawing_id": 1974,
+      "confidence": 0.94,
+      "bbox": [
+        0.4672304539898642,
+        0.8536262897529987,
+        0.4997304779252196,
+        0.8651717985519255
+      ],
+      "page": 1
+    },
+    {
+      "method": "reference_lookup",
+      "source_drawing_id": 1926,
+      "confidence": 0.94,
+      "bbox": [
+        0.5417017718545751,
+        0.1316817794183288,
+        0.6318978702320772,
+        0.1493579113122189
+      ],
+      "page": 1
+    },
+    {
+      "method": "reference_lookup",
+      "source_drawing_id": 1722,
+      "confidence": 0.88,
+      "bbox": [
+        0.39983094,
+        0.91893488,
+        0.43406594,
+        0.9597632899999999
+      ],
+      "page": 1
+    },
+    {
+      "method": "reference_lookup",
+      "source_drawing_id": 1722,
+      "confidence": 0.88,
+      "bbox": [
+        0.91335589,
+        0.11893491,
+        0.970760607845569,
+        0.16210027624059603
+      ],
+      "page": 1
+    },
+    {
+      "method": "reference_lookup",
+      "source_drawing_id": 1722,
+      "confidence": 0.88,
+      "bbox": [
+        0.9192730199999999,
+        0.20355029,
+        0.9548171108992642,
+        0.23672191478587962
+      ],
+      "page": 1
+    },
+    {
+      "method": "reference_lookup",
+      "source_drawing_id": 1722,
+      "confidence": 0.75,
+      "bbox": [
+        0.8781099672670718,
+        0.9634962293836805,
+        0.9218827504960317,
+        0.9754357231987847
+      ],
+      "page": 1
+    }
+  ],
+  "fused_scores_top": [
+    {
+      "rank": 1,
+      "fused_score": 0.591,
+      "rationale": "matcher=coordinate_lookup@0.98 | hits=coordinate:coordinate:n=2131764.84,e=6051541.82; legend:SS",
+      "clue_hits": [
+        {
+          "dimension": "coordinate",
+          "value": "coordinate:n=2131764.84,e=6051541.82",
+          "weight": 0.34299999999999997
+        },
+        {
+          "dimension": "legend",
+          "value": "SS",
+          "weight": 0.15
+        }
+      ],
+      "bbox": [
+        0.8490980043943057,
+        0.02885556928827021,
+        0.8621411106643971,
+        0.051384477022008046
+      ],
+      "method": "coordinate_lookup"
+    },
+    {
+      "rank": 2,
+      "fused_score": 0.502,
+      "rationale": "matcher=station_lookup@0.88 | hits=station:station:10+90.95; legend:SS",
+      "clue_hits": [
+        {
+          "dimension": "station",
+          "value": "station:10+90.95",
+          "weight": 0.264
+        },
+        {
+          "dimension": "legend",
+          "value": "SS",
+          "weight": 0.15
+        }
+      ],
+      "bbox": [
+        0.15415280000000003,
+        0.20043749999999994,
+        0.17015280000000005,
+        0.21643749999999995
+      ],
+      "method": "station_lookup"
+    },
+    {
+      "rank": 3,
+      "fused_score": 0.502,
+      "rationale": "matcher=station_lookup@0.88 | hits=station:station:11+14.23; legend:SS",
+      "clue_hits": [
+        {
+          "dimension": "station",
+          "value": "station:11+14.23",
+          "weight": 0.264
+        },
+        {
+          "dimension": "legend",
+          "value": "SS",
+          "weight": 0.15
+        }
+      ],
+      "bbox": [
+        0.30200000000000005,
+        0.27179169999999997,
+        0.3180000000000001,
+        0.2877917
+      ],
+      "method": "station_lookup"
+    },
+    {
+      "rank": 4,
+      "fused_score": 0.244,
+      "rationale": "matcher=reference_lookup@0.94 | hits=legend:SANITARY SEWER",
+      "clue_hits": [
+        {
+          "dimension": "legend",
+          "value": "SANITARY SEWER",
+          "weight": 0.15
+        }
+      ],
+      "bbox": [
+        0.3715131,
+        0.81005919,
+        0.37658495,
+        0.81301773
+      ],
+      "method": "reference_lookup"
+    },
+    {
+      "rank": 5,
+      "fused_score": 0.244,
+      "rationale": "matcher=reference_lookup@0.94 | hits=legend:SS",
+      "clue_hits": [
+        {
+          "dimension": "legend",
+          "value": "SS",
+          "weight": 0.15
+        }
+      ],
+      "bbox": [
+        0.4047222222222222,
+        0.05583333333333333,
+        0.4088888888888889,
+        0.06
+      ],
+      "method": "reference_lookup"
+    },
+    {
+      "rank": 6,
+      "fused_score": 0.244,
+      "rationale": "matcher=reference_lookup@0.94 | hits=legend:SS",
+      "clue_hits": [
+        {
+          "dimension": "legend",
+          "value": "SS",
+          "weight": 0.15
+        }
+      ],
+      "bbox": [
+        0.6009929382723141,
+        0.12852282421646516,
+        0.6911889867844925,
+        0.14619895338594788
+      ],
+      "method": "reference_lookup"
+    },
+    {
+      "rank": 7,
+      "fused_score": 0.244,
+      "rationale": "matcher=reference_lookup@0.94 | hits=legend:SS",
+      "clue_hits": [
+        {
+          "dimension": "legend",
+          "value": "SS",
+          "weight": 0.15
+        }
+      ],
+      "bbox": [
+        0.4672304539898642,
+        0.8536262897529987,
+        0.4997304779252196,
+        0.8651717985519255
+      ],
+      "method": "reference_lookup"
+    },
+    {
+      "rank": 8,
+      "fused_score": 0.244,
+      "rationale": "matcher=reference_lookup@0.94 | hits=legend:SS",
+      "clue_hits": [
+        {
+          "dimension": "legend",
+          "value": "SS",
+          "weight": 0.15
+        }
+      ],
+      "bbox": [
+        0.5417017718545751,
+        0.1316817794183288,
+        0.6318978702320772,
+        0.1493579113122189
+      ],
+      "method": "reference_lookup"
+    },
+    {
+      "rank": 9,
+      "fused_score": 0.238,
+      "rationale": "matcher=reference_lookup@0.88 | region=141028 labels=AND,FEC,FOR,GARAGE,PLAN | hits=legend:SS | conflicts=location '120 Constitution Drive 747 52nd Street SRMG Menlo Park, California 94025 Oakland, California 94609' not in region tags ('AND', 'FEC', 'FOR', 'GARAGE', 'PLAN')",
+      "clue_hits": [
+        {
+          "dimension": "legend",
+          "value": "SS",
+          "weight": 0.15
+        }
+      ],
+      "bbox": [
+        0.39983094,
+        0.91893488,
+        0.43406594,
+        0.9597632899999999
+      ],
+      "method": "reference_lookup"
+    },
+    {
+      "rank": 10,
+      "fused_score": 0.238,
+      "rationale": "matcher=reference_lookup@0.88 | region=141037 labels=09,09,,2026,612034.,612034.F,AND,APPROVAL,APPROVAL:,APPROVED,AUTHORIZE,BKCK01,BPS,DOES,F,FIRE,MAKE,NOT,OF,PANIC,PLAN,READY,READY-BPS_ACD01,STATE,THE,THIS | hits=legend:SS | conflicts=location '120 Constitution Drive 747 52nd Street SRMG Menlo Park, California 94025 Oakland, California 94609' not in region tags ('09', '09,', '2026', '612034.', '612034.F', 'AND', 'APPROVAL', 'APPROVAL:', 'APPROVED', 'AUTHORIZE', 'BKCK01', 'BPS', 'DOES', 'F', 'FIRE', 'MAKE', 'NOT', 'OF', 'PANIC', 'PLAN', 'READY', 'READY-BPS_ACD01', 'STATE', 'THE', 'THIS')",
+      "clue_hits": [
+        {
+          "dimension": "legend",
+          "value": "SS",
+          "weight": 0.15
+        }
+      ],
+      "bbox": [
+        0.91335589,
+        0.11893491,
+        0.970760607845569,
+        0.16210027624059603
+      ],
+      "method": "reference_lookup"
+    },
+    {
+      "rank": 11,
+      "fused_score": 0.238,
+      "rationale": "matcher=reference_lookup@0.88 | region=141039 labels=*REVIEWED,APPROVAL,APPROVAL:,BUILDING,CODE,FOR,PERMIT,REVIEWED,UCSF | hits=legend:SS | conflicts=location '120 Constitution Drive 747 52nd Street SRMG Menlo Park, California 94025 Oakland, California 94609' not in region tags ('*REVIEWED', 'APPROVAL', 'APPROVAL:', 'BUILDING', 'CODE', 'FOR', 'PERMIT', 'REVIEWED', 'UCSF')",
+      "clue_hits": [
+        {
+          "dimension": "legend",
+          "value": "SS",
+          "weight": 0.15
+        }
+      ],
+      "bbox": [
+        0.9192730199999999,
+        0.20355029,
+        0.9548171108992642,
+        0.23672191478587962
+      ],
+      "method": "reference_lookup"
+    },
+    {
+      "rank": 12,
+      "fused_score": 0.225,
+      "rationale": "matcher=reference_lookup@0.75 | region=141049 labels=4/13/2026,MR,OBTERA,ORLAND,SHEET,UTILITY | hits=legend:SS | conflicts=location '120 Constitution Drive 747 52nd Street SRMG Menlo Park, California 94025 Oakland, California 94609' not in region tags ('4/13/2026', 'MR', 'OBTERA', 'ORLAND', 'SHEET', 'UTILITY')",
+      "clue_hits": [
+        {
+          "dimension": "legend",
+          "value": "SS",
+          "weight": 0.15
+        }
+      ],
+      "bbox": [
+        0.8781099672670718,
+        0.9634962293836805,
+        0.9218827504960317,
+        0.9754357231987847
+      ],
+      "method": "reference_lookup"
+    }
+  ],
+  "scope_kind": "utility_line",
+  "vision_pipeline": {
+    "should_invoke_vision_heuristic": true,
+    "strong_coordinate_winner_top_candidate": true,
+    "note": "Vision localize runs whenever a master PNG exists; utility scope tries vision_trace before aux_survey_chain when master_png_path is set."
+  },
+  "scope_trace_inputs": {
+    "winner_rationale": "matcher=coordinate_lookup@0.98 | hits=coordinate:coordinate:n=2131764.84,e=6051541.82; legend:SS",
+    "anchor_bbox": [
+      0.8490980043943057,
+      0.02885556928827021,
+      0.8621411106643971,
+      0.051384477022008046
+    ],
+    "scope_source_drawing_id": 1872,
+    "registration_transform": {
+      "scale_x": 1.3499355269127948,
+      "scale_y": 1.3499355269127948,
+      "translate_x": -0.1857143370452634,
+      "translate_y": -0.12909713632226738,
+      "rotation_degrees": -1.0
+    },
+    "registration_aux_drawing_id": 1872
+  },
+  "scope_trace_result": {
+    "type": "line_segments",
+    "points": null,
+    "meta": {
+      "source": "sheet_line",
+      "source_drawing_id": 1872,
+      "viewport_id": "plan",
+      "sheet_line_confidence": 0.9
+    }
+  },
+  "persisted_overlay": {
+    "id": 528,
+    "status": "unknown",
+    "geometry": {
+      "page": 1,
+      "type": "polyline",
+      "points": [
+        [
+          0.22737121145063088,
+          0.2403304891627029
+        ],
+        [
+          0.2084375,
+          0.24
+        ]
+      ],
+      "scope_kind": "utility_line",
+      "meta": {
+        "source": "aux_survey_chain_projected",
+        "source_drawing_id": 1872,
+        "stations": [
+          "10+90",
+          "10+90.95"
+        ],
+        "projected_from_drawing_id": 1872
+      },
+      "label": "inspection_match"
+    },
+    "meta": {
+      "match_status": "needs_review",
+      "agent_rationale": "matcher=coordinate_lookup@0.98 | hits=coordinate:coordinate:n=2131764.84,e=6051541.82; legend:SS | scope=aux_survey_chain_projected",
+      "agent_fused_score": 0.591,
+      "agent_candidates": [
+        {
+          "rank": 1,
+          "rationale": "matcher=coordinate_lookup@0.98 | hits=coordinate:coordinate:n=2131764.84,e=6051541.82; legend:SS",
+          "clue_hits": [
+            {
+              "clue_value": "coordinate:n=2131764.84,e=6051541.82",
+              "dimension": "coordinate",
+              "weight": 0.34299999999999997
+            },
+            {
+              "clue_value": "SS",
+              "dimension": "legend",
+              "weight": 0.15
+            }
+          ],
+          "conflicts": [],
+          "fused_score": 0.591
+        },
+        {
+          "rank": 2,
+          "rationale": "matcher=station_lookup@0.88 | hits=station:station:10+90.95; legend:SS",
+          "clue_hits": [
+            {
+              "clue_value": "station:10+90.95",
+              "dimension": "station",
+              "weight": 0.264
+            },
+            {
+              "clue_value": "SS",
+              "dimension": "legend",
+              "weight": 0.15
+            }
+          ],
+          "conflicts": [],
+          "fused_score": 0.502
+        },
+        {
+          "rank": 3,
+          "rationale": "matcher=station_lookup@0.88 | hits=station:station:11+14.23; legend:SS",
+          "clue_hits": [
+            {
+              "clue_value": "station:11+14.23",
+              "dimension": "station",
+              "weight": 0.264
+            },
+            {
+              "clue_value": "SS",
+              "dimension": "legend",
+              "weight": 0.15
+            }
+          ],
+          "conflicts": [],
+          "fused_score": 0.502
+        },
+        {
+          "rank": 4,
+          "rationale": "matcher=reference_lookup@0.94 | hits=legend:SS",
+          "clue_hits": [
+            {
+              "clue_value": "SS",
+              "dimension": "legend",
+              "weight": 0.15
+            }
+          ],
+          "conflicts": [],
+          "fused_score": 0.244
+        },
+        {
+          "rank": 5,
+          "rationale": "matcher=reference_lookup@0.94 | hits=legend:SS",
+          "clue_hits": [
+            {
+              "clue_value": "SS",
+              "dimension": "legend",
+              "weight": 0.15
+            }
+          ],
+          "conflicts": [],
+          "fused_score": 0.244
+        },
+        {
+          "rank": 6,
+          "rationale": "matcher=reference_lookup@0.94 | hits=legend:SS",
+          "clue_hits": [
+            {
+              "clue_value": "SS",
+              "dimension": "legend",
+              "weight": 0.15
+            }
+          ],
+          "conflicts": [],
+          "fused_score": 0.244
+        },
+        {
+          "rank": 7,
+          "rationale": "matcher=reference_lookup@0.94 | hits=legend:SS",
+          "clue_hits": [
+            {
+              "clue_value": "SS",
+              "dimension": "legend",
+              "weight": 0.15
+            }
+          ],
+          "conflicts": [],
+          "fused_score": 0.244
+        },
+        {
+          "rank": 8,
+          "rationale": "matcher=reference_lookup@0.88 | region=141029 labels=OSHPD,PLAN | hits=legend:SS | conflicts=location '52ND STREET, OAKLAND, CA 94609' not in region tags ('OSHPD', 'PLAN')",
+          "clue_hits": [
+            {
+              "clue_value": "SS",
+              "dimension": "legend",
+              "weight": 0.15
+            }
+          ],
+          "conflicts": [
+            "location '52ND STREET, OAKLAND, CA 94609' not in region tags ('OSHPD', 'PLAN')"
+          ],
+          "fused_score": 0.238
+        },
+        {
+          "rank": 9,
+          "rationale": "matcher=reference_lookup@0.88 | region=141037 labels=09,09,,2026,612034.,612034.F,AND,APPROVAL,APPROVAL:,APPROVED,AUTHORIZE,BKCK01,BPS,DOES,F,FIRE,MAKE,NOT,OF,PANIC,PLAN,READY,READY-BPS_ACD01,STATE,THE,THIS | hits=legend:SS | conflicts=location '52ND STREET, OAKLAND, CA 94609' not in region tags ('09', '09,', '2026', '612034.', '612034.F', 'AND', 'APPROVAL', 'APPROVAL:', 'APPROVED', 'AUTHORIZE', 'BKCK01', 'BPS', 'DOES', 'F', 'FIRE', 'MAKE', 'NOT', 'OF', 'PANIC', 'PLAN', 'READY', 'READY-BPS_ACD01', 'STATE', 'THE', 'THIS')",
+          "clue_hits": [
+            {
+              "clue_value": "SS",
+              "dimension": "legend",
+              "weight": 0.15
+            }
+          ],
+          "conflicts": [
+            "location '52ND STREET, OAKLAND, CA 94609' not in region tags ('09', '09,', '2026', '612034.', '612034.F', 'AND', 'APPROVAL', 'APPROVAL:', 'APPROVED', 'AUTHORIZE', 'BKCK01', 'BPS', 'DOES', 'F', 'FIRE', 'MAKE', 'NOT', 'OF', 'PANIC', 'PLAN', 'READY', 'READY-BPS_ACD01', 'STATE', 'THE', 'THIS')"
+          ],
+          "fused_score": 0.238
+        },
+        {
+          "rank": 10,
+          "rationale": "matcher=reference_lookup@0.88 | region=141047 labels=A,RESUBMITTAL,SUBMITTAL | hits=legend:SS | conflicts=location '52ND STREET, OAKLAND, CA 94609' not in region tags ('A', 'RESUBMITTAL', 'SUBMITTAL')",
+          "clue_hits": [
+            {
+              "clue_value": "SS",
+              "dimension": "legend",
+              "weight": 0.15
+            }
+          ],
+          "conflicts": [
+            "location '52ND STREET, OAKLAND, CA 94609' not in region tags ('A', 'RESUBMITTAL', 'SUBMITTAL')"
+          ],
+          "fused_score": 0.238
+        },
+        {
+          "rank": 11,
+          "rationale": "matcher=reference_lookup@0.75 | region=141049 labels=4/13/2026,MR,OBTERA,ORLAND,SHEET,UTILITY | hits=legend:SS | conflicts=location '52ND STREET, OAKLAND, CA 94609' not in region tags ('4/13/2026', 'MR', 'OBTERA', 'ORLAND', 'SHEET', 'UTILITY')",
+          "clue_hits": [
+            {
+              "clue_value": "SS",
+              "dimension": "legend",
+              "weight": 0.15
+            }
+          ],
+          "conflicts": [
+            "location '52ND STREET, OAKLAND, CA 94609' not in region tags ('4/13/2026', 'MR', 'OBTERA', 'ORLAND', 'SHEET', 'UTILITY')"
+          ],
+          "fused_score": 0.225
+        }
+      ],
+      "scope_kind": "utility_line",
+      "scope_source": "survey_endpoints"
+    }
+  },
+  "base_pdf_native_ocr": {
+    "pages": [
+      {
+        "page": 1,
+        "chars": 1544,
+        "preview": "Rudolph and Sletten, Inc. Project: 02001.161310 UCSF Benioff Oakland 120 Constitution Drive 747 52nd Street Menlo Park, California 94025 Oakland, California 94609 P: (650) 216-3600 Inspection: Underground Sanitary Sewer #7 0/2 0 0 0 0 Items Inspected Conforming Deficient N/A Neutral Type Underground Rough-in Status Open Trade 33-Sanitary Sewerage Location Utility MR (NPC-5) Spec Section 33 30 00 - SANITARY SEWER Created By Andrew Clemons Linked Drawings Description 7/20/2026-7/24/2026 - UMR/NPC-5 OSHPD - IOR Inspection - 7:30AM - 8hrs OSHPD IOR Ongoing Inspection - Sanitary Sewer Line Rough in UMR OSHPD Sheets C4.20 C4.21 C6.00 Attachments UMR 331000-5.0 - M&H - Sanitary Sewer PD_Approved (5).pdf, 7.20-7.24 U1.C4.20 6.00 Sanitary Sewer Install.pdf Inspection Types IOR/Special Inspection AHJ Percepta R&S QC Samuel Rosales OSHPD TIO Index # Inspected/Witnesse Date Inspected d By Requested AM Inspection Time Time of Inspection Document As-built No Required? Permit Code IOR Notes/Issues Inspection Details Inspection Date Jul 20, 2026 Due Date Jul 24, 2026 Point of Contact Andrew Clemons Responsible McGuire & Hester Contractor Assignee(s) Dennis Hayse, Nicole Coreas Inspection of underground sanitary sewer installed in 0 Neutral 0 Conforming 0 Deficient 0 N/A requested area only. 1.1 Underground Sanitary Sewer is in compliance with the contract documents. Activity: 0 Response Changes, 0 Attachments, 0 Photos, 0 Comments, 0 Observations Pass Fail N/A Rudolph and Sletten, Inc. Page "
+      },
+      {
+        "page": 2,
+        "chars": 330,
+        "preview": "Inspection #7 - Underground Sanitary Sewer Project: 02001.161310 UCSF Benioff Oakland 1.2 Warning tape installed is in compliance with the contract documents. Activity: 0 Response Changes, 0 Attachments, 0 Photos, 0 Comments, 0 Observations Pass Fail N/A Rudolph and Sletten, Inc. Page 2 of 2 Printed On: Jul 23, 2026 04:22 PM PDT"
+      }
+    ]
+  },
+  "base_pdf_hyperlinks_not_followed_from_here": [
+    {
+      "page": 1,
+      "uri": "https://storage.procore.com/api/v5/files/us-east-1/pro-core.com/1789-c/5747272-p/01KXRWH87V5MSTG49T0TSEDJHB?companyId=9871&projectId=2727475&sig=c45935546ca79e13924d450e36d6e488be0afb4d997a54976b3770ee16dd3bb1",
+      "kind": "PdfLinkKind.EXTERNAL_URI"
+    },
+    {
+      "page": 1,
+      "uri": "https://storage.procore.com/api/v5/files/us-east-1/pro-core.com/1789-c/5747272-p/01KXRWH88XNQHS5YFS4EJ0R578?companyId=9871&projectId=2727475&sig=25c6b05e42cc71e050a6dc82103870b73e48e1ec475833f428f8c5960aa604c5",
+      "kind": "PdfLinkKind.EXTERNAL_URI"
+    }
+  ],
+  "not_indexed_or_partial": {
+    "investigation_complete": false,
+    "skipped_link_count": 13,
+    "errors": [
+      "https://app.procore.com/2727475/project/submittal_log_approvers/document_downloader?attachment_id=6001321764&item_id=177539970&item_type=SubmittalLogApprover&project_id=2727475&source=coversheet&submittal_log_id=69397739: unsupported content type: application/xml"
+    ],
+    "merge_included": [
+      "7.20-7.24 U1.C4.20 6.00 Sanitary Sewer Install.pdf",
+      "UMR 331000-5.0 - M&H - Sanitary Sewer PD_Approved (5).pdf",
+      "nested-UMR 331000-5.0 - M&H - Sanitary Sewer PD_Approved (5).pdf"
+    ],
+    "merge_truncated": [],
+    "merge_dropped": [],
+    "cover_lists_sheets_without_pdf_link": [
+      "C4.21",
+      "C6.00"
+    ],
+    "linked_drawing_ids_in_db": [
+      1973,
+      1974,
+      1872
+    ]
+  },
+  "linked_drawing_ocr_token_counts": {
+    "1973": {
+      "name": "UMR 331000-5.0 - M&H - Sanitary Sewer PD_Approved (5).pdf",
+      "text_elements": 47183,
+      "index_status": "ready"
+    },
+    "1974": {
+      "name": "344.EPD_Polaris_Materials_final.pdf",
+      "text_elements": 4656,
+      "index_status": "ready"
+    },
+    "1872": {
+      "name": "7.20-7.24 U1.C4.20 6.00 Sanitary Sewer Install.pdf",
+      "text_elements": 888,
+      "index_status": "ready"
+    }
+  },
+  "why_not_confident_placement": [
+    "Match status is needs_review (below auto-accept threshold or ambiguous scope).",
+    "Scope geometry fallback 'aux_survey_chain_projected' \u2014 short segment from survey/station labels, not traced sewer linework on master.",
+    "PDF link investigation marked incomplete (skipped links or merge issues)."
+  ]
+}

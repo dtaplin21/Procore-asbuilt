@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 type Props = {
   progress: InspectionRunProgress | undefined;
   isLoading?: boolean;
+  /** When true, keep the panel visible for the whole inspect/index/match job. */
+  isActive?: boolean;
 };
 
 function stepIcon(status: string): string {
@@ -15,20 +17,31 @@ function stepIcon(status: string): string {
   return "○";
 }
 
-export default function InspectionRunProgressPanel({ progress, isLoading }: Props) {
-  if (isLoading && !progress?.current?.label) {
+export default function InspectionRunProgressPanel({
+  progress,
+  isLoading,
+  isActive = false,
+}: Props) {
+  const hasPayload =
+    Boolean(progress?.current?.label?.trim()) || Boolean(progress?.steps?.length);
+
+  if (!isActive && !hasPayload) {
+    return null;
+  }
+
+  if ((isLoading || !hasPayload) && isActive) {
     return (
       <div
         className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground flex items-center gap-2"
         data-testid="inspection-run-progress-panel"
       >
         <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-        Loading progress…
+        {isLoading ? "Loading progress…" : "Inspecting…"}
       </div>
     );
   }
 
-  if (!progress?.current?.label && !(progress?.steps?.length ?? 0)) {
+  if (!hasPayload || !progress) {
     return null;
   }
 

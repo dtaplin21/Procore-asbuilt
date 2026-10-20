@@ -280,14 +280,18 @@ def maybe_enqueue_inspection_match_after_extraction(
             page=page,
             inspection_run_id=inspection_run_id,
         )
+        defer_extra: dict[str, object] = {
+            "evidence_id": evidence_id,
+            "master_drawing_id": master_drawing_id,
+            "index_status": readiness.index_status,
+            "region_count": readiness.region_count,
+        }
+        inv = readiness.sheet_line_inventory
+        if inv is not None:
+            defer_extra["sheet_line_inventory"] = inv.to_dict()
         logger.info(
             "inspection_match_deferred_until_index_ready",
-            extra={
-                "evidence_id": evidence_id,
-                "master_drawing_id": master_drawing_id,
-                "index_status": readiness.index_status,
-                "region_count": readiness.region_count,
-            },
+            extra=defer_extra,
         )
         log_inspection_upload_match_summary(
             evidence_id=evidence_id,
@@ -449,6 +453,79 @@ def flush_inspection_matches_for_linked_auxiliary_drawing(
 
     if enqueued:
         session.commit()
+    return enqueued
+
+
+def _pending_match_run_ids(session: Session, project_id: int, drawing_id: int) -> set[int]:
+    jobs = (
+        session.query(JobQueue)
+        .filter(
+            JobQueue.project_id == project_id,
+            JobQueue.job_type == JOB_TYPE_INSPECTION_MATCH,
+            JobQueue.status.in_(("pending", "processing")),
+        )
+        .all()
+    )
+    run_ids: set[int] = set()
+    for job in jobs:
+        payload = job.input_data if isinstance(job.input_data, dict) else {}
+        payload_drawing = _parse_optional_int(payload.get("drawing_id"))
+        if payload_drawing != drawing_id:
+            continue
+        run_id = _parse_optional_int(payload.get("inspection_run_id"))
+        if run_id is not None:
+            run_ids.add(run_id)
+    return run_ids
+
+
+def enqueue_rematch_after_master_reindex(session: Session, drawing_id: int) -> int:
+    """Re-place inspection overlays after the master sheet index changes.
+
+    Geometry from the previous index is hidden until these match jobs finish
+    and stamp the overlay with the new ``indexed_at``.
+    """
+    drawing = session.get(Drawing, drawing_id)
+    if drawing is None or cast(str, drawing.index_status) != "ready":
+        return 0
+
+    project_id = cast(int, drawing.project_id)
+    overlays = (
+        session.query(DrawingOverlay)
+        .filter(DrawingOverlay.master_drawing_id == drawing_id)
+        .all()
+    )
+    run_ids = {cast(int, overlay.inspection_run_id) for overlay in overlays}
+    if not run_ids:
+        return 0
+
+    pending = _pending_match_run_ids(session, project_id, drawing_id)
+    enqueued = 0
+    for run_id in sorted(run_ids):
+        if run_id in pending:
+            continue
+        run = session.get(InspectionRun, run_id)
+        if run is None:
+            continue
+        evidence_id = getattr(run, "evidence_id", None)
+        if evidence_id is None:
+            continue
+        try:
+            enqueue_inspection_match_job(
+                session,
+                project_id=project_id,
+                inspection_id=str(evidence_id),
+                drawing_id=drawing_id,
+                page=1,
+                inspection_run_id=run_id,
+                match_only=True,
+            )
+        except Exception:
+            logger.exception(
+                "inspection_rematch_after_reindex_failed",
+                extra={"drawing_id": drawing_id, "inspection_run_id": run_id},
+            )
+            continue
+        enqueued += 1
     return enqueued
 
 
@@ -646,7 +723,14 @@ def run_inspection_match_job(payload: dict[str, Any], session: Session) -> Match
             )
     except Exception as exc:
         session.rollback()
-        finalize_inspection_run_for_job_failure(payload, str(exc))
+        from services.inspection_placement_errors import InspectionPlacementError
+
+        message = (
+            exc.format_message()
+            if isinstance(exc, InspectionPlacementError)
+            else str(exc)
+        )
+        finalize_inspection_run_for_job_failure(payload, message)
         raise
 
 

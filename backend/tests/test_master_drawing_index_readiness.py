@@ -6,8 +6,10 @@ from typing import cast
 
 from models.drawing_region import DrawingRegion
 from models.models import Drawing
+from services.inspection_placement_errors import MASTER_SHEET_GRAPH_MISSING
 from services.master_drawing_index_readiness import get_master_drawing_index_readiness
 from services.storage import StorageService
+from tests.test_master_sheet_line_inventory import _placable_stats
 
 
 def test_readiness_pending_when_index_not_ready(db_session, project) -> None:
@@ -42,6 +44,7 @@ def test_readiness_ready_when_indexed_with_regions(db_session, project) -> None:
     row = db_session.get(Drawing, drawing_id)
     assert row is not None
     setattr(row, "index_status", "ready")
+    setattr(row, "index_stats_json", _placable_stats(drawing_id=drawing_id))
     storage.create_drawing_region(
         drawing_id,
         label="COLO",
@@ -55,6 +58,35 @@ def test_readiness_ready_when_indexed_with_regions(db_session, project) -> None:
     assert readiness.is_ready_for_matching is True
     assert readiness.upload_response_status == "ready"
     assert readiness.region_count == 1
+
+
+def test_readiness_not_ready_when_index_ready_but_no_sheet_lines(db_session, project) -> None:
+    storage = StorageService(db_session)
+    drawing = storage.create_drawing(
+        project_id=cast(int, project.id),
+        source="upload",
+        name="Master.pdf",
+        storage_key="projects/1/drawings/master-no-lines.pdf",
+        content_type="application/pdf",
+    )
+    drawing_id = cast(int, drawing.id)
+    row = db_session.get(Drawing, drawing_id)
+    assert row is not None
+    setattr(row, "index_status", "ready")
+    setattr(row, "index_stats_json", {})
+    storage.create_drawing_region(
+        drawing_id,
+        label="COLO",
+        geometry={"type": "rect", "x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2},
+        location_tags=["COLO"],
+    )
+    db_session.commit()
+
+    readiness = get_master_drawing_index_readiness(db_session, drawing_id)
+
+    assert readiness.is_ready_for_matching is False
+    assert readiness.upload_response_status == "pending"
+    assert readiness.sheet_line_blocker_code == MASTER_SHEET_GRAPH_MISSING
 
 
 def test_readiness_not_ready_when_index_ready_but_no_regions(db_session, project) -> None:

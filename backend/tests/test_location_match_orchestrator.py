@@ -117,7 +117,7 @@ def test_select_best_location_match_ignores_candidates_without_bbox() -> None:
     assert winner.method == ResolutionMethod.STATION_LOOKUP
 
 
-def test_match_status_from_result_contour_always_needs_review() -> None:
+def test_match_status_from_result_contour_is_matched() -> None:
     result = LocationMatchResult(
         master_drawing_id=661,
         method=ResolutionMethod.CONTOUR_MATCH,
@@ -125,14 +125,14 @@ def test_match_status_from_result_contour_always_needs_review() -> None:
         bbox_fractional=(0.1, 0.1, 0.2, 0.2),
         page=1,
     )
-    assert match_status_from_result(result) == "needs_review"
+    assert match_status_from_result(result) == "matched"
 
 
-def test_match_status_from_result_coordinate_matched_at_threshold() -> None:
+def test_match_status_from_result_coordinate_matched_below_threshold() -> None:
     result = LocationMatchResult(
         master_drawing_id=661,
         method=ResolutionMethod.COORDINATE_LOOKUP,
-        confidence=MATCH_SCORE_THRESHOLD,
+        confidence=MATCH_SCORE_THRESHOLD - 0.2,
         bbox_fractional=(0.1, 0.1, 0.2, 0.2),
         page=1,
     )

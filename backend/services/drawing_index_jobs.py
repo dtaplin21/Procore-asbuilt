@@ -29,6 +29,7 @@ from models.drawing_text_element import DrawingTextElement
 from models.models import Drawing, DrawingRendition, JobQueue, Project, User, UserCompany
 from observability.workflow_logging import log_job_status_transition
 from services.inspection_matching_jobs import (
+    enqueue_rematch_after_master_reindex,
     flush_deferred_inspection_matches_for_drawing,
     flush_inspection_matches_for_linked_auxiliary_drawing,
 )
@@ -334,7 +335,7 @@ def _rendition_png_for_page(session: Session, drawing_id: int, page: int) -> Pat
 def maybe_digitize_drawing_after_index(session: Session, drawing_id: int) -> None:
     """Optionally digitize pages after OCR index (non-blocking for the index job).
 
-    Controlled by ``SHEET_DIGITIZATION_ENABLED`` (default false). Failures are
+    Controlled by ``SHEET_DIGITIZATION_ENABLED`` (default true). Failures are
     logged and never raised to the caller — missing YOLO weights must not fail index.
     """
     if not settings.sheet_digitization_enabled:
@@ -428,6 +429,7 @@ def run_drawing_index_job(drawing_id: int, session: Session) -> IndexResult:
         apply_viewport_scale_promotion(session, drawing)
         session.commit()
         flush_deferred_inspection_matches_for_drawing(session, drawing_id)
+        enqueue_rematch_after_master_reindex(session, drawing_id)
         flush_inspection_matches_for_linked_auxiliary_drawing(session, drawing_id)
         return result
     except Exception as exc:

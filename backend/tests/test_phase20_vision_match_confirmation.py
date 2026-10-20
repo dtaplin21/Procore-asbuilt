@@ -115,5 +115,5 @@ def test_match_status_endpoint_does_not_expose_candidate_score(
     body = response.json()
 
     assert response.status_code == 200
-    assert body["match_status"] == "needs_review"
+    assert body["match_status"] == "matched"
     assert contains_forbidden_frontend_score_fields(body) == []

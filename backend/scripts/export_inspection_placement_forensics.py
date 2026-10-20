@@ -37,6 +37,7 @@ from models.drawing_text_element import DrawingTextElement
 from models.inspection_run import InspectionRun
 from models.models import Drawing, EvidenceRecord
 from services.inspection_index_export import build_inspection_index_inventory
+from services.master_sheet_line_inventory import get_master_sheet_line_inventory
 from services.storage import storage_key_to_abs_path
 
 _PREVIEW = 4000
@@ -62,6 +63,9 @@ def export_forensics(session, *, run_id: int) -> dict[str, Any]:
         "master_drawing_id": master_id,
         "run_status": run.status,
         "run_error": run.error_message,
+        "master_sheet_line_inventory": get_master_sheet_line_inventory(
+            session, master_id, page=1
+        ).to_dict(),
     }
 
     try:
@@ -326,7 +330,7 @@ def _placement_blockers(report: dict[str, Any]) -> list[str]:
     meta = po.get("meta") or {}
     if meta.get("match_status") == "needs_review":
         blockers.append(
-            "Match status is needs_review (below auto-accept threshold or ambiguous scope)."
+            "Legacy overlay match_status needs_review (re-run match to refresh as matched)."
         )
     geom = po.get("geometry") or {}
     gmeta = geom.get("meta") or {}

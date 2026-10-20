@@ -32,6 +32,7 @@ from services.inspection_matching_jobs import (
     maybe_enqueue_inspection_match_after_extraction,
     run_inspection_match_job,
 )
+from tests.test_master_sheet_line_inventory import _placable_stats
 
 
 def _unique() -> str:
@@ -297,12 +298,12 @@ def test_run_inspection_match_job_matched(mock_agent_cls, db: Session):
 
 
 @patch("services.inspection_matching_jobs.InspectionLocationAgent")
-def test_run_inspection_match_job_weak_match_needs_review(mock_agent_cls, db: Session):
+def test_run_inspection_match_job_weak_match_still_placed(mock_agent_cls, db: Session):
     run, file_id = _seed_run(db)
     master_drawing_id = cast(int, run.master_drawing_id)
     mock_agent = mock_agent_cls.return_value
-    needs_review = AgentMatchResult(
-        status="needs_review",
+    weak_match = AgentMatchResult(
+        status="matched",
         scope=ScopeGeometry(
             page=1,
             type="rect",
@@ -323,7 +324,7 @@ def test_run_inspection_match_job_weak_match_needs_review(mock_agent_cls, db: Se
         master_drawing_id=kwargs["master_drawing_id"],
         page=kwargs.get("page", 1),
         inspection_run_id=kwargs.get("inspection_run_id"),
-        result=needs_review,
+        result=weak_match,
     )
 
     status = run_inspection_match_job(
@@ -335,14 +336,15 @@ def test_run_inspection_match_job_weak_match_needs_review(mock_agent_cls, db: Se
         db,
     )
 
-    assert status == "needs_review"
+    assert status == "matched"
     overlay = (
         db.query(DrawingOverlay)
         .filter(DrawingOverlay.inspection_run_id == run.id)
         .one()
     )
     meta = cast(dict, overlay.meta)
-    assert meta["match_status"] == "needs_review"
+    assert meta["match_status"] == "matched"
+    assert overlay.geometry is not None
 
 
 @patch("services.inspection_matching_jobs.InspectionLocationAgent")
@@ -569,6 +571,7 @@ def test_flush_deferred_inspection_matches_enqueues_after_index(db: Session) -> 
 
     drawing = db.query(Drawing).filter(Drawing.id == drawing_id).one()
     setattr(drawing, "index_status", "ready")
+    setattr(drawing, "index_stats_json", _placable_stats(drawing_id=drawing_id))
     from services.storage import StorageService
 
     storage = StorageService(db)
@@ -598,6 +601,7 @@ def test_flush_linked_auxiliary_drawing_re_enqueues_match(db: Session) -> None:
 
     master = db.query(Drawing).filter(Drawing.id == master_id).one()
     setattr(master, "index_status", "ready")
+    setattr(master, "index_stats_json", _placable_stats(drawing_id=master_id))
     from services.storage import StorageService
 
     storage = StorageService(db)

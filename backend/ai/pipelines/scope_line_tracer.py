@@ -35,6 +35,8 @@ _PLAN_VIEW_MIN_Y = 0.10
 _SHEET_LINE_HIGH_CONFIDENCE = 0.7
 # Break ties vs. legacy untyped lines when a typed line already matched legend codes.
 _TYPED_SHEET_LINE_MATCH_BONUS = 0.2
+# Full plan band used when anchor-local SheetLine search misses.
+_MASTER_PLAN_PLACEMENT_ANCHOR = (0.12, 0.22, 0.92, 0.78)
 
 
 @dataclass(frozen=True)
@@ -312,6 +314,94 @@ def _trace_utility_line(
     )
 
 
+def resolve_master_sheet_line_scope(
+    session: Session,
+    *,
+    dossier: EvidenceDossier,
+    master_drawing_id: int,
+    page: int,
+    anchor_bbox: tuple[float, float, float, float],
+    strict: bool | None = None,
+) -> ScopeGeometry:
+    """Snap inspection placement to a digitized SheetLine on the master plan only."""
+    if strict is None:
+        from services.inspection_placement_errors import placement_strict_enabled
+
+        strict = placement_strict_enabled()
+
+    legend_codes = _utility_legend_codes(dossier, session=session)
+    base_meta: dict[str, Any] = {
+        "source": "sheet_line",
+        "legend_codes": sorted(legend_codes),
+    }
+    if strict:
+        search_passes: list[
+            tuple[tuple[float, float, float, float], float, bool, str | None]
+        ] = [
+            (
+                _expand_bbox(anchor_bbox, _ANCHOR_PADDING),
+                _SHEET_LINE_HIGH_CONFIDENCE,
+                True,
+                None,
+            ),
+        ]
+    else:
+        search_passes = [
+            (_expand_bbox(anchor_bbox, _ANCHOR_PADDING), _SHEET_LINE_HIGH_CONFIDENCE, True, None),
+            (
+                _expand_bbox(anchor_bbox, _ANCHOR_PADDING * 4.0),
+                _SHEET_LINE_HIGH_CONFIDENCE,
+                True,
+                "wide_anchor",
+            ),
+            (_MASTER_PLAN_PLACEMENT_ANCHOR, 0.45, True, "plan_corridor"),
+            (_MASTER_PLAN_PLACEMENT_ANCHOR, 0.25, True, "plan_corridor_relaxed"),
+            (_MASTER_PLAN_PLACEMENT_ANCHOR, 0.15, False, "plan_any_line"),
+        ]
+    for expanded, min_confidence, use_legend, search_tag in search_passes:
+        candidate = _best_plan_sheet_line(
+            session,
+            drawing_id=int(master_drawing_id),
+            page=page,
+            expanded_anchor=expanded,
+            legend_codes=legend_codes if use_legend else set(),
+            min_confidence=min_confidence,
+        )
+        if candidate is None:
+            continue
+        points, viewport_id, confidence = candidate
+        meta = {
+            **base_meta,
+            "viewport_id": viewport_id,
+            "sheet_line_confidence": confidence,
+        }
+        if search_tag:
+            meta["sheet_line_search"] = search_tag
+        return scope_line_segments(
+            page=page,
+            points=points,
+            scope_kind=ScopeKind.UTILITY_LINE,
+            meta=meta,
+        )
+    from services.master_sheet_line_inventory import (
+        get_master_sheet_line_inventory,
+        placement_failure_from_inventory,
+    )
+    from services.inspection_placement_errors import INSPECTION_NO_MASTER_SHEET_LINE
+
+    inventory = get_master_sheet_line_inventory(
+        session, int(master_drawing_id), page=page
+    )
+    failure = placement_failure_from_inventory(inventory)
+    if failure is not None:
+        code, message = failure
+        raise ValueError(f"[{code}] {message}")
+    raise ValueError(
+        f"[{INSPECTION_NO_MASTER_SHEET_LINE}] "
+        f"No plan SheetLine on master drawing {master_drawing_id} page {page} for placement"
+    )
+
+
 def _prefer_plan_sheet_line(
     *,
     session: Session | None,
@@ -321,6 +411,7 @@ def _prefer_plan_sheet_line(
     base_meta: dict[str, Any],
     source_drawing_id: int | None,
     legend_codes: set[str] | None = None,
+    min_confidence: float = _SHEET_LINE_HIGH_CONFIDENCE,
 ) -> ScopeGeometry | None:
     """Use high-confidence SheetLine polylines inside plan viewports over vision."""
     if session is None:
@@ -331,6 +422,7 @@ def _prefer_plan_sheet_line(
         page=page,
         expanded_anchor=expanded_anchor,
         legend_codes=legend_codes or set(),
+        min_confidence=min_confidence,
     )
     if candidate is None:
         return None
@@ -380,6 +472,7 @@ def _best_plan_sheet_line(
     page: int,
     expanded_anchor: tuple[float, float, float, float],
     legend_codes: set[str] | None = None,
+    min_confidence: float = _SHEET_LINE_HIGH_CONFIDENCE,
 ) -> tuple[tuple[tuple[float, float], ...], str | None, float] | None:
     drawing = session.get(Drawing, int(drawing_id))
     if drawing is None:
@@ -436,7 +529,7 @@ def _best_plan_sheet_line(
             confidence = float(raw.get("confidence") or 0.0)
         except (TypeError, ValueError):
             continue
-        if confidence < _SHEET_LINE_HIGH_CONFIDENCE:
+        if confidence < min_confidence:
             continue
         if not _line_matches_utility_legend(raw, legend_codes=codes, session=session):
             continue

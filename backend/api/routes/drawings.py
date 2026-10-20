@@ -22,6 +22,7 @@ from models.schemas import (
 )
 from config import settings
 from services.drawing_index_jobs import enqueue_drawing_index_job
+from services.overlay_index_binding import overlay_response_for_index
 from services.drawing_index_api import (
     drawing_index_status_response,
     list_drawing_survey_points,
@@ -382,4 +383,5 @@ def list_drawing_overlays(
         master_drawing_id=drawing_id,
         inspection_run_id=inspection_run_id,
     )
-    return [DrawingOverlayResponse.model_validate(o) for o in overlays]
+    indexed_at = getattr(drawing, "indexed_at", None)
+    return [overlay_response_for_index(overlay, indexed_at) for overlay in overlays]

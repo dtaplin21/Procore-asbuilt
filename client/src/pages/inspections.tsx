@@ -3,6 +3,8 @@ import { useLocation, Link } from "wouter";
 import { ClipboardCheck, Filter, Loader2, Search } from "lucide-react";
 
 import InspectionRunRow from "@/components/drawing-workspace/inspection_run_row";
+import InspectionRunProgressPanel from "@/components/drawing-workspace/inspection_run_progress_panel";
+import { useInspectionRunProgress } from "@/hooks/use-inspection-run-progress";
 import InspectionUploadForm from "@/components/inspections/inspection_upload_form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,6 +28,7 @@ import { toast } from "@/hooks/use-toast";
 import { replaceDashboardProjectIdInUrl } from "@/lib/active_project";
 import {
   hasActiveInspectionRun,
+  pickInspectionProgressRun,
   pollWhileInspectionRunsActive,
 } from "@/lib/inspection-runs/active_run";
 import { buildObjectsUrlWithRun } from "@/lib/workspace-links";
@@ -75,6 +78,21 @@ export default function Inspections() {
 
   const pipelinePending = reindexPending || rematchPending;
   const pipelinePendingRunId = reindexRunId ?? rematchRunId ?? null;
+
+  const progressRun = useMemo(
+    () =>
+      pickInspectionProgressRun(runs, {
+        pipelinePendingRunId,
+      }),
+    [runs, pipelinePendingRunId],
+  );
+
+  const { data: runProgress, isLoading: runProgressLoading } = useInspectionRunProgress(
+    selectedProjectId,
+    progressRun,
+    { pipelinePendingRunId },
+  );
+
   const pipelinePendingAction = reindexPending
     ? "reindex"
     : rematchPending
@@ -313,7 +331,15 @@ export default function Inspections() {
           </CardContent>
         </Card>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <>
+          {progressRun ? (
+            <InspectionRunProgressPanel
+              progress={runProgress}
+              isLoading={runProgressLoading}
+              isActive
+            />
+          ) : null}
+          <ul className="flex flex-col gap-2">
           {filteredRuns.map((run) => (
             <InspectionRunRow
               key={run.id}
@@ -328,7 +354,8 @@ export default function Inspections() {
               pipelinePendingAction={pipelinePendingAction}
             />
           ))}
-        </ul>
+          </ul>
+        </>
       )}
 
       {selectedProjectId != null && hasActiveInspectionRun(runs) ? (

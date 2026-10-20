@@ -329,11 +329,7 @@ def select_best_location_match(
 def match_status_from_result(result: LocationMatchResult) -> MatchStatus:
     if result.method == ResolutionMethod.UNRESOLVED:
         return "no_match"
-    if result.method == ResolutionMethod.CONTOUR_MATCH:
-        return "needs_review"
-    if result.confidence >= MATCH_SCORE_THRESHOLD:
-        return "matched"
-    return "needs_review"
+    return "matched"
 
 
 def _normalize_station(value: str | None) -> str | None:

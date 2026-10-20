@@ -54,7 +54,7 @@ Master drawing auto-index::
 Sheet digitization (optional symbol YOLO)::
 
     SYMBOL_DETECTOR_WEIGHTS_PATH           # path to .pt/.onnx weights; unset → symbols=[]
-    SHEET_DIGITIZATION_ENABLED             # default false — run digitize after OCR index
+    SHEET_DIGITIZATION_ENABLED             # unset → true (set false to disable digitize after index)
 
 Google Document AI (master drawing batch OCR — see Notes/ai google implementation.md)::
 
@@ -171,6 +171,12 @@ class Settings(BaseSettings):
         default=True,
         description="INSPECTION_INDEX_ALIGN_WITH_MASTER",
     )
+    #: Fail inspection match when placement would use fallbacks (no synthetic anchors / relaxed sheet lines).
+    #: Unset env defaults to ``false``. Env: ``INSPECTION_PLACEMENT_STRICT``.
+    inspection_placement_strict: Optional[bool] = Field(
+        default=None,
+        description="INSPECTION_PLACEMENT_STRICT",
+    )
 
     #: Enable master drawing auto-index jobs. Env: ``DRAWING_INDEX_ENABLED``.
     drawing_index_enabled: bool = Field(default=True, description="DRAWING_INDEX_ENABLED")
@@ -235,9 +241,9 @@ class Settings(BaseSettings):
         description="SYMBOL_DETECTOR_WEIGHTS_PATH",
     )
     #: After successful OCR index, optionally run ``digitize_drawing_page`` (D-2).
-    #: Default false — enable only after viewports are seeded. Env: ``SHEET_DIGITIZATION_ENABLED``.
-    sheet_digitization_enabled: bool = Field(
-        default=False,
+    #: Unset env defaults to ``true`` (run digitize after OCR index). Env: ``SHEET_DIGITIZATION_ENABLED``.
+    sheet_digitization_enabled: Optional[bool] = Field(
+        default=None,
         description="SHEET_DIGITIZATION_ENABLED",
     )
 
@@ -402,6 +408,18 @@ class Settings(BaseSettings):
     def _never_insecure_db_ssl_in_production(self) -> "Settings":
         if self.app_env == "production" and self.database_ssl_insecure_dev:
             object.__setattr__(self, "database_ssl_insecure_dev", False)
+        return self
+
+    @model_validator(mode="after")
+    def _default_inspection_placement_strict(self) -> "Settings":
+        if self.inspection_placement_strict is None:
+            object.__setattr__(self, "inspection_placement_strict", False)
+        return self
+
+    @model_validator(mode="after")
+    def _default_sheet_digitization_enabled(self) -> "Settings":
+        if self.sheet_digitization_enabled is None:
+            object.__setattr__(self, "sheet_digitization_enabled", True)
         return self
 
     @model_validator(mode="after")
