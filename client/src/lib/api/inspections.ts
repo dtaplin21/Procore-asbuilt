@@ -75,6 +75,7 @@ function mapEvidenceUploadResponse(data: {
     master_index_status:
       data.master_index_status === "ready" ||
       data.master_index_status === "processing" ||
+      data.master_index_status === "needs_review" ||
       data.master_index_status === "failed"
         ? data.master_index_status
         : "pending",

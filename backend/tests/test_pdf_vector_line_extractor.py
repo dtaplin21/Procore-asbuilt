@@ -94,6 +94,67 @@ def test_dashed_shape_has_multiple_segments_and_non_solid_kind(tmp_path: Path) -
     assert chains[0].style.kind_guess in {"dashed", "dash_dot", "unknown"}
 
 
+def test_dark_fill_is_owned_as_unclassified_symbol(tmp_path: Path) -> None:
+    from ai.pipelines.pdf_vector_line_extractor import extract_pdf_fill_symbols
+
+    pdf_path = tmp_path / "fill.pdf"
+    doc = fitz.open()
+    page = doc.new_page(width=800, height=600)
+    shape = page.new_shape()
+    shape.draw_rect(fitz.Rect(120, 140, 180, 200))
+    shape.finish(color=(0, 0, 0), fill=(0.2, 0.2, 0.2), width=0)
+    shape.commit()
+    page.draw_rect(fitz.Rect(300, 300, 360, 340), color=(0, 0, 0), fill=(1, 1, 1), width=0)
+    doc.save(str(pdf_path))
+    doc.close()
+
+    symbols = extract_pdf_fill_symbols(pdf_path)
+
+    assert len(symbols) == 1
+    assert symbols[0].detector == "pdf_fill"
+    assert symbols[0].symbol_class == "unclassified_fill"
+    assert symbols[0].bbox_fractional[0] < 0.2
+
+
+def test_hairline_segment_is_kept(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "hairline.pdf"
+    doc = fitz.open()
+    page = doc.new_page(width=800, height=600)
+    # 0.3 pt on an 800 pt page is 0.000375, under the old 0.0005 cutoff.
+    page.draw_line((100, 100), (100.3, 100), width=0.2, color=(0, 0, 0))
+    doc.save(str(pdf_path))
+    doc.close()
+
+    segments = extract_pdf_vector_segments(pdf_path)
+    chains = extract_pdf_vector_chains(pdf_path)
+
+    assert segments
+    assert chains
+    assert chains[0].points[0] != chains[0].points[-1]
+
+
+def test_curve_and_rect_are_kept_as_segments(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "curve.pdf"
+    doc = fitz.open()
+    page = doc.new_page(width=800, height=600)
+    shape = page.new_shape()
+    shape.draw_bezier(
+        fitz.Point(80, 200),
+        fitz.Point(200, 80),
+        fitz.Point(400, 320),
+        fitz.Point(600, 200),
+    )
+    shape.draw_rect(fitz.Rect(100, 100, 220, 180))
+    shape.finish(color=(0, 0, 0), width=1.0)
+    shape.commit()
+    doc.save(str(pdf_path))
+    doc.close()
+
+    segments = extract_pdf_vector_segments(pdf_path)
+
+    assert len(segments) >= 5
+
+
 def test_extract_segments_on_rotated_page_stays_in_fractional_range(tmp_path: Path) -> None:
     pdf_path = tmp_path / "rotated.pdf"
     doc = fitz.open()

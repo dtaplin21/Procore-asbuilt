@@ -225,9 +225,15 @@ class InspectionLocationAgent:
             source = scope.meta.get("source")
             if source:
                 rationale = f"{rationale} | scope={source}"
+            if scope.meta.get("anchor_intersects_line") is False:
+                rationale = f"{rationale} | anchor_intersects_line=false"
+
+        placement_status = "matched"
+        if not strict and (scope.meta or {}).get("anchor_intersects_line") is False:
+            placement_status = "needs_review"
 
         result = AgentMatchResult(
-            status="matched",
+            status=placement_status,
             scope=scope,
             region_id=winner.candidate.region_id,
             page=winner.candidate.page,

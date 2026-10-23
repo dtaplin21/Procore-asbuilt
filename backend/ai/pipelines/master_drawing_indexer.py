@@ -649,6 +649,12 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
     )
 
     gaps_noticed: list[str] = []
+    merge_pipeline_stats_frame: dict[str, Any] = {
+        "outcome": "INSUFFICIENT",
+        "reason": "NO_FRAME_REPORT",
+        "compared": None,
+        "agreement": None,
+    }
     frame_report = (
         document_ai_stats.get("native_docai_frame_agreement")
         if isinstance(document_ai_stats, dict)
@@ -667,6 +673,21 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
                 "native_pdf tokens disagree with Document AI positions "
                 "(rotation/frame bug) — native positions not trusted"
             )
+            # FRAME check: disagreement blocks the drawing-level scale. Viewport scales stay.
+            scale_json = None
+            merge_pipeline_stats_frame = {
+                "outcome": "WARN",
+                "reason": "FRAME_DISAGREE",
+                "compared": compared,
+                "agreement": float(agreement),
+            }
+        else:
+            merge_pipeline_stats_frame = {
+                "outcome": "OK",
+                "reason": "CORROBORATED" if isinstance(agreement, (int, float)) else "FEW_WORDS",
+                "compared": compared,
+                "agreement": agreement,
+            }
 
     scale_status = scale_resolution.get("status")
     if scale_status:
@@ -695,6 +716,7 @@ def index_master_drawing(drawing_id: int, session: Session) -> IndexResult:
     }
     if isinstance(frame_report, dict):
         merge_pipeline_stats["native_docai_frame_agreement"] = frame_report
+    merge_pipeline_stats["frame_check"] = merge_pipeline_stats_frame
     merge_pipeline_stats.update(merge_pipeline_stats_scale)
     if scale_resolution.get("other_scales"):
         merge_pipeline_stats["scale_other_view_local"] = [

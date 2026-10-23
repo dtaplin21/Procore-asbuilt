@@ -348,3 +348,35 @@ def test_process_drawing_render_job_chains_index_job(
             mock_enqueue.assert_called_once()
             assert mock_enqueue.call_args.kwargs["project_id"] == project_id
             assert mock_enqueue.call_args.kwargs["drawing_id"] == drawing_id
+
+
+def test_capture_failure_blocks_ready_status() -> None:
+    from unittest.mock import MagicMock
+
+    from services.drawing_index_jobs import apply_stage_checks_after_digitize
+
+    drawing = Drawing(
+        project_id=1,
+        source="upload",
+        name="sheet.pdf",
+        index_status="ready",
+        index_stats_json={
+            "frame_check": {"outcome": "OK", "reason": "CORROBORATED"},
+            "sheetEntityGraph": {
+                "1": {
+                    "symbols": [],
+                    "meta": {
+                        "capture_check": {"outcome": "FAILED", "reason": "CHAIN_CAP", "dropped": 4},
+                        "grounding_check": {"outcome": "WARN", "reason": "EMPTY_OUTPUT"},
+                    },
+                }
+            },
+        },
+    )
+    ready = apply_stage_checks_after_digitize(MagicMock(), drawing)
+    stats = cast(dict, drawing.index_stats_json)
+    assert ready is False
+    assert drawing.index_status == "failed"
+    assert stats["stageChecks"]["CAPTURE"]["outcome"] == "FAILED"
+    assert stats["stageChecks"]["GROUNDING"]["reason"] == "EMPTY_OUTPUT"
+    assert "CHAIN_CAP" in str(drawing.index_error)

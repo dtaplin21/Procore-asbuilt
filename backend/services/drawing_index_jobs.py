@@ -264,9 +264,11 @@ def index_inspection_attachment_drawing_sync(
         maybe_seed_viewports_after_index(session, drawing_id)
         maybe_digitize_drawing_after_index(session, drawing_id)
         apply_viewport_scale_promotion(session, drawing)
+        stays_ready = apply_stage_checks_after_digitize(session, drawing)
         session.commit()
-        flush_inspection_matches_for_linked_auxiliary_drawing(session, drawing_id)
-        return result
+        if stays_ready:
+            flush_inspection_matches_for_linked_auxiliary_drawing(session, drawing_id)
+        return result if stays_ready else None
     except Exception as exc:
         drawing.index_status = "failed"  # type: ignore[assignment]
         drawing.index_error = str(exc)  # type: ignore[assignment]
@@ -297,6 +299,51 @@ def index_linked_attachment_drawings_sync(
         if result is not None:
             indexed.append(drawing_id)
     return indexed
+
+
+def apply_stage_checks_after_digitize(session: Session, drawing: Drawing) -> bool:
+    """Record CAPTURE and GROUNDING on the index. A dropped chain means the index is not ready.
+
+    Returns True when the drawing can stay ``ready``.
+    """
+    stats_raw = drawing.index_stats_json
+    stats: dict[str, Any] = dict(stats_raw) if isinstance(stats_raw, dict) else {}
+    graphs = stats.get("sheetEntityGraph")
+    capture_failed: list[str] = []
+    grounding_pages: list[str] = []
+    if isinstance(graphs, dict):
+        for page, graph in graphs.items():
+            if not isinstance(graph, dict):
+                continue
+            meta = graph.get("meta") if isinstance(graph.get("meta"), dict) else {}
+            capture = meta.get("capture_check") if isinstance(meta.get("capture_check"), dict) else {}
+            if capture.get("outcome") == "FAILED":
+                capture_failed.append(f"page {page}: dropped {capture.get('dropped')}")
+            grounding = meta.get("grounding_check") if isinstance(meta.get("grounding_check"), dict) else {}
+            if grounding.get("outcome") == "WARN":
+                grounding_pages.append(str(page))
+    frame = stats.get("frame_check") if isinstance(stats.get("frame_check"), dict) else {}
+    stats["stageChecks"] = {
+        "CAPTURE": {
+            "outcome": "FAILED" if capture_failed else "OK",
+            "reason": "CHAIN_CAP" if capture_failed else "KEPT",
+            "detail": capture_failed,
+        },
+        "GROUNDING": {
+            "outcome": "WARN" if grounding_pages else "OK",
+            "reason": "EMPTY_OUTPUT" if grounding_pages else "HAS_SYMBOLS",
+            "pages": grounding_pages,
+        },
+        "FRAME": frame or {"outcome": "INSUFFICIENT", "reason": "NO_FRAME_REPORT"},
+    }
+    drawing.index_stats_json = stats  # type: ignore[assignment]
+    if capture_failed:
+        drawing.index_status = "failed"  # type: ignore[assignment]
+        drawing.index_error = ("CAPTURE CHAIN_CAP " + "; ".join(capture_failed))[:500]  # type: ignore[assignment]
+        session.flush()
+        return False
+    session.flush()
+    return True
 
 
 def _apply_index_result(drawing: Drawing, result: IndexResult) -> None:
@@ -427,10 +474,12 @@ def run_drawing_index_job(drawing_id: int, session: Session) -> IndexResult:
         maybe_seed_viewports_after_index(session, drawing_id)
         maybe_digitize_drawing_after_index(session, drawing_id)
         apply_viewport_scale_promotion(session, drawing)
+        stays_ready = apply_stage_checks_after_digitize(session, drawing)
         session.commit()
-        flush_deferred_inspection_matches_for_drawing(session, drawing_id)
-        enqueue_rematch_after_master_reindex(session, drawing_id)
-        flush_inspection_matches_for_linked_auxiliary_drawing(session, drawing_id)
+        if stays_ready:
+            flush_deferred_inspection_matches_for_drawing(session, drawing_id)
+            enqueue_rematch_after_master_reindex(session, drawing_id)
+            flush_inspection_matches_for_linked_auxiliary_drawing(session, drawing_id)
         return result
     except Exception as exc:
         drawing.index_status = "failed"  # type: ignore[assignment]

@@ -25,6 +25,7 @@ from models.drawing_text_element import DrawingTextElement
 from models.models import Drawing
 from services.legend_lookup import find_codes_for_term
 from services.location_match_eval import rect_iou
+from services.sheet_digitization import load_page_lines
 
 _ANCHOR_PADDING = 0.05
 _POINT_RECT_SIZE = 0.02
@@ -358,22 +359,48 @@ def resolve_master_sheet_line_scope(
             (_MASTER_PLAN_PLACEMENT_ANCHOR, 0.25, True, "plan_corridor_relaxed"),
             (_MASTER_PLAN_PLACEMENT_ANCHOR, 0.15, False, "plan_any_line"),
         ]
+    from services.inspection_placement_errors import (
+        INSPECTION_NO_ANCHOR_INTERSECTING_LINE,
+        INSPECTION_NO_MASTER_SHEET_LINE,
+    )
+
     for expanded, min_confidence, use_legend, search_tag in search_passes:
+        legend_set = legend_codes if use_legend else set()
+        require_intersect = bool(strict)
         candidate = _best_plan_sheet_line(
             session,
             drawing_id=int(master_drawing_id),
             page=page,
             expanded_anchor=expanded,
-            legend_codes=legend_codes if use_legend else set(),
+            legend_codes=legend_set,
             min_confidence=min_confidence,
+            require_anchor_intersection=require_intersect,
         )
+        if candidate is None and require_intersect:
+            near_miss = _best_plan_sheet_line(
+                session,
+                drawing_id=int(master_drawing_id),
+                page=page,
+                expanded_anchor=expanded,
+                legend_codes=legend_set,
+                min_confidence=min_confidence,
+                require_anchor_intersection=False,
+            )
+            if near_miss is not None:
+                raise ValueError(
+                    f"[{INSPECTION_NO_ANCHOR_INTERSECTING_LINE}] "
+                    f"No digitized SheetLine intersects the location anchor on master "
+                    f"drawing {master_drawing_id} page {page} (nearest-line fallback "
+                    f"disabled in strict placement)."
+                )
         if candidate is None:
             continue
-        points, viewport_id, confidence = candidate
+        points, viewport_id, confidence, anchor_intersects = candidate
         meta = {
             **base_meta,
             "viewport_id": viewport_id,
             "sheet_line_confidence": confidence,
+            "anchor_intersects_line": anchor_intersects,
         }
         if search_tag:
             meta["sheet_line_search"] = search_tag
@@ -387,7 +414,6 @@ def resolve_master_sheet_line_scope(
         get_master_sheet_line_inventory,
         placement_failure_from_inventory,
     )
-    from services.inspection_placement_errors import INSPECTION_NO_MASTER_SHEET_LINE
 
     inventory = get_master_sheet_line_inventory(
         session, int(master_drawing_id), page=page
@@ -426,12 +452,13 @@ def _prefer_plan_sheet_line(
     )
     if candidate is None:
         return None
-    points, viewport_id, confidence = candidate
+    points, viewport_id, confidence, anchor_intersects = candidate
     meta = {
         **base_meta,
         "source": "sheet_line",
         "viewport_id": viewport_id,
         "sheet_line_confidence": confidence,
+        "anchor_intersects_line": anchor_intersects,
     }
     if source_drawing_id is not None:
         meta["source_drawing_id"] = source_drawing_id
@@ -473,7 +500,8 @@ def _best_plan_sheet_line(
     expanded_anchor: tuple[float, float, float, float],
     legend_codes: set[str] | None = None,
     min_confidence: float = _SHEET_LINE_HIGH_CONFIDENCE,
-) -> tuple[tuple[tuple[float, float], ...], str | None, float] | None:
+    require_anchor_intersection: bool = False,
+) -> tuple[tuple[tuple[float, float], ...], str | None, float, bool] | None:
     drawing = session.get(Drawing, int(drawing_id))
     if drawing is None:
         return None
@@ -521,8 +549,8 @@ def _best_plan_sheet_line(
     anchor_cx = (ax0 + ax1) / 2.0
     anchor_cy = (ay0 + ay1) / 2.0
 
-    best: tuple[tuple[tuple[float, float], ...], str | None, float, float] | None = None
-    for raw in page_graph.get("lines") or []:
+    best: tuple[tuple[tuple[float, float], ...], str | None, float, float, bool] | None = None
+    for raw in load_page_lines(page_graph):
         if not isinstance(raw, dict):
             continue
         try:
@@ -552,17 +580,19 @@ def _best_plan_sheet_line(
         mid_x = sum(p[0] for p in points) / len(points)
         mid_y = sum(p[1] for p in points) / len(points)
         intersects = any(ax0 <= px <= ax1 and ay0 <= py <= ay1 for px, py in points)
+        if require_anchor_intersection and not intersects:
+            continue
         # Prefer lines that intersect the anchor; otherwise nearest midpoint.
         distance = 0.0 if intersects else ((mid_x - anchor_cx) ** 2 + (mid_y - anchor_cy) ** 2)
         score = distance - confidence  # lower is better
         if raw.get("line_type"):
             score -= _TYPED_SHEET_LINE_MATCH_BONUS
         if best is None or score < best[3]:
-            best = (tuple(points), str(viewport_id), confidence, score)
+            best = (tuple(points), str(viewport_id), confidence, score, intersects)
 
     if best is None:
         return None
-    return best[0], best[1], best[2]
+    return best[0], best[1], best[2], best[4]
 
 
 def _vision_trace_fallback(

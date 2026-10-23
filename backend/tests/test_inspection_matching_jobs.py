@@ -208,6 +208,59 @@ def test_run_inspection_match_job_calls_agent(
     )
 
 
+@patch("ai.agents.evidence_dossier.index_evidence_attachments")
+def test_index_only_finishes_indexed_not_complete(mock_index, db: Session) -> None:
+    mock_index.return_value = {"pdf_investigation_errors": []}
+    run, file_id = _seed_run(db)
+    setattr(run, "status", "processing")
+    db.commit()
+
+    status = run_inspection_match_job(
+        {
+            "inspection_id": file_id,
+            "drawing_id": str(cast(int, run.master_drawing_id)),
+            "page": 1,
+            "project_id": cast(int, run.project_id),
+            "inspection_run_id": cast(int, run.id),
+            "index_only": True,
+        },
+        db,
+    )
+
+    assert status == "no_match"
+    db.refresh(run)
+    assert run.status == "indexed"
+    assert run.error_message is None
+    progress = run.progress_json if isinstance(run.progress_json, dict) else {}
+    assert progress.get("current", {}).get("label") == "Indexed"
+
+
+@patch("ai.agents.evidence_dossier.index_evidence_attachments")
+def test_index_only_investigation_errors_fail_the_run(mock_index, db: Session) -> None:
+    mock_index.return_value = {"pdf_investigation_errors": ["link follow failed"]}
+    run, file_id = _seed_run(db)
+    setattr(run, "status", "processing")
+    db.commit()
+
+    status = run_inspection_match_job(
+        {
+            "inspection_id": file_id,
+            "drawing_id": str(cast(int, run.master_drawing_id)),
+            "page": 1,
+            "project_id": cast(int, run.project_id),
+            "inspection_run_id": cast(int, run.id),
+            "index_only": True,
+            "chain_match": True,
+        },
+        db,
+    )
+
+    assert status == "no_match"
+    db.refresh(run)
+    assert run.status == "failed"
+    assert run.error_message == "link follow failed"
+
+
 @patch("services.inspection_matching_jobs.InspectionLocationAgent")
 def test_run_inspection_match_job_force_investigate(mock_agent_cls, db: Session):
     run, file_id = _seed_run(db)

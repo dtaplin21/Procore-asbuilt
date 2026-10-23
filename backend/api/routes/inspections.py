@@ -203,7 +203,7 @@ def create_inspection_run(
 def list_inspection_runs(
     project_id: int,
     master_drawing_id: Optional[int] = Query(None, description="Filter by master drawing"),
-    status: Optional[str] = Query(None, description="Filter by status (queued, processing, complete, failed)"),
+    status: Optional[str] = Query(None, description="Filter by status (queued, processing, complete, indexed, failed)"),
     limit: int = Query(50, ge=1, le=100, description="Page size"),
     offset: int = Query(0, ge=0, description="Number of items to skip"),
     db: Session = Depends(get_db),

@@ -265,3 +265,34 @@ def test_digitize_uses_pdf_vector_lines_when_gated(
     assert graph.meta.get("pdf_line_source") == "vector"
     assert len(graph.lines) == 1
     assert graph.lines[0].source == "pdf_vector"
+
+
+def test_line_lists_past_the_inline_limit_move_to_a_file(tmp_path: Path, monkeypatch) -> None:
+    from services.sheet_digitization import INLINE_LINE_LIMIT, load_page_lines, partition_sheet_lines
+
+    lines = [{"points": [[0.1, 0.2], [0.3, 0.4]], "confidence": 0.9} for _ in range(INLINE_LINE_LIMIT + 1)]
+    slim, sidecar = partition_sheet_lines(
+        {"page": 1, "lines": lines, "labels": [{"text": "SS"}]},
+        project_id=1348,
+        drawing_id=1722,
+    )
+    assert slim["lines"] == []
+    assert slim["labels"] == [{"text": "SS"}]
+    assert slim["line_count"] == INLINE_LINE_LIMIT + 1
+    assert sidecar is not None
+    key, body = sidecar
+    assert key == "drawings/sheet-graph/project-1348/drawing-1722/page-1-lines.json"
+    path = tmp_path / "lines.json"
+    path.write_bytes(body)
+    monkeypatch.setattr("services.storage.storage_key_to_abs_path", lambda _key: path)
+
+    assert len(load_page_lines(slim)) == INLINE_LINE_LIMIT + 1
+
+    small, no_file = partition_sheet_lines(
+        {"page": 1, "lines": lines[:2]},
+        project_id=1348,
+        drawing_id=1722,
+    )
+    assert no_file is None
+    assert len(small["lines"]) == 2
+    assert "line_storage_key" not in small

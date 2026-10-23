@@ -12,7 +12,7 @@ from services.inspection_placement_errors import (
     MASTER_SHEET_GRAPH_MISSING,
     MASTER_SHEET_LINES_NOT_PLACABLE,
 )
-from services.sheet_digitization import SHEET_ENTITY_GRAPH_KEY
+from services.sheet_digitization import SHEET_ENTITY_GRAPH_KEY, load_page_lines
 
 # Keep in sync with scope_line_tracer plan-band heuristics.
 _PLAN_VIEW_MAX_Y = 0.55
@@ -117,7 +117,7 @@ def inventory_from_index_stats(
     )
     plan_bbox = _plan_viewport_bbox(page_graph)
 
-    raw_lines = page_graph.get("lines") or []
+    raw_lines = load_page_lines(page_graph)
     line_count = sum(1 for raw in raw_lines if isinstance(raw, dict))
 
     high_conf_plan = 0

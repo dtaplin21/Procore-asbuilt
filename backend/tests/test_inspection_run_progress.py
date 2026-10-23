@@ -66,3 +66,22 @@ def test_progress_reading_page_updates_json(db_session: Session, project: Projec
     assert payload["current"]["page"] == 3
     assert payload["current"]["page_total"] == 12
     assert "Reading page 3 of 12" in payload["current"]["label"]
+
+
+def test_index_finish_label_is_indexed(db_session: Session, project: Project) -> None:
+    run = _seed_run(db_session, project)
+    handle = InspectionProgressHandle(
+        db_session,
+        run_id=cast(int, run.id),
+        job_id=407,
+        mode="index",
+    )
+    handle.finish()
+    payload = get_run_progress(
+        db_session,
+        project_id=cast(int, project.id),
+        run_id=cast(int, run.id),
+    )
+    assert payload is not None
+    assert payload["current"]["label"] == "Indexed"
+    assert payload["mode"] == "index"

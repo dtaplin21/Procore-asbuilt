@@ -316,8 +316,10 @@ def select_chains_for_storage(
         items = sorted(tiers[t], key=lambda p: -p[0])
         counts[f"tier{t}"] = len(items)
         for _, idx in items:
-            if len(selected) < max_chains:
+            # Wanted line types stay even when they would exceed the storage cap.
+            if t == 1 or len(selected) < max_chains:
                 selected.append(idx)
     counts["selected"] = len(selected)
     counts["dropped"] = len(chains) - len(selected)
+    counts["wanted_dropped"] = 0
     return selected, counts

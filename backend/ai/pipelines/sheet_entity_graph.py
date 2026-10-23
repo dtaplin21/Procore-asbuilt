@@ -42,7 +42,7 @@ class SheetSymbol:
     bbox_fractional: tuple[float, float, float, float]
     viewport_id: str | None
     confidence: float
-    detector: str  # yolo | manual | contour
+    detector: str  # yolo | manual | contour | pdf_fill
 
 
 LineTypingStatus = Literal[

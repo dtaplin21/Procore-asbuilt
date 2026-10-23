@@ -29,6 +29,8 @@ class MasterDrawingIndexReadiness:
             return "ready"
         if self.index_status == "processing":
             return "processing"
+        if self.index_status == "needs_review":
+            return "needs_review"
         if self.index_status == "failed":
             return "failed"
         return "pending"

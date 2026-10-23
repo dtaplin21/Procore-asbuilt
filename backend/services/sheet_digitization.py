@@ -6,6 +6,7 @@ per-viewport ``scale_json`` — never sheet-global ``drawings.scale_json`` alone
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import asdict
 from pathlib import Path
@@ -35,6 +36,11 @@ logger = logging.getLogger(__name__)
 MAX_LABELS_PER_PAGE = 800
 SHEET_ENTITY_GRAPH_KEY = "sheetEntityGraph"
 MIN_VECTOR_CHAINS_BEFORE_RASTER_FALLBACK = 50
+# Past this, line geometry is a file. index_stats_json is returned on every
+# index-status poll, and 1722 is on the order of 80k chains.
+INLINE_LINE_LIMIT = 2000
+LINE_STORAGE_KEY = "line_storage_key"
+LINE_COUNT_KEY = "line_count"
 
 
 def _bbox_json_from_symbol(symbol: SheetSymbol | Mapping[str, Any]) -> dict[str, float]:
@@ -282,7 +288,6 @@ def _extract_lines(
     from ai.pipelines.legend_line_swatch import classify_chain_typings
     from ai.pipelines.pdf_line_source_gate import PdfLineSource, classify_pdf_line_source
     from ai.pipelines.pdf_vector_line_extractor import (
-        DEFAULT_MAX_CHAINS,
         chains_to_sheet_lines,
         extract_pdf_vector_chains,
     )
@@ -305,7 +310,7 @@ def _extract_lines(
             "stroked_path_count": line_stats.stroked_path_count,
         }
         if source is PdfLineSource.VECTOR:
-            chains = extract_pdf_vector_chains(pdf_path, page=page, max_chains=10**9)
+            chains = extract_pdf_vector_chains(pdf_path, page=page, max_chains=None)
             if len(chains) >= MIN_VECTOR_CHAINS_BEFORE_RASTER_FALLBACK:
                 typings = classify_chain_typings(chains, list(dash_templates))
                 plan_bbox: tuple[float, float, float, float] | None = None
@@ -355,14 +360,25 @@ def _extract_lines(
                     )
                     line_meta["label_seeded_trace"] = trace_stats
                 line_meta["chain_typing_counts"] = dict(Counter(t.status for t in typings))
+                wanted_type_ids = tuple(tpl.legend_line_type_id for tpl in dash_templates)
+                # Keep every chain, including hairlines. A 2000 cap dropped more than
+                # half the stroked items on Master.pdf and the audit counted them missing.
                 keep_indices, tier_counts = select_chains_for_storage(
                     chains,
                     typings,
                     plan_bbox=plan_bbox,
-                    wanted_type_ids=(),
-                    max_chains=DEFAULT_MAX_CHAINS,
+                    wanted_type_ids=wanted_type_ids,
+                    max_chains=len(chains),
                 )
                 line_meta["chain_storage_tiers"] = tier_counts
+                dropped = int(tier_counts.get("dropped") or 0)
+                line_meta["capture_check"] = {
+                    "outcome": "FAILED" if dropped else "OK",
+                    "reason": "CHAIN_CAP" if dropped else "KEPT",
+                    "kept": int(tier_counts.get("selected") or 0),
+                    "dropped": dropped,
+                    "wanted_dropped": int(tier_counts.get("wanted_dropped") or 0),
+                }
                 lines: list[SheetLine] = []
                 for idx in keep_indices:
                     chain = chains[idx]
@@ -404,6 +420,57 @@ def sheet_entity_graph_to_json(graph: SheetEntityGraph) -> dict[str, Any]:
     }
 
 
+def sheet_line_storage_key(project_id: int, drawing_id: int, page: int) -> str:
+    return (
+        f"drawings/sheet-graph/project-{int(project_id)}"
+        f"/drawing-{int(drawing_id)}/page-{int(page)}-lines.json"
+    )
+
+
+def partition_sheet_lines(
+    payload: dict[str, Any],
+    *,
+    project_id: int,
+    drawing_id: int,
+) -> tuple[dict[str, Any], tuple[str, bytes] | None]:
+    """Keep small line lists on the drawing row. Write larger ones to a file.
+
+    Returns the payload to store in ``index_stats_json`` and, when the lines
+    do not fit inline, ``(storage_key, file_bytes)``.
+    """
+    lines = payload.get("lines") if isinstance(payload.get("lines"), list) else []
+    out = dict(payload)
+    out[LINE_COUNT_KEY] = len(lines)
+    if len(lines) <= INLINE_LINE_LIMIT:
+        out.pop(LINE_STORAGE_KEY, None)
+        return out, None
+    page = int(payload.get("page") or 1)
+    key = sheet_line_storage_key(project_id, drawing_id, page)
+    body = json.dumps({"lines": lines}, separators=(",", ":")).encode("utf-8")
+    out["lines"] = []
+    out[LINE_STORAGE_KEY] = key
+    return out, (key, body)
+
+
+def load_page_lines(page_graph: dict[str, Any] | None) -> list[Any]:
+    """Line dicts for one page, from the sidecar file or from the inline list."""
+    if not isinstance(page_graph, dict):
+        return []
+    key = page_graph.get(LINE_STORAGE_KEY)
+    if isinstance(key, str) and key.strip():
+        from services.storage import storage_key_to_abs_path
+
+        path = storage_key_to_abs_path(key)
+        if not path.is_file():
+            logger.warning("sheet_lines_file_missing", extra={"storage_key": key})
+            return []
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        lines = raw.get("lines") if isinstance(raw, dict) else None
+        return lines if isinstance(lines, list) else []
+    lines = page_graph.get("lines")
+    return lines if isinstance(lines, list) else []
+
+
 def persist_sheet_entity_graph(
     session: Session,
     drawing_id: int,
@@ -412,7 +479,11 @@ def persist_sheet_entity_graph(
     """Store graph under ``drawing.index_stats_json['sheetEntityGraph'][page]``.
 
     Drawing has no dedicated ``meta`` column; index_stats_json is the v1 sink.
+    Line geometry above ``INLINE_LINE_LIMIT`` is a file next to the PDF. The
+    drawing row keeps ``line_count`` and ``line_storage_key``.
     """
+    from services.storage import storage_key_to_abs_path, write_bytes_to_storage_key
+
     drawing = session.get(Drawing, int(drawing_id))
     if drawing is None:
         raise ValueError(f"Drawing {drawing_id} not found")
@@ -424,7 +495,22 @@ def persist_sheet_entity_graph(
 
     by_page = stats.get(SHEET_ENTITY_GRAPH_KEY)
     graphs: dict[str, Any] = dict(by_page) if isinstance(by_page, dict) else {}
-    graphs[str(graph.page)] = sheet_entity_graph_to_json(graph)
+    previous = graphs.get(str(graph.page))
+    previous_key = previous.get(LINE_STORAGE_KEY) if isinstance(previous, dict) else None
+    project_id = int(drawing.project_id) if drawing.project_id is not None else 0
+    payload, sidecar = partition_sheet_lines(
+        sheet_entity_graph_to_json(graph),
+        project_id=project_id,
+        drawing_id=int(drawing_id),
+    )
+    if sidecar is not None:
+        key, body = sidecar
+        write_bytes_to_storage_key(key, body)
+    elif isinstance(previous_key, str) and previous_key.strip():
+        old_path = storage_key_to_abs_path(previous_key)
+        if old_path.is_file():
+            old_path.unlink()
+    graphs[str(graph.page)] = payload
     stats[SHEET_ENTITY_GRAPH_KEY] = graphs
     drawing.index_stats_json = stats  # type: ignore[assignment]
     session.flush()
@@ -494,6 +580,12 @@ def digitize_drawing_page(
         )
         for symbol in symbols
     ]
+    if pdf_path is not None:
+        from ai.pipelines.pdf_vector_line_extractor import extract_pdf_fill_symbols
+
+        symbols.extend(
+            extract_pdf_fill_symbols(pdf_path, page=int(page), viewports=viewports)
+        )
 
     associations = associate_labels_to_symbols(
         labels,
@@ -501,6 +593,14 @@ def digitize_drawing_page(
         legend_session=session,
         project_id=resolved_project_id,
     )
+    classified = [symbol for symbol in symbols if symbol.detector != "pdf_fill"]
+    fill_owned = [symbol for symbol in symbols if symbol.detector == "pdf_fill"]
+    meta["grounding_check"] = {
+        "outcome": "WARN" if not classified else "OK",
+        "reason": "EMPTY_OUTPUT" if not classified else "HAS_SYMBOLS",
+        "symbol_count": len(classified),
+        "fill_owned_count": len(fill_owned),
+    }
 
     graph = SheetEntityGraph(
         drawing_id=int(drawing_id),
@@ -528,13 +628,23 @@ def digitize_drawing_page(
 
     if persist:
         persist_sheet_entity_graph(session, int(drawing_id), graph)
-        if symbols:
+        detected = [symbol for symbol in symbols if symbol.detector != "pdf_fill"]
+        fill_owned = [symbol for symbol in symbols if symbol.detector == "pdf_fill"]
+        if detected:
             upsert_drawing_symbols(
                 session,
                 int(drawing_id),
-                symbols,
+                detected,
                 page=int(page),
                 replace_detector="yolo",
+            )
+        if fill_owned:
+            upsert_drawing_symbols(
+                session,
+                int(drawing_id),
+                fill_owned,
+                page=int(page),
+                replace_detector="pdf_fill",
             )
 
     return graph

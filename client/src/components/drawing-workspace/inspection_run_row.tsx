@@ -45,6 +45,7 @@ const STATUS_LABEL: Record<string, string> = {
   queued: "Queued",
   processing: "Processing…",
   complete: "Complete",
+  indexed: "Indexed",
   failed: "Failed",
 };
 
@@ -74,6 +75,7 @@ function statusVariant(
 ): "default" | "secondary" | "destructive" | "outline" {
   const normalized = status.toLowerCase();
   if (normalized === "complete") return "default";
+  if (normalized === "indexed") return "outline";
   if (normalized === "failed") return "destructive";
   if (normalized === "processing" || normalized === "queued") return "secondary";
   return "outline";

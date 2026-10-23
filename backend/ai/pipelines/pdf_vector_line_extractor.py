@@ -10,7 +10,10 @@ from typing import Literal
 import fitz
 
 from ai.pipelines.landmark_extractor import TITLE_BLOCK_X_MIN, TITLE_BLOCK_Y_MIN
-from ai.pipelines.pdf_display_space import pdf_point_to_display_fractional
+from ai.pipelines.pdf_display_space import (
+    pdf_point_to_display_fractional,
+    pdf_rect_to_display_fractional,
+)
 from ai.pipelines.line_extractor import (
     MERGE_ANGLE_DEG,
     _merge_colinear_segments,
@@ -20,12 +23,17 @@ from ai.pipelines.sheet_entity_graph import (
     DrawingViewport,
     LineTypingStatus,
     SheetLine,
+    SheetSymbol,
     assign_viewport_id,
 )
 
 LineStyleKind = Literal["solid", "dashed", "dash_dot", "unknown"]
 
-MIN_POLYLINE_LENGTH_FRAC = 0.002
+# Zero means every positive-length chain is kept. A 0.002 floor dropped hairlines
+# that are real ink on Master.pdf (about half the stroked items).
+MIN_POLYLINE_LENGTH_FRAC = 0.0
+# Identical endpoints are not a segment. This is not a hairline policy.
+_DEGENERATE_LEN_FRAC = 1e-9
 DEFAULT_MAX_CHAINS = 2000
 
 
@@ -65,6 +73,23 @@ def _in_titleblock_frac(x: float, y: float) -> bool:
     return x >= TITLE_BLOCK_X_MIN and y >= TITLE_BLOCK_Y_MIN
 
 
+def _flatten_cubic(p0: object, p1: object, p2: object, p3: object, steps: int = 8) -> list[tuple[float, float]]:
+    """Sample a PDF cubic in user space. Callers convert samples to display fractions."""
+
+    def _xy(point: object) -> tuple[float, float]:
+        return float(getattr(point, "x")), float(getattr(point, "y"))
+
+    a, b, c, d = _xy(p0), _xy(p1), _xy(p2), _xy(p3)
+    pts: list[tuple[float, float]] = []
+    for i in range(steps + 1):
+        t = i / steps
+        u = 1.0 - t
+        x = u**3 * a[0] + 3 * u**2 * t * b[0] + 3 * u * t**2 * c[0] + t**3 * d[0]
+        y = u**3 * a[1] + 3 * u**2 * t * b[1] + 3 * u * t**2 * c[1] + t**3 * d[1]
+        pts.append((x, y))
+    return pts
+
+
 def _parse_stroke_color(color: object) -> tuple[int, int, int] | None:
     if not isinstance(color, (list, tuple)) or len(color) < 3:
         return None
@@ -85,7 +110,7 @@ def extract_pdf_vector_segments(
     pdf_path: str | Path,
     *,
     page: int = 1,
-    min_segment_len_frac: float = 0.0005,
+    min_segment_len_frac: float = _DEGENERATE_LEN_FRAC,
 ) -> list[PdfVectorSegment]:
     doc = fitz.open(str(pdf_path))
     segments: list[PdfVectorSegment] = []
@@ -94,27 +119,58 @@ def extract_pdf_vector_segments(
             raise ValueError(f"page {page} out of range (1..{doc.page_count})")
         page_obj = doc.load_page(page - 1)
         min_len_sq = min_segment_len_frac**2
+
+        def _keep(x0: float, y0: float, x1: float, y1: float, width: float, rgb: tuple[int, int, int] | None, path_index: int, seg_i: int) -> int:
+            if (x0 - x1) ** 2 + (y0 - y1) ** 2 < min_len_sq:
+                return seg_i
+            mx, my = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+            if _in_titleblock_frac(mx, my):
+                return seg_i
+            segments.append(PdfVectorSegment(x0, y0, x1, y1, width, rgb, path_index, seg_i))
+            return seg_i + 1
+
+        def _keep_pdf_edge(ax: float, ay: float, bx: float, by: float, width: float, rgb: tuple[int, int, int] | None, path_index: int, seg_i: int) -> int:
+            x0, y0 = pdf_point_to_display_fractional(page_obj, ax, ay)
+            x1, y1 = pdf_point_to_display_fractional(page_obj, bx, by)
+            return _keep(x0, y0, x1, y1, width, rgb, path_index, seg_i)
+
         for path_index, path in enumerate(page_obj.get_drawings()):
-            if path.get("type") != "s":
+            # "fs" is a stroked path with a fill. Stroke-only "s" is the common case.
+            # Fill-only paths are not line geometry and stay out of this list.
+            if path.get("type") not in {"s", "fs"}:
                 continue
             width = float(path.get("width") or 0.0)
             rgb = _parse_stroke_color(path.get("color"))
             seg_i = 0
             for item in path.get("items") or []:
-                if not item or item[0] != "l":
+                if not item:
                     continue
-                _, p0, p1 = item
-                x0, y0 = pdf_point_to_display_fractional(page_obj, float(p0.x), float(p0.y))
-                x1, y1 = pdf_point_to_display_fractional(page_obj, float(p1.x), float(p1.y))
-                if (x0 - x1) ** 2 + (y0 - y1) ** 2 < min_len_sq:
-                    continue
-                mx, my = (x0 + x1) / 2.0, (y0 + y1) / 2.0
-                if _in_titleblock_frac(mx, my):
-                    continue
-                segments.append(
-                    PdfVectorSegment(x0, y0, x1, y1, width, rgb, path_index, seg_i)
-                )
-                seg_i += 1
+                op = item[0]
+                if op == "l" and len(item) >= 3:
+                    p0, p1 = item[1], item[2]
+                    seg_i = _keep_pdf_edge(float(p0.x), float(p0.y), float(p1.x), float(p1.y), width, rgb, path_index, seg_i)
+                elif op == "c" and len(item) >= 5:
+                    samples = _flatten_cubic(item[1], item[2], item[3], item[4])
+                    for (ax, ay), (bx, by) in zip(samples, samples[1:]):
+                        seg_i = _keep_pdf_edge(ax, ay, bx, by, width, rgb, path_index, seg_i)
+                elif op == "re" and len(item) >= 2:
+                    rect = item[1]
+                    corners = (
+                        (rect.x0, rect.y0),
+                        (rect.x1, rect.y0),
+                        (rect.x1, rect.y1),
+                        (rect.x0, rect.y1),
+                    )
+                    for (ax, ay), (bx, by) in zip(corners, corners[1:] + corners[:1]):
+                        seg_i = _keep_pdf_edge(float(ax), float(ay), float(bx), float(by), width, rgb, path_index, seg_i)
+                elif op == "qu" and len(item) >= 2:
+                    quad = item[1]
+                    corners = tuple(
+                        (float(getattr(quad, name).x), float(getattr(quad, name).y))
+                        for name in ("ul", "ur", "lr", "ll")
+                    )
+                    for (ax, ay), (bx, by) in zip(corners, corners[1:] + corners[:1]):
+                        seg_i = _keep_pdf_edge(ax, ay, bx, by, width, rgb, path_index, seg_i)
     finally:
         doc.close()
     return segments
@@ -299,12 +355,83 @@ def extract_pdf_vector_chains(
     pdf_path: str | Path,
     *,
     page: int = 1,
-    max_chains: int = DEFAULT_MAX_CHAINS,
+    max_chains: int | None = None,
 ) -> list[PdfVectorChain]:
+    """Extract chains. ``max_chains`` truncates only when a caller sets it.
+
+    Digitization stores every chain. A default of 2000 dropped most of Master.pdf.
+    """
     segments = extract_pdf_vector_segments(pdf_path, page=page)
     chains = segments_to_chains(segments)
     chains.sort(key=lambda c: -_chain_length(c.points))
+    if max_chains is None:
+        return chains
     return chains[:max_chains]
+
+
+def _fill_is_paper(color: object) -> bool:
+    if not isinstance(color, (list, tuple)) or len(color) < 3:
+        return False
+    try:
+        comps = [float(c) for c in color[:3]]
+    except (TypeError, ValueError):
+        return False
+    if max(comps) <= 1.0:
+        comps = [c * 255.0 for c in comps]
+    return min(comps) >= 245.0
+
+
+def extract_pdf_fill_symbols(
+    pdf_path: str | Path,
+    *,
+    page: int = 1,
+    viewports: tuple[DrawingViewport, ...] = (),
+) -> list[SheetSymbol]:
+    """Own fill paths as unclassified symbols.
+
+    The symbol detector may later classify them. Until then the fill is saved
+    with ``detector='pdf_fill'`` so the mapping audit can count it as owned
+    instead of ``fill_not_extracted``.
+    """
+    doc = fitz.open(str(pdf_path))
+    symbols: list[SheetSymbol] = []
+    try:
+        if page < 1 or page > doc.page_count:
+            raise ValueError(f"page {page} out of range (1..{doc.page_count})")
+        page_obj = doc.load_page(page - 1)
+        for path in page_obj.get_drawings():
+            if path.get("type") not in {"f", "fs"}:
+                continue
+            if _fill_is_paper(path.get("fill")):
+                continue
+            rect = path.get("rect")
+            if rect is None:
+                continue
+            bbox = pdf_rect_to_display_fractional(
+                page_obj,
+                float(rect.x0),
+                float(rect.y0),
+                float(rect.x1),
+                float(rect.y1),
+            )
+            if (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) < 1e-8:
+                continue
+            cx = (bbox[0] + bbox[2]) / 2.0
+            cy = (bbox[1] + bbox[3]) / 2.0
+            if _in_titleblock_frac(cx, cy):
+                continue
+            symbols.append(
+                SheetSymbol(
+                    symbol_class="unclassified_fill",
+                    bbox_fractional=bbox,
+                    viewport_id=assign_viewport_id(bbox, viewports),
+                    confidence=0.0,
+                    detector="pdf_fill",
+                )
+            )
+    finally:
+        doc.close()
+    return symbols
 
 
 def chains_to_sheet_lines(

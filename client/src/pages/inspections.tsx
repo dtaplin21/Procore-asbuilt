@@ -285,6 +285,7 @@ export default function Inspections() {
                 <SelectItem value="queued">Queued</SelectItem>
                 <SelectItem value="processing">Processing</SelectItem>
                 <SelectItem value="complete">Complete</SelectItem>
+                <SelectItem value="indexed">Indexed</SelectItem>
                 <SelectItem value="failed">Failed</SelectItem>
               </SelectContent>
             </Select>

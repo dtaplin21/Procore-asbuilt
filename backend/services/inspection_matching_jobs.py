@@ -620,19 +620,51 @@ def finalize_inspection_run_for_job_failure(
         db.close()
 
 
+def _investigation_failure_message(meta: dict[str, Any] | None) -> str | None:
+    """Errors swallowed by the index stage. Empty means the index finished."""
+    if not isinstance(meta, dict):
+        return None
+    raw = meta.get("pdf_investigation_errors")
+    if not isinstance(raw, list):
+        return None
+    messages = [str(item).strip() for item in raw if str(item).strip()]
+    if not messages:
+        return None
+    return "; ".join(messages)[:500]
+
+
 def _finalize_inspection_run_after_index(
     session: Session,
     *,
     inspection_run_id: int | None,
     finish_progress: bool = True,
+    error_message: str | None = None,
 ) -> None:
+    """Close an index-only job.
+
+    A finished index is ``indexed``. It is not ``complete``: placement did not
+    run. Investigation errors are ``failed``.
+    """
     if inspection_run_id is None:
         return
     storage = StorageService(session)
+    now = datetime.now(timezone.utc)
+    if error_message:
+        storage.update_inspection_run_status(
+            inspection_run_id,
+            "failed",
+            completed_at=now,
+            error_message=error_message[:500],
+        )
+        if finish_progress:
+            from services.inspection_run_progress import fail_run_progress
+
+            fail_run_progress(inspection_run_id, error_message)
+        return
     storage.update_inspection_run_status(
         inspection_run_id,
-        "complete",
-        completed_at=datetime.now(timezone.utc),
+        "indexed",
+        completed_at=now,
         clear_error_message=True,
     )
     if finish_progress:
@@ -797,6 +829,15 @@ def _run_inspection_match_job_body(
             inspection_run_id=run_id_hint,
         )
         session.flush()
+        index_error = _investigation_failure_message(investigation_meta)
+        if index_error:
+            _finalize_inspection_run_after_index(
+                session,
+                inspection_run_id=run_id_hint,
+                finish_progress=True,
+                error_message=index_error,
+            )
+            return "no_match"
         if chain_match:
             from services.inspection_run_progress import get_inspection_progress
 

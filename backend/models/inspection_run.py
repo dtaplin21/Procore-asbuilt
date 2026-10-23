@@ -11,7 +11,7 @@ Most runs will not have one yet.
 
 Reconciled with the existing Postgres schema (94abb60704c6): integer PK/FK,
 evidence_id, started_at/completed_at/error_message, status values
-queued|processing|complete|failed — not the reference's string IDs or
+queued|processing|complete|indexed|failed — not the reference's string IDs or
 pending-only status.
 """
 
@@ -44,7 +44,7 @@ class InspectionRun(Base):
     __tablename__ = "inspection_runs"
     __table_args__ = (
         CheckConstraint(
-            "status in ('queued','processing','complete','failed')",
+            "status in ('queued','processing','complete','indexed','failed')",
             name="ck_inspection_runs_status",
         ),
         Index("ix_inspection_runs_project_id", "project_id"),

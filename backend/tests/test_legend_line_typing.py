@@ -122,4 +122,12 @@ def test_select_chains_for_storage_wanted_type_first() -> None:
         for t in ty
     ]
     keep2, tiers2 = select_chains_for_storage(allc, ty2, plan_bbox=None, wanted_type_ids=(1,), max_chains=5)
-    assert {50, 51, 52} <= set(keep2) and tiers2["tier1"] == 3
+    assert {50, 51, 52} <= set(keep2) and tiers2["tier1"] == 3 and tiers2["wanted_dropped"] == 0
+
+    many_wanted = [
+        ChainTyping(i, "typed", "SS", 1, (1,), None) for i in range(6)
+    ]
+    short = [Ch(((0.1, 0.1), (0.11, 0.1)), mid, St(0.72)) for _ in range(6)]
+    keep3, tiers3 = select_chains_for_storage(short, many_wanted, plan_bbox=None, wanted_type_ids=(1,), max_chains=2)
+    assert set(keep3) == {0, 1, 2, 3, 4, 5}
+    assert tiers3["dropped"] == 0 and tiers3["wanted_dropped"] == 0

@@ -209,13 +209,14 @@ class InspectionProgressHandle:
         )
 
     def finish(self) -> None:
+        label = "Indexed" if self.mode == "index" else "Complete"
         self._write(
             _default_payload(
                 run_id=self.run_id,
                 job_id=self.job_id,
                 mode=self.mode,
                 phase="done",
-                current_label="Complete",
+                current_label=label,
             )
         )
 
