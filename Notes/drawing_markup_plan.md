@@ -911,7 +911,7 @@ export function useDrawingMarkups(drawingId: number | null, page: number, opts: 
 }
 ```
 
-- [ ] File saved
+- [x] File saved
 
 ---
 
@@ -1064,7 +1064,7 @@ export function MarkupLayer({ markups, tool, visibleTypes = null, selectedId = n
 }
 ```
 
-- [ ] File saved
+- [x] File saved
 
 ---
 
