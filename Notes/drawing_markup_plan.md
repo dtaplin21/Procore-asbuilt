@@ -1318,7 +1318,7 @@ export function MarkupWorkspace({ drawingId, page = 1, pageImageUrl, pageAspect,
 }
 ```
 
-- [ ] File saved
+- [x] File saved
 
 ---
 
