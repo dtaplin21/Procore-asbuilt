@@ -4,6 +4,7 @@ from models.base import Base
 import models.drawing_region  # noqa: F401
 import models.drawing_overlay  # noqa: F401
 import models.inspection_run  # noqa: F401
+import models.drawing_markup  # noqa: F401
 import models.models  # noqa: F401 — register remaining ORM tables on Base.metadata
 from config import settings, sqlalchemy_connect_args
 

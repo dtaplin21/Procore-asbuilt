@@ -18,6 +18,7 @@ import models.drawing_match_candidate  # noqa: F401
 import models.drawing_text_element  # noqa: F401
 import models.drawing_viewport  # noqa: F401
 import models.drawing_symbol  # noqa: F401
+import models.drawing_markup  # noqa: F401
 import models.legend_reference  # noqa: F401
 import models.models  # noqa: F401 — register ORM tables on Base.metadata
 
