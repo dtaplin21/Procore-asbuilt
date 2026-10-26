@@ -1164,7 +1164,7 @@ From the repo root:
 npx vitest run src/components/MarkupLayer.test.tsx
 ```
 
-- [ ] `8 passed` in that file
+- [x] `8 passed` in that file
 
 ---
 
@@ -1218,7 +1218,7 @@ export function InspectionTypeFilter({ summary, selected, onChange }: Inspection
 }
 ```
 
-- [ ] File saved
+- [x] File saved
 
 ---
 
