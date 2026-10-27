@@ -43,7 +43,7 @@ export function formatOverlayTagSummary(overlay: DrawingOverlay): string {
   parts.push(...stringList(tags.fieldConditions ?? tags.field_conditions));
   parts.push(...stringList(tags.actions));
 
-  return [...new Set(parts)].slice(0, 4).join(" · ");
+  return Array.from(new Set(parts)).slice(0, 4).join(" · ");
 }
 
 export function formatOverlayListItem(overlay: DrawingOverlay): {

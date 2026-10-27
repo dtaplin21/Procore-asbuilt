@@ -3,17 +3,26 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import DrawingOverlayLayer from "@/components/drawing-workspace/drawing_overlay_layer";
 import { DrawingRegionLayer } from "@/components/drawing-workspace/drawing_region_layer";
 import { RegionHoverTooltip } from "@/components/drawing-workspace/region_hover_tooltip";
+import { InspectionTypeFilter } from "@/components/InspectionTypeFilter";
+import { MarkupLayer } from "@/components/MarkupLayer";
 import PanZoomContainer from "@/components/drawing-workspace/pan_zoom_container";
 import WorkspaceEmptyState from "@/components/drawing-workspace/workspace_empty_state";
+import { useDrawingMarkups } from "@/hooks/useDrawingMarkups";
 import { useDrawingOverlays } from "@/hooks/use-inspection-runs";
 import { useResizeObserver } from "@/hooks/use_resize_observer";
 import { toOverlayRegions } from "@/lib/drawing-overlays/inspection_overlay";
 import type { RenderableRegion } from "@/lib/drawing-regions/region_display";
 import type { RegionInspectionSummaryEntry } from "@/lib/drawing-regions/types";
+import { VocabCategory, VOCABULARY } from "@shared/inspection_vocabulary";
 import type { DrawingOverlay } from "@shared/schema";
+import type { MarkupTool } from "@/types/drawing_markup";
 import type { DrawingWorkspaceDrawing } from "@/types/drawing_workspace";
 
 import { apiUrl } from "@/lib/api/base_url";
+
+const INSPECTION_TYPES = VOCABULARY[VocabCategory.InspectionType];
+const INSPECTION_STATUSES = VOCABULARY[VocabCategory.InspectionStatus];
+const MARKUP_TOOLS: MarkupTool[] = ["select", "polyline", "cloud", "arrow", "rect", "text"];
 
 /** True when `fileUrl` is the raw upload route (PDF/image bytes), not a rendered page PNG. */
 function legacyMasterUsesPdfEmbed(drawing: DrawingWorkspaceDrawing): boolean {
@@ -55,6 +64,8 @@ type Props = {
   onRegionClick?: (region: RenderableRegion) => void;
   /** Optional overlay click handler (wired from DrawingComparisonWorkspace). */
   onOverlayClick?: (overlay: DrawingOverlay) => void;
+  /** Name stored as created_by. Sent as X-Procore-User. */
+  userName?: string;
 };
 
 export default function DrawingViewer({
@@ -70,6 +81,7 @@ export default function DrawingViewer({
   showInspectableAreas = false,
   onRegionHoverChange,
   onRegionClick,
+  userName,
 }: Props) {
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const layoutSize = useResizeObserver(layoutRef);
@@ -79,6 +91,29 @@ export default function DrawingViewer({
   const [imageError, setImageError] = useState<string | null>(null);
   const [hoveredRegion, setHoveredRegion] = useState<RenderableRegion | null>(null);
   const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
+  const page = drawing != null && drawing.activePage >= 1 ? drawing.activePage : 1;
+  const { markups, summary, error: markupError, create, update, remove } = useDrawingMarkups(
+    drawing?.id ?? null,
+    page,
+    { userName },
+  );
+  const [tool, setTool] = useState<MarkupTool>("select");
+  const [inspectionType, setInspectionType] = useState(INSPECTION_TYPES[0] ?? "");
+  const [markupStatus, setMarkupStatus] = useState("Open");
+  const [selectedTypes, setSelectedTypes] = useState<Set<string> | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const allTypes = useMemo(
+    () => new Set(summary.map((row) => row.inspection_type ?? "")),
+    [summary],
+  );
+  const visibleTypes = selectedTypes ?? allTypes;
+  const selectedMarkup = markups.find((markup) => markup.id === selectedId) ?? null;
+
+  useEffect(() => {
+    if (selectedId != null && !markups.some((markup) => markup.id === selectedId)) {
+      setSelectedId(null);
+    }
+  }, [markups, selectedId]);
 
   const resolvedProjectId = projectIdProp ?? drawing?.projectId ?? null;
   const projectIdStr =
@@ -239,7 +274,8 @@ export default function DrawingViewer({
         </div>
       </div>
 
-      <div className="flex w-full flex-1 flex-col min-h-[min(28rem,70vh)]">
+      <div className="flex w-full min-h-[min(28rem,70vh)] flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <PanZoomContainer>
           <div
             ref={layoutRef}
@@ -265,20 +301,46 @@ export default function DrawingViewer({
               />
             ) : (
               <>
-                <img
-                  ref={masterImgRef}
-                  src={drawing.fileUrl ? apiUrl(drawing.fileUrl) : ""}
-                  alt={drawing.name}
-                  className="relative z-0 block max-h-[80vh] max-w-[1200px] select-none rounded"
-                  onLoad={onMasterLoad}
-                  onError={() => {
-                    setImageError(
-                      messageForDrawingImageLoadFailure(drawing.fileUrl ?? "")
-                    );
-                  }}
-                  data-testid="drawing-viewer-image"
-                  draggable={false}
-                />
+                <div className="relative inline-block" data-testid="drawing-viewer-page">
+                  <img
+                    ref={masterImgRef}
+                    src={drawing.fileUrl ? apiUrl(drawing.fileUrl) : ""}
+                    alt={drawing.name}
+                    className="relative z-0 block max-h-[80vh] max-w-[1200px] select-none rounded"
+                    onLoad={onMasterLoad}
+                    onError={() => {
+                      setImageError(messageForDrawingImageLoadFailure(drawing.fileUrl ?? ""));
+                    }}
+                    data-testid="drawing-viewer-image"
+                    draggable={false}
+                  />
+                  <div
+                    className="absolute inset-0 z-20"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onPointerMove={(event) => event.stopPropagation()}
+                    onPointerUp={(event) => event.stopPropagation()}
+                  >
+                    <MarkupLayer
+                      markups={markups}
+                      tool={tool}
+                      visibleTypes={visibleTypes}
+                      selectedId={selectedId}
+                      onSelect={setSelectedId}
+                      onCreate={(kind, points, label) => {
+                        void create({
+                          page,
+                          kind,
+                          points,
+                          label,
+                          inspectionType,
+                          status: markupStatus,
+                        }).then((made) => {
+                          if (made) setSelectedId(made.id);
+                        });
+                      }}
+                    />
+                  </div>
+                </div>
 
                 {canRenderOverlay ? (
                   <DrawingRegionLayer
@@ -310,6 +372,52 @@ export default function DrawingViewer({
             )}
           </div>
         </PanZoomContainer>
+        </div>
+        {!legacyPdfEmbed ? (
+          <aside
+            aria-label="Markups"
+            className="flex w-[280px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-slate-200 p-3"
+          >
+            <div role="toolbar" aria-label="Markup tools" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {MARKUP_TOOLS.map((markupTool) => (
+                <button
+                  key={markupTool}
+                  type="button"
+                  aria-pressed={tool === markupTool}
+                  onClick={() => setTool(markupTool)}
+                  style={{ fontWeight: tool === markupTool ? 700 : 400 }}
+                >
+                  {markupTool}
+                </button>
+              ))}
+              <select aria-label="Inspection type" value={inspectionType} onChange={(event) => setInspectionType(event.target.value)}>
+                {INSPECTION_TYPES.map((typeName) => <option key={typeName}>{typeName}</option>)}
+              </select>
+              <select aria-label="Status" value={markupStatus} onChange={(event) => setMarkupStatus(event.target.value)}>
+                {INSPECTION_STATUSES.map((statusName) => <option key={statusName}>{statusName}</option>)}
+              </select>
+            </div>
+            {markupError ? <p role="alert" style={{ color: "#b00020" }}>{markupError}</p> : null}
+            <h3 style={{ margin: 0 }}>Inspection types</h3>
+            <InspectionTypeFilter summary={summary} selected={visibleTypes} onChange={setSelectedTypes} />
+            {selectedMarkup ? (
+              <section aria-label="Selected markup" style={{ marginTop: 8, fontSize: 13 }}>
+                <strong>{selectedMarkup.kind}</strong> #{selectedMarkup.id} by {selectedMarkup.createdBy}
+                <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                  <select
+                    aria-label="Selected status"
+                    value={selectedMarkup.status ?? ""}
+                    onChange={(event) => update(selectedMarkup.id, { status: event.target.value || null })}
+                  >
+                    <option value="">No status</option>
+                    {INSPECTION_STATUSES.map((statusName) => <option key={statusName}>{statusName}</option>)}
+                  </select>
+                  <button type="button" onClick={() => remove(selectedMarkup.id)}>Delete</button>
+                </div>
+              </section>
+            ) : null}
+          </aside>
+        ) : null}
       </div>
     </div>
   );

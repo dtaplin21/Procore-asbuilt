@@ -6,15 +6,35 @@
  * basic region-layer wiring into DrawingViewer.
  */
 
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import DrawingViewer from "@/components/drawings/DrawingViewer";
 import type { DrawingOverlay } from "@shared/schema";
+import type { DrawingMarkup } from "@/types/drawing_markup";
 import type { DrawingWorkspaceDrawing } from "@/types/drawing_workspace";
 import { getQueryFn } from "@/lib/queryClient";
 import type { RegionInspectionSummaryEntry } from "@/lib/drawing-regions/types";
+
+const markupApi = vi.hoisted(() => ({
+  markups: [] as DrawingMarkup[],
+  summary: [] as { inspection_type: string | null; status: string | null; count: number }[],
+  create: vi.fn(),
+}));
+
+vi.mock("@/hooks/useDrawingMarkups", () => ({
+  useDrawingMarkups: () => ({
+    markups: markupApi.markups,
+    summary: markupApi.summary,
+    loading: false,
+    error: null,
+    reload: vi.fn(),
+    create: markupApi.create,
+    update: vi.fn(),
+    remove: vi.fn(),
+  }),
+}));
 
 vi.mock("@/hooks/use_resize_observer", () => ({
   useResizeObserver: () => ({ width: 1000, height: 800 }),
@@ -28,6 +48,13 @@ beforeAll(() => {
   }
 
   vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+});
+
+beforeEach(() => {
+  markupApi.markups = [];
+  markupApi.summary = [];
+  markupApi.create.mockReset();
+  markupApi.create.mockResolvedValue(null);
 });
 
 function renderViewer(ui: ReactElement) {
@@ -309,5 +336,88 @@ describe("DrawingViewer — PR4 region visibility", () => {
 
     fireEvent.mouseLeave(screen.getByTestId("region-shape"));
     expect(screen.queryByTestId("region-hover-tooltip")).not.toBeInTheDocument();
+  });
+});
+
+describe("DrawingViewer — markups", () => {
+  const pointer = (el: Element, type: string, x: number, y: number) => {
+    act(() => {
+      el.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y }));
+    });
+  };
+
+  it("keeps the markup layer on the page image inside the zoom box", () => {
+    renderReadyViewer(<DrawingViewer projectId={1} drawing={readyDrawing} />);
+    const stage = screen.getByTestId("drawing-viewer-stage");
+    const page = screen.getByTestId("drawing-viewer-page");
+    const image = screen.getByTestId("drawing-viewer-image");
+    const layer = screen.getByTestId("markup-layer");
+
+    expect(page.contains(image)).toBe(true);
+    expect(page.contains(layer)).toBe(true);
+    expect(stage.contains(page)).toBe(true);
+    expect(layer.parentElement?.parentElement).toBe(page);
+    expect(screen.getByTestId("pan-zoom-content").contains(layer)).toBe(true);
+    expect(screen.getByRole("toolbar", { name: "Markup tools" })).toBeInTheDocument();
+  });
+
+  it("maps an edge-to-edge line to the page edges at two image sizes", () => {
+    renderReadyViewer(<DrawingViewer projectId={1} drawing={readyDrawing} />);
+    fireEvent.click(screen.getByRole("button", { name: "polyline" }));
+    const layer = screen.getByTestId("markup-layer");
+
+    for (const size of [
+      { width: 1000, height: 500 },
+      { width: 400, height: 200 },
+    ]) {
+      layer.getBoundingClientRect = () =>
+        ({
+          left: 10,
+          top: 20,
+          width: size.width,
+          height: size.height,
+          right: 10 + size.width,
+          bottom: 20 + size.height,
+          x: 10,
+          y: 20,
+          toJSON() {},
+        }) as DOMRect;
+      pointer(layer, "pointerdown", 10, 20);
+      pointer(layer, "pointerdown", 10 + size.width, 20 + size.height);
+      fireEvent.keyDown(window, { key: "Enter" });
+    }
+
+    expect(markupApi.create).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ kind: "polyline", points: [[0, 0], [1, 1]] }),
+    );
+    expect(markupApi.create).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ kind: "polyline", points: [[0, 0], [1, 1]] }),
+    );
+  });
+
+  it("draws a saved markup back on the page", () => {
+    markupApi.summary = [{ inspection_type: "Final", status: "Open", count: 1 }];
+    markupApi.markups = [
+      {
+        id: 3,
+        drawingId: 10,
+        page: 1,
+        kind: "polyline",
+        points: [[0, 0], [1, 1]],
+        label: null,
+        inspectionType: "Final",
+        status: "Open",
+        color: null,
+        createdBy: "Dom",
+        createdAt: "",
+        updatedAt: "",
+      },
+    ];
+    renderReadyViewer(<DrawingViewer projectId={1} drawing={readyDrawing} />);
+    const page = screen.getByTestId("drawing-viewer-page");
+    const line = page.querySelector("polyline");
+    expect(line?.getAttribute("points")).toBe("0,0 1,1");
   });
 });

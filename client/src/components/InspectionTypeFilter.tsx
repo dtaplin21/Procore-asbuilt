@@ -25,7 +25,7 @@ export function InspectionTypeFilter({ summary, selected, onChange }: Inspection
   if (byType.size === 0) return <p style={{ fontSize: 13, color: "#666" }}>No markups on this page yet.</p>;
   return (
     <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-      {[...byType.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => (
+      {Array.from(byType.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => (
         <li key={key || "none"} style={{ marginBottom: 6 }}>
           <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
             <input type="checkbox" checked={selected.has(key)} onChange={() => toggle(key)} />
@@ -34,7 +34,7 @@ export function InspectionTypeFilter({ summary, selected, onChange }: Inspection
             <span>{entry.total}</span>
           </label>
           <div style={{ marginLeft: 28, fontSize: 11, color: "#666" }}>
-            {[...entry.statuses.entries()].map(([s, n]) => `${s} ${n}`).join(" · ")}
+            {Array.from(entry.statuses.entries()).map(([s, n]) => `${s} ${n}`).join(" · ")}
           </div>
         </li>
       ))}

@@ -1416,8 +1416,8 @@ describe("procore_embed", () => {
 });
 ```
 
-- [ ] Package installed
-- [ ] Three files saved
+- [x] Package installed
+- [x] Three files saved
 
 ---
 
@@ -1469,7 +1469,7 @@ describe.skipIf(!base)("MarkupWorkspace against the real API", () => {
 });
 ```
 
-- [ ] File saved
+- [x] File saved
 
 ---
 
@@ -1486,8 +1486,8 @@ npx vitest run src/lib/markup_geometry.test.ts src/components/MarkupLayer.test.t
 
 Expected: no type errors, and `17 passed, 1 skipped`. The skipped test is the end-to-end file. `npm run test:unit` also runs the rest of the client tests.
 
-- [ ] `tsc --noEmit` is clean
-- [ ] The four files above are `17 passed, 1 skipped`
+- [x] `tsc --noEmit` is clean
+- [x] The four files above are `17 passed, 1 skipped`
 
 ---
 
@@ -1534,9 +1534,9 @@ Copy the toolbar and `InspectionTypeFilter` from `MarkupWorkspace` into the view
 
 The image must already be the display frame. The rendered `page-1.png` for 1722 has rotation `270` applied. Do not rotate it again in CSS.
 
-- [ ] Layer sits on the image, not on the full-width stage
-- [ ] A line drawn edge to edge lands on the page edges at two zoom levels
-- [ ] Reload: the markups come back where they were drawn
+- [x] Layer sits on the image, not on the full-width stage
+- [x] A line drawn edge to edge lands on the page edges at two zoom levels
+- [x] Reload: the markups come back where they were drawn
 
 ---
 
