@@ -38,6 +38,8 @@ export type DrawingComparisonWorkspaceProps = {
   showInspectableAreas?: boolean;
   onRegionHoverChange?: (region: RenderableRegion | null) => void;
   onRegionClick?: (region: RenderableRegion) => void;
+  canvasTool?: "select" | "pan" | "zoom";
+  fitToken?: number;
 };
 
 export function DrawingComparisonWorkspace({
@@ -52,6 +54,8 @@ export function DrawingComparisonWorkspace({
   showInspectableAreas = false,
   onRegionHoverChange,
   onRegionClick,
+  canvasTool = "select",
+  fitToken = 0,
 }: DrawingComparisonWorkspaceProps) {
   const [showChangesOnly, setShowChangesOnly] = useState(false);
   const [showInspectionStatuses, setShowInspectionStatuses] = useState(true);
@@ -177,6 +181,8 @@ export function DrawingComparisonWorkspace({
           showInspectableAreas={showInspectableAreas}
           onRegionHoverChange={onRegionHoverChange}
           onRegionClick={onRegionClick}
+          canvasTool={canvasTool}
+          fitToken={fitToken}
         />
       </div>
     </div>

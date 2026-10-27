@@ -122,6 +122,7 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedTool, setSelectedTool] = useState<"select" | "pan" | "zoom">("select");
+  const [fitToken, setFitToken] = useState(0);
   const [selectedMasterDrawingId, setSelectedMasterDrawingId] = useState<number | null>(null);
   const [showInspectableAreas, setShowInspectableAreas] = useState(false);
   const [isManagingRegions, setIsManagingRegions] = useState(false);
@@ -631,6 +632,7 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
                   size="icon"
                   onClick={() => setSelectedTool("pan")}
                   data-testid="tool-pan"
+                  aria-label="Pan"
                 >
                   <Move className="w-4 h-4" />
                 </Button>
@@ -639,8 +641,17 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
                   size="icon"
                   onClick={() => setSelectedTool("zoom")}
                   data-testid="tool-zoom"
+                  aria-label="Zoom"
                 >
                   <ZoomIn className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFitToken((token) => token + 1)}
+                  data-testid="tool-full-view"
+                >
+                  Full view
                 </Button>
               </div>
             </div>
@@ -710,6 +721,8 @@ export default function Objects({ procoreUserId }: { procoreUserId?: string | nu
                   regionSummary={regionSummaryQuery.data ?? []}
                   showInspectableAreas={showInspectableAreas}
                   onRegionClick={handleRegionClick}
+                  canvasTool={selectedTool}
+                  fitToken={fitToken}
                 />
               )}
               </div>

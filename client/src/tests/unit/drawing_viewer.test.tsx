@@ -346,6 +346,31 @@ describe("DrawingViewer — markups", () => {
     });
   };
 
+  it("lets a select-tool drag pan the master and keeps draw tools on the page", () => {
+    renderReadyViewer(<DrawingViewer projectId={1} drawing={readyDrawing} />);
+    const container = screen.getByTestId("pan-zoom-container");
+    const content = screen.getByTestId("pan-zoom-content");
+    const layer = screen.getByTestId("markup-layer");
+    class TestPointerEvent extends MouseEvent {
+      pointerId: number;
+      constructor(type: string, init: MouseEventInit & { pointerId?: number } = {}) {
+        super(type, init);
+        this.pointerId = init.pointerId ?? 0;
+      }
+    }
+    vi.stubGlobal("PointerEvent", TestPointerEvent);
+    container.setPointerCapture = () => {};
+    fireEvent.pointerDown(layer, { pointerId: 1, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(container, { pointerId: 1, clientX: 30, clientY: 20 });
+    expect(content.style.transform).toContain("translate(20px, 10px)");
+
+    fireEvent.pointerUp(container, { pointerId: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "polyline" }));
+    fireEvent.pointerDown(layer, { pointerId: 2, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(container, { pointerId: 2, clientX: 80, clientY: 80 });
+    expect(content.style.transform).toContain("translate(20px, 10px)");
+  });
+
   it("keeps the markup layer on the page image inside the zoom box", () => {
     renderReadyViewer(<DrawingViewer projectId={1} drawing={readyDrawing} />);
     const stage = screen.getByTestId("drawing-viewer-stage");

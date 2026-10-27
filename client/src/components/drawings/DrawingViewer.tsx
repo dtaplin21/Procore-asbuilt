@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import DrawingOverlayLayer from "@/components/drawing-workspace/drawing_overlay_layer";
 import { DrawingRegionLayer } from "@/components/drawing-workspace/drawing_region_layer";
@@ -66,6 +66,10 @@ type Props = {
   onOverlayClick?: (overlay: DrawingOverlay) => void;
   /** Name stored as created_by. Sent as X-Procore-User. */
   userName?: string;
+  /** Objects canvas tool. Pan forces sheet dragging even while a markup tool is active. */
+  canvasTool?: "select" | "pan" | "zoom";
+  /** Increment to fit the master sheet in the viewport. */
+  fitToken?: number;
 };
 
 export default function DrawingViewer({
@@ -82,11 +86,20 @@ export default function DrawingViewer({
   onRegionHoverChange,
   onRegionClick,
   userName,
+  canvasTool = "select",
+  fitToken = 0,
 }: Props) {
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const layoutSize = useResizeObserver(layoutRef);
   const masterImgRef = useRef<HTMLImageElement | null>(null);
 
+  const [fullScreen, setFullScreen] = useState(false);
+  const seenFitToken = useRef(fitToken);
+  useEffect(() => {
+    if (fitToken === seenFitToken.current) return;
+    seenFitToken.current = fitToken;
+    setFullScreen(true);
+  }, [fitToken]);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const [hoveredRegion, setHoveredRegion] = useState<RenderableRegion | null>(null);
@@ -253,6 +266,11 @@ export default function DrawingViewer({
   }
 
   const legacyPdfEmbed = legacyMasterUsesPdfEmbed(drawing);
+  const claimDrawPointer = (event: ReactPointerEvent) => {
+    const middleButton = event.button === 1 || (event.buttons & 4) === 4;
+    if (tool === "select" || canvasTool === "pan" || middleButton) return;
+    event.stopPropagation();
+  };
 
   return (
     <div className="flex min-h-[70vh] w-full flex-1 flex-col overflow-hidden rounded-xl border bg-white">
@@ -276,10 +294,14 @@ export default function DrawingViewer({
 
       <div className="flex w-full min-h-[min(28rem,70vh)] flex-1">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <PanZoomContainer>
+        <PanZoomContainer fullScreen={fullScreen} onFullScreenChange={setFullScreen}>
           <div
             ref={layoutRef}
-            className="relative inline-block w-full max-w-[1200px]"
+            className={
+              fullScreen
+                ? "relative inline-block max-w-none"
+                : "relative inline-block w-full max-w-[1200px]"
+            }
             data-testid="drawing-viewer-stage"
           >
             {!imageLoaded && !imageError && !legacyPdfEmbed ? (
@@ -306,7 +328,11 @@ export default function DrawingViewer({
                     ref={masterImgRef}
                     src={drawing.fileUrl ? apiUrl(drawing.fileUrl) : ""}
                     alt={drawing.name}
-                    className="relative z-0 block max-h-[80vh] max-w-[1200px] select-none rounded"
+                    className={
+                      fullScreen
+                        ? "relative z-0 block h-[100dvh] w-auto max-h-none max-w-none select-none"
+                        : "relative z-0 block max-h-[80vh] max-w-[1200px] select-none rounded"
+                    }
                     onLoad={onMasterLoad}
                     onError={() => {
                       setImageError(messageForDrawingImageLoadFailure(drawing.fileUrl ?? ""));
@@ -316,9 +342,9 @@ export default function DrawingViewer({
                   />
                   <div
                     className="absolute inset-0 z-20"
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onPointerMove={(event) => event.stopPropagation()}
-                    onPointerUp={(event) => event.stopPropagation()}
+                    onPointerDown={claimDrawPointer}
+                    onPointerMove={claimDrawPointer}
+                    onPointerUp={claimDrawPointer}
                   >
                     <MarkupLayer
                       markups={markups}

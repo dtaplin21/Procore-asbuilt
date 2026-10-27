@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 type Point = {
   x: number;
@@ -30,6 +30,11 @@ type Props = {
   minScale?: number;
   maxScale?: number;
   initialScale?: number;
+  /** Increment to open the sheet across the screen from a parent control. */
+  fitToken?: number;
+  /** When set, the parent owns fullscreen. The sheet then fills the screen. */
+  fullScreen?: boolean;
+  onFullScreenChange?: (fullScreen: boolean) => void;
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -51,11 +56,24 @@ function midpointBetween(a: Point, b: Point): Point {
 
 export default function PanZoomContainer({
   children,
-  minScale = 0.5,
+  minScale = 0.1,
   maxScale = 5,
   initialScale = 1,
+  fitToken = 0,
+  fullScreen: fullScreenProp,
+  onFullScreenChange,
 }: Props) {
+  const [uncontrolledFullScreen, setUncontrolledFullScreen] = useState(false);
+  const fullScreen = fullScreenProp ?? uncontrolledFullScreen;
+  const setFullScreen = useCallback(
+    (next: boolean) => {
+      if (onFullScreenChange) onFullScreenChange(next);
+      else setUncontrolledFullScreen(next);
+    },
+    [onFullScreenChange],
+  );
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
 
   const [transform, setTransform] = useState<TransformState>({
     scale: initialScale,
@@ -138,7 +156,13 @@ export default function PanZoomContainer({
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       const container = event.currentTarget;
-      container.setPointerCapture(event.pointerId);
+      if (typeof container.setPointerCapture === "function") {
+        try {
+          container.setPointerCapture(event.pointerId);
+        } catch {
+          /* Pointer is already released, or this event was not a live capture. */
+        }
+      }
 
       const rect = container.getBoundingClientRect();
       const point = {
@@ -237,8 +261,13 @@ export default function PanZoomContainer({
 
   const cleanupPointer = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
+      const target = event.currentTarget;
+      if (typeof target.hasPointerCapture === "function" && target.hasPointerCapture(event.pointerId)) {
+        try {
+          target.releasePointerCapture(event.pointerId);
+        } catch {
+          /* Pointer is already released. */
+        }
       }
 
       activePointersRef.current.delete(event.pointerId);
@@ -283,22 +312,101 @@ export default function PanZoomContainer({
     });
   }, [initialScale]);
 
+  const fitView = useCallback(() => {
+    const container = containerRef.current;
+    const content = contentRef.current;
+    if (!container || !content) return;
+
+    const viewportWidth = container.clientWidth;
+    const viewportHeight = container.clientHeight;
+    const contentWidth = content.offsetWidth;
+    const contentHeight = content.offsetHeight;
+    if (viewportWidth <= 0 || viewportHeight <= 0 || contentWidth <= 0 || contentHeight <= 0) {
+      return;
+    }
+
+    activePointersRef.current.clear();
+    dragRef.current = null;
+    pinchRef.current = null;
+    setIsDragging(false);
+    setIsPinching(false);
+
+    const scale = clamp(
+      Math.min(viewportWidth / contentWidth, viewportHeight / contentHeight),
+      minScale,
+      maxScale,
+    );
+    setTransform({
+      scale,
+      x: (viewportWidth - contentWidth * scale) / 2,
+      y: (viewportHeight - contentHeight * scale) / 2,
+    });
+  }, [minScale, maxScale]);
+
+  const seenFitToken = useRef(fitToken);
+  useEffect(() => {
+    if (fitToken === seenFitToken.current) return;
+    seenFitToken.current = fitToken;
+    setFullScreen(true);
+  }, [fitToken, setFullScreen]);
+
+  const wasFullScreen = useRef(false);
+  const transformRef = useRef(transform);
+  transformRef.current = transform;
+  const restoreTransform = useRef<TransformState | null>(null);
+  useLayoutEffect(() => {
+    if (fullScreen && !wasFullScreen.current) {
+      restoreTransform.current = transformRef.current;
+      fitView();
+    } else if (!fullScreen && wasFullScreen.current && restoreTransform.current) {
+      setTransform(restoreTransform.current);
+      restoreTransform.current = null;
+    }
+    wasFullScreen.current = fullScreen;
+  }, [fullScreen, fitView]);
+
+  useEffect(() => {
+    if (!fullScreen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFullScreen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullScreen, setFullScreen]);
+
   const percent = useMemo(() => Math.round(transform.scale * 100), [transform.scale]);
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col">
+    <div
+      className={
+        fullScreen
+          ? "fixed inset-0 z-[80] flex h-screen w-screen flex-col bg-white"
+          : "flex min-h-0 w-full flex-1 flex-col"
+      }
+      data-testid="pan-zoom-frame"
+      data-fullscreen={fullScreen ? "true" : "false"}
+    >
       <div className="flex items-center justify-between border-b border-border px-4 py-2">
         <div className="text-xs text-muted-foreground">
           Zoom: {percent}% {isPinching ? "• Pinching" : ""}
         </div>
 
-        <button
-          type="button"
-          onClick={resetView}
-          className="rounded-md border border-border px-2 py-1 text-xs text-foreground hover:bg-muted"
-        >
-          Reset view
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFullScreen(!fullScreen)}
+            className="rounded-md border border-border px-2 py-1 text-xs text-foreground hover:bg-muted"
+          >
+            {fullScreen ? "Exit full view" : "Full view"}
+          </button>
+          <button
+            type="button"
+            onClick={resetView}
+            className="rounded-md border border-border px-2 py-1 text-xs text-foreground hover:bg-muted"
+          >
+            Reset view
+          </button>
+        </div>
       </div>
 
       <div
@@ -313,6 +421,7 @@ export default function PanZoomContainer({
         data-testid="pan-zoom-container"
       >
         <div
+          ref={contentRef}
           className="absolute left-0 top-0 will-change-transform"
           style={{
             transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
