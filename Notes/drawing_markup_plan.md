@@ -1569,7 +1569,7 @@ The helper's unit tests cover the standalone redirect and a cross-origin parent.
 
 - [ ] App loads inside the sandbox
 - [ ] Sign-in opens a window, closes it, and the iframe continues
-- [ ] `frame-ancestors` lists only Procore origins
+- [x] `frame-ancestors` lists only Procore origins
 - [ ] Session survives a reload inside the iframe
 
 ---

@@ -21,6 +21,7 @@ import NotFound from "@/pages/not-found";
 import type { ProcoreConnection } from "@shared/schema";
 
 import { apiUrl } from "@/lib/api/base_url";
+import { isEmbedded, notifySignInDone, signInThroughProcore } from "@/lib/procore_embed";
 
 type ProcoreStatusResponse = {
   connected: boolean;
@@ -32,6 +33,7 @@ type ProcoreStatusResponse = {
 };
 
 const PROCORE_USER_ID_STORAGE_KEY = "procore_user_id";
+// The browser session is this id in localStorage, not a cookie, so an iframe reload on this origin keeps it.
 
 function Router({ 
   procoreConnection, 
@@ -127,21 +129,37 @@ function App() {
       window.localStorage.setItem(PROCORE_USER_ID_STORAGE_KEY, userId);
       setProcoreUserId(userId);
       void loadProcoreStatus(userId);
-      return;
+    } else {
+      setProcoreUserId(null);
+      setActiveCompanyId(null);
+      setProcoreConnection({
+        connected: false,
+        syncStatus: "idle",
+        projectsLinked: 0,
+        errorMessage: "Not connected to Procore",
+      });
     }
 
-    setProcoreUserId(null);
-    setActiveCompanyId(null);
-    setProcoreConnection({
-      connected: false,
-      syncStatus: "idle",
-      projectsLinked: 0,
-      errorMessage: "Not connected to Procore",
-    });
+    if (sp.get("procore_connected") === "true") {
+      void notifySignInDone({
+        userId: userId ?? "",
+        companyId: sp.get("company_id"),
+      });
+    }
   }, []);
 
   const handleConnectProcore = () => {
-    window.location.href = apiUrl("/api/procore/oauth/authorize");
+    const url = apiUrl("/api/procore/oauth/authorize");
+    void signInThroughProcore(url).then((payload) => {
+      if (!isEmbedded()) return;
+      const record = payload && typeof payload === "object" ? payload as { userId?: unknown } : null;
+      const userId = typeof record?.userId === "string" ? record.userId.trim() : "";
+      if (userId) {
+        window.localStorage.setItem(PROCORE_USER_ID_STORAGE_KEY, userId);
+        setProcoreUserId(userId);
+      }
+      window.location.reload();
+    });
   };
 
   const handleDisconnectProcore = async () => {

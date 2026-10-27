@@ -22,12 +22,13 @@ describe.skipIf(!base)("MarkupWorkspace against the real API", () => {
     fire(layer, "pointerdown", 350, 405);
     fireEvent.keyDown(window, { key: "Enter" });
 
-    const filter = await screen.findByText("Underground Piping");
-    expect(filter).toBeTruthy();
-    const res = await fetch(`${base}/api/drawings/${drawingId}/markups?page=${page}`);
-    const rows = await res.json();
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ kind: "polyline", inspectionType: "Underground Piping", status: "Open", createdBy: "Dom", points: [[0.26, 0.79], [0.35, 0.81]] });
+    await waitFor(async () => {
+      const res = await fetch(`${base}/api/drawings/${drawingId}/markups?page=${page}`);
+      const rows = await res.json();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ kind: "polyline", inspectionType: "Underground Piping", status: "Open", createdBy: "Dom", points: [[0.26, 0.79], [0.35, 0.81]] });
+    });
+    expect(within(document.querySelector("aside")!).getByText("Underground Piping")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "select" }));
     fire(layer, "pointerdown", 300, 400);

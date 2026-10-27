@@ -4,6 +4,10 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
+/** Same allowlist as backend/api/procore_frame.py. Procore origins only. */
+const procoreFrameAncestors =
+  "frame-ancestors https://sandbox.procore.com https://app.procore.com https://*.procore.com https://*.procore.gov";
+
 export default defineConfig({
   plugins: [
     react(),
@@ -43,11 +47,19 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    headers: {
+      "Content-Security-Policy": procoreFrameAncestors,
+    },
     proxy: {
       "/api": {
         target: "http://localhost:2000",
         changeOrigin: true,
       },
+    },
+  },
+  preview: {
+    headers: {
+      "Content-Security-Policy": procoreFrameAncestors,
     },
   },
 });

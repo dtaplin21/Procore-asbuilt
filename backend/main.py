@@ -5,6 +5,8 @@ from fastapi import FastAPI, Request
 from observability.logging_config import configure_logging
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+
+from api.procore_frame import ProcoreFrameAncestorsMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from errors import AppError
@@ -150,6 +152,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Outermost: Procore may frame the app. Do not add X-Frame-Options.
+app.add_middleware(ProcoreFrameAncestorsMiddleware)
 
 # Include routers
 app.include_router(dashboard.router)

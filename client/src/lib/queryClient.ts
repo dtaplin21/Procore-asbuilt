@@ -1,6 +1,7 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 import { apiUrl } from "@/lib/api/base_url";
+import { signInThroughProcore } from "@/lib/procore_embed";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -43,8 +44,7 @@ export const getQueryFn: <T>(options: {
         return null;
       }
       if (unauthorizedBehavior === "redirectToProcore") {
-        // Redirect to Procore OAuth flow
-        window.location.href = apiUrl("/api/procore/oauth/authorize");
+        void signInThroughProcore(apiUrl("/api/procore/oauth/authorize"));
         throw new Error("Redirecting to Procore authentication");
       }
     }

@@ -20,31 +20,49 @@ export function isEmbedded(win: Window = window): boolean {
   }
 }
 
+/** The OAuth popup is a top-level window whose opener is the embedded app. */
+export function isAuthPopup(win: Window = window): boolean {
+  try {
+    return win.opener != null;
+  } catch {
+    return false;
+  }
+}
+
 let cached: IframeContext | null = null;
+
+async function loadHelpers(): Promise<IframeContext> {
+  const mod = (await import("@procore/procore-iframe-helpers")) as unknown as { default?: HelpersModule } & HelpersModule;
+  const helpers: HelpersModule = mod.default ?? mod;
+  return helpers.initialize();
+}
 
 export async function getProcoreContext(): Promise<IframeContext | null> {
   if (!isEmbedded()) return null;
   if (cached) return cached;
-  const mod = (await import("@procore/procore-iframe-helpers")) as unknown as { default?: HelpersModule } & HelpersModule;
-  const helpers: HelpersModule = mod.default ?? mod;
-  cached = helpers.initialize();
+  cached = await loadHelpers();
   return cached;
 }
 
-/** Opens the sign-in window at `url` (a route on your server that starts the OAuth redirect). */
-export async function signInThroughProcore(url = "/auth/procore"): Promise<void> {
+/** Opens the sign-in window at `url` (the route that starts the OAuth redirect). */
+export async function signInThroughProcore(url = "/api/procore/oauth/authorize"): Promise<unknown> {
   const ctx = await getProcoreContext();
   if (!ctx) {
     window.location.assign(url);
-    return;
+    return null;
   }
-  await new Promise<void>((resolve, reject) => {
-    ctx.authentication.authenticate({ url, onSuccess: () => resolve(), onFailure: (e) => reject(e instanceof Error ? e : new Error(String(e))) });
+  return new Promise((resolve, reject) => {
+    ctx.authentication.authenticate({
+      url,
+      onSuccess: (payload) => resolve(payload),
+      onFailure: (e) => reject(e instanceof Error ? e : new Error(String(e))),
+    });
   });
 }
 
-/** Call this from the page your OAuth callback renders, so the iframe learns that sign-in finished. */
-export async function notifySignInDone(): Promise<void> {
-  const ctx = await getProcoreContext();
-  ctx?.authentication.notifySuccess({});
+/** Call this from the page the OAuth popup lands on, so the iframe learns that sign-in finished. */
+export async function notifySignInDone(payload: unknown = {}): Promise<void> {
+  if (!isAuthPopup()) return;
+  const ctx = await loadHelpers();
+  ctx.authentication.notifySuccess(payload);
 }
