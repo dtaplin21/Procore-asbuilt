@@ -96,6 +96,20 @@ describe("toOverlayRegions", () => {
     expect(regions[0].bbox.height).toBeCloseTo(0.25);
   });
 
+  it("skips overlays whose placement was insufficient", () => {
+    const regions = toOverlayRegions([
+      makeOverlay({
+        id: 8,
+        meta: {
+          match_status: "insufficient",
+          insufficient_reason: "insufficient: Anchor box is in the legend area.",
+        },
+      }),
+    ]);
+
+    expect(regions).toHaveLength(0);
+  });
+
   it("skips overlays whose placement index is stale", () => {
     const regions = toOverlayRegions([
       makeOverlay({

@@ -84,6 +84,21 @@ describe("MatchAlertBanner", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("shows the insufficient reason", () => {
+    useInspectionMatchStatusMock.mockReturnValue({
+      inspection_id: "357",
+      match_status: "insufficient",
+      bbox: null,
+      reason:
+        "insufficient: Anchor box is in the legend area. Coordinate anchor rejected because the sheet has no registered N/E.",
+    });
+
+    render(<MatchAlertBanner evidenceId="357" />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("legend area");
+    expect(screen.getByRole("alert")).toHaveTextContent("registered N/E");
+  });
+
   it("shows no_match message", () => {
     useInspectionMatchStatusMock.mockReturnValue({
       inspection_id: "357",

@@ -39,6 +39,7 @@ describe("isTerminalMatchStatus", () => {
     expect(isTerminalMatchStatus("matched")).toBe(true);
     expect(isTerminalMatchStatus("needs_review")).toBe(true);
     expect(isTerminalMatchStatus("no_match")).toBe(true);
+    expect(isTerminalMatchStatus("insufficient")).toBe(true);
     expect(isTerminalMatchStatus("index_pending")).toBe(false);
   });
 });

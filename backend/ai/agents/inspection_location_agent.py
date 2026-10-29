@@ -10,6 +10,11 @@ from typing import Any, cast
 from sqlalchemy.orm import Session
 
 from ai.agents.evidence_dossier import EvidenceDossier, build_evidence_dossier
+from ai.pipelines.anchor_eligibility import (
+    insufficient_rationale,
+    load_anchor_context,
+    partition_anchors,
+)
 from ai.pipelines.clue_fusion_scorer import (
     FusedCandidateScore,
     fuse_candidate_scores,
@@ -131,6 +136,34 @@ class InspectionLocationAgent:
                 INSPECTION_NO_CANDIDATES,
                 "No location candidates were generated for this evidence on the master drawing.",
             )
+
+        anchor_context = load_anchor_context(
+            session,
+            master_drawing_id,
+            page=page,
+        )
+        eligible, rejected = partition_anchors(candidates, anchor_context)
+        if candidates and not eligible:
+            rationale = insufficient_rationale(rejected)
+            result = AgentMatchResult(
+                status="insufficient",
+                scope=None,
+                region_id=None,
+                page=page,
+                rationale=rationale,
+                fused_score=None,
+            )
+            persist_agent_match_result(
+                session,
+                evidence_id=evidence_id,
+                master_drawing_id=master_drawing_id,
+                result=result,
+                ranked_scores=[],
+                page=page,
+                inspection_run_id=inspection_run_id,
+            )
+            return result
+        candidates = eligible
 
         ranked_scores = fuse_candidate_scores(dossier, candidates) if candidates else []
         master_png_path = _master_rendition_path(session, master_drawing_id, page)

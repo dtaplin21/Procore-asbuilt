@@ -45,7 +45,9 @@ export function MatchAlertBanner({
     >
       {status.match_status === "index_pending"
         ? "Master drawing is still being indexed. Location matching will run automatically when indexing finishes."
-        : "No likely location was found on the master drawing for this inspection."}
+        : status.match_status === "insufficient"
+          ? status.reason?.trim() || "Placement was insufficient."
+          : "No likely location was found on the master drawing for this inspection."}
     </div>
   );
 }

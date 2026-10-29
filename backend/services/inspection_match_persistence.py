@@ -25,12 +25,24 @@ logger = logging.getLogger(__name__)
 # Used for eval, vision heuristics, and logging — not for gating overlay placement.
 MATCH_SCORE_THRESHOLD = 0.75
 
-MatchStatus = Literal["matched", "needs_review", "no_match", "index_pending"]
+MatchStatus = Literal[
+    "matched",
+    "needs_review",
+    "no_match",
+    "index_pending",
+    "insufficient",
+]
+
+_EMPTY_PLACEMENT_GEOMETRY_TYPE = "none"
 
 
 def status_includes_placement_geometry(status: MatchStatus) -> bool:
     """Whether this match status should persist scope/bbox on the master drawing."""
-    return status not in ("no_match", "index_pending")
+    return status not in ("no_match", "index_pending", "insufficient")
+
+
+def _empty_placement_geometry(page: int) -> dict[str, Any]:
+    return {"page": page, "type": _EMPTY_PLACEMENT_GEOMETRY_TYPE}
 
 
 @dataclass(frozen=True)
@@ -135,7 +147,9 @@ def persist_inspection_match_overlay(
     if overlay is not None:
         current_meta = overlay.meta if isinstance(overlay.meta, dict) else {}
         setattr(overlay, "meta", with_index_stamp({**current_meta, **meta_patch}, indexed_at))
-        if has_resolved_geometry:
+        if status == "insufficient":
+            setattr(overlay, "geometry", _empty_placement_geometry(page))
+        elif has_resolved_geometry:
             setattr(
                 overlay,
                 "geometry",
@@ -150,11 +164,14 @@ def persist_inspection_match_overlay(
         session.commit()
         return cast(int, overlay.id)
 
-    geometry = scope_to_geometry(
-        scope if status_includes_placement_geometry(status) else None,
-        fallback_bbox=bbox if status_includes_placement_geometry(status) else None,
-        page=page,
-    )
+    if status == "insufficient":
+        geometry = _empty_placement_geometry(page)
+    else:
+        geometry = scope_to_geometry(
+            scope if status_includes_placement_geometry(status) else None,
+            fallback_bbox=bbox if status_includes_placement_geometry(status) else None,
+            page=page,
+        )
     storage = StorageService(session)
     created = storage.create_drawing_overlay(
         master_drawing_id,
@@ -369,6 +386,7 @@ def persist_agent_match_result(
         {
             **current_meta,
             "match_status": result.status,
+            "insufficient_reason": result.rationale if result.status == "insufficient" else None,
             "agent_rationale": result.rationale,
             "agent_fused_score": result.fused_score,
             "agent_candidates": [

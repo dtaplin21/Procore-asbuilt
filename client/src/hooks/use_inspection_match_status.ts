@@ -7,12 +7,18 @@ import { invalidateOverlaysForRun } from "@/lib/api/overlays";
 export const MATCH_STATUS_POLL_INTERVAL_MS = 2000;
 export const MATCH_STATUS_MAX_POLL_ATTEMPTS = 30;
 
-export type MatchStatus = "matched" | "needs_review" | "no_match" | "index_pending";
+export type MatchStatus =
+  | "matched"
+  | "needs_review"
+  | "no_match"
+  | "index_pending"
+  | "insufficient";
 
 export interface MatchStatusResponse {
   inspection_id: string;
   match_status: MatchStatus;
   bbox: { x: number; y: number; width: number; height: number } | null;
+  reason?: string | null;
 }
 
 export interface UseInspectionMatchStatusOptions {
@@ -28,7 +34,8 @@ export function isTerminalMatchStatus(status: MatchStatus | undefined): boolean 
   return (
     status === "matched" ||
     status === "needs_review" ||
-    status === "no_match"
+    status === "no_match" ||
+    status === "insufficient"
   );
 }
 

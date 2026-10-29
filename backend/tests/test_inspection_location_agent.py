@@ -220,6 +220,23 @@ def _seed_ready_master_run(db: Session) -> tuple[InspectionRun, int, int, int]:
     return run, cast(int, evidence.id), cast(int, drawing.id), cast(int, region.id)
 
 
+def _seed_registered_ne(db: Session, drawing_id: int) -> None:
+    from models.drawing_survey_point import DrawingSurveyPoint
+
+    db.add(
+        DrawingSurveyPoint(
+            drawing_id=drawing_id,
+            page=1,
+            northing=2131764.84,
+            easting=6051541.82,
+            label_bbox_json={"x0": 0.20, "y0": 0.20, "x1": 0.22, "y1": 0.22},
+            source="auto_index",
+            ocr_confidence=0.95,
+        )
+    )
+    db.commit()
+
+
 def test_agent_defers_when_master_index_not_ready(db_session: Session) -> None:
     run, evidence_id, master_drawing_id, _region_id = _seed_ready_master_run(db_session)
     drawing = db_session.get(Drawing, master_drawing_id)
@@ -346,6 +363,7 @@ def test_agent_traces_on_master_when_registration_missing(
     from ai.pipelines.scope_geometry import ScopeGeometry
 
     run, evidence_id, master_drawing_id, region_id = _seed_ready_master_run(db_session)
+    _seed_registered_ne(db_session, master_drawing_id)
     dossier = _utility_line_dossier(
         evidence_id=evidence_id,
         master_drawing_id=master_drawing_id,
@@ -500,6 +518,7 @@ def test_agent_places_on_master_sheet_line_with_registration_context(
     from ai.pipelines.drawing_location_resolver import RegistrationTransform
 
     run, evidence_id, master_drawing_id, region_id = _seed_ready_master_run(db_session)
+    _seed_registered_ne(db_session, master_drawing_id)
     dossier = _utility_line_dossier(
         evidence_id=evidence_id,
         master_drawing_id=master_drawing_id,
@@ -527,7 +546,7 @@ def test_agent_places_on_master_sheet_line_with_registration_context(
     candidate = LocationMatchCandidate(
         method=ResolutionMethod.COORDINATE_LOOKUP,
         confidence=0.98,
-        bbox_fractional=(0.518, 0.472, 0.556, 0.480),
+        bbox_fractional=(0.38, 0.26, 0.44, 0.32),
         page=1,
         source_drawing_id=aux_drawing_id,
     )
@@ -582,6 +601,7 @@ def test_agent_uses_master_sheet_line_when_aux_coordinate_unprojected(
     db_session: Session,
 ) -> None:
     run, evidence_id, master_drawing_id, region_id = _seed_ready_master_run(db_session)
+    _seed_registered_ne(db_session, master_drawing_id)
     dossier = _utility_line_dossier(
         evidence_id=evidence_id,
         master_drawing_id=master_drawing_id,
@@ -629,3 +649,155 @@ def test_agent_uses_master_sheet_line_when_aux_coordinate_unprojected(
     )
     geometry = cast(dict, overlay.geometry)
     assert geometry["type"] == "line_segments"
+
+
+def _legend_rect(db: Session, drawing_id: int) -> None:
+    drawing = db.get(Drawing, drawing_id)
+    assert drawing is not None
+    stats = dict(drawing.index_stats_json or {})
+    stats["legend_index"] = {"legend_rect": [0.7, 0.02, 0.98, 0.135]}
+    setattr(drawing, "index_stats_json", stats)
+    db.commit()
+
+
+def _legend_rect(db: Session, drawing_id: int) -> None:
+    drawing = db.get(Drawing, drawing_id)
+    assert drawing is not None
+    stats = dict(drawing.index_stats_json or {})
+    stats["legend_index"] = {"legend_rect": [0.7, 0.02, 0.98, 0.135]}
+    setattr(drawing, "index_stats_json", stats)
+    db.commit()
+
+
+@patch(
+    "ai.agents.inspection_location_agent.apply_vision_to_fused_scores",
+    side_effect=lambda _dossier, scores, **kwargs: scores,
+)
+@patch("ai.agents.inspection_location_agent.resolve_master_sheet_line_scope")
+@patch("ai.agents.inspection_location_agent.fuse_candidate_scores")
+@patch("ai.agents.inspection_location_agent.generate_all_location_candidates")
+@patch("ai.agents.inspection_location_agent.build_evidence_dossier")
+def test_agent_ranks_a_valid_station_ahead_of_a_legend_coordinate(
+    mock_build_dossier,
+    mock_generate_candidates,
+    mock_fuse_scores,
+    mock_resolve_scope,
+    _mock_should_vision,
+    db_session: Session,
+) -> None:
+    from ai.pipelines.scope_geometry import ScopeGeometry
+
+    run, evidence_id, master_drawing_id, region_id = _seed_ready_master_run(db_session)
+    _legend_rect(db_session, master_drawing_id)
+    dossier = _utility_line_dossier(
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+        region_id=region_id,
+    )
+    mock_build_dossier.return_value = dossier
+
+    legend_coordinate = LocationMatchCandidate(
+        method=ResolutionMethod.COORDINATE_LOOKUP,
+        confidence=0.98,
+        bbox_fractional=(0.849, 0.029, 0.862, 0.051),
+        page=1,
+        source_drawing_id=master_drawing_id,
+    )
+    station = LocationMatchCandidate(
+        method=ResolutionMethod.STATION_LOOKUP,
+        confidence=0.50,
+        bbox_fractional=(0.20, 0.30, 0.24, 0.34),
+        page=1,
+        source_drawing_id=master_drawing_id,
+    )
+    mock_generate_candidates.return_value = [legend_coordinate, station]
+
+    def _fuse(_dossier, candidates):
+        assert candidates == [station]
+        return [
+            FusedCandidateScore(
+                candidate=station,
+                fused_score=0.50,
+                clue_hits=(),
+                conflicts=(),
+                rationale="station_lookup@0.88",
+            )
+        ]
+
+    mock_fuse_scores.side_effect = _fuse
+    mock_resolve_scope.return_value = ScopeGeometry(
+        page=1,
+        type="line_segments",
+        segments=(((0.20, 0.30), (0.24, 0.34)),),
+        scope_kind=ScopeKind.UTILITY_LINE,
+        meta={"source": "sheet_line", "anchor_intersects_line": True},
+    )
+
+    result = InspectionLocationAgent().run(
+        db_session,
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+        inspection_run_id=run.id,
+    )
+
+    assert result.status == "matched"
+    mock_fuse_scores.assert_called_once()
+
+
+@patch(
+    "ai.agents.inspection_location_agent.apply_vision_to_fused_scores",
+    side_effect=lambda _dossier, scores, **kwargs: scores,
+)
+@patch("ai.agents.inspection_location_agent.resolve_master_sheet_line_scope")
+@patch("ai.agents.inspection_location_agent.fuse_candidate_scores")
+@patch("ai.agents.inspection_location_agent.generate_all_location_candidates")
+@patch("ai.agents.inspection_location_agent.build_evidence_dossier")
+def test_agent_returns_insufficient_when_every_anchor_is_rejected(
+    mock_build_dossier,
+    mock_generate_candidates,
+    mock_fuse_scores,
+    mock_resolve_scope,
+    _mock_should_vision,
+    db_session: Session,
+) -> None:
+    run, evidence_id, master_drawing_id, region_id = _seed_ready_master_run(db_session)
+    _legend_rect(db_session, master_drawing_id)
+    mock_build_dossier.return_value = _utility_line_dossier(
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+        region_id=region_id,
+    )
+    mock_generate_candidates.return_value = [
+        LocationMatchCandidate(
+            method=ResolutionMethod.COORDINATE_LOOKUP,
+            confidence=0.98,
+            bbox_fractional=(0.849, 0.029, 0.862, 0.051),
+            page=1,
+            source_drawing_id=894,
+        )
+    ]
+
+    result = InspectionLocationAgent().run(
+        db_session,
+        evidence_id=evidence_id,
+        master_drawing_id=master_drawing_id,
+        inspection_run_id=run.id,
+    )
+
+    assert result.status == "insufficient"
+    assert result.scope is None
+    assert "legend" in (result.rationale or "")
+    assert "registered N/E" in (result.rationale or "")
+    mock_fuse_scores.assert_not_called()
+    mock_resolve_scope.assert_not_called()
+
+    overlay = (
+        db_session.query(DrawingOverlay)
+        .filter(DrawingOverlay.inspection_run_id == run.id)
+        .one()
+    )
+    geometry = cast(dict, overlay.geometry)
+    meta = cast(dict, overlay.meta)
+    assert geometry["type"] == "none"
+    assert meta["match_status"] == "insufficient"
+    assert "legend" in meta["insufficient_reason"]

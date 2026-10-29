@@ -103,6 +103,7 @@ class TestInspectionMatchStatusApi:
             "inspection_id": inspection_id,
             "match_status": "matched",
             "bbox": {"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.4},
+            "reason": None,
         }
         assert "confidence" not in body
         assert "score" not in body
@@ -172,6 +173,42 @@ class TestInspectionMatchStatusApi:
         assert response.status_code == 200
         assert response.json()["match_status"] == "no_match"
         assert response.json()["bbox"] is None
+
+    def test_insufficient_returns_the_reason(self, client, db_session: Session) -> None:
+        _, inspection_id = _seed_run_with_overlay(
+            db_session,
+            match_status="insufficient",
+        )
+        run = (
+            db_session.query(InspectionRun)
+            .filter(InspectionRun.evidence_id == int(inspection_id))
+            .one()
+        )
+        overlay = (
+            db_session.query(DrawingOverlay)
+            .filter(DrawingOverlay.inspection_run_id == run.id)
+            .one()
+        )
+        assert overlay is not None
+        overlay.meta = {
+            "match_status": "insufficient",
+            "insufficient_reason": (
+                "insufficient: Anchor box is in the legend area. "
+                "Coordinate anchor rejected because the sheet has no registered N/E."
+            ),
+        }
+        overlay.geometry = {"page": 1, "type": "none"}
+        db_session.commit()
+
+        response = client.get(f"/api/inspections/{inspection_id}/match-status")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["match_status"] == "insufficient"
+        assert body["bbox"] is None
+        assert "legend" in body["reason"]
+        assert "registered N/E" in body["reason"]
+        assert "score" not in body
+        assert "confidence" not in body
 
 
 class TestInspectionMatchStatusApiNoScoreLeaks:

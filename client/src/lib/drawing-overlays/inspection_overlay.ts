@@ -366,6 +366,7 @@ export function toOverlayRegions(overlays: DrawingOverlay[]): OverlayRegion[] {
 
     const meta = isRecord(overlay.meta) ? overlay.meta : null;
     if (meta?.index_stale === true) continue;
+    if (meta?.match_status === "insufficient") continue;
 
     const shape = overlayGeometryToDiffRegion(overlay.geometry);
     if (!shape) continue;

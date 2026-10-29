@@ -53,6 +53,7 @@ DEFERRED_MATCH_META_KEY = "deferredInspectionMatch"
 class InspectionMatchRecord:
     match_status: MatchStatus
     bbox: tuple[float, float, float, float] | None = None
+    reason: str | None = None
 
 
 def load_inspection_match_status(
@@ -83,9 +84,15 @@ def load_inspection_match_status(
     raw_status = meta.get("match_status", "needs_review")
     status: MatchStatus = (
         raw_status
-        if raw_status in ("matched", "needs_review", "no_match", "index_pending")
+        if raw_status
+        in ("matched", "needs_review", "no_match", "index_pending", "insufficient")
         else "needs_review"
     )
+    reason: str | None = None
+    if status == "insufficient":
+        raw_reason = meta.get("insufficient_reason")
+        if isinstance(raw_reason, str) and raw_reason.strip():
+            reason = raw_reason.strip()
 
     bbox: tuple[float, float, float, float] | None = None
     if status == "matched" and isinstance(overlay.geometry, dict):
@@ -101,7 +108,7 @@ def load_inspection_match_status(
             except (KeyError, TypeError, ValueError):
                 bbox = None
 
-    return InspectionMatchRecord(match_status=status, bbox=bbox)
+    return InspectionMatchRecord(match_status=status, bbox=bbox, reason=reason)
 
 
 def _resolve_user_id_for_project(db: Session, project_id: int) -> int:

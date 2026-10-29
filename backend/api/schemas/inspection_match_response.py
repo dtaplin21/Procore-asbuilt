@@ -17,7 +17,8 @@ class BboxResponse(BaseModel):
 
 class InspectionMatchStatusResponse(BaseModel):
     inspection_id: str
-    match_status: str  # matched | needs_review | no_match | index_pending
+    match_status: str  # matched | needs_review | no_match | index_pending | insufficient
     bbox: Optional[BboxResponse] = None
+    reason: Optional[str] = None
 
     model_config = ConfigDict(extra="forbid")

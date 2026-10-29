@@ -1206,9 +1206,24 @@ def resolve_evidence_location(
         master_drawing_id=master_drawing_id,
         page=page,
     )
+    from ai.pipelines.anchor_eligibility import (
+        insufficient_rationale,
+        load_anchor_context,
+        partition_anchors,
+    )
+
+    eligible_candidates, rejected_anchors = partition_anchors(
+        location_candidates,
+        load_anchor_context(session, master_drawing_id, page=page),
+    )
+    if location_candidates and not eligible_candidates:
+        return LocationMatchResult.unresolved(
+            master_drawing_id,
+            notes=insufficient_rationale(rejected_anchors),
+        )
     method_candidates = [
         method_candidate_from_location(candidate)
-        for candidate in location_candidates
+        for candidate in eligible_candidates
     ]
 
     match_detail = {
@@ -1219,9 +1234,10 @@ def resolve_evidence_location(
         "clue_count": len(clues),
         "coordinate_lookup_skipped": not evidence_points or not scoped_points,
         "has_registration_transform": _load_registration_transform(evidence) is not None,
-        "candidate_count": len(location_candidates),
+        "candidate_count": len(eligible_candidates),
+        "rejected_anchor_count": len(rejected_anchors),
         "coordinate_projections": _coordinate_projection_log_entries(
-            location_candidates,
+            eligible_candidates,
             master_drawing_id=master_drawing_id,
         ),
     }

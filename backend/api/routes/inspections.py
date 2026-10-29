@@ -54,6 +54,7 @@ def get_match_status(
         inspection_id=inspection_id,
         match_status=record.match_status,
         bbox=bbox,
+        reason=record.reason,
     )
 
 
