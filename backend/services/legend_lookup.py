@@ -6,6 +6,7 @@ token resolves to 'fire department connection' for candidate scoring.
 
 from __future__ import annotations
 
+import re
 from typing import List, Optional, cast
 
 from sqlalchemy.orm import Session
@@ -16,6 +17,27 @@ from models.legend_reference import (
     DrawingLegendLineType,
     DrawingLegendSymbol,
 )
+
+# One-letter codes ("S", "E", "A", "D") are real abbreviations, but they are
+# not safe to search for in free text. "S" is a substring of DASHED.
+MIN_LEGEND_CODE_LENGTH = 2
+
+
+def legend_code_matches_text(code: str, text: str) -> bool:
+    """True when ``code`` is a whole token in ``text`` and long enough to search.
+
+    Matching is case-insensitive. Punctuation that belongs to the code (``C&G``)
+    stays part of the token. A code shorter than ``MIN_LEGEND_CODE_LENGTH``
+    alphanumerics never matches, including as its own token.
+    """
+    raw = code.strip().upper()
+    alphanumerics = re.sub(r"[^A-Z0-9]", "", raw)
+    if len(alphanumerics) < MIN_LEGEND_CODE_LENGTH or not text.strip():
+        return False
+    return (
+        re.search(rf"(?<![A-Z0-9]){re.escape(raw)}(?![A-Z0-9])", text.upper())
+        is not None
+    )
 
 
 def expand_abbreviation(

@@ -35,6 +35,8 @@ type Props = {
   /** When set, the parent owns fullscreen. The sheet then fills the screen. */
   fullScreen?: boolean;
   onFullScreenChange?: (fullScreen: boolean) => void;
+  /** Size the sheet to the viewer instead of the artwork's pixel size. */
+  fillViewport?: boolean;
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -62,6 +64,7 @@ export default function PanZoomContainer({
   fitToken = 0,
   fullScreen: fullScreenProp,
   onFullScreenChange,
+  fillViewport = false,
 }: Props) {
   const [uncontrolledFullScreen, setUncontrolledFullScreen] = useState(false);
   const fullScreen = fullScreenProp ?? uncontrolledFullScreen;
@@ -422,7 +425,11 @@ export default function PanZoomContainer({
       >
         <div
           ref={contentRef}
-          className="absolute left-0 top-0 will-change-transform"
+          className={
+            fillViewport
+              ? "absolute inset-0 will-change-transform"
+              : "absolute left-0 top-0 will-change-transform"
+          }
           style={{
             transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
             transformOrigin: "0 0",

@@ -18,7 +18,9 @@ from ai.pipelines.drawing_location_resolver import MasterRegion
 from ai.pipelines.evidence_kind_classifier import EvidenceKind
 from ai.pipelines.scope_geometry import ScopeKind
 from ai.pipelines.scope_line_tracer import (
+    LONG_LINE_FRAC,
     resolve_master_sheet_line_scope,
+    suspect_line_reason,
     trace_scope_geometry,
 )
 from ai.pipelines.survey_point_extractor import SurveyPointRecord
@@ -399,7 +401,7 @@ def test_trace_utility_line_prefers_plan_sheet_line_over_vision(
                     "symbols": [],
                     "lines": [
                         {
-                            "points": [[0.20, 0.25], [0.45, 0.30]],
+                            "points": [[0.25, 0.27], [0.41, 0.30]],
                             "viewport_id": "plan",
                             "confidence": 0.85,
                             "line_type": None,
@@ -453,7 +455,7 @@ def test_trace_utility_line_prefers_plan_sheet_line_over_vision(
     assert scope.meta is not None
     assert scope.meta.get("source") == "sheet_line"
     assert scope.meta.get("viewport_id") == "plan"
-    assert scope.segments == (((0.20, 0.25), (0.45, 0.30)),)
+    assert scope.segments == (((0.25, 0.27), (0.41, 0.30)),)
 
 
 def test_trace_utility_line_skips_mismatched_typed_sheet_line(
@@ -509,7 +511,7 @@ def test_trace_utility_line_skips_mismatched_typed_sheet_line(
                     "symbols": [],
                     "lines": [
                         {
-                            "points": [[0.20, 0.25], [0.45, 0.30]],
+                            "points": [[0.25, 0.27], [0.41, 0.30]],
                             "viewport_id": "plan",
                             "confidence": 0.95,
                             "line_type": "Water Main",
@@ -618,7 +620,7 @@ def test_trace_utility_line_prefers_typed_over_untyped_sheet_line(
                     "symbols": [],
                     "lines": [
                         {
-                            "points": [[0.20, 0.25], [0.45, 0.30]],
+                            "points": [[0.25, 0.27], [0.41, 0.30]],
                             "viewport_id": "plan",
                             "confidence": 0.95,
                             "line_type": None,
@@ -718,7 +720,7 @@ def test_resolve_master_sheet_line_strict_requires_anchor_intersection(
                             "line_type": None,
                         },
                         {
-                            "points": [[0.20, 0.25], [0.45, 0.30]],
+                            "points": [[0.25, 0.27], [0.41, 0.30]],
                             "viewport_id": "plan",
                             "confidence": 0.85,
                             "line_type": None,
@@ -754,11 +756,11 @@ def test_resolve_master_sheet_line_strict_requires_anchor_intersection(
     )
     assert scope.meta is not None
     assert scope.meta.get("anchor_intersects_line") is True
-    assert scope.segments == (((0.20, 0.25), (0.45, 0.30)),)
+    assert scope.segments == (((0.25, 0.27), (0.41, 0.30)),)
 
-    # Lower-left pin: no vertex on either line inside padded anchor (padding 0.05).
+    # Pin sits outside the plan viewport, so the plan lines are not searched.
     far_anchor = (0.02, 0.02, 0.05, 0.05)
-    with pytest.raises(ValueError, match="INSPECTION_NO_ANCHOR_INTERSECTING_LINE"):
+    with pytest.raises(ValueError, match="outside every viewport"):
         resolve_master_sheet_line_scope(
             session,
             dossier=dossier,
@@ -768,8 +770,20 @@ def test_resolve_master_sheet_line_strict_requires_anchor_intersection(
             strict=True,
         )
 
+    # Inside the plan, but neither line comes within tolerance of the point.
+    missed_anchor = (0.10, 0.40, 0.14, 0.44)
+    with pytest.raises(ValueError, match="INSPECTION_NO_ANCHOR_INTERSECTING_LINE"):
+        resolve_master_sheet_line_scope(
+            session,
+            dossier=dossier,
+            master_drawing_id=master_id,
+            page=1,
+            anchor_bbox=missed_anchor,
+            strict=True,
+        )
 
-def test_resolve_master_sheet_line_non_strict_allows_nearest_line(
+
+def test_resolve_master_sheet_line_non_strict_rejects_line_that_misses_anchor(
     db_session,
     project,
 ) -> None:
@@ -827,14 +841,554 @@ def test_resolve_master_sheet_line_non_strict_allows_nearest_line(
         master_drawing_id=master_id,
     )
 
+    with pytest.raises(ValueError, match="outside every viewport"):
+        resolve_master_sheet_line_scope(
+            session,
+            dossier=dossier,
+            master_drawing_id=master_id,
+            page=1,
+            anchor_bbox=(0.02, 0.02, 0.05, 0.05),
+            strict=False,
+        )
+
+
+def _sheet(
+    *,
+    viewports: list[dict],
+    lines: list[dict],
+) -> dict:
+    return {
+        "sheetEntityGraph": {
+            "1": {
+                "drawing_id": 0,
+                "page": 1,
+                "viewports": viewports,
+                "labels": [],
+                "symbols": [],
+                "lines": lines,
+                "associations": [],
+                "meta": {},
+            }
+        }
+    }
+
+
+def test_profile_station_searches_the_profile_viewport(db_session, project) -> None:
+    from dataclasses import replace
+
+    from models.models import Drawing
+    from sqlalchemy.orm import Session
+
+    session = cast(Session, db_session)
+    master = Drawing(
+        project_id=cast(int, project.id),
+        source="upload",
+        name="Master.pdf",
+        content_type="application/pdf",
+        processing_status="ready",
+        index_status="ready",
+        index_stats_json=_sheet(
+            viewports=[
+                {
+                    "viewport_id": "plan",
+                    "kind": "plan",
+                    "page": 1,
+                    "bbox_fractional": [0.05, 0.08, 0.80, 0.42],
+                    "scale": None,
+                    "source": "manual",
+                    "notes": "",
+                },
+                {
+                    "viewport_id": "profile",
+                    "kind": "profile",
+                    "page": 1,
+                    "bbox_fractional": [0.03, 0.45, 0.82, 0.94],
+                    "scale": None,
+                    "source": "manual",
+                    "notes": "",
+                },
+            ],
+            lines=[
+                {
+                    "points": [[0.20, 0.20], [0.50, 0.24]],
+                    "viewport_id": "plan",
+                    "confidence": 0.99,
+                    "line_type": "SS",
+                },
+                {
+                    "points": [[0.26, 0.80], [0.35, 0.81]],
+                    "viewport_id": "profile",
+                    "confidence": 0.8,
+                    "line_type": "SS",
+                },
+                {
+                    "points": [
+                        [0.036, 0.017],
+                        [0.905, 0.017],
+                        [0.905, 0.983],
+                        [0.036, 0.983],
+                        [0.036, 0.017],
+                    ],
+                    "viewport_id": None,
+                    "confidence": 0.95,
+                    "line_type": "dashed",
+                },
+            ],
+        ),
+    )
+    session.add(master)
+    session.commit()
+    master_id = cast(int, master.id)
+    dossier = replace(
+        _dossier(evidence_text="Sanitary sewer", tiles=(), legend_codes=("SS",)),
+        master_drawing_id=master_id,
+    )
+
     scope = resolve_master_sheet_line_scope(
         session,
         dossier=dossier,
         master_drawing_id=master_id,
         page=1,
-        anchor_bbox=(0.02, 0.02, 0.05, 0.05),
+        anchor_bbox=(0.28, 0.79, 0.32, 0.82),
         strict=False,
     )
+
+    assert scope.segments == (((0.26, 0.80), (0.35, 0.81)),)
     assert scope.meta is not None
-    assert scope.meta.get("anchor_intersects_line") is False
-    assert scope.segments == (((0.80, 0.08), (0.69, 0.73)),)
+    assert scope.meta.get("search_viewport_kind") == "profile"
+    assert scope.meta.get("search_region") == "viewport"
+    assert scope.meta.get("anchor_intersects_line") is True
+
+
+def test_single_letter_legend_code_does_not_match_dashed(db_session, project) -> None:
+    from dataclasses import replace
+
+    from models.models import Drawing
+    from sqlalchemy.orm import Session
+
+    session = cast(Session, db_session)
+    master = Drawing(
+        project_id=cast(int, project.id),
+        source="upload",
+        name="Master.pdf",
+        content_type="application/pdf",
+        processing_status="ready",
+        index_status="ready",
+        index_stats_json=_sheet(
+            viewports=[
+                {
+                    "viewport_id": "profile",
+                    "kind": "profile",
+                    "page": 1,
+                    "bbox_fractional": [0.03, 0.45, 0.82, 0.94],
+                    "scale": None,
+                    "source": "manual",
+                    "notes": "",
+                }
+            ],
+            lines=[
+                {
+                    "points": [[0.10, 0.80], [0.60, 0.80]],
+                    "viewport_id": "profile",
+                    "confidence": 0.99,
+                    "line_type": "dashed",
+                },
+                {
+                    "points": [[0.22, 0.80], [0.38, 0.80]],
+                    "viewport_id": "profile",
+                    "confidence": 0.8,
+                    "line_type": "SS",
+                },
+            ],
+        ),
+    )
+    session.add(master)
+    session.commit()
+    master_id = cast(int, master.id)
+    dossier = replace(
+        _dossier(
+            evidence_text="Sanitary sewer",
+            tiles=(),
+            legend_codes=("S", "A", "D", "E", "SS"),
+        ),
+        master_drawing_id=master_id,
+    )
+
+    scope = resolve_master_sheet_line_scope(
+        session,
+        dossier=dossier,
+        master_drawing_id=master_id,
+        page=1,
+        anchor_bbox=(0.29, 0.79, 0.31, 0.81),
+        strict=False,
+    )
+
+    assert scope.segments == (((0.22, 0.80), (0.38, 0.80)),)
+
+
+def test_padded_box_corner_does_not_count_as_touching(db_session, project) -> None:
+    from dataclasses import replace
+
+    from models.models import Drawing
+    from sqlalchemy.orm import Session
+
+    session = cast(Session, db_session)
+    master = Drawing(
+        project_id=cast(int, project.id),
+        source="upload",
+        name="Master.pdf",
+        content_type="application/pdf",
+        processing_status="ready",
+        index_status="ready",
+        index_stats_json=_sheet(
+            viewports=[
+                {
+                    "viewport_id": "plan",
+                    "kind": "plan",
+                    "page": 1,
+                    "bbox_fractional": [0.0, 0.0, 1.0, 1.0],
+                    "scale": None,
+                    "source": "manual",
+                    "notes": "",
+                }
+            ],
+            lines=[
+                {
+                    "points": [[0.80, 0.063], [0.90, 0.063]],
+                    "viewport_id": "plan",
+                    "confidence": 0.9,
+                    "line_type": None,
+                }
+            ],
+        ),
+    )
+    session.add(master)
+    session.commit()
+    master_id = cast(int, master.id)
+    dossier = replace(
+        _dossier(evidence_text="Sanitary sewer", tiles=(), legend_codes=("SS",)),
+        master_drawing_id=master_id,
+    )
+
+    # Expanded by 0.05 this box contains the border corner (0.905, 0.017).
+    # The closest border segment is still farther than the touch tolerance.
+    with pytest.raises(ValueError, match="INSPECTION_NO_ANCHOR_INTERSECTING_LINE"):
+        resolve_master_sheet_line_scope(
+            session,
+            dossier=dossier,
+            master_drawing_id=master_id,
+            page=1,
+            anchor_bbox=(0.849, 0.029, 0.862, 0.051),
+            strict=False,
+        )
+
+
+def test_fixed_y_band_is_recorded_when_no_viewport_exists(db_session, project) -> None:
+    from dataclasses import replace
+
+    from models.models import Drawing
+    from sqlalchemy.orm import Session
+
+    session = cast(Session, db_session)
+    master = Drawing(
+        project_id=cast(int, project.id),
+        source="upload",
+        name="Master.pdf",
+        content_type="application/pdf",
+        processing_status="ready",
+        index_status="ready",
+        index_stats_json=_sheet(
+            viewports=[],
+            lines=[
+                {
+                    "points": [[0.20, 0.30], [0.40, 0.32]],
+                    "viewport_id": None,
+                    "confidence": 0.9,
+                    "line_type": None,
+                },
+                {
+                    "points": [[0.20, 0.80], [0.40, 0.82]],
+                    "viewport_id": None,
+                    "confidence": 0.99,
+                    "line_type": None,
+                },
+            ],
+        ),
+    )
+    session.add(master)
+    session.commit()
+    master_id = cast(int, master.id)
+    dossier = replace(
+        _dossier(evidence_text="Sanitary sewer", tiles=(), legend_codes=("SS",)),
+        master_drawing_id=master_id,
+    )
+
+    scope = resolve_master_sheet_line_scope(
+        session,
+        dossier=dossier,
+        master_drawing_id=master_id,
+        page=1,
+        anchor_bbox=(0.28, 0.29, 0.32, 0.33),
+        strict=False,
+    )
+
+    assert scope.segments == (((0.20, 0.30), (0.40, 0.32)),)
+    assert scope.meta is not None
+    assert scope.meta.get("search_region") == "fixed_y_band"
+    assert "fixed y band" in str(scope.meta.get("search_region_note"))
+
+
+def test_segment_that_ends_on_the_anchor_point_counts(db_session, project) -> None:
+    from dataclasses import replace
+
+    from models.models import Drawing
+    from sqlalchemy.orm import Session
+
+    session = cast(Session, db_session)
+    master = Drawing(
+        project_id=cast(int, project.id),
+        source="upload",
+        name="Master.pdf",
+        content_type="application/pdf",
+        processing_status="ready",
+        index_status="ready",
+        index_stats_json=_sheet(
+            viewports=[
+                {
+                    "viewport_id": "profile",
+                    "kind": "profile",
+                    "page": 1,
+                    "bbox_fractional": [0.03, 0.45, 0.82, 0.94],
+                    "scale": None,
+                    "source": "manual",
+                    "notes": "",
+                }
+            ],
+            lines=[
+                {
+                    "points": [[0.20, 0.80], [0.30, 0.80]],
+                    "viewport_id": "profile",
+                    "confidence": 0.9,
+                    "line_type": None,
+                }
+            ],
+        ),
+    )
+    session.add(master)
+    session.commit()
+    master_id = cast(int, master.id)
+    dossier = replace(
+        _dossier(evidence_text="Sanitary sewer", tiles=(), legend_codes=("SS",)),
+        master_drawing_id=master_id,
+    )
+
+    scope = resolve_master_sheet_line_scope(
+        session,
+        dossier=dossier,
+        master_drawing_id=master_id,
+        page=1,
+        anchor_bbox=(0.29, 0.79, 0.31, 0.81),
+        strict=True,
+    )
+
+    assert scope.meta is not None
+    assert scope.meta.get("anchor_intersects_line") is True
+    assert scope.segments == (((0.20, 0.80), (0.30, 0.80)),)
+
+
+_AUDITED_SHEET_BORDER = [
+    [0.036, 0.017],
+    [0.905, 0.017],
+    [0.905, 0.983],
+    [0.036, 0.983],
+    [0.036, 0.017],
+]
+
+
+def test_audited_sheet_border_is_a_suspect_line() -> None:
+    points = [(x, y) for x, y in _AUDITED_SHEET_BORDER]
+    assert suspect_line_reason(points, explicitly_requested=False) == "sheet_border"
+    assert suspect_line_reason(points, explicitly_requested=True) == "sheet_border"
+
+    on_edges = [
+        (0.02, 0.02),
+        (0.20, 0.02),
+        (0.20, 0.15),
+        (0.02, 0.15),
+        (0.02, 0.02),
+    ]
+    assert suspect_line_reason(on_edges, explicitly_requested=False) == "sheet_border"
+
+    long_line = [(0.10, 0.50), (0.10 + LONG_LINE_FRAC + 0.01, 0.50)]
+    assert suspect_line_reason(long_line, explicitly_requested=False) == "long_line"
+    assert suspect_line_reason(long_line, explicitly_requested=True) is None
+
+    short_line = [(0.20, 0.50), (0.35, 0.50)]
+    assert suspect_line_reason(short_line, explicitly_requested=False) is None
+
+
+def test_sheet_border_is_not_traced_when_the_anchor_lies_on_it(db_session, project) -> None:
+    from dataclasses import replace
+
+    from models.models import Drawing
+    from sqlalchemy.orm import Session
+
+    session = cast(Session, db_session)
+    master = Drawing(
+        project_id=cast(int, project.id),
+        source="upload",
+        name="Master.pdf",
+        content_type="application/pdf",
+        processing_status="ready",
+        index_status="ready",
+        index_stats_json=_sheet(
+            viewports=[
+                {
+                    "viewport_id": "plan",
+                    "kind": "plan",
+                    "page": 1,
+                    "bbox_fractional": [0.0, 0.0, 1.0, 1.0],
+                    "scale": None,
+                    "source": "manual",
+                    "notes": "",
+                }
+            ],
+            lines=[
+                {
+                    "points": _AUDITED_SHEET_BORDER,
+                    "viewport_id": "plan",
+                    "confidence": 0.99,
+                    "line_type": None,
+                },
+                {
+                    "points": [[0.40, 0.50], [0.55, 0.50]],
+                    "viewport_id": "plan",
+                    "confidence": 0.8,
+                    "line_type": "SS",
+                },
+            ],
+        ),
+    )
+    session.add(master)
+    session.commit()
+    master_id = cast(int, master.id)
+    dossier = replace(
+        _dossier(evidence_text="Sanitary sewer", tiles=(), legend_codes=("SS",)),
+        master_drawing_id=master_id,
+    )
+
+    # Anchor sits on the border's top edge. The border must not be the match.
+    with pytest.raises(ValueError, match="INSPECTION_NO_ANCHOR_INTERSECTING_LINE"):
+        resolve_master_sheet_line_scope(
+            session,
+            dossier=dossier,
+            master_drawing_id=master_id,
+            page=1,
+            anchor_bbox=(0.39, 0.007, 0.41, 0.027),
+            strict=False,
+        )
+
+
+def test_long_line_is_kept_only_when_its_type_was_requested(db_session, project) -> None:
+    from dataclasses import replace
+
+    from models.models import Drawing
+    from sqlalchemy.orm import Session
+
+    session = cast(Session, db_session)
+    master = Drawing(
+        project_id=cast(int, project.id),
+        source="upload",
+        name="Master.pdf",
+        content_type="application/pdf",
+        processing_status="ready",
+        index_status="ready",
+        index_stats_json=_sheet(
+            viewports=[
+                {
+                    "viewport_id": "plan",
+                    "kind": "plan",
+                    "page": 1,
+                    "bbox_fractional": [0.0, 0.0, 1.0, 1.0],
+                    "scale": None,
+                    "source": "manual",
+                    "notes": "",
+                }
+            ],
+            lines=[
+                {
+                    "points": [[0.10, 0.50], [0.70, 0.50]],
+                    "viewport_id": "plan",
+                    "confidence": 0.99,
+                    "line_type": None,
+                },
+                {
+                    "points": [[0.40, 0.50], [0.55, 0.50]],
+                    "viewport_id": "plan",
+                    "confidence": 0.8,
+                    "line_type": "SS",
+                },
+            ],
+        ),
+    )
+    session.add(master)
+    session.commit()
+    master_id = cast(int, master.id)
+    dossier = replace(
+        _dossier(evidence_text="Sanitary sewer", tiles=(), legend_codes=("SS",)),
+        master_drawing_id=master_id,
+    )
+
+    scope = resolve_master_sheet_line_scope(
+        session,
+        dossier=dossier,
+        master_drawing_id=master_id,
+        page=1,
+        anchor_bbox=(0.44, 0.49, 0.48, 0.51),
+        strict=False,
+    )
+
+    assert scope.segments == (((0.40, 0.50), (0.55, 0.50)),)
+
+    long_only = Drawing(
+        project_id=cast(int, project.id),
+        source="upload",
+        name="Master.pdf",
+        content_type="application/pdf",
+        processing_status="ready",
+        index_status="ready",
+        index_stats_json=_sheet(
+            viewports=[
+                {
+                    "viewport_id": "plan",
+                    "kind": "plan",
+                    "page": 1,
+                    "bbox_fractional": [0.0, 0.0, 1.0, 1.0],
+                    "scale": None,
+                    "source": "manual",
+                    "notes": "",
+                }
+            ],
+            lines=[
+                {
+                    "points": [[0.10, 0.50], [0.70, 0.50]],
+                    "viewport_id": "plan",
+                    "confidence": 0.9,
+                    "line_type": "SS",
+                }
+            ],
+        ),
+    )
+    session.add(long_only)
+    session.commit()
+    long_id = cast(int, long_only.id)
+    long_dossier = replace(dossier, master_drawing_id=long_id)
+    long_scope = resolve_master_sheet_line_scope(
+        session,
+        dossier=long_dossier,
+        master_drawing_id=long_id,
+        page=1,
+        anchor_bbox=(0.44, 0.49, 0.48, 0.51),
+        strict=False,
+    )
+    assert long_scope.segments == (((0.10, 0.50), (0.70, 0.50)),)

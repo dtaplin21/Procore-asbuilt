@@ -14,6 +14,7 @@ from ai.pipelines.drawing_location_resolver import MasterRegion, ResolutionMetho
 from ai.pipelines.location_match_orchestrator import LocationMatchCandidate
 from ai.pipelines.fractional_coords import bbox_intersects_page
 from services.inspection_vocabulary import location_labels_compatible
+from services.legend_lookup import legend_code_matches_text
 from services.location_match_eval import rect_iou
 
 logger = logging.getLogger(__name__)
@@ -758,15 +759,10 @@ def _sewer_tokens_from_clues(
 
 
 def _sewer_tokens_from_text(text: str) -> set[str]:
-    upper = text.upper()
     found: set[str] = set()
     for token in _SEWER_LEGEND_TOKENS:
-        if token in upper:
+        if legend_code_matches_text(token, text):
             found.add(token)
-    if re.search(r"\bSS\b", upper):
-        found.add("SS")
-    if re.search(r"\bSSMH\b", upper):
-        found.add("SSMH")
     return found
 
 

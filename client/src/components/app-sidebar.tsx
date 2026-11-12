@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   ClipboardCheck,
   Layers,
+  ScanSearch,
   Settings,
   Cloud,
 } from "lucide-react";
@@ -39,6 +40,11 @@ const mainNavItems = [
 ];
 
 const secondaryNavItems = [
+  {
+    title: "Master perception",
+    url: "/testing/master-perception",
+    icon: ScanSearch,
+  },
   {
     title: "Settings",
     url: "/settings",

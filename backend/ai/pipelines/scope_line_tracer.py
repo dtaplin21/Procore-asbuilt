@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,11 +24,14 @@ from ai.pipelines.scope_geometry import (
 from ai.pipelines.survey_point_extractor import extract_stations_from_text
 from models.drawing_text_element import DrawingTextElement
 from models.models import Drawing
-from services.legend_lookup import find_codes_for_term
+from services.legend_lookup import find_codes_for_term, legend_code_matches_text
 from services.location_match_eval import rect_iou
 from services.sheet_digitization import load_page_lines
 
 _ANCHOR_PADDING = 0.05
+# Distance from the anchor point to a segment, in page fractions.
+# A vertex inside the padded search box is not close enough on its own.
+_ANCHOR_TOUCH_TOLERANCE = 0.02
 _POINT_RECT_SIZE = 0.02
 _STATION_NORMALIZE_RE = re.compile(r"\s+")
 _PLAN_VIEW_MAX_Y = 0.55
@@ -36,8 +40,13 @@ _PLAN_VIEW_MIN_Y = 0.10
 _SHEET_LINE_HIGH_CONFIDENCE = 0.7
 # Break ties vs. legacy untyped lines when a typed line already matched legend codes.
 _TYPED_SHEET_LINE_MATCH_BONUS = 0.2
-# Full plan band used when anchor-local SheetLine search misses.
-_MASTER_PLAN_PLACEMENT_ANCHOR = (0.12, 0.22, 0.92, 0.78)
+# A line this long, in page fractions, is sheet furniture unless the tracer
+# was asked for that line type.
+LONG_LINE_FRAC = 0.25
+_BORDER_SPAN_FRAC = 0.5
+_PAGE_EDGE_MARGIN = 0.06
+_RECT_CLOSE_EPS = 0.02
+_AXIS_EDGE_SLOP = 0.01
 
 
 @dataclass(frozen=True)
@@ -88,7 +97,7 @@ def trace_scope_geometry(
             session=session,
             drawing_id=int(dossier.master_drawing_id),
             page=page,
-            expanded_anchor=expanded_anchor,
+            anchor_bbox=anchor_bbox,
             base_meta=trace_meta,
             source_drawing_id=None,
             legend_codes=legend_codes,
@@ -101,7 +110,7 @@ def trace_scope_geometry(
                 session=session,
                 drawing_id=int(source_drawing_id),
                 page=page,
-                expanded_anchor=expanded_anchor,
+                anchor_bbox=anchor_bbox,
                 base_meta=trace_meta,
                 source_drawing_id=source_drawing_id,
                 legend_codes=legend_codes,
@@ -287,7 +296,7 @@ def _trace_utility_line(
             else int(dossier.master_drawing_id)
         ),
         page=page,
-        expanded_anchor=expanded_anchor,
+        anchor_bbox=anchor_bbox,
         base_meta={**meta, "legend_codes": sorted(legend_codes)},
         source_drawing_id=source_drawing_id,
         legend_codes=legend_codes,
@@ -324,107 +333,81 @@ def resolve_master_sheet_line_scope(
     anchor_bbox: tuple[float, float, float, float],
     strict: bool | None = None,
 ) -> ScopeGeometry:
-    """Snap inspection placement to a digitized SheetLine on the master plan only."""
+    """Snap placement to a SheetLine in the viewport that contains the anchor."""
     if strict is None:
         from services.inspection_placement_errors import placement_strict_enabled
 
         strict = placement_strict_enabled()
+    # A segment must reach the anchor point whether or not strict placement is on.
+    _ = strict
 
     legend_codes = _utility_legend_codes(dossier, session=session)
     base_meta: dict[str, Any] = {
         "source": "sheet_line",
         "legend_codes": sorted(legend_codes),
     }
-    if strict:
-        search_passes: list[
-            tuple[tuple[float, float, float, float], float, bool, str | None]
-        ] = [
-            (
-                _expand_bbox(anchor_bbox, _ANCHOR_PADDING),
-                _SHEET_LINE_HIGH_CONFIDENCE,
-                True,
-                None,
-            ),
-        ]
-    else:
-        search_passes = [
-            (_expand_bbox(anchor_bbox, _ANCHOR_PADDING), _SHEET_LINE_HIGH_CONFIDENCE, True, None),
-            (
-                _expand_bbox(anchor_bbox, _ANCHOR_PADDING * 4.0),
-                _SHEET_LINE_HIGH_CONFIDENCE,
-                True,
-                "wide_anchor",
-            ),
-            (_MASTER_PLAN_PLACEMENT_ANCHOR, 0.45, True, "plan_corridor"),
-            (_MASTER_PLAN_PLACEMENT_ANCHOR, 0.25, True, "plan_corridor_relaxed"),
-            (_MASTER_PLAN_PLACEMENT_ANCHOR, 0.15, False, "plan_any_line"),
-        ]
     from services.inspection_placement_errors import (
         INSPECTION_NO_ANCHOR_INTERSECTING_LINE,
         INSPECTION_NO_MASTER_SHEET_LINE,
     )
 
-    for expanded, min_confidence, use_legend, search_tag in search_passes:
-        legend_set = legend_codes if use_legend else set()
-        require_intersect = bool(strict)
-        candidate = _best_plan_sheet_line(
+    candidate, region = _best_plan_sheet_line(
+        session,
+        drawing_id=int(master_drawing_id),
+        page=page,
+        anchor_bbox=anchor_bbox,
+        legend_codes=legend_codes,
+        min_confidence=_SHEET_LINE_HIGH_CONFIDENCE,
+        require_anchor_intersection=True,
+    )
+    if candidate is None:
+        near_miss, _near_region = _best_plan_sheet_line(
             session,
             drawing_id=int(master_drawing_id),
             page=page,
-            expanded_anchor=expanded,
-            legend_codes=legend_set,
-            min_confidence=min_confidence,
-            require_anchor_intersection=require_intersect,
+            anchor_bbox=anchor_bbox,
+            legend_codes=legend_codes,
+            min_confidence=_SHEET_LINE_HIGH_CONFIDENCE,
+            require_anchor_intersection=False,
         )
-        if candidate is None and require_intersect:
-            near_miss = _best_plan_sheet_line(
-                session,
-                drawing_id=int(master_drawing_id),
-                page=page,
-                expanded_anchor=expanded,
-                legend_codes=legend_set,
-                min_confidence=min_confidence,
-                require_anchor_intersection=False,
+        region_note = str(region.get("search_region_note") or "")
+        if near_miss is not None:
+            raise ValueError(
+                f"[{INSPECTION_NO_ANCHOR_INTERSECTING_LINE}] "
+                f"No digitized SheetLine passes within {_ANCHOR_TOUCH_TOLERANCE:.2f} "
+                f"of the anchor point on master drawing {master_drawing_id} page {page}. "
+                f"{region_note}".strip()
             )
-            if near_miss is not None:
-                raise ValueError(
-                    f"[{INSPECTION_NO_ANCHOR_INTERSECTING_LINE}] "
-                    f"No digitized SheetLine intersects the location anchor on master "
-                    f"drawing {master_drawing_id} page {page} (nearest-line fallback "
-                    f"disabled in strict placement)."
-                )
-        if candidate is None:
-            continue
-        points, viewport_id, confidence, anchor_intersects = candidate
-        meta = {
-            **base_meta,
-            "viewport_id": viewport_id,
-            "sheet_line_confidence": confidence,
-            "anchor_intersects_line": anchor_intersects,
-        }
-        if search_tag:
-            meta["sheet_line_search"] = search_tag
-        return scope_line_segments(
-            page=page,
-            points=points,
-            scope_kind=ScopeKind.UTILITY_LINE,
-            meta=meta,
+        from services.master_sheet_line_inventory import (
+            get_master_sheet_line_inventory,
+            placement_failure_from_inventory,
         )
-    from services.master_sheet_line_inventory import (
-        get_master_sheet_line_inventory,
-        placement_failure_from_inventory,
-    )
 
-    inventory = get_master_sheet_line_inventory(
-        session, int(master_drawing_id), page=page
-    )
-    failure = placement_failure_from_inventory(inventory)
-    if failure is not None:
-        code, message = failure
-        raise ValueError(f"[{code}] {message}")
-    raise ValueError(
-        f"[{INSPECTION_NO_MASTER_SHEET_LINE}] "
-        f"No plan SheetLine on master drawing {master_drawing_id} page {page} for placement"
+        inventory = get_master_sheet_line_inventory(
+            session, int(master_drawing_id), page=page
+        )
+        failure = placement_failure_from_inventory(inventory)
+        if failure is not None:
+            code, message = failure
+            raise ValueError(f"[{code}] {message} {region_note}".strip())
+        raise ValueError(
+            f"[{INSPECTION_NO_MASTER_SHEET_LINE}] "
+            f"No SheetLine in the anchor search region on master drawing "
+            f"{master_drawing_id} page {page}. {region_note}".strip()
+        )
+    points, viewport_id, confidence, anchor_intersects = candidate
+    meta = {
+        **base_meta,
+        **region,
+        "viewport_id": viewport_id,
+        "sheet_line_confidence": confidence,
+        "anchor_intersects_line": anchor_intersects,
+    }
+    return scope_line_segments(
+        page=page,
+        points=points,
+        scope_kind=ScopeKind.UTILITY_LINE,
+        meta=meta,
     )
 
 
@@ -433,28 +416,30 @@ def _prefer_plan_sheet_line(
     session: Session | None,
     drawing_id: int,
     page: int,
-    expanded_anchor: tuple[float, float, float, float],
+    anchor_bbox: tuple[float, float, float, float],
     base_meta: dict[str, Any],
     source_drawing_id: int | None,
     legend_codes: set[str] | None = None,
     min_confidence: float = _SHEET_LINE_HIGH_CONFIDENCE,
 ) -> ScopeGeometry | None:
-    """Use high-confidence SheetLine polylines inside plan viewports over vision."""
+    """Use a high-confidence SheetLine in the anchor's viewport over vision."""
     if session is None:
         return None
-    candidate = _best_plan_sheet_line(
+    candidate, region = _best_plan_sheet_line(
         session,
         drawing_id=drawing_id,
         page=page,
-        expanded_anchor=expanded_anchor,
+        anchor_bbox=anchor_bbox,
         legend_codes=legend_codes or set(),
         min_confidence=min_confidence,
+        require_anchor_intersection=True,
     )
     if candidate is None:
         return None
     points, viewport_id, confidence, anchor_intersects = candidate
     meta = {
         **base_meta,
+        **region,
         "source": "sheet_line",
         "viewport_id": viewport_id,
         "sheet_line_confidence": confidence,
@@ -486,10 +471,233 @@ def _line_matches_utility_legend(
         row = session.get(DrawingLegendLineType, int(type_id))
         if row is not None:
             code = cast(str | None, row.abbreviation_code)
-            if code and code in legend_codes:
+            if code and code.strip().upper() in {item.strip().upper() for item in legend_codes}:
                 return True
-    upper = str(line_type).upper()
-    return any(code in upper for code in legend_codes)
+    return any(legend_code_matches_text(code, str(line_type)) for code in legend_codes)
+
+
+def _point_in_bbox(
+    point: tuple[float, float],
+    bbox: tuple[float, float, float, float],
+) -> bool:
+    x, y = point
+    x0, y0, x1, y1 = bbox
+    return x0 <= x <= x1 and y0 <= y <= y1
+
+
+def _points_inside_bbox(
+    points: list[tuple[float, float]],
+    bbox: tuple[float, float, float, float],
+) -> bool:
+    return all(_point_in_bbox(point, bbox) for point in points)
+
+
+def _bbox_area(bbox: tuple[float, float, float, float]) -> float:
+    return max(0.0, bbox[2] - bbox[0]) * max(0.0, bbox[3] - bbox[1])
+
+
+def _page_viewports(
+    page_graph: dict[str, Any],
+) -> list[dict[str, Any]]:
+    viewports: list[dict[str, Any]] = []
+    for raw in page_graph.get("viewports") or []:
+        if not isinstance(raw, dict):
+            continue
+        viewport_id = raw.get("viewport_id")
+        kind = raw.get("kind")
+        bb = raw.get("bbox_fractional")
+        if not viewport_id or not kind or not isinstance(bb, (list, tuple)) or len(bb) != 4:
+            continue
+        x0, y0, x1, y1 = (float(v) for v in bb)
+        viewports.append(
+            {
+                "id": str(viewport_id),
+                "kind": str(kind),
+                "bbox": (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)),
+            }
+        )
+    return viewports
+
+
+def _anchor_search_region(
+    page_graph: dict[str, Any] | None,
+    anchor_point: tuple[float, float],
+) -> dict[str, Any]:
+    """Viewport of the anchor's kind, or the fixed y band when the page has none."""
+    viewports = _page_viewports(page_graph or {})
+    if not viewports:
+        note = (
+            "No viewport on this page; searched the fixed y band "
+            f"{_PLAN_VIEW_MIN_Y:.2f}–{_PLAN_VIEW_MAX_Y:.2f}."
+        )
+        return {
+            "search_region": "fixed_y_band",
+            "search_region_note": note,
+            "viewport_ids": set(),
+            "bboxes": [],
+            "kind": None,
+        }
+    containing = [
+        viewport
+        for viewport in viewports
+        if _point_in_bbox(anchor_point, viewport["bbox"])
+    ]
+    if not containing:
+        return {
+            "search_region": "outside_viewports",
+            "search_region_note": (
+                "Anchor is outside every viewport; fixed y bands are not used."
+            ),
+            "viewport_ids": set(),
+            "bboxes": [],
+            "kind": None,
+        }
+    chosen = min(containing, key=lambda viewport: _bbox_area(viewport["bbox"]))
+    kind = str(chosen["kind"])
+    same_kind = [viewport for viewport in viewports if viewport["kind"] == kind]
+    return {
+        "search_region": "viewport",
+        "search_viewport_kind": kind,
+        "search_viewport_id": chosen["id"],
+        "search_region_note": f"Searched the {kind} viewport.",
+        "viewport_ids": {viewport["id"] for viewport in same_kind},
+        "bboxes": [viewport["bbox"] for viewport in same_kind],
+        "kind": kind,
+    }
+
+
+def _line_in_search_region(
+    points: list[tuple[float, float]],
+    viewport_id: Any,
+    region: dict[str, Any],
+) -> bool:
+    mode = region.get("search_region")
+    if mode == "fixed_y_band":
+        mid_y = sum(point[1] for point in points) / len(points)
+        return _PLAN_VIEW_MIN_Y <= mid_y <= _PLAN_VIEW_MAX_Y
+    if mode != "viewport":
+        return False
+    viewport_ids = region.get("viewport_ids") or set()
+    if viewport_id is not None and str(viewport_id) in viewport_ids:
+        return True
+    if viewport_id not in (None, ""):
+        return False
+    return any(_points_inside_bbox(points, bbox) for bbox in region.get("bboxes") or [])
+
+
+def _point_segment_distance(
+    point: tuple[float, float],
+    start: tuple[float, float],
+    end: tuple[float, float],
+) -> float:
+    """Distance from a point to a segment, including the endpoints."""
+    px, py = point
+    ax, ay = start
+    bx, by = end
+    dx = bx - ax
+    dy = by - ay
+    length_sq = dx * dx + dy * dy
+    if length_sq <= 1e-12:
+        return math.hypot(px - ax, py - ay)
+    t = ((px - ax) * dx + (py - ay) * dy) / length_sq
+    t = max(0.0, min(1.0, t))
+    return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+
+
+def _polyline_length(points: list[tuple[float, float]]) -> float:
+    return sum(
+        math.hypot(x1 - x0, y1 - y0)
+        for (x0, y0), (x1, y1) in zip(points, points[1:])
+    )
+
+
+def _closed_rectangle(points: list[tuple[float, float]]) -> list[tuple[float, float]] | None:
+    """Four axis-aligned corners, including a repeated closing vertex."""
+    if len(points) < 4:
+        return None
+    ring = list(points)
+    x0, y0 = ring[0]
+    x1, y1 = ring[-1]
+    if math.hypot(x1 - x0, y1 - y0) <= _RECT_CLOSE_EPS:
+        ring = ring[:-1]
+    if len(ring) != 4:
+        return None
+    corners = ring + ring[:1]
+    for (ax, ay), (bx, by) in zip(corners, corners[1:]):
+        if min(abs(bx - ax), abs(by - ay)) > _AXIS_EDGE_SLOP:
+            return None
+    return ring
+
+
+def _line_bbox(
+    points: list[tuple[float, float]],
+) -> tuple[float, float, float, float]:
+    xs = [point[0] for point in points]
+    ys = [point[1] for point in points]
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
+def _is_sheet_border(points: list[tuple[float, float]]) -> bool:
+    """Closed rectangle covering most of the page, or lying on the page edges."""
+    ring = _closed_rectangle(points)
+    if ring is None:
+        return False
+    x0, y0, x1, y1 = _line_bbox(ring)
+    width = x1 - x0
+    height = y1 - y0
+    if width >= _BORDER_SPAN_FRAC and height >= _BORDER_SPAN_FRAC:
+        return True
+    edges = 0
+    if x0 <= _PAGE_EDGE_MARGIN:
+        edges += 1
+    if y0 <= _PAGE_EDGE_MARGIN:
+        edges += 1
+    if x1 >= 1.0 - _PAGE_EDGE_MARGIN:
+        edges += 1
+    if y1 >= 1.0 - _PAGE_EDGE_MARGIN:
+        edges += 1
+    return edges >= 2
+
+
+def suspect_line_reason(
+    points: list[tuple[float, float]],
+    *,
+    explicitly_requested: bool,
+) -> str | None:
+    """Why a digitized line must not be traced, or None when it may be used.
+
+    The sheet border on the audited page is a closed rectangle on the page
+    edges. A line at least ``LONG_LINE_FRAC`` long is the same kind of
+    furniture unless the tracer was asked for that line's type.
+    """
+    if _is_sheet_border(points):
+        return "sheet_border"
+    if _polyline_length(points) >= LONG_LINE_FRAC and not explicitly_requested:
+        return "long_line"
+    return None
+
+
+def _line_explicitly_requested(
+    raw: dict[str, Any],
+    *,
+    legend_codes: set[str],
+    session: Session | None,
+) -> bool:
+    """True when this line's type is one the tracer was asked to find."""
+    has_type = bool(raw.get("line_type")) or raw.get("legend_line_type_id") is not None
+    if not has_type:
+        return False
+    return _line_matches_utility_legend(raw, legend_codes=legend_codes, session=session)
+
+
+def _line_anchor_distance(
+    points: list[tuple[float, float]],
+    anchor_point: tuple[float, float],
+) -> float:
+    return min(
+        _point_segment_distance(anchor_point, points[index], points[index + 1])
+        for index in range(len(points) - 1)
+    )
 
 
 def _best_plan_sheet_line(
@@ -497,58 +705,44 @@ def _best_plan_sheet_line(
     *,
     drawing_id: int,
     page: int,
-    expanded_anchor: tuple[float, float, float, float],
+    anchor_bbox: tuple[float, float, float, float],
     legend_codes: set[str] | None = None,
     min_confidence: float = _SHEET_LINE_HIGH_CONFIDENCE,
-    require_anchor_intersection: bool = False,
-) -> tuple[tuple[tuple[float, float], ...], str | None, float, bool] | None:
+    require_anchor_intersection: bool = True,
+) -> tuple[
+    tuple[tuple[tuple[float, float], ...], str | None, float, bool] | None,
+    dict[str, Any],
+]:
+    empty_region = {
+        "search_region": "fixed_y_band",
+        "search_region_note": (
+            "No viewport on this page; searched the fixed y band "
+            f"{_PLAN_VIEW_MIN_Y:.2f}–{_PLAN_VIEW_MAX_Y:.2f}."
+        ),
+    }
     drawing = session.get(Drawing, int(drawing_id))
     if drawing is None:
-        return None
+        return None, empty_region
     stats = cast(dict[str, Any] | None, drawing.index_stats_json)
     if not isinstance(stats, dict):
-        return None
+        return None, empty_region
     graphs = stats.get("sheetEntityGraph")
     if not isinstance(graphs, dict):
-        return None
+        return None, empty_region
     page_graph = graphs.get(str(page))
     if not isinstance(page_graph, dict):
-        return None
+        return None, empty_region
 
-    plan_ids = {
-        str(vp.get("viewport_id"))
-        for vp in (page_graph.get("viewports") or [])
-        if isinstance(vp, dict) and vp.get("kind") == "plan" and vp.get("viewport_id")
+    ax0, ay0, ax1, ay1 = anchor_bbox
+    anchor_point = ((ax0 + ax1) / 2.0, (ay0 + ay1) / 2.0)
+    region = _anchor_search_region(page_graph, anchor_point)
+    public_region = {
+        key: value
+        for key, value in region.items()
+        if key not in {"viewport_ids", "bboxes", "kind"}
     }
-    plan_bbox: tuple[float, float, float, float] | None = None
-    for vp in page_graph.get("viewports") or []:
-        if not isinstance(vp, dict) or vp.get("kind") != "plan":
-            continue
-        bb = vp.get("bbox_fractional")
-        if isinstance(bb, (list, tuple)) and len(bb) == 4:
-            plan_bbox = tuple(float(v) for v in bb)
-            break
-
-    def _line_in_plan_area(raw_line: dict[str, Any]) -> bool:
-        points_raw = raw_line.get("points")
-        if not isinstance(points_raw, (list, tuple)) or len(points_raw) < 2:
-            return False
-        ys: list[float] = []
-        for pt in points_raw:
-            if isinstance(pt, (list, tuple)) and len(pt) >= 2:
-                ys.append(float(pt[1]))
-        if not ys:
-            return False
-        mid_y = sum(ys) / len(ys)
-        if plan_bbox is not None:
-            return plan_bbox[1] <= mid_y <= plan_bbox[3]
-        return _PLAN_VIEW_MIN_Y <= mid_y <= _PLAN_VIEW_MAX_Y
 
     codes = legend_codes or set()
-    ax0, ay0, ax1, ay1 = expanded_anchor
-    anchor_cx = (ax0 + ax1) / 2.0
-    anchor_cy = (ay0 + ay1) / 2.0
-
     best: tuple[tuple[tuple[float, float], ...], str | None, float, float, bool] | None = None
     for raw in load_page_lines(page_graph):
         if not isinstance(raw, dict):
@@ -561,12 +755,6 @@ def _best_plan_sheet_line(
             continue
         if not _line_matches_utility_legend(raw, legend_codes=codes, session=session):
             continue
-        viewport_id = raw.get("viewport_id")
-        if plan_ids:
-            if viewport_id is None or str(viewport_id) not in plan_ids:
-                continue
-        elif not _line_in_plan_area(raw):
-            continue
         points_raw = raw.get("points")
         if not isinstance(points_raw, (list, tuple)) or len(points_raw) < 2:
             continue
@@ -577,22 +765,29 @@ def _best_plan_sheet_line(
             points.append((float(pt[0]), float(pt[1])))
         if len(points) < 2:
             continue
-        mid_x = sum(p[0] for p in points) / len(points)
-        mid_y = sum(p[1] for p in points) / len(points)
-        intersects = any(ax0 <= px <= ax1 and ay0 <= py <= ay1 for px, py in points)
-        if require_anchor_intersection and not intersects:
+        if suspect_line_reason(
+            points,
+            explicitly_requested=_line_explicitly_requested(
+                raw, legend_codes=codes, session=session
+            ),
+        ):
             continue
-        # Prefer lines that intersect the anchor; otherwise nearest midpoint.
-        distance = 0.0 if intersects else ((mid_x - anchor_cx) ** 2 + (mid_y - anchor_cy) ** 2)
-        score = distance - confidence  # lower is better
+        viewport_id = raw.get("viewport_id")
+        if not _line_in_search_region(points, viewport_id, region):
+            continue
+        distance = _line_anchor_distance(points, anchor_point)
+        touches = distance <= _ANCHOR_TOUCH_TOLERANCE
+        if require_anchor_intersection and not touches:
+            continue
+        score = distance - confidence
         if raw.get("line_type"):
             score -= _TYPED_SHEET_LINE_MATCH_BONUS
         if best is None or score < best[3]:
-            best = (tuple(points), str(viewport_id), confidence, score, intersects)
+            best = (tuple(points), str(viewport_id) if viewport_id else None, confidence, score, touches)
 
     if best is None:
-        return None
-    return best[0], best[1], best[2], best[4]
+        return None, public_region
+    return (best[0], best[1], best[2], best[4]), public_region
 
 
 def _vision_trace_fallback(
@@ -890,8 +1085,7 @@ def _legend_label_points(
     for token in tokens:
         if not global_search and not _bbox_intersects(token.bbox, expanded_anchor):
             continue
-        upper = token.text.upper()
-        if not any(re.search(rf"\b{re.escape(code)}\b", upper) for code in legend_codes):
+        if not any(legend_code_matches_text(code, token.text) for code in legend_codes):
             continue
         if global_search:
             points.append(clamp_point_to_page(_centroid(token.bbox)))

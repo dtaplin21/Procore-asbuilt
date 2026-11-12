@@ -29,7 +29,7 @@ from services.evidence_text import (
     build_location_reasoning_excerpt,
 )
 from services.file_storage import resolve_stored_file_path
-from services.legend_lookup import find_codes_for_term
+from services.legend_lookup import find_codes_for_term, legend_code_matches_text
 from services.match_candidate_scope import build_match_scope
 from services.master_drawing_index_readiness import get_master_drawing_index_readiness
 from services.region_index_loader import build_region_index
@@ -654,6 +654,6 @@ def _legend_codes_near_candidates(
 
     tile_haystack = " ".join(tile.text for tile in tiles).upper()
     if tile_haystack:
-        codes = [code for code in codes if code.upper() in tile_haystack] or codes
+        codes = [code for code in codes if legend_code_matches_text(code, tile_haystack)] or codes
 
     return tuple(codes)

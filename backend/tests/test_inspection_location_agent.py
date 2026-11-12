@@ -151,6 +151,12 @@ def _plan_sheet_line_index_stats(*, drawing_id: int = 0) -> dict:
                         "confidence": 0.88,
                         "line_type": "SS",
                     },
+                    {
+                        "points": [[0.40, 0.50], [0.64, 0.50]],
+                        "viewport_id": "plan",
+                        "confidence": 0.9,
+                        "line_type": "SS",
+                    },
                 ],
                 "associations": [],
                 "meta": {},

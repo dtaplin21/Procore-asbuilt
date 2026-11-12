@@ -31,6 +31,7 @@ from api.routes import (
     drawing_regions,
     drawing_progress,
     inspection_reviews,
+    testing_master_perception,
 )
 from database import init_db
 from config import cors_allowed_origins, settings as app_settings
@@ -176,6 +177,7 @@ app.include_router(evidence_records.router)
 app.include_router(drawing_regions.router)
 app.include_router(drawing_progress.router)
 app.include_router(inspection_reviews.router)
+app.include_router(testing_master_perception.router)
 
 # Serve static files in production (if needed)
 # static_dir = os.path.join(os.path.dirname(__file__), "..", "dist", "public")

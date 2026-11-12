@@ -260,6 +260,9 @@ class InspectionLocationAgent:
                 rationale = f"{rationale} | scope={source}"
             if scope.meta.get("anchor_intersects_line") is False:
                 rationale = f"{rationale} | anchor_intersects_line=false"
+            search_note = scope.meta.get("search_region_note")
+            if isinstance(search_note, str) and search_note:
+                rationale = f"{rationale} | {search_note}"
 
         placement_status = "matched"
         if not strict and (scope.meta or {}).get("anchor_intersects_line") is False:

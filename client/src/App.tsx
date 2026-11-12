@@ -17,6 +17,7 @@ import WorkspaceStub from "@/pages/workspace";
 import DrawingWorkspacePage from "@/pages/drawing_workspace";
 import DrawingPickerPage from "@/pages/drawing_picker";
 import DrawingLibraryPage from "@/pages/drawing_library";
+import MasterPerceptionPage from "@/pages/testing/master_perception";
 import NotFound from "@/pages/not-found";
 import type { ProcoreConnection } from "@shared/schema";
 
@@ -71,6 +72,8 @@ function Router({
       <Route path="/projects/:projectId/drawings/:drawingId/workspace" component={DrawingWorkspacePage} />
       <Route path="/projects/:projectId/drawings/manage" component={DrawingLibraryPage} />
       <Route path="/projects/:projectId/drawings" component={DrawingPickerPage} />
+      <Route path="/testing/master-perception/:masterId" component={MasterPerceptionPage} />
+      <Route path="/testing/master-perception" component={MasterPerceptionPage} />
       <Route path="/settings">
         <SettingsPage 
           procoreConnection={procoreConnection}
